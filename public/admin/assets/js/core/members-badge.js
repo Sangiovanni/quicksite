@@ -7,7 +7,9 @@
  *   - awaiting me: my pending invitations + undismissed notices
  *     (one /admin/self/invitations call);
  *   - awaiting my adjudication: direction:'request' rows in the queue of each
- *     project where I am admin/owner (listProjects → listMembers per project).
+ *     project where I am admin/owner (listProjects → listMembers per project),
+ *     in total and per project (adjudicationByProject: the Project members page
+ *     names the projects other than the edited one where a request waits).
  *
  * Publishes the result two ways: window.QSMembershipCounts (a Promise of the
  * counts object) and a 'quicksite:membership-counts-updated' window event
@@ -36,6 +38,7 @@
             myRequests: 0,
             notices: 0,
             adjudication: 0,
+            adjudicationByProject: [],   // { project, name, count } for each project where a request waits
             awaitingMe: 0,
             total: 0,
         };
@@ -54,16 +57,23 @@
             var adminProjects = [];
             projects.forEach(function (p) {
                 if (p.my_role === 'owner') counts.owned++;
-                if (p.my_role === 'owner' || p.my_role === 'admin') adminProjects.push(p.project);
+                if (p.my_role === 'owner' || p.my_role === 'admin') adminProjects.push(p);
             });
-            return Promise.all(adminProjects.map(function (id) {
-                return API.request('listMembers', 'GET', null, [], {}, false, { project: id }).then(function (r) {
+            return Promise.all(adminProjects.map(function (p) {
+                return API.request('listMembers', 'GET', null, [], {}, false, { project: p.project }).then(function (r) {
                     var invs = (r && r.ok && r.data && r.data.data && r.data.data.invitations) || [];
+                    var n = 0;
                     invs.forEach(function (inv) {
-                        if (inv.direction === 'request') counts.adjudication++;
+                        if (inv.direction === 'request') n++;
                     });
+                    counts.adjudication += n;
+                    if (n > 0) counts.adjudicationByProject.push({ project: p.project, name: p.name, count: n });
                 });
-            }));
+            })).then(function () {
+                // In the order listProjects gave, whatever order the answers came in.
+                var order = adminProjects.map(function (p) { return p.project; });
+                counts.adjudicationByProject.sort(function (a, b) { return order.indexOf(a.project) - order.indexOf(b.project); });
+            });
         });
 
         return Promise.all([inboxP, adjudicationP]).then(function () {

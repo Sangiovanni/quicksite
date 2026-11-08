@@ -934,6 +934,61 @@
     // Load + init
     // ============================================================
 
+    // ============================================================
+    // Requests waiting in your other projects
+    // ============================================================
+
+    /** Makes `project` the edited one and reopens this page on it; a refusal says so and stays here. */
+    function switchToProject(project, button) {
+        button.disabled = true;
+        window.QuickSiteAdmin.setSelectedProject(project).then(function (res) {
+            if (res && res.ok) {
+                window.location.href = window.location.pathname + '?t=' + Date.now();
+                return;
+            }
+            toast(serverMessage(res, T.elsewhereSwitchFailed || 'Could not switch project'), 'error');
+            button.disabled = false;
+        }, function () {
+            toast(T.elsewhereSwitchFailed || 'Could not switch project', 'error');
+            button.disabled = false;
+        });
+    }
+
+    /** One project of the notice: its number, its name and the way to it. @returns {HTMLElement} */
+    function _renderElsewhereRow(p) {
+        var label = window.QuickSiteAdmin && typeof window.QuickSiteAdmin.projectLabel === 'function'
+            ? window.QuickSiteAdmin.projectLabel(p.project, p.name)
+            : p.project;
+        var go = el('button', {
+            class: 'admin-btn admin-btn--primary',
+            type: 'button',
+            onclick: function () { switchToProject(p.project, go); },
+        }, [T.elsewhereSwitch || 'Switch to this project']);
+        return el('div', { class: 'members-elsewhere__row' }, [
+            el('span', { class: 'badge badge--warning', text: String(p.count) }),
+            el('span', { class: 'members-elsewhere__name', text: label }),
+            go,
+        ]);
+    }
+
+    /**
+     * A notice for each project, other than the edited one, where a join request waits for this
+     * account: the menu's count covers every project it runs, the page one. Nothing when none
+     * waits. The numbers are members-badge.js's, read once per change.
+     */
+    function renderElsewhere(counts) {
+        var box = document.getElementById('members-elsewhere');
+        if (!box) return;
+        var others = ((counts && counts.adjudicationByProject) || []).filter(function (p) {
+            return p.project !== CFG.project;
+        });
+        clearNode(box);
+        box.hidden = !others.length;
+        if (!others.length) return;
+        box.appendChild(el('strong', { class: 'members-elsewhere__title', text: T.elsewhereTitle || 'Join requests are waiting in your other projects' }));
+        others.forEach(function (p) { box.appendChild(_renderElsewhereRow(p)); });
+    }
+
     function refreshLists() {
         api('getProjectRoster', 'GET').then(function (res) {
             state.roster = (res && res.ok && res.data && res.data.data && res.data.data.members) || [];
@@ -962,5 +1017,9 @@
         // After the two forms have registered their redraws, so one fetch fills
         // both. Harmless when neither form rendered — the list stays unused.
         loadContacts();
+        // members-badge.js has run by now (a script at the end of the body); it recomputes,
+        // and says so, after every change to a membership.
+        if (window.QSMembershipCounts) window.QSMembershipCounts.then(renderElsewhere);
+        window.addEventListener('quicksite:membership-counts-updated', function (e) { renderElsewhere(e.detail); });
     });
 })();

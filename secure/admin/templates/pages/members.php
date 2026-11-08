@@ -87,6 +87,9 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'denyNoteLabel'    => __admin('members.queue.denyNoteLabel', 'Reason (required — shown to the requester)'),
     'denyNoteRequired' => __admin('members.queue.denyNoteRequired', 'The refusal reason is required.'),
     'deniedMsg'        => __admin('members.queue.deniedMsg', 'Request denied'),
+    'elsewhereTitle'   => __admin('members.queue.elsewhereTitle', 'Join requests are waiting in your other projects'),
+    'elsewhereSwitch'  => __admin('members.queue.elsewhereSwitch', 'Switch to this project'),
+    'elsewhereSwitchFailed' => __admin('members.queue.elsewhereSwitchFailed', 'Could not switch project'),
     'cancelTitle'      => __admin('members.queue.cancelTitle', 'Cancel this invitation?'),
     'cancelledMsg'     => __admin('members.queue.cancelledMsg', 'Invitation cancelled'),
     'changeRole'       => __admin('members.roster.changeRole', 'Change role'),
@@ -167,6 +170,11 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     <span class="members-role-chip members-role-chip--<?= adminEscape((string)$__myRole) ?>"><?= adminEscape((string)$__myRole) ?></span>
     <?php endif; ?>
 </div>
+
+<!-- The projects other than this one where a join request waits for you, each with its number and
+     the way to it: the menu's count covers every project you run. Filled by members.js from
+     members-badge.js's per-project numbers; hidden when none waits. -->
+<div class="admin-alert admin-alert--warning members-elsewhere" id="members-elsewhere" role="status" hidden></div>
 
 <!-- Roster — every member rank -->
 <section class="admin-section" id="members-roster-section">

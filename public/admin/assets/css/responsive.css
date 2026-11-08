@@ -90,16 +90,39 @@
         grid-template-columns: repeat(3, 1fr);
     }
 
-    /* Optimize */
+    /* Optimize: one column, as wide as the page. A 1fr column is at least as wide as the widest
+       thing it holds that cannot wrap, and the sidebar shares it */
     .optimize-layout {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .optimize-sidebar {
         position: static;
     }
+
+    /* The dashboard: the project's buttons wrap from here down, and a divider means nothing once a
+       row breaks */
+    .dashboard-current__divider {
+        display: none;
+    }
+
+    /* A finger has no hover: what a pointer reveals on a computer is in view from here down */
+    .sitemap-actions,
+    .sitemap__route-external,
+    .asset-card__actions,
+    .asset-card__rename,
+    .asset-card__star,
+    .asset-card__favicon,
+    .asset-video-overlay {
+        opacity: 1;
+    }
 }
 
 @media (max-width: 40rem) {
+    /* A word with no break in it, a path or a variable's name, breaks rather than leave its box */
+    .admin-main {
+        overflow-wrap: break-word;
+    }
+
     /* Card grids */
     .admin-grid--cols-3,
     .admin-grid--cols-4 {
@@ -295,29 +318,195 @@
     .sitemap-layout-toggles {
         display: none;
     }
-
-    /* The dashboard: the project list keeps a width it can be read at, and the buttons wrap,
-       centred, with no divider, which means nothing once a row breaks */
-    .project-manager__select-row {
+    .sitemap__tree-header,
+    .sitemap__route {
         flex-wrap: wrap;
-        justify-content: center;
+        min-width: 0;
     }
-    .project-manager__select-row .qs-searchable-select {
-        flex-basis: 100%;
+    .sitemap__route-name {
+        min-width: 0;
+        overflow-wrap: anywhere;
     }
-    .project-manager__quick-actions {
-        justify-content: center;
+    .sitemap-edit-title-modal__footer,
+    .sitemap-resolver-modal__footer,
+    .sitemap-resolver-list-modal__footer {
+        flex-wrap: wrap;
     }
-    .project-manager__action-divider {
-        display: none;
+    /* A link of the generator: its address wraps, and its count of languages stays in view */
+    .sitemap-url__text {
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
+
     .storage-overview__header {
         flex-direction: column;
         gap: var(--space-xs);
+    }
+    /* The project's buttons: New Project across, the others in pairs, as they belong together */
+    .dashboard-current__actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .dashboard-current__actions .admin-btn--primary {
+        grid-column: 1 / -1;
+    }
+    .dashboard-memberships__links,
+    .dashboard-current__line {
+        flex-wrap: wrap;
+    }
+    .dashboard-current__name {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    /* My total space: a project's name whole, with its size and its bin, and its bar under them */
+    .owner-space__project {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+    .owner-space__project-name {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .owner-space__project-bar {
+        grid-column: 1 / -1;
+        grid-row: 2;
     }
 
     /* AI connections */
     .qsac-kinds {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Optimize: an analyzer's title and its two buttons wrap */
+    .optimize-analyzer-header {
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+    }
+
+    /* A row that runs past the edge wraps: a section's title and its links, a card's title and
+       its button, the pages of a list */
+    .admin-section__header {
+        flex-wrap: wrap;
+        row-gap: var(--space-sm);
+    }
+    .admin-card__header,
+    .admin-pagination,
+    .admin-form-actions {
+        flex-wrap: wrap;
+    }
+
+    /* A long value with no space in it breaks where it must: a command's name, a code in a hint,
+       a list of errors or a list of facts */
+    .admin-page-header__title code,
+    .admin-hint code,
+    .admin-error-list code,
+    .admin-definition-list dd code {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* History: the date field gives way to its clear button */
+    .admin-filter-group input[type="date"] {
+        min-width: 0;
+    }
+
+    /* A command's form: setRootVariables' value column goes under its list */
+    .admin-variable-selector > div {
+        flex-wrap: wrap;
+    }
+
+    /* The APIs page: a card's header wraps, the line under its name breaks, nothing is cut */
+    .api-card__header {
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+    }
+    .api-card__title-row {
+        flex: 1 1 12rem;
+        min-width: 0;
+    }
+    .api-card__chevron {
+        flex-shrink: 0;
+    }
+    .api-card__text {
+        min-width: 0;
+    }
+    .api-card__name {
+        flex-wrap: wrap;
+    }
+    .api-card__meta {
+        overflow-wrap: anywhere;
+    }
+    .api-card__actions {
+        margin-left: auto;
+    }
+    .api-auth-token {
+        flex-wrap: wrap;
+    }
+    .api-auth-token__field {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+    .api-auth-token__input {
+        min-width: 0;
+    }
+
+    /* My memberships and Project members: a row's buttons go under its text, every one in reach;
+       a contact's id has a line of its own */
+    .members-banner,
+    .members-policy-row,
+    .members-row {
+        flex-wrap: wrap;
+    }
+    .members-row__main {
+        flex: 1 1 100%;
+    }
+    .members-row__actions {
+        flex: 1 1 100%;
+        justify-content: flex-start;
+    }
+    .members-match-row {
+        flex-wrap: wrap;
+    }
+    .members-match-row .members-row__id {
+        flex: 1 1 100%;
+    }
+
+    /* Privacy: Add data collected and a host's address stay inside their box */
+    .privacy-section__head,
+    .privacy-section__actions,
+    .privacy-host {
+        flex-wrap: wrap;
+    }
+    .privacy-host__url {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    /* Its coverage: the verdict first, over the three figures it sums up, each its label then its number */
+    .privacy-coverage__status {
+        order: -1;
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+    .privacy-coverage__cell {
+        flex: 1 1 100%;
+        flex-direction: row-reverse;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: var(--space-sm);
+    }
+
+    /* Project members: a project's line in the notice wraps, its button under its name */
+    .members-elsewhere__row {
+        flex-wrap: wrap;
+    }
+
+    /* My account: a label above its value */
+    .account-identity__label {
+        flex-basis: 100%;
+    }
+    .account-identity__value {
+        min-width: 0;
+    }
+    .account-identity__value code {
+        overflow-wrap: anywhere;
     }
 }

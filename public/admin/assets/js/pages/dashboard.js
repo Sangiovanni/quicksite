@@ -19,7 +19,6 @@
     let pendingRestoreBackup = null;
     let restoreTargetProject = null; // the project whose backups the restore modal is showing
     let manageSpaceLoaded = false;
-    let dashStructureLoaded = null; // Stores { type, name, structure }
 
     // ========================================================================
     // Helper Functions
@@ -491,15 +490,12 @@
     }
 
     // ========================================================================
-    // Project Manager
+    // The Edited Project
     // ========================================================================
 
-    // The project the manager ACTS ON = the one chosen in the selector (falls back
-    // to the edited project). Every project-manager command sends this as the URL
-    // marker (opts.project); the server binds + re-authorizes it.
-    function getTargetProject() {
-        const sel = document.getElementById('project-selector');
-        return (sel && sel.value) ? sel.value : currentProject;
+    /** The project you edit, as the page was served it: My total space's rows load apart from the project list, and may draw first. */
+    function editedProjectId() {
+        return currentProject || (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || null;
     }
 
     /** A project of listProjects' answer, by id, or null. */
@@ -513,40 +509,18 @@
         return QuickSiteAdmin.projectLabel(id, p ? p.name : null);
     }
 
-    /**
-     * Rename is the OWNER's (renameProject is owner-only), and the Project Manager
-     * acts on the project chosen in its selector — so the button follows that
-     * project's role from listProjects, not the panel-wide permission set, which
-     * answers for the edited project only.
-     */
+    /** Rename is the OWNER's (renameProject is owner-only): the button follows your role on the edited project. */
     function _syncRenameButton() {
         const btn = document.getElementById('btn-rename-project');
         if (!btn) return;
-        const p = projectById(getTargetProject());
+        const p = projectById(currentProject);
         btn.disabled = !(p && p.my_role === 'owner');
-    }
-
-    // Folder icon as an ELEMENT. QuickSiteUtils.icon* return HTML STRINGS; the
-    // element-shaped route through the same catalogue is QSDom.iconEl.
-    //
-    // ⚠ This one keeps its own path rather than moving to ICON_PATHS.folder:
-    // the two are DIFFERENT drawings (this is the tabbed folder, the catalogue's
-    // is the square-cornered one), so switching would quietly change the icon
-    // in the project-manager rows. Unifying them is a design call, not a
-    // refactor.
-    function _folderIcon(size) {
-        return QSDom.svgIcon('M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', size || 18);
     }
 
     /** The panel's spinner-plus-label loading block. @returns {HTMLElement} */
     function _renderLoading(text) {
         const spinner = QSDom.el('span', { class: 'admin-spinner' });
         return QSDom.el('div', { class: 'admin-loading' }, [spinner, ' ' + text]);
-    }
-
-    /** A red alert box holding one message. @returns {HTMLElement} */
-    function _renderAlertError(message) {
-        return QSDom.el('div', { class: 'admin-alert admin-alert--error', text: message });
     }
 
     /** The "nothing here" block. @returns {HTMLElement} */
@@ -559,8 +533,6 @@
 
     async function loadProjectManager() {
         const infoContainer = document.getElementById('current-project-info');
-        const selector = document.getElementById('project-selector');
-        const switchBtn = document.getElementById('btn-switch-project');
         const proj = t('dashboard.projects', {});
 
         // The dashboard reflects the project you are EDITING (selected_project).
@@ -581,12 +553,8 @@
         // 0-membership empty state — no doomed project-scoped calls (they'd 400/403).
         if (allProjects.length === 0) {
             infoContainer.appendChild(_renderProjectManagerEmpty(proj));
-            selector.disabled = true;
-            if (selector._qsPicker) selector._qsPicker.refresh();
-            switchBtn.disabled = true;
             _setProjectActionsEnabled(false);
             _syncRenameButton();
-            _syncStarButton();
             return;
         }
 
@@ -597,70 +565,28 @@
         const edited = projectById(currentProject) || allProjects[0];
         infoContainer.appendChild(_renderProjectChip(edited, proj));
 
-        QSDom.clear(selector);
-        allProjects.forEach(p => {
-            const label = QuickSiteAdmin.projectLabel(p.project, p.name) + (p.my_role ? ' — ' + p.my_role : '');
-            const opt = QSDom.el('option', { value: p.project, text: label });
-            if (p.project === currentProject) opt.selected = true;
-            selector.appendChild(opt);
-        });
-        selector.disabled = false;
-        // Starred projects first; refreshes the searchable dropdown over it.
-        QuickSiteAdmin.orderProjectSelect(selector);
-        switchBtn.disabled = false;
         _setProjectActionsEnabled(true);
         _syncRenameButton();
-        _syncStarButton();
-
-        updateDeleteSelector();
     }
 
-    /** The star beside the selector follows the project chosen in it. */
-    function _syncStarButton() {
-        const selector = document.getElementById('project-selector');
-        QuickSiteAdmin.syncStarToggle(document.getElementById('btn-star-project'), selector && !selector.disabled ? selector.value : null);
-    }
-
-    /**
-     * The dashboard's two project lists as the panel's searchable dropdown (the native
-     * selects stay as their data store), each list's placeholder the words of its blank
-     * option; their order follows the account's stars, and the star beside the selector
-     * stars the project chosen there.
-     */
-    function mountProjectPickers() {
-        ['project-selector', 'delete-project-selector'].forEach(id => {
-            const select = document.getElementById(id);
-            if (!select || !window.QSSearchableSelect || select._qsPicker) return;
-            const blank = select.options[0] && select.options[0].value === '' ? select.options[0].textContent : undefined;
-            select._qsPicker = new window.QSSearchableSelect(select, { placeholder: blank });
-        });
-        document.addEventListener('quicksite:stars-changed', () => {
-            QuickSiteAdmin.orderProjectSelect(document.getElementById('project-selector'));
-            QuickSiteAdmin.orderProjectSelect(document.getElementById('delete-project-selector'));
-        });
-        QuickSiteAdmin.bindStarToggle(document.getElementById('btn-star-project'), () => {
-            const selector = document.getElementById('project-selector');
-            return selector && !selector.disabled ? selector.value : null;
-        });
-    }
-
+    /** The page's first line: the edited project's star, its name, that you edit it, and your role on it. @returns {HTMLElement} */
     function _renderProjectChip(edited, proj) {
-        return QSDom.el('div', { class: 'project-manager__info' }, [
-            QSDom.el('div', { class: 'project-manager__name' }, [
-                _folderIcon(20),
-                QSDom.el('span', { text: QuickSiteAdmin.projectLabel(edited.project, edited.name) }),
-                QSDom.el('span', { class: 'badge badge--primary', text: proj.editing || 'Editing' }),
-                edited.my_role ? QSDom.el('span', { class: 'badge', text: edited.my_role }) : null,
-            ]),
+        const star = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost admin-project-star', id: 'btn-star-project' });
+        QuickSiteAdmin.syncStarToggle(star, edited.project);
+        QuickSiteAdmin.bindStarToggle(star);
+        return QSDom.el('div', { class: 'dashboard-current__line' }, [
+            star,
+            QSDom.el('span', { class: 'dashboard-current__name', text: QuickSiteAdmin.projectLabel(edited.project, edited.name) }),
+            QSDom.el('span', { class: 'badge badge--primary', text: proj.editing || 'Editing' }),
+            edited.my_role ? QSDom.el('span', { class: 'members-role-chip members-role-chip--' + edited.my_role, text: edited.my_role }) : null,
         ]);
     }
 
+    /** The same line for an account in no project yet. @returns {HTMLElement} */
     function _renderProjectManagerEmpty(proj) {
-        return QSDom.el('div', { class: 'project-manager__info' }, [
-            QSDom.el('div', { class: 'project-manager__name' }, [
-                QSDom.el('span', { text: proj.noProjects || 'You are not a member of any project yet.' }),
-            ]),
-            QSDom.el('div', { class: 'project-manager__meta', text: proj.noProjectsHint || 'Create a project to get started.' }),
+        return QSDom.el('div', {}, [
+            QSDom.el('div', { class: 'dashboard-current__line', text: proj.noProjects || 'You are not a member of any project yet.' }),
+            QSDom.el('div', { class: 'dashboard-current__hint', text: proj.noProjectsHint || 'Create a project to get started.' }),
         ]);
     }
 
@@ -669,7 +595,7 @@
     // nothing must still be able to make or import their first project.
     function _setProjectActionsEnabled(enabled) {
         ['btn-clone-project', 'btn-backup-project', 'btn-restore-backup',
-         'btn-export-project', 'btn-delete-project'].forEach(id => {
+         'btn-export-project'].forEach(id => {
             const b = document.getElementById(id);
             if (b) b.disabled = !enabled;
         });
@@ -680,6 +606,101 @@
     // ========================================================================
 
     /**
+     * A project's bin, in My total space: that list is the projects you own, and deleting one is
+     * the owner's (the server authorizes the project in the URL marker). One question names the
+     * project, what goes with it, and whether it is the one you are editing; then the page reloads,
+     * as a project gone leaves the header's list, this list and the Members counts.
+     *
+     * @returns {HTMLElement}
+     */
+    function _renderDeleteProjectButton(project) {
+        const proj = t('dashboard.projects', {});
+        const label = QuickSiteAdmin.projectLabel(project.project, project.name);
+        const title = t('dashboard.projects.deleteTitle', 'Delete Project');
+        const button = QSDom.el('button', {
+            type: 'button',
+            class: 'manage-space__delete-btn',
+            title: title,
+            'aria-label': title + ': ' + label,
+        }, [QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14)]);
+
+        button.addEventListener('click', async function () {
+            // A function, so a project's name is taken as it is: a string would read `$&` in it as a pattern.
+            let question = t('dashboard.projects.deleteConfirmNamed', 'dashboard.projects.deleteConfirmNamed').replace(':name', () => label);
+            if (project.project === editedProjectId()) {
+                question += '\n\n' + t('dashboard.projects.deleteConfirmEditing', 'This is the project you are editing.');
+            }
+            const confirmed = await QuickSiteAdmin.confirm(question, {
+                title: title,
+                type: 'danger',
+                confirmText: t('dashboard.projects.deleteBtn', 'Delete Project'),
+                confirmClass: 'danger'
+            });
+            if (!confirmed) return;
+
+            this.disabled = true;
+            try {
+                // Target the project being deleted via the URL marker (opts.project); the server
+                // authorizes THAT project (owner-only) and refuses if the body name disagrees.
+                const result = await QuickSiteAdmin.apiRequest('deleteProject', 'POST', {
+                    name: project.project,
+                    confirm: true
+                }, [], {}, { project: project.project });
+                if (result.ok) {
+                    reloadWithMessage(proj.deleted || 'Project deleted');
+                    return;
+                }
+                QuickSiteAdmin.showToast(result.data?.message || 'Failed to delete project', 'error');
+            } catch (error) {
+                QuickSiteAdmin.showToast('Failed to delete project', 'error');
+            }
+            this.disabled = false;
+        });
+        return button;
+    }
+
+    /**
+     * A row's name: another project's switches to it, after one question; the edited project's
+     * is only its name. The same write as the header's list, panel state and not a command.
+     *
+     * @returns {HTMLElement}
+     */
+    function _renderProjectRowName(project) {
+        const label = QuickSiteAdmin.projectLabel(project.project, project.name);
+        if (project.project === editedProjectId()) {
+            return QSDom.el('span', { class: 'owner-space__project-name', text: label, title: label });
+        }
+        const title = t('dashboard.projects.switch', 'Switch Project');
+        const name = QSDom.el('button', {
+            type: 'button',
+            class: 'owner-space__project-name owner-space__project-switch',
+            text: label,
+            title: title + ': ' + label,
+        });
+        name.addEventListener('click', async function () {
+            const proj = t('dashboard.projects', {});
+            const confirmed = await QuickSiteAdmin.confirm(
+                t('dashboard.projects.switchConfirmNamed', 'Switch to ":name"? Every page of the panel then works on this project.').replace(':name', () => label),
+                { title: title, confirmText: t('dashboard.projects.switchBtn', 'Switch') }
+            );
+            if (!confirmed) return;
+            this.disabled = true;
+            try {
+                const result = await QuickSiteAdmin.setSelectedProject(project.project);
+                if (result.ok) {
+                    reloadWithMessage((proj.switched || 'Switched to project') + ': ' + label);
+                    return;
+                }
+                QuickSiteAdmin.showToast(result.data?.message || 'Failed to switch project', 'error');
+            } catch (error) {
+                QuickSiteAdmin.showToast('Failed to switch project', 'error');
+            }
+            this.disabled = false;
+        });
+        return name;
+    }
+
+    /**
      * One row in the owner-space project list. Returns ONE element.
      * Built with createElement + textContent: project names are user-authored.
      */
@@ -687,10 +708,7 @@
         const row = document.createElement('div');
         row.className = 'owner-space__project';
 
-        const name = document.createElement('span');
-        name.className = 'owner-space__project-name';
-        name.textContent = QuickSiteAdmin.projectLabel(project.project, project.name);
-        row.appendChild(name);
+        row.appendChild(_renderProjectRowName(project));
 
         const bar = document.createElement('span');
         bar.className = 'owner-space__project-bar';
@@ -705,6 +723,7 @@
         size.className = 'owner-space__project-size';
         size.textContent = project.total_formatted || formatSize(project.total || 0);
         row.appendChild(size);
+        row.appendChild(_renderDeleteProjectButton(project));
 
         // Backup/export counts only when there is something to say.
         const extras = [];
@@ -797,12 +816,13 @@
             );
             const data = result.ok ? result.data?.data : null;
 
-            // Owning nothing is a normal state, not an error: stay hidden.
+            // Owning nothing is a normal state, not an error: the card shows only
+            // Manage Space, or nothing.
             if (!data || !data.project_count) {
-                section.style.display = 'none';
+                showOwnerSpace(section, false);
                 return;
             }
-            section.style.display = '';
+            showOwnerSpace(section, true);
 
             const total = data.total?.size || 0;
             document.getElementById('owner-space-total').textContent =
@@ -868,8 +888,36 @@
             }
         } catch (error) {
             console.error('Failed to load owner space usage:', error);
-            section.style.display = 'none';
+            showOwnerSpace(section, false);
         }
+    }
+
+    /**
+     * My total space, with Manage Space at its foot. Your own space shows when you own
+     * a project. Manage Space is about the EDITED project, so it stays for an account
+     * that owns nothing but can read one of its three lists: the card then holds it
+     * alone. With neither, the card stays hidden.
+     */
+    function showOwnerSpace(section, ownsProjects) {
+        const manageReach = canRun('getBuild') || canRun('getSizeInfo') || canRun('listBackups');
+        const card = section.querySelector('.owner-space');
+        if (card) card.classList.toggle('owner-space--manage-only', !ownsProjects);
+        section.style.display = (ownsProjects || manageReach) ? '' : 'none';
+    }
+
+    /**
+     * After something on this page changed what a project takes: the edited project's
+     * figures and your own, re-measured, or a deletion reads high until the cache lapses.
+     */
+    function refreshSpaceFigures() {
+        loadStorageOverview();
+        loadOwnerSpaceUsage(true);
+    }
+
+    /** The same after a backup made or deleted from Project management, with Manage Space's list if it has been opened. */
+    function afterBackupsChanged() {
+        refreshSpaceFigures();
+        if (manageSpaceLoaded && canRun('listBackups')) loadManageSpaceBackups();
     }
 
     async function loadStorageOverview() {
@@ -1041,7 +1089,7 @@
                         item.remove();
                         count.textContent = '0';
                         list.appendChild(emptyRow());
-                        loadStorageOverview();
+                        refreshSpaceFigures();
                         QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + build.name, 'success');
                     } else {
                         QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
@@ -1058,11 +1106,10 @@
     }
 
     async function loadManageSpaceExports() {
+        const section = document.getElementById('manage-space-exports');
         const list = document.getElementById('manage-exports-list');
         const count = document.getElementById('manage-exports-count');
         if (!list) return;
-
-        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: t('dashboard.storage.noItems', 'No items') });
 
         QSDom.clear(list);
         list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: t('common.loading', 'Loading...') }));
@@ -1078,16 +1125,20 @@
             count.textContent = fileCount;
 
             QSDom.clear(list);
-            if (fileCount === 0) { list.appendChild(emptyRow()); return; }
+            // The section shows only when the project holds a saved export: the panel's Export
+            // keeps none on the server, and an API caller's save=true is what leaves one.
+            if (fileCount === 0) { section.style.display = 'none'; return; }
 
-            list.appendChild(_renderManageSpaceExports(fileCount, totalBytes, list, count, emptyRow));
+            section.style.display = '';
+            list.appendChild(_renderManageSpaceExports(fileCount, totalBytes, section));
         } catch (error) {
             QSDom.clear(list);
+            section.style.display = '';
             list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: t('common.error', 'Error loading data') }));
         }
     }
 
-    function _renderManageSpaceExports(fileCount, totalBytes, list, count, emptyRow) {
+    function _renderManageSpaceExports(fileCount, totalBytes, section) {
         const clearBtn = QSDom.el('button', {
             type: 'button',
             class: 'manage-space__clear-btn',
@@ -1112,10 +1163,9 @@
             try {
                 const res = await QuickSiteAdmin.apiRequest('clearExports', 'POST', { confirm: true });
                 if (res.ok) {
-                    count.textContent = '0';
+                    section.style.display = 'none';
                     item.remove();
-                    list.appendChild(emptyRow());
-                    loadStorageOverview();
+                    refreshSpaceFigures();
                     QuickSiteAdmin.showToast(t('dashboard.storage.exportsCleared', 'Exports cleared'), 'success');
                 } else {
                     QuickSiteAdmin.showToast(res.data?.message || 'Clear failed', 'error');
@@ -1191,7 +1241,7 @@
                     const remaining = list.querySelectorAll('.manage-space__item').length;
                     count.textContent = remaining;
                     if (remaining === 0) list.appendChild(emptyRow());
-                    loadStorageOverview();
+                    refreshSpaceFigures();
                     QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + b.name, 'success');
                 } else {
                     QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
@@ -1206,32 +1256,7 @@
     }
 
     // ========================================================================
-    // Delete Selector
-    // ========================================================================
-
-    /**
-     * The Delete dialog's list: the projects you OWN (deleteProject is the owner's),
-     * starred first, nothing chosen. Delete itself is off when you own none.
-     */
-    function updateDeleteSelector() {
-        const deleteSelector = document.getElementById('delete-project-selector');
-        const placeholder = deleteSelector.options[0] && deleteSelector.options[0].value === '' ? deleteSelector.options[0] : null;
-        const owned = allProjects.filter(p => p.my_role === 'owner');
-
-        QSDom.clear(deleteSelector);
-        if (placeholder) deleteSelector.appendChild(placeholder);
-        owned.forEach(p => {
-            deleteSelector.appendChild(QSDom.el('option', { value: p.project, text: QuickSiteAdmin.projectLabel(p.project, p.name) }));
-        });
-        deleteSelector.value = '';
-        QuickSiteAdmin.orderProjectSelect(deleteSelector);
-        document.getElementById('btn-confirm-delete').disabled = true;
-        const deleteBtn = document.getElementById('btn-delete-project');
-        if (deleteBtn && owned.length === 0) deleteBtn.disabled = true;
-    }
-
-    // ========================================================================
-    // Project Manager Events
+    // The Edited Project's Buttons
     // ========================================================================
 
     /**
@@ -1331,32 +1356,6 @@
         const proj = t('dashboard.projects', {});
         const common = t('common', {});
         
-        // Switch project
-        document.getElementById('btn-switch-project').addEventListener('click', async function() {
-            const selector = document.getElementById('project-selector');
-            const newProject = selector.value;
-            
-            if (!newProject || newProject === currentProject) return;
-            
-            QSDom.setButtonBusy(this, common.loading || 'Switching...');
-            try {
-                // The dashboard's project switch changes which project you EDIT,
-                // the SAME as the header picker. Panel state, not a command.
-                const result = await QuickSiteAdmin.setSelectedProject(newProject);
-                if (result.ok) {
-                    reloadWithMessage((proj.switched || 'Switched to project') + ': ' + labelOf(newProject));
-                } else {
-                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to switch project', 'error');
-                    this.disabled = false;
-                    this.textContent = proj.switch || 'Switch';
-                }
-            } catch (error) {
-                QuickSiteAdmin.showToast('Failed to switch project', 'error');
-                this.disabled = false;
-                this.textContent = proj.switch || 'Switch';
-            }
-        });
-        
         // The project's first language, offered from the installation's language
         // list with the installation's default language preselected — the one
         // createProject uses when none is sent. getLanguageList returns both, and
@@ -1414,13 +1413,11 @@
         }
         
         // The selector's choice moves what Rename may act on, and what the star stars.
-        document.getElementById('project-selector').addEventListener('change', _syncRenameButton);
-        document.getElementById('project-selector').addEventListener('change', _syncStarButton);
 
         // Clone project modal: prefilled with the source's name (the copy gets
         // an id of its own, drawn by the server).
         document.getElementById('btn-clone-project').addEventListener('click', function() {
-            const target = getTargetProject();
+            const target = currentProject;
             const source = projectById(target);
             document.getElementById('clone-source-name').textContent = labelOf(target);
             document.getElementById('clone-project-name').value = source ? source.name : target;
@@ -1429,10 +1426,10 @@
             document.getElementById('clone-project-name').select();
         });
 
-        // Rename project modal: the project chosen in the selector, its current
-        // name prefilled. The button is enabled only for its owner.
+        // Rename project modal: the edited project, its current name prefilled. The
+        // button is enabled only for its owner.
         document.getElementById('btn-rename-project').addEventListener('click', function() {
-            const target = getTargetProject();
+            const target = currentProject;
             const current = projectById(target);
             if (!current || current.my_role !== 'owner') return;
             document.getElementById('rename-project-current').textContent = labelOf(target);
@@ -1444,7 +1441,7 @@
         });
 
         document.getElementById('btn-confirm-rename').addEventListener('click', async function() {
-            const target = getTargetProject();
+            const target = currentProject;
             const name = cleanProjectName(document.getElementById('rename-project-name').value);
             if (!name) {
                 QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
@@ -1484,7 +1481,7 @@
             try {
                 // Source = the selected target project (bound to the URL marker
                 // server-side); body carries only the new name + switch_to.
-                const target = getTargetProject();
+                const target = currentProject;
                 const result = await QuickSiteAdmin.apiRequest('cloneProject', 'POST', {
                     name: name,
                     switch_to: activateCheckbox.checked
@@ -1572,7 +1569,7 @@
         // Export project: its dialog first, which asks whether the archive carries the
         // project's OAuth build keys (unticked each time it opens).
         document.getElementById('btn-export-project').addEventListener('click', function() {
-            document.getElementById('export-source-name').textContent = labelOf(getTargetProject());
+            document.getElementById('export-source-name').textContent = labelOf(currentProject);
             document.getElementById('export-include-secrets').checked = false;
             document.getElementById('modal-export-project').style.display = 'flex';
         });
@@ -1587,7 +1584,7 @@
                 // carries the '/p/<id>/' marker for the target (the command binds it
                 // as the target, so no ?name is needed), reads a refusal as an
                 // envelope, and keeps the write allowance current like every call.
-                const target = getTargetProject();
+                const target = currentProject;
                 const withKeys = document.getElementById('export-include-secrets').checked;
                 const res = await QuickSiteAdmin.downloadFile('exportProject', [],
                     withKeys ? { include_oauth_secrets: 'true' } : {},
@@ -1678,7 +1675,7 @@
             const originalText = QSDom.setButtonBusy(this, proj.backing_up || 'Creating backup...');
             
             try {
-                const result = await QuickSiteAdmin.apiRequest('backupProject', 'GET', null, [], {}, { project: getTargetProject() });
+                const result = await QuickSiteAdmin.apiRequest('backupProject', 'GET', null, [], {}, { project: currentProject });
 
                 if (result.ok && result.data?.data?.backup) {
                     const data = result.data.data;
@@ -1686,6 +1683,7 @@
                         t('dashboard.projects.backup_created', 'dashboard.projects.backup_created') + ': ' + data.backup.name + ' (' + data.backup.size_formatted + ')',
                         'success'
                     );
+                    afterBackupsChanged();
                 } else if (result.data?.code === 'backup.incomplete') {
                     // Nothing was kept, so nothing on the page changed: a red message that
                     // stays until it is closed, naming what could not be copied.
@@ -1715,73 +1713,9 @@
         
         // Restore backup modal — pin the target project the modal operates on.
         document.getElementById('btn-restore-backup').addEventListener('click', async function() {
-            restoreTargetProject = getTargetProject();
+            restoreTargetProject = currentProject;
             document.getElementById('modal-restore-backup').style.display = 'flex';
             await loadBackupList();
-        });
-        
-        // Delete project modal
-        document.getElementById('btn-delete-project').addEventListener('click', function() {
-            updateDeleteSelector();
-            document.getElementById('modal-delete-project').style.display = 'flex';
-        });
-        
-        // Enable delete button only when project selected
-        document.getElementById('delete-project-selector').addEventListener('change', function() {
-            document.getElementById('btn-confirm-delete').disabled = !this.value;
-        });
-        
-        // Confirm delete project
-        document.getElementById('btn-confirm-delete').addEventListener('click', async function() {
-            const selector = document.getElementById('delete-project-selector');
-            const projectToDelete = selector.value;
-            
-            if (!projectToDelete) return;
-
-            // The modal warns in general terms; this names the project, the last
-            // step before it is gone for good.
-            const confirmed = await QuickSiteAdmin.confirm(
-                t('dashboard.projects.deleteConfirmNamed', 'dashboard.projects.deleteConfirmNamed').replace(':name', labelOf(projectToDelete)),
-                {
-                    title: t('dashboard.projects.deleteTitle', 'dashboard.projects.deleteTitle'),
-                    type: 'danger',
-                    confirmText: t('dashboard.projects.deleteBtn', 'dashboard.projects.deleteBtn'),
-                    confirmClass: 'danger'
-                }
-            );
-            if (!confirmed) return;
-            
-            this.disabled = true;
-            try {
-                // Target the project being deleted via the URL marker (opts.project);
-                // the server authorizes THAT project (owner-only) and refuses if the
-                // body name disagrees (confused-deputy guard).
-                const result = await QuickSiteAdmin.apiRequest('deleteProject', 'POST', {
-                    name: projectToDelete,
-                    confirm: true
-                }, [], {}, { project: projectToDelete });
-                
-                if (result.ok) {
-                    closeAllModals();
-                    // If we just deleted the project we were EDITING, currentProject now
-                    // points at a dead project — any further project-scoped call (e.g.
-                    // getSizeInfo behind loadStorageOverview) would fire with that stale
-                    // marker and 403. Reload so the server re-resolves the effective
-                    // project instead of refreshing in place.
-                    if (projectToDelete === currentProject) {
-                        reloadWithMessage(proj.deleted || 'Project deleted');
-                        return;
-                    }
-                    QuickSiteAdmin.showToast(proj.deleted || 'Project deleted', 'success');
-                    loadProjectManager();
-                    loadStorageOverview();
-                } else {
-                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to delete project', 'error');
-                }
-            } catch (error) {
-                QuickSiteAdmin.showToast('Failed to delete project', 'error');
-            }
-            this.disabled = false;
         });
         
         // Modal close handlers
@@ -1896,6 +1830,7 @@
                 if (res.ok) {
                     QuickSiteAdmin.showToast(proj.backup_deleted || 'Backup deleted', 'success');
                     await loadBackupList();
+                    afterBackupsChanged();
                 } else {
                     QuickSiteAdmin.showToast(res.data?.message || 'Failed to delete backup', 'error');
                     this.disabled = false;
@@ -1923,275 +1858,6 @@
             ]),
             QSDom.el('div', { class: 'backup-item__actions' }, [restoreBtn, delBtn]),
         ]);
-    }
-
-    // ========================================================================
-    // Structure Panel
-    // ========================================================================
-
-    /**
-     * Toggle the structure panel open/closed
-     */
-    function toggleStructurePanel() {
-        const body = document.getElementById('structure-panel-body');
-        const toggle = document.getElementById('structure-panel-toggle');
-        
-        if (!body || !toggle) return;
-        
-        const isOpen = body.style.display !== 'none';
-        
-        if (isOpen) {
-            body.style.display = 'none';
-            toggle.classList.remove('admin-card__toggle--open');
-        } else {
-            body.style.display = 'block';
-            toggle.classList.add('admin-card__toggle--open');
-        }
-    }
-
-    /**
-     * Initialize structure viewer selectors in dashboard
-     */
-    function initDashboardStructureViewer() {
-        const typeSelect = document.getElementById('dash-structure-type');
-        const nameSelect = document.getElementById('dash-structure-name');
-        const loadBtn = document.getElementById('dash-load-structure');
-
-        if (!typeSelect || !nameSelect || !loadBtn) return;
-
-        // The viewer's own calls (listPages / listComponents / getStructure)
-        // are project-scoped. This panel is user-TRIGGERED rather than load-time, so
-        // it never showed up in the console — but with no project bound every one of
-        // its buttons leads to a refusal. Disable the controls instead, the same way
-        // _setProjectActionsEnabled already handles the project-action buttons.
-        if (!canRun('getStructure')) {
-            typeSelect.disabled = true;
-            nameSelect.disabled = true;
-            loadBtn.disabled = true;
-            return;
-        }
-
-        const trans = window.QUICKSITE_CONFIG?.translations?.structure?.select || {};
-        
-        typeSelect.addEventListener('change', async function() {
-            const type = this.value;
-            
-            if (!type) {
-                QSDom.setSelectPlaceholder(nameSelect, trans.typeFirst || 'Select type first...');
-                nameSelect.disabled = true;
-                loadBtn.disabled = true;
-                return;
-            }
-            
-            if (type === 'menu' || type === 'footer') {
-                QSDom.setSelectPlaceholder(nameSelect, (trans.notRequired || 'Not required for :type').replace(':type', type));
-                nameSelect.disabled = true;
-                loadBtn.disabled = false;
-            } else {
-                nameSelect.disabled = true;
-                QSDom.setSelectPlaceholder(nameSelect, t('common.loading'));
-                
-                try {
-                    const endpoint = type === 'page' ? 'pages' : 'components';
-                    const options = await QuickSiteAdmin.fetchHelperData(endpoint);
-                    
-                    QSDom.setSelectPlaceholder(nameSelect, (trans.selectType || 'Select :type...').replace(':type', type));
-                    options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt.value;
-                        option.textContent = opt.label;
-                        nameSelect.appendChild(option);
-                    });
-                    nameSelect.disabled = false;
-                } catch (error) {
-                    QSDom.setSelectPlaceholder(nameSelect, t('commands.errorLoadingOptions'));
-                }
-                
-                loadBtn.disabled = true;
-            }
-        });
-        
-        nameSelect.addEventListener('change', function() {
-            loadBtn.disabled = !this.value && !['menu', 'footer'].includes(typeSelect.value);
-        });
-        
-        loadBtn.addEventListener('click', loadDashboardStructure);
-    }
-
-    /**
-     * Load structure in dashboard
-     */
-    async function loadDashboardStructure() {
-        const typeSelect = document.getElementById('dash-structure-type');
-        const nameSelect = document.getElementById('dash-structure-name');
-        const treeContainer = document.getElementById('dash-structure-tree');
-        
-        const type = typeSelect?.value;
-        const name = nameSelect?.value;
-        
-        if (!type || !treeContainer) return;
-        
-        const trans = window.QUICKSITE_CONFIG?.translations?.structure?.tree || {};
-        
-        QSDom.clear(treeContainer);
-        treeContainer.appendChild(_renderLoading(trans.loading || 'Loading structure...'));
-        
-        try {
-            let urlParams = [type];
-            if (name && (type === 'page' || type === 'component')) {
-                urlParams.push(name);
-            }
-            urlParams.push('showIds');
-            
-            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
-            
-            if (result.ok && result.data?.data?.structure) {
-                dashStructureLoaded = {
-                    type,
-                    name,
-                    structure: result.data.data.structure
-                };
-                renderDashboardStructureTree(result.data.data.structure, treeContainer);
-            } else {
-                QSDom.clear(treeContainer);
-                treeContainer.appendChild(_renderAlertError(
-                    result.data?.message || trans.loadFailed || 'Failed to load structure'
-                ));
-            }
-        } catch (error) {
-            QSDom.clear(treeContainer);
-            treeContainer.appendChild(_renderAlertError(
-                t('common.error') + ': ' + error.message
-            ));
-        }
-    }
-
-    /**
-     * Render structure tree in dashboard
-     */
-    function renderDashboardStructureTree(structure, container) {
-        if (!structure || (Array.isArray(structure) && structure.length === 0)) {
-            const trans = window.QUICKSITE_CONFIG?.translations?.structure?.tree || {};
-            QSDom.clear(container);
-            container.appendChild(_renderEmpty(trans.isEmpty || 'Structure is empty'));
-            return;
-        }
-        
-        const tree = Array.isArray(structure) ? structure : [structure];
-        QSDom.clear(container);
-        container.appendChild(renderDashboardNodes(tree, 0, ''));
-    }
-
-    /**
-     * The label spans describing one node: <tag#id.class>, <Component/>,
-     * {{translation.key}}, "raw text", or <unknown> — then its [nodeId].
-     *
-     * The angle brackets are TEXT here. They were &lt;/&gt; entities while this
-     * was built as a string; textContent takes the characters themselves, so
-     * the rendered result is identical.
-     *
-     * @returns {Node[]} the spans, in order
-     */
-    function _renderNodeLabel(node, element, attributes, nodeId) {
-        const span = (cls, text) => QSDom.el('span', { class: cls, text: text });
-        const parts = [];
-
-        if (node.component) {
-            parts.push(span('admin-tree__component', '<' + node.component + '/>'));
-        } else if (node.tag) {
-            parts.push(span('admin-tree__element', '<' + element));
-            if (attributes.id) {
-                parts.push(span('admin-tree__attr-id', '#' + attributes.id));
-            }
-            if (attributes.class) {
-                const classes = Array.isArray(attributes.class)
-                    ? attributes.class.join(' ')
-                    : attributes.class;
-                parts.push(span('admin-tree__attr-class', '.' + classes.replace(/\s+/g, '.')));
-            }
-            parts.push(span('admin-tree__element', '>'));
-        } else if (node.textKey) {
-            parts.push(span('admin-tree__trans', '{{' + node.textKey + '}}'));
-        } else if (node.text) {
-            const preview = node.text.length > 30
-                ? node.text.substring(0, 30) + '...'
-                : node.text;
-            parts.push(span('admin-tree__text', '"' + preview + '"'));
-        } else {
-            parts.push(span('admin-tree__element', '<unknown>'));
-        }
-
-        parts.push(span('admin-tree__node-id', '[' + nodeId + ']'));
-        return parts;
-    }
-
-    /**
-     * The expand/collapse triangle for a node that has children.
-     *
-     * What this replaces carried the entire toggle as an inline onclick
-     * attribute, quote-escaped through two levels of string literal. Same
-     * behaviour, as a listener.
-     *
-     * @returns {HTMLElement}
-     */
-    function _renderTreeToggle() {
-        const toggle = QSDom.el('span', { class: 'admin-tree__toggle', text: '\u25b6' });
-        toggle.addEventListener('click', function (event) {
-            event.stopPropagation();
-            const item = toggle.closest('.admin-tree__item');
-            if (!item) return;
-            const expanded = item.classList.toggle('admin-tree__item--expanded');
-            toggle.textContent = expanded ? '\u25bc' : '\u25b6';
-        });
-        return toggle;
-    }
-
-    /**
-     * Render tree nodes recursively for dashboard.
-     * @returns {HTMLElement} ONE <ul>
-     */
-    function renderDashboardNodes(nodes, depth, parentPath) {
-        const ul = QSDom.el('ul', { class: 'admin-tree' });
-
-        nodes.forEach((node, index) => {
-            const nodePath = parentPath ? parentPath + '.' + index : String(index);
-            const nodeId = node._nodeId ?? nodePath;
-
-            const element = node.tag || node.component || (node.textKey ? 'text' : (node.text ? 'raw' : 'node'));
-            const hasChildren = node.children && node.children.length > 0;
-            const attributes = node.params || {};
-
-            const row = QSDom.el('div', { class: 'admin-tree__row' }, [
-                hasChildren ? _renderTreeToggle() : QSDom.el('span', { class: 'admin-tree__spacer' })
-            ]);
-            _renderNodeLabel(node, element, attributes, nodeId).forEach(n => row.appendChild(n));
-
-            const li = QSDom.el('li', {
-                class: 'admin-tree__item' + (hasChildren ? ' admin-tree__item--has-children' : ''),
-                dataset: { nodeId: String(nodeId) }
-            }, [row]);
-
-            if (hasChildren) {
-                li.appendChild(renderDashboardNodes(node.children, depth + 1, nodePath));
-            }
-
-            ul.appendChild(li);
-        });
-
-        return ul;
-    }
-
-    /**
-     * Setup structure panel event listeners
-     */
-    function setupStructurePanel() {
-        const header = document.getElementById('structure-panel-header');
-        if (header) {
-            header.addEventListener('click', toggleStructurePanel);
-        }
-        
-        // Initialize the structure viewer selectors
-        initDashboardStructureViewer();
     }
 
     // ========================================================================
@@ -2267,7 +1933,6 @@
 
     document.addEventListener('DOMContentLoaded', async function() {
         setupRestoreConfirmModal();
-        mountProjectPickers();
         setupOwnerSpaceList();
 
         // Wait for admin.js to finish loading permissions before checking them
@@ -2284,7 +1949,8 @@
             hp('listProjects')       ? loadProjectManager()  : Promise.resolve(),
             hp('getSizeInfo')        ? loadStorageOverview() : Promise.resolve(),
             // Owner-wide usage walks every owned project, so it loads alongside
-            // rather than gating anything; it hides itself when you own nothing.
+            // rather than gating anything; when you own nothing it keeps only Manage
+            // Space, or hides itself.
             // No canRun() gate: it is not a command, so there is no
             // permission to test — every authenticated account may ask for its
             // own quota, and the answer is empty when you own nothing.
@@ -2309,9 +1975,6 @@
         
         // Setup manage space toggle
         setupManageSpace();
-        
-        // Setup structure panel (collapsible)
-        setupStructurePanel();
     });
 
 })();

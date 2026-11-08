@@ -54,7 +54,7 @@
    would leave a hole in the first case. */
 .builds-facts {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
     gap: var(--space-sm) var(--space-lg);
     margin-bottom: var(--space-lg);
 }

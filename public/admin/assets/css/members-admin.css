@@ -46,6 +46,28 @@
     margin-left: 12px;
 }
 
+/* The projects other than this one where a join request waits for you */
+.members-elsewhere {
+    margin: 0 0 20px 0;
+}
+
+.members-elsewhere__title {
+    display: block;
+}
+
+.members-elsewhere__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-sm);
+}
+
+.members-elsewhere__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 /* ---- Role + status chips ---- */
 .members-role-chip {
     display: inline-block;

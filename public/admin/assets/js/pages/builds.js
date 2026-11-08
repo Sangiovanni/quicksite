@@ -290,7 +290,7 @@
 
             if (locked) {
                 input.setAttribute('readonly', 'readonly');
-                var unlock = _renderButton(T.optUnlock || '', null, 'ghost', function () {
+                var unlock = _renderButton(T.optUnlock || '', null, 'primary', function () {
                     input.removeAttribute('readonly');
                     unlock.remove();
                 });

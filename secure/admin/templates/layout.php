@@ -636,7 +636,12 @@ $langNames = [
     <!-- Admin Footer -->
     <footer class="admin-footer">
         <div class="admin-footer__content">
-            <p><?= __admin('footer.version', ['version' => '1.6.0']) ?> &bull; <?= __admin('footer.powered') ?></p>
+            <?php
+            // The installation's version, from the VERSION file every release bumps: the same reader as the update notice and a build.
+            require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+            $qsPanelVersion = qs_local_version();
+            ?>
+            <p><?php if ($qsPanelVersion !== null): ?><?= __admin('footer.version', ['version' => adminEscape($qsPanelVersion)]) ?> &bull; <?php endif; ?><?= __admin('footer.powered') ?></p>
             
             <div class="admin-footer__lang">
                 <span class="admin-footer__lang-label"><?= __admin('footer.language') ?>:</span>
@@ -716,7 +721,7 @@ $langNames = [
                     search: '<?= __adminJs('common.search') ?>',
                     noMatchesFor: '<?= __adminJs('common.noMatchesFor') ?>',
                     createFromSearch: '<?= __adminJs('common.createFromSearch') ?>',
-                    // The star toggle (the dashboard's Project Manager, My Memberships).
+                    // The star toggle (the dashboard's first line, My Memberships).
                     starred: '<?= __adminJs('common.starred') ?>',
                     starProject: '<?= __adminJs('common.starProject') ?>',
                     unstarProject: '<?= __adminJs('common.unstarProject') ?>',
@@ -754,9 +759,14 @@ $langNames = [
                 },
                 dashboard: {
                     projects: {
-                        deleteTitle: '<?= __adminJs('dashboard.projects.deleteTitle') ?>',
-                        deleteBtn: '<?= __adminJs('dashboard.projects.deleteBtn') ?>',
-                        deleteConfirmNamed: '<?= __adminJs('dashboard.projects.deleteConfirmNamed') ?>',
+                        // Each with its English, as these two questions never read a key's path in a language that lacks the word.
+                        deleteTitle: <?= json_encode(__admin('dashboard.projects.deleteTitle', 'Delete Project')) ?>,
+                        deleteBtn: <?= json_encode(__admin('dashboard.projects.deleteBtn', 'Delete Project')) ?>,
+                        deleteConfirmNamed: <?= json_encode(__admin('dashboard.projects.deleteConfirmNamed', 'Delete ":name" permanently? Its pages, translations, assets and backups are removed and cannot be recovered.')) ?>,
+                        deleteConfirmEditing: <?= json_encode(__admin('dashboard.projects.deleteConfirmEditing', 'This is the project you are editing.')) ?>,
+                        switch: <?= json_encode(__admin('dashboard.projects.switch', 'Switch Project')) ?>,
+                        switchBtn: <?= json_encode(__admin('dashboard.projects.switchBtn', 'Switch')) ?>,
+                        switchConfirmNamed: <?= json_encode(__admin('dashboard.projects.switchConfirmNamed', 'Switch to ":name"? Every page of the panel then works on this project.')) ?>,
                         restoring: '<?= __adminJs('dashboard.projects.restoring') ?>',
                         restoreBtn: '<?= __adminJs('dashboard.projects.restoreBtn') ?>',
                         restore_success: '<?= __adminJs('dashboard.projects.restore_success') ?>',
@@ -792,18 +802,6 @@ $langNames = [
                     },
                     errors: {
                         loadFailed: '<?= __adminJs('history.errors.loadFailed') ?>'
-                    }
-                },
-                structure: {
-                    tree: {
-                        loading: '<?= __adminJs('structure.tree.loading') ?>',
-                        isEmpty: '<?= __adminJs('structure.tree.isEmpty') ?>'
-                    },
-                    errors: {
-                        loadFailed: '<?= __adminJs('structure.errors.loadFailed') ?>'
-                    },
-                    toast: {
-                        jsonCopied: '<?= __adminJs('structure.toast.jsonCopied') ?>'
                     }
                 },
                 commandForm: {

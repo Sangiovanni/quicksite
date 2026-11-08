@@ -51,6 +51,91 @@ if (isset($_GET['denied'])): ?>
 </div>
 <?php endif; ?>
 
+<!-- The project you are editing, with its star, and what acts on it: most of this page is about
+     it, and a phone's header shows only its first letters. The line is filled by dashboard.js.
+     New Project and Import make another project; every other button acts on this one, and each
+     shows only to a role that may run its command on it. -->
+<div class="dashboard-current" data-requires-command="listProjects">
+    <div class="dashboard-current__info" id="current-project-info">
+        <div class="admin-loading">
+            <span class="admin-spinner"></span>
+            <span><?= __admin('common.loading') ?></span>
+        </div>
+    </div>
+    <div class="dashboard-current__actions">
+        <!-- Create Project — PRIMARY among the quick actions. Every
+             other action here operates on a project you already have;
+             this is the only one a brand-new account can use, so it is
+             the one that should read as the thing to do. -->
+        <button type="button" id="btn-create-project" class="admin-btn admin-btn--primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+            </svg>
+            <?= __admin('dashboard.projects.create') ?>
+        </button>
+        
+        <!-- Clone Project -->
+        <button type="button" id="btn-clone-project" data-requires-command="cloneProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.cloneTooltip') ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <?= __admin('dashboard.projects.clone') ?>
+        </button>
+
+        <!-- Rename Project: renameProject is owner-only. -->
+        <button type="button" id="btn-rename-project" data-requires-command="renameProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.renameTooltip') ?>" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            <?= __admin('dashboard.projects.rename') ?>
+        </button>
+
+        <!-- Backup/Restore Group -->
+        <div class="dashboard-current__divider" data-requires-command="backupProject"></div>
+        
+        <!-- Backup Project -->
+        <button type="button" id="btn-backup-project" data-requires-command="backupProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.backupTooltip') ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+            </svg>
+            <?= __admin('dashboard.projects.backup') ?>
+        </button>
+        
+        <!-- Restore Backup -->
+        <button type="button" id="btn-restore-backup" data-requires-command="restoreBackup" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.restoreTooltip') ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/>
+            </svg>
+            <?= __admin('dashboard.projects.restore') ?>
+        </button>
+        
+        <!-- Export/Import Group -->
+        <div class="dashboard-current__divider" data-requires-command="backupProject"></div>
+        
+        <!-- Export Project -->
+        <button type="button" id="btn-export-project" data-requires-command="exportProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.exportTooltip') ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <?= __admin('dashboard.projects.export') ?>
+        </button>
+        
+        <!-- Import Project -->
+        <button type="button" id="btn-import-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.importTooltip') ?>">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <?= __admin('dashboard.projects.import') ?>
+        </button>
+    </div>
+</div>
+
 <!-- Owner Space Usage — every project the caller OWNS, above the per-project view -->
 <section class="admin-section" id="owner-space-section" style="display: none;">
     <div class="storage-overview owner-space">
@@ -144,6 +229,61 @@ if (isset($_GET['denied'])): ?>
                 <?= __admin('dashboard.storage.refresh', 'Refresh') ?>
             </button>
         </div>
+        <!-- Manage Space: the edited project's build, exports and backups, with your own
+             space. It stays when you own nothing and can read one of the three: then the
+             card holds it alone (dashboard.js, owner-space--manage-only). -->
+        <div class="manage-space" id="manage-space">
+            <button type="button" class="manage-space__toggle" id="manage-space-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                <?= __admin('dashboard.storage.manageSpace', 'Manage Space') ?>
+                <svg class="manage-space__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+            <div class="manage-space__body" id="manage-space-body" style="display: none;">
+                <div class="manage-space__section" id="manage-space-builds">
+                    <div class="manage-space__section-header">
+                        <span class="manage-space__section-title">
+                            <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
+                            <?= __admin('dashboard.storage.builds', 'Builds') ?>
+                            <!-- The full builds page: make one, download it, and see
+                                 whether the next one will still fit. Gated on the same
+                                 read the page itself is gated on, so a caller who
+                                 cannot open it is not offered the link. -->
+                            <a href="<?= $router->url('builds') ?>" class="manage-space__section-link"
+                               data-requires-command="getBuild"><?= __admin('dashboard.storage.buildsPage', 'Open builds page') ?> &rarr;</a>
+                        </span>
+                        <span class="manage-space__section-count" id="manage-builds-count">--</span>
+                    </div>
+                    <div class="manage-space__list" id="manage-builds-list"></div>
+                </div>
+                <!-- Shown by dashboard.js only when the project holds a saved export: the panel's Export keeps none on the server, the API's can. -->
+                <div class="manage-space__section" id="manage-space-exports" style="display: none;">
+                    <div class="manage-space__section-header">
+                        <span class="manage-space__section-title">
+                            <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
+                            <?= __admin('dashboard.storage.exports', 'Exports') ?>
+                        </span>
+                        <span class="manage-space__section-count" id="manage-exports-count">--</span>
+                    </div>
+                    <div class="manage-space__list" id="manage-exports-list"></div>
+                </div>
+                <div class="manage-space__section" id="manage-space-backups">
+                    <div class="manage-space__section-header">
+                        <span class="manage-space__section-title">
+                            <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
+                            <?= __admin('dashboard.storage.backups', 'Backups') ?>
+                            <span class="manage-space__project-label" id="manage-backups-project"></span>
+                        </span>
+                        <span class="manage-space__section-count" id="manage-backups-count">--</span>
+                    </div>
+                    <div class="manage-space__tip" id="manage-backups-tip"></div>
+                    <div class="manage-space__list" id="manage-backups-list"></div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -197,185 +337,6 @@ if (isset($_GET['denied'])): ?>
                 <span class="storage-overview__legend-color storage-overview__legend-color--system"></span>
                 <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.system') ?></span>
                 <span class="storage-overview__legend-value" id="storage-val-system">--</span>
-            </div>
-        </div>
-
-        <!-- Manage Space -->
-        <div class="manage-space" id="manage-space">
-            <button type="button" class="manage-space__toggle" id="manage-space-toggle">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-                <?= __admin('dashboard.storage.manageSpace', 'Manage Space') ?>
-                <svg class="manage-space__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </button>
-            <div class="manage-space__body" id="manage-space-body" style="display: none;">
-                <div class="manage-space__section" id="manage-space-builds">
-                    <div class="manage-space__section-header">
-                        <span class="manage-space__section-title">
-                            <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
-                            <?= __admin('dashboard.storage.builds', 'Builds') ?>
-                            <!-- The full builds page: make one, download it, and see
-                                 whether the next one will still fit. Gated on the same
-                                 read the page itself is gated on, so a caller who
-                                 cannot open it is not offered the link. -->
-                            <a href="<?= $router->url('builds') ?>" class="manage-space__section-link"
-                               data-requires-command="getBuild"><?= __admin('dashboard.storage.buildsPage', 'Open builds page') ?> &rarr;</a>
-                        </span>
-                        <span class="manage-space__section-count" id="manage-builds-count">--</span>
-                    </div>
-                    <div class="manage-space__list" id="manage-builds-list"></div>
-                </div>
-                <div class="manage-space__section" id="manage-space-exports">
-                    <div class="manage-space__section-header">
-                        <span class="manage-space__section-title">
-                            <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
-                            <?= __admin('dashboard.storage.exports', 'Exports') ?>
-                        </span>
-                        <span class="manage-space__section-count" id="manage-exports-count">--</span>
-                    </div>
-                    <div class="manage-space__list" id="manage-exports-list"></div>
-                </div>
-                <div class="manage-space__section" id="manage-space-backups">
-                    <div class="manage-space__section-header">
-                        <span class="manage-space__section-title">
-                            <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
-                            <?= __admin('dashboard.storage.backups', 'Backups') ?>
-                            <span class="manage-space__project-label" id="manage-backups-project"></span>
-                        </span>
-                        <span class="manage-space__section-count" id="manage-backups-count">--</span>
-                    </div>
-                    <div class="manage-space__tip" id="manage-backups-tip"></div>
-                    <div class="manage-space__list" id="manage-backups-list"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Project Manager -->
-<section class="admin-section" data-requires-command="listProjects">
-    <h2 class="admin-section__title"><?= __admin('dashboard.projects.title') ?></h2>
-    <div class="admin-card">
-        <div class="admin-card__body">
-            <div class="project-manager">
-                <!-- Current Project Info -->
-                <div class="project-manager__current" id="current-project-info">
-                    <div class="admin-loading">
-                        <span class="admin-spinner"></span>
-                        <span><?= __admin('common.loading') ?></span>
-                    </div>
-                </div>
-                
-                <!-- Project Actions -->
-                <div class="project-manager__actions">
-                    <!-- Switch Project -->
-                    <div class="project-manager__action-group">
-                        <label class="admin-label" for="project-selector"><?= __admin('dashboard.projects.switch') ?></label>
-                        <div class="project-manager__select-row">
-                            <select id="project-selector" class="admin-input admin-input--select" disabled>
-                                <option value=""><?= __admin('common.loading') ?></option>
-                            </select>
-                            <!-- Stars the project chosen in the selector; drawn by QuickSiteAdmin.syncStarToggle(). -->
-                            <button type="button" id="btn-star-project" class="admin-btn admin-btn--ghost admin-project-star" disabled></button>
-                            <button type="button" id="btn-switch-project" class="admin-btn admin-btn--primary" disabled>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                                </svg>
-                                <?= __admin('dashboard.projects.switchBtn') ?>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Quick Actions Row -->
-                    <div class="project-manager__quick-actions">
-                        <!-- Create Project — PRIMARY among the quick actions. Every
-                             other action here operates on a project you already have;
-                             this is the only one a brand-new account can use, so it is
-                             the one that should read as the thing to do. -->
-                        <button type="button" id="btn-create-project" class="admin-btn admin-btn--primary">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                                <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.create') ?>
-                        </button>
-                        
-                        <!-- Clone Project -->
-                        <button type="button" id="btn-clone-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.cloneTooltip') ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.clone') ?>
-                        </button>
-
-                        <!-- Rename Project — enabled by dashboard.js only when you own the
-                             project chosen in the selector (renameProject is owner-only). -->
-                        <button type="button" id="btn-rename-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.renameTooltip') ?>" disabled>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.rename') ?>
-                        </button>
-
-                        <!-- Backup/Restore Group -->
-                        <div class="project-manager__action-divider"></div>
-                        
-                        <!-- Backup Project -->
-                        <button type="button" id="btn-backup-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.backupTooltip') ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.backup') ?>
-                        </button>
-                        
-                        <!-- Restore Backup -->
-                        <button type="button" id="btn-restore-backup" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.restoreTooltip') ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                                <path d="M3 3v5h5"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.restore') ?>
-                        </button>
-                        
-                        <!-- Export/Import Group -->
-                        <div class="project-manager__action-divider"></div>
-                        
-                        <!-- Export Project -->
-                        <button type="button" id="btn-export-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.exportTooltip') ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.export') ?>
-                        </button>
-                        
-                        <!-- Import Project -->
-                        <button type="button" id="btn-import-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.importTooltip') ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.import') ?>
-                        </button>
-                        
-                        <!-- Danger Zone -->
-                        <div class="project-manager__action-divider"></div>
-                        
-                        <!-- Delete Project -->
-                        <button type="button" id="btn-delete-project" class="admin-btn admin-btn--ghost admin-btn--danger">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            </svg>
-                            <?= __admin('dashboard.projects.delete') ?>
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -637,8 +598,8 @@ if (isset($_GET['denied'])): ?>
     </div>
 </div>
 
-<!-- Rename Project Modal — opened from the Project Manager for the project chosen
-     there; prefilled with its current name by dashboard.js. -->
+<!-- Rename Project Modal — for the edited project; prefilled with its current name by
+     dashboard.js. -->
 <div id="modal-rename-project" class="admin-modal" style="display: none;">
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
@@ -657,30 +618,6 @@ if (isset($_GET['denied'])): ?>
         <div class="admin-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
             <button type="button" id="btn-confirm-rename" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.renameBtn') ?></button>
-        </div>
-    </div>
-</div>
-
-<!-- Delete Project Modal -->
-<div id="modal-delete-project" class="admin-modal" style="display: none;">
-    <div class="admin-modal__backdrop"></div>
-    <div class="admin-modal__content">
-        <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.deleteTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
-        </div>
-        <div class="admin-modal__body">
-            <p class="admin-warning"><?= __admin('dashboard.projects.deleteWarning') ?></p>
-            <div class="admin-form-group">
-                <label class="admin-label" for="delete-project-selector"><?= __admin('dashboard.projects.selectToDelete') ?></label>
-                <select id="delete-project-selector" class="admin-input admin-input--select">
-                    <option value=""><?= __admin('dashboard.projects.selectProject') ?></option>
-                </select>
-            </div>
-        </div>
-        <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
-            <button type="button" id="btn-confirm-delete" class="admin-btn admin-btn--danger" disabled><?= __admin('dashboard.projects.deleteBtn') ?></button>
         </div>
     </div>
 </div>
@@ -716,59 +653,6 @@ if (isset($_GET['denied'])): ?>
             <div class="admin-loading">
                 <span class="admin-spinner"></span>
                 <span><?= __admin('common.loading') ?></span>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Structure Viewer (Collapsible) -->
-<section class="admin-section">
-    <div class="admin-card">
-        <div class="admin-card__header admin-card__header--collapsible" id="structure-panel-header">
-            <h2 class="admin-card__title">
-                <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                    <line x1="12" y1="22.08" x2="12" y2="12"/>
-                </svg>
-                <?= __admin('dashboard.structure.title') ?>
-            </h2>
-            <svg class="admin-card__toggle" id="structure-panel-toggle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                <polyline points="6 9 12 15 18 9"/>
-            </svg>
-        </div>
-        <div class="admin-card__body" id="structure-panel-body" style="display: none;">
-            <!-- Structure Selector -->
-            <div class="admin-grid admin-grid--cols-3" style="margin-bottom: var(--space-md);">
-                <div class="admin-form-group">
-                    <label class="admin-label"><?= __admin('structure.label.type') ?></label>
-                    <select id="dash-structure-type" class="admin-select">
-                        <option value=""><?= __admin('structure.select.type') ?></option>
-                        <option value="page"><?= __admin('structure.type.page') ?></option>
-                        <option value="menu"><?= __admin('structure.type.menu') ?></option>
-                        <option value="footer"><?= __admin('structure.type.footer') ?></option>
-                        <option value="component"><?= __admin('structure.type.component') ?></option>
-                    </select>
-                </div>
-                <div class="admin-form-group">
-                    <label class="admin-label"><?= __admin('structure.label.name') ?></label>
-                    <select id="dash-structure-name" class="admin-select" disabled>
-                        <option value=""><?= __admin('structure.select.typeFirst') ?></option>
-                    </select>
-                </div>
-                <div class="admin-form-group">
-                    <label class="admin-label">&nbsp;</label>
-                    <button type="button" id="dash-load-structure" class="admin-btn admin-btn--primary" disabled>
-                        <?= __admin('structure.loadStructure') ?>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Structure Tree -->
-            <div id="dash-structure-tree" class="admin-structure-tree">
-                <div class="admin-empty">
-                    <p><?= __admin('structure.tree.empty') ?></p>
-                </div>
             </div>
         </div>
     </div>

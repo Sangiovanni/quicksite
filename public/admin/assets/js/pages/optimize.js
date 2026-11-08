@@ -107,7 +107,8 @@
         _modalConfirm.addEventListener('click', confirmAutoRefine);
         _modalCancel.addEventListener('click', closeModal);
         _modalClose.addEventListener('click', closeModal);
-        _modal.addEventListener('click', e => { if (e.target === _modal) closeModal(); });
+        // A click outside the dialog's box, on its dim layer, closes it.
+        _modal.addEventListener('click', e => { if (!e.target.closest('.admin-modal__content')) closeModal(); });
     }
 
     // ── API helpers ───────────────────────────────────────────────────────────

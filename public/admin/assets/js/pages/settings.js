@@ -19,7 +19,6 @@
 
     // Get config from PHP
     const config = window.QUICKSITE_CONFIG || {};
-    const baseUrl = config.baseUrl || '';
     const commandUrl = config.commandUrl || '';
     const aiSettingsUrl = config.aiSettingsUrl || '';
 
@@ -113,6 +112,8 @@
     /** Replace a container's contents with one element. */
     function _replace(container, element) {
         QSDom.clear(container);
+        // Loaded: no longer the spinner's centred box.
+        container.classList.remove('admin-loading');
         container.appendChild(element);
     }
 
@@ -272,13 +273,10 @@
                 const info = result.data.data;
                 const version = config.quicksiteVersion || 'unknown';
                 const totalCommands = info.total || Object.keys(info.commands || {}).length || 0;
-                const realBaseUrl = info.base_url || baseUrl;
-                
+
                 _replace(container, _renderDefinitionList([
                     [t('settings.sysInfo.version'), QSDom.el('code', { text: version })],
-                    [t('settings.sysInfo.totalCommands'), String(totalCommands)],
-                    [t('settings.sysInfo.baseUrl'), QSDom.el('code', { text: realBaseUrl })],
-                    [t('settings.sysInfo.serverTime'), new Date().toLocaleString()]
+                    [t('settings.sysInfo.totalCommands'), String(totalCommands)]
                 ]));
             } else {
                 showMuted(container, t('settings.errors.sysInfoFailed'));

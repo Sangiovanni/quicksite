@@ -326,7 +326,10 @@
             "denyNoteRequired": "The refusal reason is required.",
             "deniedMsg": "Request denied",
             "cancelTitle": "Cancel this invitation?",
-            "cancelledMsg": "Invitation cancelled"
+            "cancelledMsg": "Invitation cancelled",
+            "elsewhereTitle": "Join requests are waiting in your other projects",
+            "elsewhereSwitch": "Switch to this project",
+            "elsewhereSwitchFailed": "Could not switch project"
         },
         "invite": {
             "title": "Invite someone",
@@ -449,9 +452,9 @@
             "error": "Failed to load site map"
         },
         "projects": {
-            "title": "Project Manager",
             "switch": "Switch Project",
             "switchBtn": "Switch",
+            "switchConfirmNamed": "Switch to \":name\"? Every page of the panel then works on this project.",
             "switched": "Project switched successfully",
             "create": "New Project",
             "createTitle": "Create New Project",
@@ -516,11 +519,10 @@
             "cloning": "Cloning...",
             "activateAfterClone": "Switch to the cloned project",
             "activateAfterImport": "Switch to the imported project",
-            "delete": "Delete",
             "deleteTitle": "Delete Project",
             "deleteBtn": "Delete Project",
-            "deleteWarning": "This action cannot be undone. The project and all its data will be permanently deleted.",
             "deleteConfirmNamed": "Delete \":name\" permanently? Its pages, translations, assets and backups are removed and cannot be recovered.",
+            "deleteConfirmEditing": "This is the project you are editing.",
             "deleted": "Project deleted successfully",
             "nameLabel": "Project name",
             "nameHelp": "Free text, up to 60 characters. The project gets an id of its own, so two projects may share a name.",
@@ -537,8 +539,6 @@
             "renameBtn": "Rename",
             "renaming": "Renaming...",
             "renamed": "Project renamed",
-            "selectToDelete": "Select project to delete",
-            "selectProject": "Select a project...",
             "active": "Active",
             "error": "Failed to load project info"
         },
@@ -578,7 +578,6 @@
             "noMatch": "No project matches “{query}”."
         },
         "structure": {
-            "title": "Structure Overview",
             "viewFull": "View Full Structure",
             "routes": "Routes",
             "languages": "Languages"
@@ -1494,8 +1493,6 @@
         "sysInfo": {
             "apiVersion": "API Version",
             "totalCommands": "Total Commands",
-            "baseUrl": "Base URL",
-            "serverTime": "Server Time",
             "version": "Version"
         },
         "config": {
@@ -1605,31 +1602,11 @@
         "title": "Structure Viewer",
         "subtitle": "Visual tree view of page and component structures",
         "selectStructure": "Select Structure",
-        "loadStructure": "Load Structure",
-        "label": {
-            "type": "Type",
-            "name": "Name"
-        },
-        "select": {
-            "type": "Select type...",
-            "typeFirst": "Select type first...",
-            "notRequired": "Not required for :type",
-            "selectType": "Select :type..."
-        },
-        "type": {
-            "page": "Page",
-            "menu": "Menu",
-            "footer": "Footer",
-            "component": "Component"
-        },
         "tree": {
             "title": "Structure Tree",
             "expandAll": "Expand All",
             "collapseAll": "Collapse All",
             "copyJson": "Copy JSON",
-            "empty": "Select a structure type and name above to view",
-            "loading": "Loading structure...",
-            "isEmpty": "Structure is empty",
             "structurePrefix": "Structure:"
         },
         "nodeDetails": {
@@ -1645,12 +1622,8 @@
             "editNode": "Edit This Node",
             "editFull": "Edit Full Structure"
         },
-        "toast": {
-            "jsonCopied": "Structure JSON copied to clipboard"
-        },
         "errors": {
-            "loadOptions": "Error loading options",
-            "loadFailed": "Failed to load structure"
+            "loadOptions": "Error loading options"
         },
         "mode": {
             "content": "Content",

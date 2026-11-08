@@ -302,13 +302,23 @@
         const endpoints = api.endpoints || [];
         const hasAuth = !!(api.auth?.type && api.auth.type !== 'none');
 
+        const headCells = [
+            QSDom.el('th', { style: 'width: 80px;', text: t('apis.form.method') }),
+            QSDom.el('th', { text: t('apis.columns.endpoint') }),
+            QSDom.el('th', { text: t('apis.form.path') })
+        ];
+        if (_endpointActionsShown()) {
+            headCells.push(QSDom.el('th', { style: 'width: 120px;', text: t('apis.columns.actions') }));
+        }
+
         const tbody = QSDom.el('tbody');
         if (endpoints.length > 0) {
             endpoints.forEach(ep => tbody.appendChild(renderEndpointRow(apiId, ep)));
         } else {
+            // The empty row spans the table's own columns: four, or three for an account with no action on a row.
             tbody.appendChild(QSDom.el('tr', null, [
                 QSDom.el('td', {
-                    colspan: '5',
+                    colspan: String(headCells.length),
                     class: 'admin-text-muted',
                     style: 'text-align: center; padding: var(--space-md);',
                     text: t('apis.noEndpoints')
@@ -316,9 +326,7 @@
             ]));
         }
 
-        const heading = QSDom.el('h3', {
-            style: 'margin: 0; display: flex; align-items: center; gap: var(--space-xs);'
-        }, [api.name || apiId]);
+        const heading = QSDom.el('h3', { class: 'api-card__name' }, [api.name || apiId]);
         if (hasAuth) {
             heading.appendChild(QSDom.el('span', {
                 class: 'admin-badge admin-badge--info', text: api.auth.type
@@ -336,14 +344,6 @@
         // The row feeds the Test panel alone.
         const tokenType = canRun('testApiEndpoint') ? _tokenRowType(api) : null;
         if (tokenType) body.appendChild(_renderAuthTokenRow(apiId, tokenType));
-        const headCells = [
-            QSDom.el('th', { style: 'width: 80px;', text: t('apis.form.method') }),
-            QSDom.el('th', { text: t('apis.columns.endpoint') }),
-            QSDom.el('th', { text: t('apis.form.path') })
-        ];
-        if (_endpointActionsShown()) {
-            headCells.push(QSDom.el('th', { style: 'width: 120px;', text: t('apis.columns.actions') }));
-        }
         body.appendChild(QSDom.tableWrapper(QSDom.el('table', { class: 'admin-table admin-table--striped' }, [
             QSDom.el('thead', null, [QSDom.el('tr', null, headCells)]),
             tbody
@@ -365,20 +365,12 @@
             class: 'admin-card api-card',
             dataset: { apiId: apiId }
         }, [
-            QSDom.el('div', {
-                class: 'api-card__header',
-                style: 'cursor: pointer; display: flex; align-items: center; justify-content: space-between;'
-            }, [
-                QSDom.el('div', {
-                    style: 'display: flex; align-items: center; gap: var(--space-sm);'
-                }, [
+            QSDom.el('div', { class: 'api-card__header' }, [
+                QSDom.el('div', { class: 'api-card__title-row' }, [
                     QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 20, 'api-card__chevron'),
-                    QSDom.el('div', null, [
+                    QSDom.el('div', { class: 'api-card__text' }, [
                         heading,
-                        QSDom.el('p', {
-                            class: 'admin-text-muted',
-                            style: 'margin: 0; font-size: var(--font-sm);'
-                        }, [
+                        QSDom.el('p', { class: 'admin-text-muted api-card__meta' }, [
                             QSDom.el('code', { text: apiId }),
                             ' · ' + api.baseUrl + ' · ' + t(endpoints.length !== 1
                                 ? 'apis.endpointCountMany'
@@ -386,7 +378,7 @@
                         ])
                     ])
                 ]),
-                QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, headerActions)
+                QSDom.el('div', { class: 'api-card__actions' }, headerActions)
             ]),
             body
         ]);
@@ -433,22 +425,15 @@
     function _renderAuthTokenRow(apiId, authType) {
         const eyeOff = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eyeOff, 16, 'icon-eye-off');
         if (eyeOff) eyeOff.style.display = 'none';
-        return QSDom.el('div', {
-            class: 'api-auth-token',
-            style: 'margin-bottom: var(--space-md); padding: var(--space-sm); background: var(--bg-secondary); border-radius: var(--radius-md); display: flex; align-items: center; gap: var(--space-sm);'
-        }, [
-            QSDom.el('label', {
-                style: 'font-weight: 500; white-space: nowrap;',
-                text: t('apis.authTokenLabel')
-            }),
-            QSDom.el('div', { style: 'flex: 1; display: flex; gap: var(--space-xs);' }, [
+        return QSDom.el('div', { class: 'api-auth-token' }, [
+            QSDom.el('label', { class: 'api-auth-token__label', text: t('apis.authTokenLabel') }),
+            QSDom.el('div', { class: 'api-auth-token__field' }, [
                 QSDom.el('input', {
                     type: 'password',
                     class: 'admin-input admin-input--sm api-auth-token__input',
                     'data-api': apiId,
                     value: loadAuthToken(apiId),
-                    placeholder: t('apis.authTokenPlaceholder', { type: authType }),
-                    style: 'flex: 1;'
+                    placeholder: t('apis.authTokenPlaceholder', { type: authType })
                 }),
                 QSDom.el('button', {
                     type: 'button',

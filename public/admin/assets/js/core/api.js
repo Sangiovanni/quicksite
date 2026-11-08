@@ -182,8 +182,8 @@ window.QuickSiteAPI = (function() {
     // Build the management path for a command (WITHOUT the /management prefix):
     // project-scoped commands get the 'p/<project>/' marker, globals don't.
     // `projectOverride` (optional) targets a SPECIFIC project for this one call
-    // instead of the panel default — used by the dashboard project-manager, where
-    // the acted-on project is chosen in the modal, not the edited project. The
+    // instead of the panel default — used by the dashboard, where a row's bin acts on
+    // a project you own that may not be the edited one. The
     // server still re-authorizes the marker project on every request. Returns null
     // when a project-scoped command has no project — the caller surfaces a clean
     // error rather than firing '/management/p//<cmd>' (dispatcher reads command 'p' → 404).
@@ -298,7 +298,7 @@ window.QuickSiteAPI = (function() {
              + 'It came from the web server or a proxy rather than from QuickSite itself.';
     }
 
-    // No project-manager fence here. Every project.data command
+    // No fence for the dashboard here. Every project.data command
     // (backup/restore/clone/export/deleteBackup/listBackups) is marker-contained
     // server-side (target bound to PROJECT_NAME, body mismatch → 400 project.mismatch)
     // and the dashboard targets each call with an explicit opts.project = the selected
@@ -376,7 +376,7 @@ window.QuickSiteAPI = (function() {
      * // GET with query params: /management/getCommandHistory?limit=50&offset=0
      * const result = await QuickSiteAPI.request('getCommandHistory', 'GET', null, [], { limit: 50, offset: 0 });
      *
-     * // Target a SPECIFIC project (dashboard project-manager): opts.project sets the marker
+     * // Target a SPECIFIC project (the dashboard's bin on a row): opts.project sets the marker
      * const result = await QuickSiteAPI.request('deleteProject', 'POST', { confirm: true }, [], {}, { project: 'prj_x' });
      *
      * @param {Object} [opts] - { project?: string } marker override for this call

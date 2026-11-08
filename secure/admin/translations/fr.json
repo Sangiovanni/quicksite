@@ -424,7 +424,6 @@
             "personalSnippets": "Snippets personnels"
         },
         "structure": {
-            "title": "Aperçu de la Structure",
             "viewFull": "Voir la Structure Complète",
             "routes": "Routes",
             "languages": "Langues"
@@ -438,7 +437,6 @@
             }
         },
         "projects": {
-            "title": "Gestionnaire de Projets",
             "current": "Projet actuel",
             "switch": "Changer de projet",
             "create": "Créer un projet",
@@ -482,7 +480,6 @@
             "cloned": "Projet dupliqué avec succès",
             "cloning": "Duplication en cours...",
             "activateAfterClone": "Basculer vers le projet dupliqué",
-            "delete": "Supprimer",
             "confirmDelete": "Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.",
             "createTitle": "Créer un nouveau projet",
             "nameLabel": "Nom du projet",
@@ -1030,9 +1027,7 @@
         },
         "sysInfo": {
             "apiVersion": "Version API",
-            "totalCommands": "Total des commandes",
-            "baseUrl": "URL de base",
-            "serverTime": "Heure serveur"
+            "totalCommands": "Total des commandes"
         },
         "config": {
             "multilingualMode": "Mode multilingue",
@@ -1070,31 +1065,11 @@
         "title": "Visualiseur de structure",
         "subtitle": "Vue arborescente des structures de pages et composants",
         "selectStructure": "Sélectionner une structure",
-        "loadStructure": "Charger la structure",
-        "label": {
-            "type": "Type",
-            "name": "Nom"
-        },
-        "select": {
-            "type": "Sélectionner le type...",
-            "typeFirst": "Sélectionnez d'abord le type...",
-            "notRequired": "Non requis pour :type",
-            "selectType": "Sélectionner :type..."
-        },
-        "type": {
-            "page": "Page",
-            "menu": "Menu",
-            "footer": "Pied de page",
-            "component": "Composant"
-        },
         "tree": {
             "title": "Arborescence",
             "expandAll": "Tout déplier",
             "collapseAll": "Tout replier",
             "copyJson": "Copier JSON",
-            "empty": "Sélectionnez un type et un nom de structure ci-dessus pour visualiser",
-            "loading": "Chargement de la structure...",
-            "isEmpty": "La structure est vide",
             "structurePrefix": "Structure :"
         },
         "nodeDetails": {
@@ -1110,12 +1085,8 @@
             "editNode": "Modifier ce nœud",
             "editFull": "Modifier la structure complète"
         },
-        "toast": {
-            "jsonCopied": "JSON de la structure copié dans le presse-papiers"
-        },
         "errors": {
-            "loadOptions": "Erreur lors du chargement des options",
-            "loadFailed": "Échec du chargement de la structure"
+            "loadOptions": "Erreur lors du chargement des options"
         },
         "mode": {
             "content": "Contenu",

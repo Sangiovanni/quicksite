@@ -163,9 +163,10 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
         </main>
     </div>
 
-    <!-- Auto-Refine Confirmation Modal -->
-    <div class="admin-modal-overlay" id="optimize-auto-refine-modal" style="display:none">
-        <div class="admin-modal">
+    <!-- Auto-Refine Confirmation Modal: one dialog, built as the panel's others are -->
+    <div class="admin-modal" id="optimize-auto-refine-modal" style="display:none">
+        <div class="admin-modal__backdrop"></div>
+        <div class="admin-modal__content optimize-modal">
             <div class="admin-modal__header">
                 <h3 class="admin-modal__title"><?= __admin('optimize.cssRefiner.autoRefineModal.title') ?></h3>
                 <button type="button" class="admin-modal__close" id="optimize-modal-close">&times;</button>
@@ -174,15 +175,13 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
                 <!-- Summary list populated by JS -->
             </div>
             <div class="admin-modal__footer">
-                <p class="admin-modal__note"><?= __admin('optimize.cssRefiner.autoRefineModal.backupNote') ?></p>
-                <div class="admin-modal__actions">
-                    <button type="button" class="admin-btn admin-btn--secondary" id="optimize-modal-cancel">
-                        <?= __admin('common.cancel') ?>
-                    </button>
-                    <button type="button" class="admin-btn admin-btn--primary" id="optimize-modal-confirm">
-                        <!-- Label set by JS with count -->
-                    </button>
-                </div>
+                <p class="optimize-modal__note"><?= __admin('optimize.cssRefiner.autoRefineModal.backupNote') ?></p>
+                <button type="button" class="admin-btn admin-btn--secondary" id="optimize-modal-cancel">
+                    <?= __admin('common.cancel') ?>
+                </button>
+                <button type="button" class="admin-btn admin-btn--primary" id="optimize-modal-confirm">
+                    <!-- Label set by JS with count -->
+                </button>
             </div>
         </div>
     </div>

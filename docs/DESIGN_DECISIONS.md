@@ -15564,3 +15564,63 @@ A leftover `deploy.php`, `deploy-roots.php` or `qs-deployment.json`, and a `role
 **Alternatives considered**: a left sidebar (declined in the same ruling: it takes width from every page, and the pages were reviewed as they are); making a group's word open it (loses going straight to the page); dropping hover for a click everywhere (a mouse user's habit, and he did not ask to lose it); two sets of elements, one for each view (an id can be in the page once); a script moving the elements between the views (a width read, and a layout that jumps); a fixed height per view (wrong in French and at a larger text size); the write rate, the project and Back to site in the phone's panel (the first build: out of sight where he wanted to watch them); the whole figure on the phone's row (no room at 320 px); the header sticky for one screen (the base's accident, not a choice); a group shown in place that closes on a press elsewhere (the next entry moves from under the finger).
 
 **Source**: Sangio's page-by-page review, 2026-11-06, his ruling on the shape, and his UX run of 2026-11-07; beta.12. `secure/admin/templates/layout.php`, `public/admin/assets/admin.js` (`initHeaderMenus()`, `initHeaderHeight()`), `public/admin/assets/admin.css`, `public/admin/assets/css/responsive.css`, `public/admin/assets/js/core/members-badge.js`, `public/admin/assets/js/core/searchable-select.js` (`currentOnTop`).
+
+### The dashboard drops the Structure overview, and Manage Space lives with your own space (locked 2026-11-07)
+
+**Decision**: The dashboard no longer has a Structure overview, at any width: its card, its script, its styles and the words only it used are gone. The `getStructure` command stays, as the public API it is; the visual editor and the command console reach a structure. **Manage Space** (the edited project's build, exports and backups) moves from the foot of the *Storage overview* card to the foot of *My total space*. An account that owns no project but can read one of Manage Space's three lists sees the *My total space* card holding Manage Space alone; an account that can read none of them sees no card, as before it saw a Manage Space that opened onto three empty lists.
+
+**Reasoning**: Sangio, reviewing the dashboard on a phone: "Structure overview, I think we need to get rid of this area (for all view), it's an old artifact that represent the getStructure command." The card was a second, smaller way to the same reading the editor gives, and the dashboard is read before anything else. On Manage Space, from his run of the header's slice: "Manage space should land on My total space", with the Storage overview itself to become a deployer's choice in the setup, shown or hidden, as his users need not see the system's and the engine's space. Manage Space is what a person acts on, so it moves out of the card that may be hidden, to the one that stays. *My total space* hides for an account that owns nothing, while Manage Space answers for the edited project, which such an account may still edit: so the card keeps Manage Space alone for it, and nobody who reached Manage Space before loses it. The overview's own fate is not decided here: whether a deployer shows it is the simple / advanced mode's setup question.
+
+**Alternatives considered**: hiding the Structure overview on a phone only (he asked for every view); keeping Manage Space where it was until the overview's setup option exists (it would have to move then, and the option would hide it); hiding Manage Space with *My total space* for an account that owns nothing (an editor would lose the edited project's build and backups); a card of its own for Manage Space (a fourth storage card on the dashboard, where he asked for fewer).
+
+**Source**: Sangio's page-by-page review, 2026-11-06, and his ruling of 2026-11-07 on the Storage overview; beta.12. `secure/admin/templates/pages/dashboard.php`, `public/admin/assets/js/pages/dashboard.js` (`showOwnerSpace()`), `public/admin/assets/admin.css`.
+
+### The dashboard opens on the project you edit, with what acts on it, and My total space switches and deletes (locked 2026-11-08)
+
+**Decision**: The dashboard has no Project Manager. Its first block, under the paragraph and before *My total space*, at every width, is the edited project: its star on the left, its name, *Editing* and your role in the role's colour, then the buttons. **New Project** and **Import** make another project; **Clone**, **Rename**, **Backup**, **Restore** and **Export** act on the edited project, with no list to choose from, and each shows only to a role that may run its command on it. In *My total space*, another project's name switches to it after one question, and each row's **bin**, beside its size, deletes that project: the only place the panel does. That question names the project, says what goes with it and that it cannot be undone, and adds that it is the project you are editing when it is; its focus starts on **Cancel**; then the page reloads. The star answers for the edited project; My memberships keeps one on every row for any other.
+
+**Reasoning**: Sangio, in his UX run: "For now this only way to delete a project is in 'Project management', we have to click the 'delete' button then again select the project in the list propose." The rows are exactly the projects you own, and only an owner may delete one, so the list needed no second list, and the row shows the size you would free. Of the line: "should it be at the very top, like just under the dashboard paragraph, just before the my total space", with the star "I think left is better". Then, trying to change project from *My total space*: "the Project Manager is a bit counter intuitive, we select a project and then only switch work on it", and "we can get totally get rid of that Project manager if we move the clone, rename, backup, restore, export import and new project directly behind the new area". A list that chose a target separate from the project you edit made every button ask which project it meant; with the edited project as the one target, the permission set the panel already holds answers for each button, so a role now sees what it may do instead of pressing into a refusal. A deletion reloads the whole page rather than refresh parts of it, as a project gone leaves the header's list, this list and the Members counts together; his run found the row staying after a delete.
+
+**Alternatives considered**: keeping a target list and dropping only **Switch** (he weighed it first: every button still asks which project, for the one case of backing up a project you are not on); keeping the Delete button beside the bins (two ways to the same act); asking for a project's name to be typed (he asked for one click and a confirmation; the question names the project and starts on **Cancel**); switching on a click with no question (a stray click would change what every page acts on); leaving the name to the header alone (true on a computer, not on a phone). The costs are named and accepted: *My total space* lists only the projects you own, so a project you work on and do not own is reached by the header's list or My memberships; to back up, clone or export a project you first switch to it; the bins appear once the disk measurement has loaded, and a project outside the five largest needs **Show all** or the search first.
+
+**Source**: Sangio's UX run of 2026-11-08, his yes to the first proposal and his own second one that followed; beta.12. `secure/admin/templates/pages/dashboard.php`, `public/admin/assets/js/pages/dashboard.js` (`_renderProjectChip()`, `_renderProjectRowName()`, `_renderDeleteProjectButton()`), `public/admin/assets/admin.css`, `public/admin/assets/css/responsive.css`.
+
+### Manage Space shows the exports only when one is saved (locked 2026-11-08)
+
+**Decision**: Manage Space's **Exports** section shows only when the edited project holds a saved export, and goes once they are cleared. `exportProject` with `save`, `downloadExport` and `clearExports` stay as they are.
+
+**Reasoning**: Sangio, in his UX run: "I believe the export are now deleted after download so maybe we must get rid of that section now." True of the panel: its **Export** streams the archive from the system's temporary folder and keeps nothing. An API caller's `save` still leaves one in the project, it still counts against the owner's space, and that section is the panel's only way to clear it. So the section stays for the case that needs it and is out of the way otherwise.
+
+**Alternatives considered**: removing the section outright (a saved export would use space the panel could no longer free); removing `save`, `downloadExport` and `clearExports` from the API as well (a change to the public API, left for its own decision).
+
+**Source**: Sangio's UX run of 2026-11-08, and his yes to the proposal that followed; beta.12. `secure/admin/templates/pages/dashboard.php`, `public/admin/assets/js/pages/dashboard.js` (`loadManageSpaceExports()`).
+
+### The panel's version is the project's, and Settings states only what it knows (locked 2026-11-08)
+
+**Decision**: The panel has no version of its own. Its footer and its Settings page read the `VERSION` file through `qs_local_version()`, the reader the update notice and a build use. Settings' System Information no longer has a **Base URL** row or a **Server Time** row.
+
+**Reasoning**: Sangio, on the footer's `v1.6.0`, a number typed into `layout.php`: "I remember I wanted to separate admin panel from management as versioning, but admin panel has become an entire part of the project nowadays." The Base URL row printed `help`'s placeholder as it stands, since `help` states no deployment's value, and an address is the deployer's to know, not the engine's. The Server Time row showed the browser's own clock.
+
+**Alternatives considered**: a version constant for the panel (a second number to keep true); printing the real address in the Base URL row (the page's own address bar already says it); asking the server for its time (nothing on that page uses it).
+
+**Source**: Sangio's UX run of 2026-11-08; beta.12. `secure/admin/templates/layout.php`, `secure/admin/templates/pages/settings.php`, `public/admin/assets/js/pages/settings.js`.
+
+### A join request waiting in another project is a notice with the way to it (locked 2026-11-08)
+
+**Decision**: On Project members, under the banner, a warning-style notice lists each other project you run where a join request waits: its number, its name, and **Switch to this project**, which makes it the edited project and reopens the page on it. It is absent when none waits.
+
+**Reasoning**: The Members count covers every project you run while the page shows only the edited one, so a count of 1 could lead to an empty queue. A first build said so in one muted line. Sangio: "I think a simple shy paragraph is hard to find. It would be great to have a better area for this, and maybe a notice tag for this", and "why not a change to this project now button?"
+
+**Alternatives considered**: the one line (too easy to miss); one page listing every queue you hold (a page of its own, and more than the problem needs).
+
+**Source**: Sangio's UX run of 2026-11-08; beta.12. `secure/admin/templates/pages/members.php`, `public/admin/assets/js/pages/members.js` (`renderElsewhere()`), `public/admin/assets/js/core/members-badge.js`.
+
+### What a pointer reveals on a computer is in view from the tablet down (locked 2026-11-08)
+
+**Decision**: A control that a `:hover` reveals on a computer has its line in the tablet block of `responsive.css`, so from `64rem` down it is always in view: the sitemap's route actions and external-link icon, and a media card's star, favicon, rename, actions and video overlay. On a computer they still appear on hover.
+
+**Reasoning**: Sangio, at a phone's width on the sitemap: the **+** and the three dots "appear during the click then disappear. Then I have to click at the place where those was to trigger the thing." An invisible control can be pressed but not found, and a finger has no hover.
+
+**Alternatives considered**: a `hover: none` media query (it would also reach a touch screen wider than `64rem`, but the panel has two media queries and it would be a third: a wide touch screen keeps today's behaviour); always in view at every width (it would change the computer's view, which he had not asked for).
+
+**Source**: Sangio's UX run of 2026-11-08; beta.12. `public/admin/assets/css/responsive.css`.

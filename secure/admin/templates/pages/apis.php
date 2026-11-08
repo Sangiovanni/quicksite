@@ -87,23 +87,24 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
     </div>
 </div>
 
-<!-- Stats Overview -->
-<div class="admin-grid admin-grid--cols-4 apis-stats">
-    <div class="admin-stat-card">
-        <div class="admin-stat-card__value" id="stat-apis">-</div>
-        <div class="admin-stat-card__label"><?= __admin('apis.stats.apis') ?></div>
+<!-- The figures: each its label, then its number, on one line; they wrap as the width runs out.
+     apis.js writes each number by its id. -->
+<div class="apis-stats">
+    <div class="apis-stat">
+        <span class="apis-stat__label"><?= __admin('apis.stats.apis') ?></span>
+        <span class="apis-stat__value" id="stat-apis">-</span>
     </div>
-    <div class="admin-stat-card">
-        <div class="admin-stat-card__value" id="stat-endpoints">-</div>
-        <div class="admin-stat-card__label"><?= __admin('apis.stats.endpoints') ?></div>
+    <div class="apis-stat">
+        <span class="apis-stat__label"><?= __admin('apis.stats.endpoints') ?></span>
+        <span class="apis-stat__value" id="stat-endpoints">-</span>
     </div>
-    <div class="admin-stat-card">
-        <div class="admin-stat-card__value" id="stat-get">-</div>
-        <div class="admin-stat-card__label">GET</div>
+    <div class="apis-stat">
+        <span class="apis-stat__label">GET</span>
+        <span class="apis-stat__value" id="stat-get">-</span>
     </div>
-    <div class="admin-stat-card">
-        <div class="admin-stat-card__value" id="stat-post">-</div>
-        <div class="admin-stat-card__label">POST</div>
+    <div class="apis-stat">
+        <span class="apis-stat__label">POST</span>
+        <span class="apis-stat__value" id="stat-post">-</span>
     </div>
 </div>
 

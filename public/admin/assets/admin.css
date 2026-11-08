@@ -86,10 +86,8 @@
 }
 code,
 .admin-header__logo:hover,
-.admin-tree__trans,
 .admin-tag code,
 .sitemap__route:hover .sitemap__route-icon,
-.project-manager__name svg,
 .preview-animations-section__title svg,
 .transition-editor__settings-hint:hover {
     color: var(--admin-accent);
@@ -315,7 +313,6 @@ code,
 
 .admin-header__actions,
 .ai-browser__actions,
-.project-manager__select-row,
 .preview-keyframe-modal__footer-right,
 .admin-component-toolbar__actions {
     display: flex;
@@ -1130,33 +1127,11 @@ input.admin-checkbox {
     font-size: var(--font-size-sm);
 }
 
-/* =============================================================================
-   STRUCTURE PAGE
-   ============================================================================= */
-.admin-structure-tree {
-    max-height: 600px;
-    overflow: auto;
-    font-family: var(--font-family-mono);
-    font-size: var(--font-size-sm);
-}
-
-.admin-tree {
-    list-style: none;
-    margin: 0;
-    padding-left: var(--space-lg);
-}
-
-.admin-tree:first-child {
-    padding-left: 0;
-}
-
-.admin-tree__item,
 .admin-file-input,
 .admin-nav__group {
     position: relative;
 }
 
-.admin-tree__item--has-children > .admin-tree,
 .ai-category--hidden,
 .admin-toggle input,
 .admin-ai-section[data-visible="false"],
@@ -1180,7 +1155,6 @@ input.admin-checkbox {
     display: none;
 }
 
-.admin-tree__item--has-children.admin-tree__item--expanded > .admin-tree,
 .sitemap__lang--open .sitemap__routes,
 .sitemap__tree-node--open > .sitemap__tree-children,
 .result-item__details.expanded,
@@ -1193,17 +1167,6 @@ input.admin-checkbox {
     display: block;
 }
 
-.admin-tree__row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: background var(--transition-fast);
-}
-
-.admin-tree__row:hover,
 .sitemap__lang-header:hover,
 .preview-theme-color:hover {
     background: var(--admin-bg-tertiary);
@@ -1214,35 +1177,16 @@ input.admin-checkbox {
     background: color-mix(in srgb, var(--admin-text) 4%, transparent);
 }
 
-.admin-tree__row--selected {
-    background: var(--admin-accent-muted);
-}
-
-.admin-tree__toggle {
-    width: 16px;
-    text-align: center;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    user-select: none;
-}
-
-.admin-tree__spacer {
-    width: 16px;
-}
-
-.admin-tree__element,
 .admin-toast--info .admin-toast__icon,
 .preview-element-info__value--textkey {
     color: var(--admin-info);
 }
 
-.admin-tree__attr-id,
 .admin-toast--warning .admin-toast__icon,
 .preview-element-info__value--component {
     color: var(--admin-warning);
 }
 
-.admin-tree__attr-class,
 .admin-schema-editor__status--valid,
 .admin-toast--success .admin-toast__icon,
 .admin-json-editor__status--success,
@@ -1250,26 +1194,11 @@ input.admin-checkbox {
     color: var(--admin-success);
 }
 
-.admin-tree__node-id,
 .admin-file-input__hint,
 .asset-dropzone__hint,
 .asset-card__size {
     color: var(--admin-text-light);
     font-size: var(--font-size-xs);
-}
-
-.admin-tree__text {
-    color: var(--admin-text-muted);
-    font-style: italic;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.admin-tree__component {
-    color: var(--admin-warning);
-    font-weight: 500;
 }
 
 /* =============================================================================
@@ -1676,7 +1605,6 @@ kbd {
 /* Language list styles */
 .admin-lang-list,
 .sitemap__languages,
-.project-manager__action-group,
 .backup-list,
 .execution-results,
 .preview-keyframe-modal__properties,
@@ -1748,7 +1676,6 @@ kbd {
 
 .provider-card__info,
 .sitemap__route--parent,
-.project-manager__select-row select,
 .admin-ai-step__content,
 .fresh-start-option__content,
 .admin-datetime-picker__inputs input,
@@ -1977,8 +1904,7 @@ kbd {
     transition: background-color 0.15s ease;
 }
 
-.model-checkbox:hover,
-.admin-card__header--collapsible:hover {
+.model-checkbox:hover {
     background: var(--admin-bg-secondary);
 }
 
@@ -2589,19 +2515,6 @@ kbd {
     justify-content: flex-end;
 }
 
-/* Project Manager Styles */
-.project-manager {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-lg);
-    padding: var(--space-md);
-}
-
-.project-manager__current {
-    min-height: 50px;
-}
-
-.project-manager__info,
 .admin-datetime-picker,
 .preview-sidebar__tools-buttons,
 .transition-editor__timing-row,
@@ -2617,7 +2530,20 @@ kbd {
     gap: var(--space-xs);
 }
 
-.project-manager__name {
+/* The dashboard's first block: the project you edit, with its star, and the buttons that act on it. */
+.dashboard-current {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+}
+
+/* Holds its height while it loads. */
+.dashboard-current__info {
+    min-height: 2.5rem;
+}
+
+.dashboard-current__line {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -2626,21 +2552,12 @@ kbd {
     color: var(--admin-text);
 }
 
-.project-manager__meta {
+.dashboard-current__hint {
     font-size: var(--font-size-sm);
     color: var(--admin-text-muted);
-    margin-left: 28px;
 }
 
-.project-manager__actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-    padding-top: var(--space-md);
-    border-top: 1px solid var(--admin-border);
-}
-
-.project-manager__quick-actions,
+.dashboard-current__actions,
 .admin-ai-import-actions,
 .api-integration-controls {
     display: flex;
@@ -2649,13 +2566,13 @@ kbd {
     align-items: center;
 }
 
-.project-manager__quick-actions .admin-btn {
+.dashboard-current__actions .admin-btn {
     flex: 0 0 auto;
     min-width: auto;
     justify-content: center;
 }
 
-.project-manager__action-divider {
+.dashboard-current__divider {
     width: 1px;
     height: 24px;
     background: var(--admin-border);
@@ -2877,7 +2794,7 @@ kbd {
 
 .owner-space__project {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 3fr auto;
+    grid-template-columns: minmax(0, 1fr) 3fr auto auto;
     align-items: center;
     gap: var(--space-sm) var(--space-md);
     font-size: var(--font-size-sm);
@@ -2904,6 +2821,23 @@ kbd {
     height: 100%;
     background: var(--admin-accent, var(--admin-text-muted));
     border-radius: var(--radius-sm);
+}
+
+/* Another project's name: a click asks, then switches to it. */
+.owner-space__project-switch {
+    padding: 0;
+    background: none;
+    border: none;
+    font: inherit;
+    font-weight: var(--font-weight-medium);
+    text-align: left;
+    cursor: pointer;
+}
+
+.owner-space__project-switch:hover,
+.owner-space__project-switch:focus-visible {
+    color: var(--admin-accent);
+    text-decoration: underline;
 }
 
 .owner-space__project-size {
@@ -2977,16 +2911,19 @@ kbd {
     text-decoration: underline;
 }
 
-/* The Project Manager's selector is the searchable dropdown: its box takes the row. */
-.project-manager__select-row .qs-searchable-select {
-    flex: 1;
-    min-width: 0;
-}
-
-/* Manage Space */
+/* Manage Space, at the foot of My total space */
 .manage-space {
     margin-top: var(--space-lg);
     border-top: 1px solid var(--admin-border);
+}
+
+/* My total space for an account that owns nothing: Manage Space alone */
+.owner-space--manage-only > :not(.manage-space) {
+    display: none;
+}
+.owner-space--manage-only > .manage-space {
+    margin-top: 0;
+    border-top: none;
 }
 
 .manage-space__toggle {
@@ -3010,7 +2947,6 @@ kbd {
 }
 
 .manage-space__toggle--open .manage-space__chevron,
-.admin-card__toggle--open,
 .admin-category--open .admin-category__toggle,
 .admin-nav__group--open .admin-nav__group-arrow,
 .preview-mobile-section--expanded .preview-mobile-section__arrow,
@@ -3210,17 +3146,6 @@ kbd {
     width: 48px;
     height: 48px;
     margin-bottom: var(--space-md);
-}
-
-/* Collapsible Card Styles */
-.admin-card__header--collapsible {
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.2s;
-}
-
-.admin-card__toggle {
-    transition: transform 0.2s;
 }
 
 /* =============================================================================
@@ -4235,7 +4160,92 @@ kbd {
     padding: var(--space-md) var(--space-lg);
 }
 
+/* A card's header: the chevron, the name with its auth and the line under it, then the actions */
+.api-card__header {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.api-card__title-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.api-card__name {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.api-card__meta {
+    margin: 0;
+    font-size: var(--font-sm);
+}
+
+.api-card__actions {
+    display: flex;
+    gap: var(--space-xs);
+}
+
+/* The saved token of an API that declares authentication, which the Test panel reads */
+.api-auth-token {
+    margin-bottom: var(--space-md);
+    padding: var(--space-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.api-auth-token__label {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.api-auth-token__field {
+    flex: 1;
+    display: flex;
+    gap: var(--space-xs);
+}
+
+.api-auth-token__input {
+    flex: 1;
+}
+
 /* APIs Page specific styles */
+
+/* The figures: a label, then its number, on one line, each as narrow as its words */
+.apis-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-md);
+}
+
+.apis-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+}
+
+.apis-stat__label {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+}
+
+.apis-stat__value {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--admin-accent);
+}
 
 .apis-loading,
 .apis-empty,
@@ -14395,6 +14405,18 @@ code.preview-contextual-info__value {
     padding: var(--space-md) 0;
     border-top: 1px solid var(--admin-border);
     margin-top: var(--space-md);
+}
+
+/* The Auto-refine dialog: a confirmation's width, and its note on a row of its own above the buttons */
+.optimize-modal {
+    max-width: 520px;
+}
+
+.optimize-modal__note {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
 }
 
 /* Modal body rows */

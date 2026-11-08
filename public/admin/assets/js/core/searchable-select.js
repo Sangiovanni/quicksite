@@ -24,8 +24,7 @@
  * layout.php ships on every page); a caller's own option wins.
  *
  * Used by:
- *   - every project list: the header's project menu (layout.php), the
- *     dashboard's Project Manager selector and its Delete list (dashboard.js)
+ *   - the project list: the header's project menu (layout.php)
  *   - the JS-function picker (preview-js-interactions.js)
  *   - the event picker of an element's interaction (preview-js-interactions.js)
  *   - the Complex tab's kind picker and the preview's target (preview.js)

@@ -8,8 +8,8 @@
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
-$versionFile = dirname(ADMIN_ASSET_ROOT) . '/VERSION';
-$version = file_exists($versionFile) ? trim(file_get_contents($versionFile)) : 'unknown';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+$version = qs_local_version() ?? 'unknown';
 
 // The sub-trees settings.js renders from, verbatim and under the same dot
 // paths PHP uses, so the JS asks for the path PHP would.
