@@ -76,7 +76,7 @@ There is **no** `pages/ai.js`, `pages/batch.js`, or `pages/docs.js` in the curre
 
 ## 4. Event bus
 
-Four custom events, each with one emitter:
+Five custom events, each with one emitter:
 
 | Event | Emitted by | Listened for by |
 |---|---|---|
@@ -84,6 +84,7 @@ Four custom events, each with one emitter:
 | `quicksite:routes-changed` | `js/pages/preview/preview.js` `refreshEditList()`, after a wizard's setup and after a phase of a run that changed something | the page's other copies of the routes: `preview-js-interactions.js` (the route pickers), `contextual-complex/route-input.js` (the links' suggestions), `contextual-complex/complex-oauth-button.js` |
 | `quicksite:memberships-changed` | the membership pages, after a roster or inbox action | `js/core/members-badge.js` — recomputes the counts |
 | `quicksite:membership-counts-updated` | `js/core/members-badge.js`, once counts are recomputed | `js/pages/dashboard-memberships.js` — fills the dashboard card |
+| `quicksite:stars-changed` | `admin.js` `setProjectStar()`, on `document`, once the server answers with the account's starred projects (`detail.starred`) | `admin.js` `bindStarToggle()` — each star button; `layout.php` — the header's project list; `js/pages/memberships.js` — its project list |
 
 Payload shapes are implicit — there is no schema or version field on any of them.
 

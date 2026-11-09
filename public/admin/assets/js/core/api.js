@@ -377,7 +377,7 @@ window.QuickSiteAPI = (function() {
      * const result = await QuickSiteAPI.request('getCommandHistory', 'GET', null, [], { limit: 50, offset: 0 });
      *
      * // Target a SPECIFIC project (the dashboard's bin on a row): opts.project sets the marker
-     * const result = await QuickSiteAPI.request('deleteProject', 'POST', { confirm: true }, [], {}, { project: 'prj_x' });
+     * const result = await QuickSiteAPI.request('deleteProject', 'POST', { confirm: true }, [], {}, false, { project: 'prj_x' });
      *
      * @param {Object} [opts] - { project?: string } marker override for this call
      */
