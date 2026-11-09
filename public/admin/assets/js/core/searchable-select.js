@@ -15,6 +15,11 @@
  * trigger, so a click on the label opens the list; destroy() points it back.
  * A label that wraps the select already has the trigger as its control.
  *
+ * With the option fitOptions, the dropdown is as wide as its longest row, where
+ * it would otherwise be as wide as the trigger. With the option currentCopy
+ * ({ title, done }), the line currentOnTop draws has a button copying the chosen
+ * option's value.
+ *
  * With the option currentOnTop, the chosen option's text is the dropdown's first
  * line, whole, above the search field, and the list under it holds the others:
  * the header's project list, whose badge may cut a long name.
@@ -263,6 +268,13 @@
             const width = Math.max(rect.width, Number(this.options.minWidth) || 0);
             this.dropdownEl.style.width = width + 'px';
             this.dropdownEl.style.maxWidth = width + 'px';
+            // With fitOptions the list is as wide as its longest row (a list whose rows are short
+            // names, not descriptions), at least its trigger, and never wider than the window.
+            if (this.options.fitOptions) {
+                this.dropdownEl.style.width = 'max-content';
+                this.dropdownEl.style.minWidth = width + 'px';
+                this.dropdownEl.style.maxWidth = 'calc(100vw - 1rem)';
+            }
 
             const chosen = this.options.currentOnTop ? this.nativeSelect.selectedOptions[0] : null;
             if (chosen && chosen.value !== '') this.dropdownEl.appendChild(this._renderCurrent(chosen));
@@ -296,13 +308,19 @@
             // measure the rendered height, then flip up if needed. A list
             // wider than its trigger moves left as far as it must to stay
             // inside the page.
-            let left = rect.left;
-            if (width > rect.width) {
-                left = Math.max(8, Math.min(rect.left, document.documentElement.clientWidth - 8 - width));
-            }
             this.dropdownEl.style.top = (rect.bottom + 4) + 'px';
-            this.dropdownEl.style.left = left + 'px';
             document.body.appendChild(this.dropdownEl);
+            let drawn = width;
+            if (this.options.fitOptions) {
+                // Measured once with every row in it, so a search does not narrow it under the typing.
+                drawn = this.dropdownEl.offsetWidth;
+                this.dropdownEl.style.width = drawn + 'px';
+            }
+            let left = rect.left;
+            if (drawn > rect.width) {
+                left = Math.max(8, Math.min(rect.left, document.documentElement.clientWidth - 8 - drawn));
+            }
+            this.dropdownEl.style.left = left + 'px';
             this._positionDropdown(rect);
 
             // A close() in the same tick has dropped the field already.
@@ -497,7 +515,33 @@
             const line = document.createElement('div');
             line.className = 'qs-searchable-select__current';
             line.textContent = optionEl.textContent;
+            if (this.options.currentCopy) line.appendChild(this._renderCurrentCopy(optionEl.value));
             return line;
+        }
+
+        /** A button copying the chosen option's value (currentCopy: { title, done }). */
+        _renderCurrentCopy(value) {
+            const { title, done } = this.options.currentCopy;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'qs-searchable-select__current-copy';
+            button.title = title;
+            button.setAttribute('aria-label', title);
+            const ns = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(ns, 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('width', '14');
+            svg.setAttribute('height', '14');
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'currentColor');
+            svg.setAttribute('stroke-width', '2');
+            svg.setAttribute('aria-hidden', 'true');
+            const path = document.createElementNS(ns, 'path');
+            path.setAttribute('d', 'M8 8h12v12H8zM16 8V4H4v12h4');
+            svg.appendChild(path);
+            button.appendChild(svg);
+            button.addEventListener('click', () => window.QuickSiteUtils.copyToClipboard(value, done));
+            return button;
         }
 
         _renderItem(optionEl) {

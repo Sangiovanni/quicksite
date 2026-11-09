@@ -322,6 +322,18 @@ $langNames = [
                     <span><?= __admin('nav.account') ?></span>
                 </a>
 
+                <!-- The panel's language, the current one marked; the script below answers any [data-lang] click. -->
+                <div class="admin-account__lang">
+                    <span class="admin-account__lang-label"><?= __admin('footer.language') ?>:</span>
+                    <?php foreach ($availableLangs as $langCode): ?>
+                        <?php if ($langCode === $currentLang): ?>
+                            <span class="admin-account__lang-btn admin-account__lang-btn--active"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></span>
+                        <?php else: ?>
+                            <button type="button" class="admin-account__lang-btn" data-lang="<?= $langCode ?>"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></button>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+
                 <!-- Both logouts POST and carry the per-session token: signing
                      somebody out is a state change, and as GET links any foreign
                      page could spend one <img> tag doing it. The router refuses
@@ -642,17 +654,6 @@ $langNames = [
             $qsPanelVersion = qs_local_version();
             ?>
             <p><?php if ($qsPanelVersion !== null): ?><?= __admin('footer.version', ['version' => adminEscape($qsPanelVersion)]) ?> &bull; <?php endif; ?><?= __admin('footer.powered') ?></p>
-            
-            <div class="admin-footer__lang">
-                <span class="admin-footer__lang-label"><?= __admin('footer.language') ?>:</span>
-                <?php foreach ($availableLangs as $langCode): ?>
-                    <?php if ($langCode === $currentLang): ?>
-                        <span class="admin-footer__lang-btn admin-footer__lang-btn--active"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></span>
-                    <?php else: ?>
-                        <button type="button" class="admin-footer__lang-btn" data-lang="<?= $langCode ?>"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></button>
-                    <?php endif; ?>
-                <?php endforeach; ?>
-            </div>
         </div>
     </footer>
     <?php endif; ?>
@@ -760,6 +761,8 @@ $langNames = [
                 dashboard: {
                     projects: {
                         // Each with its English, as these two questions never read a key's path in a language that lacks the word.
+                        copyId: <?= json_encode(__admin('nav.copyProjectId', "Copy this project's id")) ?>,
+                        idCopied: <?= json_encode(__admin('nav.projectIdCopied', 'Project id copied')) ?>,
                         deleteTitle: <?= json_encode(__admin('dashboard.projects.deleteTitle', 'Delete Project')) ?>,
                         deleteBtn: <?= json_encode(__admin('dashboard.projects.deleteBtn', 'Delete Project')) ?>,
                         deleteConfirmNamed: <?= json_encode(__admin('dashboard.projects.deleteConfirmNamed', 'Delete ":name" permanently? Its pages, translations, assets and backups are removed and cannot be recovered.')) ?>,
@@ -947,7 +950,14 @@ $langNames = [
             // on the page re-orders this list too.
             QuickSiteAdmin.orderProjectSelect(picker);
             // The badge may cut a long name: the list says it whole on its first line.
-            picker._qsPicker = new QSSearchableSelect(picker, { minWidth: 288, currentOnTop: true });
+            picker._qsPicker = new QSSearchableSelect(picker, {
+                minWidth: 288,
+                currentOnTop: true,
+                currentCopy: {
+                    title: <?= json_encode(__admin('nav.copyProjectId', "Copy this project's id")) ?>,
+                    done: <?= json_encode(__admin('nav.projectIdCopied', 'Project id copied')) ?>
+                }
+            });
             document.addEventListener('quicksite:stars-changed', function () {
                 QuickSiteAdmin.orderProjectSelect(picker);
             });

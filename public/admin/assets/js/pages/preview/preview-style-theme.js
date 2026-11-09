@@ -649,20 +649,28 @@
 
     /**
      * Sync the dependent controls (default mode, visitor toggle) based on
-     * whether dark mode support is enabled. When disabled, reset to defaults
+     * whether dark mode support is ticked. When it is not, reset to defaults
      * and prevent interaction.
      */
     function syncThemeConfigDependents() {
         if (!themeConfigEnabled) return;
         const enabled = themeConfigEnabled.checked;
 
-        // Dependent config controls
         if (themeConfigDefault)  { themeConfigDefault.disabled  = !enabled; }
         if (themeConfigToggleEl) { themeConfigToggleEl.disabled = !enabled; }
         if (!enabled) {
             if (themeConfigDefault)  themeConfigDefault.value    = 'light';
             if (themeConfigToggleEl) themeConfigToggleEl.checked = false;
         }
+    }
+
+    /**
+     * Show what the editor offers of dark mode: what the project has saved, so
+     * a tick moves nothing until Save Settings succeeds.
+     */
+    function showSavedThemeMode() {
+        if (!themeConfigEnabled) return;
+        const enabled = themeConfigEnabled.checked;
 
         // Scope switcher inside style panel
         const scopeSwitcher = document.getElementById('theme-scope-switcher');
@@ -671,17 +679,13 @@
         // Toolbar theme toggle group
         const toolbarGroup = document.getElementById('preview-theme-toggle-group');
         if (toolbarGroup) toolbarGroup.style.display = enabled ? '' : 'none';
-
-        // If dark mode is being disabled and we're currently in dark scope, switch back to light
-        if (!enabled && currentScope === 'dark') {
-            switchScope('light');
-        }
     }
 
     if (themeConfigEnabled) {
         themeConfigEnabled.addEventListener('change', syncThemeConfigDependents);
         // Run once on init to set correct state based on current PHP-rendered value
         syncThemeConfigDependents();
+        showSavedThemeMode();
     }
 
     if (themeConfigToggle && themeConfigBody) {
@@ -707,7 +711,7 @@
                 const data = res.data || {};
                 if (data.status === 200) {
                     // Reflect new config immediately in this panel and toolbar visibility.
-                    syncThemeConfigDependents();
+                    showSavedThemeMode();
 
                     // Keep editor scope aligned with configured default when dark mode is enabled.
                     if (themeConfigEnabled?.checked) {

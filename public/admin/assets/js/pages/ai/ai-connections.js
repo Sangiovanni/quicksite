@@ -317,7 +317,7 @@
         if (probeAbort) { probeAbort.abort(); probeAbort = null; }
         lastProbe = null;
         const modal = document.getElementById('qsac-modal');
-        if (modal) modal.style.display = 'block';
+        if (modal) modal.style.display = 'flex';
         document.getElementById('qsac-modal-title').textContent = t(existing
             ? 'aiConnections.editConnection'
             : 'aiConnections.modalTitle');

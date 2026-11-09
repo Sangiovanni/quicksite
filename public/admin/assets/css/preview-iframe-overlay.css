@@ -56,6 +56,7 @@ embed[data-qs-struct], object[data-qs-struct] {
     outline-offset: 2px !important;
     background-color: #05966926 !important;
     cursor: grab !important;
+    touch-action: none !important; /* A finger on it drags it; anywhere else it still scrolls the page */
 }
 .qs-dragging {
     opacity: 0.25 !important;

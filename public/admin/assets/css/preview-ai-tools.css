@@ -84,6 +84,37 @@
     cursor: not-allowed;
 }
 
+.preview-contextual-ai-tools__backup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.preview-contextual-ai-tools__backup-hide {
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--admin-text-muted);
+    font-size: 12px;
+    font-family: inherit;
+    text-align: left;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* The message put away, for this browser: only the backup button stays */
+.preview-contextual-ai-tools__backup-banner--note-hidden {
+    padding: 0;
+    background: none;
+    border: none;
+}
+
+.preview-contextual-ai-tools__backup-banner--note-hidden .preview-contextual-ai-tools__backup-banner-text,
+.preview-contextual-ai-tools__backup-banner--note-hidden .preview-contextual-ai-tools__backup-hide {
+    display: none;
+}
+
 .preview-contextual-ai-tools__search-row {
     display: flex;
     align-items: center;
@@ -163,6 +194,11 @@
 }
 .preview-contextual-ai-tools__tag-toggle:hover {
     color: var(--admin-text);
+}
+/* The phone block shows these two, and hides the other count */
+.preview-contextual-ai-tools__tag-toggle--phone-only,
+.preview-contextual-ai-tools__tag-toggle-count--phone {
+    display: none;
 }
 
 .preview-contextual-ai-tools__categories {

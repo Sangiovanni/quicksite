@@ -8,7 +8,7 @@
         <span><?= __admin('preview.selectModeHint') ?? 'Click any element in the preview to inspect it' ?></span>
     </div>
     <div class="preview-contextual-info" id="contextual-select-info" style="display: none;">
-        <!-- Element info now displayed in global info bar at bottom of workspace -->
+        <!-- Element info is displayed in its own row, above the workspace -->
         
         <!-- Navigation Buttons (visible in both select-info and variables modes) -->
         <div class="preview-contextual-info__nav" id="ctx-node-nav">

@@ -127,6 +127,10 @@
             if (e.data.action === 'reindexNodes') {
                 reindexAllNodes(e.data.struct);
             }
+            // The frame just got shorter: what is selected comes back into view
+            if (e.data.action === 'revealSelection' && selectedElement) {
+                selectedElement.scrollIntoView({ block: 'nearest' });
+            }
             // Drag tool options from parent
             if (e.data.action === 'dragToggleLock') {
                 toggleDragLockPersistent();
@@ -2248,7 +2252,7 @@
         return currentMode === 'select'  || currentMode === 'drag' ||
                currentMode === 'text'    || currentMode === 'style' ||
                currentMode === 'js'      || currentMode === 'add'  ||
-               currentMode === 'preview' || currentMode === 'translation';
+               currentMode === 'translation';
     }
     function navTarget(el) {
         if (!el || !el.closest) return null;
@@ -2270,7 +2274,7 @@
             // capture-phase listeners on `document` — including the
             // mode-specific select/style/js/add handlers below. Only
             // call it in modes where there is NO downstream handler
-            // that needs the click (drag, preview), so anchors / form
+            // that needs the click (drag), so anchors / form
             // submits stay selectable in all authoring modes.
             //
             // Why: without that, anchor text is unreachable in Text mode,
@@ -2309,31 +2313,10 @@
         }
     }, true);
 
-    // Preview mode is a pure look-don't-touch view: also block focus / typing
-    // on form controls so the user can't accidentally fill an input. Other
-    // editor modes leave inputs alone (text mode etc. may need them).
-    function formField(el) {
-        return el && el.closest && el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
-    }
-    document.addEventListener('mousedown', function(e) {
-        if (currentMode === 'preview' && formField(e.target)) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-        }
-    }, true);
-    document.addEventListener('keydown', function(e) {
-        if (currentMode === 'preview' && formField(e.target)) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-        }
-    }, true);
-    
     // Click handling
     document.addEventListener('click', function(e) {
         // Prevent link navigation in all editor modes
-        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style' || currentMode === 'js' || currentMode === 'add' || currentMode === 'preview') {
+        if (currentMode === 'select' || currentMode === 'drag' || currentMode === 'text' || currentMode === 'style' || currentMode === 'js' || currentMode === 'add') {
             e.preventDefault();
             e.stopPropagation();
         }
@@ -2587,25 +2570,44 @@
         }
     }, true);
     
-    // Mouse events for drag mode
+    // A mouse's press selects no text and starts no browser drag under the tools
     document.addEventListener('mousedown', function(e) {
         if (currentMode === 'select') {
             e.preventDefault();
         }
-        
+
+        if (currentMode === 'drag') {
+            const target = getDraggableTarget(e.target, e.clientX, e.clientY);
+            if (target && target.classList.contains('qs-draggable')) {
+                e.preventDefault();
+            }
+        }
+    }, true);
+
+    // Move's press, drag and release are pointer events, so a mouse and a finger run the same code.
+    // A finger's press may be a scroll: it selects on release, and it drags only the locked element,
+    // whose touch-action keeps the browser from scrolling under it.
+    let fingerTapTarget = null;
+
+    document.addEventListener('pointerdown', function(e) {
         if (currentMode === 'drag') {
             const target = getDraggableTarget(e.target, e.clientX, e.clientY);
             if (!target || !target.classList.contains('qs-draggable')) return;
-            
-            e.preventDefault();
-            
+
+            const finger = e.pointerType === 'touch';
             if (dragLocked && dragSelectedElement) {
-                // Phase 2: Locked — mousedown starts the actual drag
-                handleDragStart(e, dragSelectedElement);
+                // Phase 2: Locked — the press starts the actual drag
+                if (!finger || dragSelectedElement.contains(e.target)) {
+                    handleDragStart(e, dragSelectedElement);
+                }
+            } else if (finger) {
+                fingerTapTarget = target;
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
             } else {
                 // Phase 1: Select the element and start long-press timer
                 dragSelectElement(target);
-                
+
                 // Start long-press timer for momentary lock
                 dragStartX = e.clientX;
                 dragStartY = e.clientY;
@@ -2622,8 +2624,8 @@
             }
         }
     }, true);
-    
-    document.addEventListener('mousemove', function(e) {
+
+    document.addEventListener('pointermove', function(e) {
         if (currentMode === 'drag') {
             // Cancel long-press if mouse moves significantly before timer fires
             if (longPressTimer) {
@@ -2642,18 +2644,43 @@
         }
     }, true);
     
-    document.addEventListener('mouseup', function(e) {
+    document.addEventListener('pointerup', function(e) {
         if (currentMode === 'drag') {
             // Clear long-press timer
             if (longPressTimer) {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
             }
-            
+
+            // A finger that barely moved has tapped: that selects, as a mouse's press does
+            if (fingerTapTarget) {
+                const dx = e.clientX - dragStartX;
+                const dy = e.clientY - dragStartY;
+                if (Math.sqrt(dx * dx + dy * dy) <= dragThreshold) {
+                    dragSelectElement(fingerTapTarget);
+                }
+                fingerTapTarget = null;
+            }
+
             if (isDragging) {
                 e.preventDefault();
                 handleDragEnd(e);
             }
+        }
+    }, true);
+
+    // The browser took the press for itself, a scroll most often: nothing is selected, nothing moves
+    document.addEventListener('pointercancel', function(e) {
+        fingerTapTarget = null;
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+        if (isDragging) {
+            if (dropTarget) dropTarget.classList.remove('qs-drag-over', 'qs-drop-target-inside');
+            dropTarget = null;
+            dropPosition = null;
+            handleDragEnd(e);
         }
     }, true);
     

@@ -25,6 +25,8 @@ window.PreviewAiTools = (function () {
     var PAGE_SIZE = 10;
     var SEARCH_DEBOUNCE_MS = 180;
     var TAG_SHOW_LIMIT = 6;
+    var TAG_SHOW_LIMIT_PHONE = 3;
+    var BACKUP_NOTE_HIDDEN_KEY = 'quicksite-ai-tools-backup-note-hidden';
 
     // ──────────────────────────── State ─────────────────────────────────
 
@@ -93,6 +95,8 @@ window.PreviewAiTools = (function () {
     var _showMoreBtn = null;
     var _emptyEl = null;
     var _backupBtnEl = null;
+    var _backupBannerEl = null;
+    var _backupHideBtn = null;
 
     // Live runner DOM refs (per-render).
     var _generalPromptTextarea = null;
@@ -153,6 +157,9 @@ window.PreviewAiTools = (function () {
         _showMoreBtn = document.getElementById('ai-tools-show-more');
         _emptyEl = document.getElementById('ai-tools-empty');
         _backupBtnEl = document.getElementById('ai-tools-backup-btn');
+        _backupBannerEl = document.getElementById('ai-tools-backup-banner');
+        _backupHideBtn = document.getElementById('ai-tools-backup-hide');
+        _showBackupNote(!_isBackupNoteHidden());
 
         _bindEvents();
         _subscribeToSelectionChanges();
@@ -192,6 +199,30 @@ window.PreviewAiTools = (function () {
         if (_backupBtnEl) {
             _backupBtnEl.addEventListener('click', _onBackupClick);
         }
+        if (_backupHideBtn) {
+            _backupHideBtn.addEventListener('click', _onBackupNoteHide);
+        }
+    }
+
+    function _isBackupNoteHidden() {
+        try {
+            return localStorage.getItem(BACKUP_NOTE_HIDDEN_KEY) === '1';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function _showBackupNote(show) {
+        if (_backupBannerEl) {
+            _backupBannerEl.classList.toggle('preview-contextual-ai-tools__backup-banner--note-hidden', !show);
+        }
+    }
+
+    function _onBackupNoteHide() {
+        try {
+            localStorage.setItem(BACKUP_NOTE_HIDDEN_KEY, '1');
+        } catch (e) { /* the message goes for this visit, and comes back on the next */ }
+        _showBackupNote(false);
     }
 
     function _onBackupClick() {
@@ -380,11 +411,20 @@ window.PreviewAiTools = (function () {
                 if (!topSet.has(t)) visible.push(t);
             });
         }
+        // A phone shows fewer: every chip is drawn, and past its count the phone block hides one
+        // that is not in use.
+        var shownOnPhone = 0;
         for (var i = 0; i < visible.length; i++) {
-            _tagsContainer.appendChild(_renderTagChip(visible[i]));
+            var chip = _renderTagChip(visible[i]);
+            if (!_tagsExpanded && i >= TAG_SHOW_LIMIT_PHONE && !_activeTags.has(visible[i])) {
+                chip.classList.add('preview-contextual-ai-tools__tag--past-phone');
+            } else {
+                shownOnPhone++;
+            }
+            _tagsContainer.appendChild(chip);
         }
-        if (tags.length > TAG_SHOW_LIMIT) {
-            _tagsContainer.appendChild(_renderTagOverflowToggle(tags.length, visible.length));
+        if (tags.length > TAG_SHOW_LIMIT_PHONE) {
+            _tagsContainer.appendChild(_renderTagOverflowToggle(tags.length, visible.length, shownOnPhone));
         }
     }
 
@@ -400,19 +440,29 @@ window.PreviewAiTools = (function () {
         return btn;
     }
 
-    function _renderTagOverflowToggle(total, currentlyVisible) {
+    function _renderTagOverflowToggle(total, currentlyVisible, shownOnPhone) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'preview-contextual-ai-tools__tag-toggle';
+        // Up to the limit only a phone hides a tag, so only a phone has this button.
+        if (total <= TAG_SHOW_LIMIT) {
+            btn.classList.add('preview-contextual-ai-tools__tag-toggle--phone-only');
+        }
         if (_tagsExpanded) {
             btn.textContent = _t('tagShowLess', 'Show less');
         } else {
-            var hidden = total - currentlyVisible;
-            var template = _t('tagShowMore', '+{n} more');
-            btn.textContent = template.replace('{n}', String(hidden));
+            btn.appendChild(_renderTagToggleCount('preview-contextual-ai-tools__tag-toggle-count', total - currentlyVisible));
+            btn.appendChild(_renderTagToggleCount('preview-contextual-ai-tools__tag-toggle-count--phone', total - shownOnPhone));
         }
         btn.addEventListener('click', _toggleTagsExpanded);
         return btn;
+    }
+
+    function _renderTagToggleCount(className, hidden) {
+        var span = document.createElement('span');
+        span.className = className;
+        span.textContent = _t('tagShowMore', '+{n} more').replace('{n}', String(hidden));
+        return span;
     }
 
     // ──────────────────────────── Render: cards ─────────────────────────

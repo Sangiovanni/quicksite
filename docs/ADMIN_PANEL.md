@@ -136,7 +136,12 @@ dim their own way; a button that is not an admin button keeps its own rule.
 query; tablet, at `64rem` and under; phone, at `40rem` and under (1024 and 640 pixels at the
 browser's default text size, so someone with a larger text size reaches the narrower view sooner).
 Every media query of the panel is in `css/responsive.css`, the last stylesheet the layout links,
-the tablet block before the phone block.
+the tablet block before the phone block. On a computer and a tablet the visual editor's options
+panel sits beside the page; on a phone it is one of its rows, under the tools and before the element
+info, and pushes the page down rather than covering it. There it opens when a tool with options is
+picked or an element is selected. A bar always there at its foot names the tool in use, with an arrow
+pointing the way it will go, and that bar or the tool in use opens and closes it. On a computer and a
+tablet a grip on the panel's edge says it can be dragged wider or narrower.
 
 **The header.** A computer and a tablet have two bands. Band one holds the brand, then the write
 rate, the project and Back to site, then the account menu; on a tablet Back to site is its icon
@@ -157,8 +162,8 @@ hover opened leaves it open, and the next click closes it. While a menu is pinne
 other. In the phone's panel a group expands in place and has no hover; it closes when another group
 opens, with the panel, by its arrow or on Escape, never on the way to a press elsewhere in the
 panel, which would move the next entry from under the finger. The **account menu**, which
-your name and role open, holds My account, Log out and Log out everywhere, and on a phone says
-your name and role as its first line. One helper opens and closes all three kinds of menu
+your name and role open, holds My account, the panel's language, Log out and Log out everywhere,
+and on a phone says your name and role as its first line. One helper opens and closes all three kinds of menu
 (`QuickSiteAdmin.initHeaderMenus()`), so they close by the same rules: one at a time, but for a
 group inside the open panel; on Escape, which puts the focus back on what opened it; on a click or
 tap outside; when the focus leaves; and when the page changes. A menu's box stays inside the
@@ -369,7 +374,7 @@ A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, u
 
 ## 8. Visual editor (preview subsystem)
 
-The visual editor is the panel's flagship feature. It runs as a sidebar UI in the admin shell driving a preview iframe loaded with `?_editor=1`. The renderer (server side) emits `data-qs-node` and `data-qs-struct` attributes so the iframe can map clicks back to JSON paths.
+The visual editor is the panel's flagship feature. It runs in the admin shell driving a preview iframe loaded with `?_editor=1`. The renderer (server side) emits `data-qs-node` and `data-qs-struct` attributes so the iframe can map clicks back to JSON paths.
 
 ### 8.0 Which project the editor edits
 
@@ -389,13 +394,12 @@ The preview iframe loads the edited project in editor mode through its per-proje
 
 ### 8.1 Modes
 
-The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Source: `secure/admin/templates/pages/preview/sidebar-tools.php`.
+The row under the toolbar exposes seven modes, each backed by a `data-mode="..."` button. Source: `secure/admin/templates/pages/preview/tools.php`.
 
 | Button | Mode | What it does |
 |---|---|---|
-| **Preview** | `preview` | Reloads the iframe and re-enters preview-only behaviour (no selection / hover overlays). |
 | **Select** | `select` | Click an element → inspect node, add a sibling/child (a child only where the element can hold one: not a text, a component or a void element such as an image), **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
-| **Drag** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. |
+| **Drag** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. A press selects an element, and **Lock** keeps it selected through any number of drops. A finger scrolls the page: a tap selects, and only a locked element is dragged, by a press on it. |
 | **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. A paste is plain text on one line — the clipboard's text, each run of line breaks a space — inserted as typing is, so Ctrl+Z undoes it; when an edit ends, the element holds exactly the text saved. |
 | **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. An element's event list offers the events the interaction commands accept, in two groups: **Common for** the element's tag, and **Less common**. |
@@ -418,7 +422,7 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 
 ### 8.2 Context selectors
 
-The toolbar carries an **Edit** list (the menu and the footer, every route in `routes.php` then the `404` page when it has a structure, and the project's components) and a **Language** dropdown (any active language). Switching either reloads the iframe; in Text mode the language dropdown decides which translation file is being edited.
+The toolbar carries an **Edit** list (the menu and the footer, every route in `routes.php` then the `404` page when it has a structure, and the project's components) and a **Language** dropdown (any active language). Switching either reloads the iframe; in Text mode the language dropdown decides which translation file is being edited. Beside **Reload**, a button hides the toolbar's lists, the tools, the element info and the options panel, leaving the page alone under the header, and brings them back as they were; the tool in use and what is selected stay as they are, and a page opened anew has them back.
 
 While a page is the edit target, the toolbar's **Title** field holds that page's title in the language shown — on a one-language site, the title the page reads from `default.json`. **Enter**, or leaving the field, saves it through `editTitle`; **Escape**, or an emptied field, puts the saved title back; a refusal says why in a toast. Its placeholder is the title the preview shows: for a page with no title of its own, the last part of its address, readable — *Get started* for `get-started` (see [ARCHITECTURE.md](ARCHITECTURE.md) §6.3, *How captured params flow*). The field hides for the menu, the footer and a component.
 
@@ -428,7 +432,7 @@ While a page is the edit target, the toolbar's **Title** field holds that page's
 
 ### 8.3 Device preview
 
-Three device widths: Desktop, Tablet (768 x 1024) and Mobile (375 x 667). Desktop is the iframe's full available width rather than a fixed pixel size, so it follows the window; the other two resize the iframe. The project's media queries apply automatically.
+Three device widths: Desktop, Tablet (768 x 1024) and Mobile (375 x 667). Desktop is the iframe's full available width rather than a fixed pixel size, so it follows the window; the other two resize the iframe. The project's media queries apply automatically. The switch sits at the right end of the tools' row. A tablet has no Tablet button and shows the page at its own width unless Mobile is chosen; a phone has no switch and shows the page at its own width. A device chosen on a wider window comes back when the window is widened.
 
 ### 8.4 Shared regions
 
@@ -731,7 +735,7 @@ handle just like translation-key text.
 
 A sixth editor mode that **manages translation keys site-wide for the current project** — a dense table view of every key the site references plus every key the chosen language file has, classified into three buckets. Complements Text mode: Text mode edits values inline on the rendered page; Translations mode is the bird's-eye where you find orphans, set bulk values, and audit coverage.
 
-**Where you land it from:** sidebar Translations icon → `setMode('translation')` → `#contextual-translation` shows + `PreviewTranslation.enter()` fetches the panel's data — at every opening, so a key written elsewhere (the wizards' key picker, Text mode, **Add Element → Text**) shows at the next one. The first opening shows the loading state; a later one keeps the rows and the chosen scope on screen until the new data is in.
+**Where you land it from:** the **Translations** tool → `setMode('translation')` → `#contextual-translation` shows + `PreviewTranslation.enter()` fetches the panel's data — at every opening, so a key written elsewhere (the wizards' key picker, Text mode, **Add Element → Text**) shows at the next one. The first opening shows the loading state; a later one keeps the rows and the chosen scope on screen until the new data is in.
 
 **Status taxonomy** — every key is one of:
 
@@ -792,7 +796,7 @@ This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists 
 | Concern | Where |
 |---|---|
 | Panel template | `secure/admin/templates/pages/preview/contextual-translation.php` |
-| Sidebar mode button | `secure/admin/templates/pages/preview/sidebar-tools.php` |
+| Tool button | `secure/admin/templates/pages/preview/tools.php` |
 | JS module | `public/admin/assets/js/pages/preview/preview-translation.js` |
 | Mode wiring | `public/admin/assets/js/pages/preview/preview.js` (`setMode('translation')`) |
 | i18n keys exposed to JS | `secure/admin/templates/pages/preview-config.php` (`i18nPanels.translation` block) |
@@ -807,7 +811,7 @@ This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists 
 
 An advanced sub-view of CSS mode that exposes the entire `style.css` as a code-editor surface for designers / developers who need to read or edit the whole file in context, without leaving the visual editor. Hidden for roles without the `editStyles` permission.
 
-**Where you land it from:** CSS sidebar mode → top-row **Source** button above the Theme / Selectors / Motion tabs. Activating it hides the three tabs and swaps the iframe canvas for the editor; deactivating restores both.
+**Where you land it from:** the **CSS** tool → top-row **Source** button above the Theme / Selectors / Motion tabs. Activating it hides the three tabs and swaps the iframe canvas for the editor; deactivating restores both.
 
 **What it shows.** Source reads `style.css` (`getStyles`) every time it is opened, so it catches every writer — the Theme, Selectors and Motion tabs, the console, a workflow, another window, another member.
 
@@ -868,7 +872,7 @@ Selectors, media queries, variable names, and declaration blocks additionally ma
 
 **Dirty guards.** Leaving Source discards nothing: the edits stay in the editor, in the draft and in the preview.
 - Closing Source while dirty — its **Source** button again, the way back to Theme / Selectors / Motion, whose tabs are hidden while Source is shown → the panel's confirmation dialog says the edits are not saved and stay in Source, shown in the preview, until they are saved or cancelled. Source closes (and the tab opens) once the answer is yes; Cancel stays in Source.
-- Switching to another sidebar mode while dirty → the same question (`setMode`'s guard); the mode switches once the answer is yes.
+- Switching to another tool while dirty → the same question (`setMode`'s guard); the mode switches once the answer is yes.
 - Closing the browser tab / refreshing while dirty → the draft is written at once, then the native `beforeunload` prompt.
 
 **Cross-tab cache invalidation.** A Source save, Reload or Cancel rewrites or re-reads the whole `style.css`, so the three structured tabs' caches are invalidated (`PreviewStyleTheme.invalidate()` + `PreviewSelectorBrowser.reset()` + `PreviewStyleMotion.reset()`). The next view of any tab triggers a fresh fetch — visible both from the tab-click handler and from `deactivateSource()` so all exit paths converge. See `DESIGN_DECISIONS.md` "Source / structured-tabs cross-tab cache invalidation" for the accepted trade-off (a structured tab's unsaved edits are lost on the next view after a Source save). The other direction needs no hook in those tabs: Source reads the file again every time it opens.
@@ -892,7 +896,7 @@ Selectors, media queries, variable names, and declaration blocks additionally ma
 
 The third tab of CSS mode — manages CSS transitions, animations, and the `@keyframes` library for the current project. Renamed from "Animations" (the old label collided with the inner "animations" sub-group and led to the "Animations > Animations" head-scratcher).
 
-**Where you land it from:** CSS sidebar mode → click the **Motion** tab.
+**Where you land it from:** the **CSS** tool → click the **Motion** tab.
 
 **Two top-level sections:**
 
@@ -962,7 +966,7 @@ The AI tools mode lets the operator pick a workflow spec, fill its parameters, a
 
 #### Backup-first banner
 
-A persistent amber-bordered banner sits at the top of the panel: `⚠ AI tools modify your site directly. Changes cannot be easily reverted. We recommend creating a backup before running any workflow you're not sure about.` The banner is not dismissable. The button calls the existing `backupProject` command (timestamped folder copy into `secure/projects/<active>/backups/<timestamp>/`) and confirms via toast on success or failure.
+An amber-bordered banner sits at the top of the panel: `⚠ AI tools modify your site directly. Changes cannot be easily reverted. We recommend creating a backup before running any workflow you're not sure about.` *Don't show this message again* puts the message away for this browser and leaves the button. The button calls the existing `backupProject` command (timestamped folder copy into `secure/projects/<active>/backups/<timestamp>/`) and confirms via toast on success or failure.
 
 #### Workflow list
 
@@ -1079,7 +1083,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id", *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename**, **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any: the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. An account that owns no project but can read one of the three sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures both cards. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
+| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id" with a button copying the id, *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename**, **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any: the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. An account that owns no project but can read one of the three sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures both cards. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
@@ -2930,6 +2934,13 @@ Behaviours:
 - **`currentOnTop`**: the chosen option's text is the dropdown's first
   line, whole, above the search, and the list under it holds the others.
   The header's project list sets it, as its badge may cut a long name.
+- **`currentCopy`** (`{ title, done }`): that first line gains a button
+  copying the chosen option's value: in the header's project list, the
+  project's id.
+- **`fitOptions`**: the dropdown is as wide as its longest row, at least
+  its trigger and never wider than the window, where it would otherwise be
+  its trigger's width. The visual editor's Edit list sets it, as its rows
+  are short names and its trigger may be narrow.
 - **Named by its select.** The trigger takes the select's name — its
   `aria-labelledby`, else its `aria-label`, else the `<label for>` that
   points at it — with the value after it, as a native select reads
@@ -3984,7 +3995,7 @@ editor with no JSON editing.
 #### Scenario A — Hide a Next button at the last page (`data-state-show`)
 
 ```
-Admin Panel → Visual Editor → Select mode (cursor icon in sidebar)
+Admin Panel → Visual Editor → Select mode (cursor icon in the tools' row)
   → Click the "Next" button in the iframe to select it
   → Sidebar action panel → Advanced → "+ Add custom param"
   → KEY field: type "data-"

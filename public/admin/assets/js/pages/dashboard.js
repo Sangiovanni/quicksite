@@ -577,9 +577,23 @@
         return QSDom.el('div', { class: 'dashboard-current__line' }, [
             star,
             QSDom.el('span', { class: 'dashboard-current__name', text: QuickSiteAdmin.projectLabel(edited.project, edited.name) }),
+            _renderCopyIdButton(edited.project, proj),
             QSDom.el('span', { class: 'badge badge--primary', text: proj.editing || 'Editing' }),
             edited.my_role ? QSDom.el('span', { class: 'members-role-chip members-role-chip--' + edited.my_role, text: edited.my_role }) : null,
         ]);
+    }
+
+    /** A button copying the project's id: what someone types to ask to join it. @returns {HTMLElement} */
+    function _renderCopyIdButton(projectId, proj) {
+        return QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--ghost admin-btn--icon-only',
+            title: proj.copyId,
+            'aria-label': proj.copyId,
+            onClick: function () {
+                window.QuickSiteUtils.copyToClipboard(projectId, proj.idCopied);
+            },
+        }, [QSDom.svgIcon('M8 8h12v12H8zM16 8V4H4v12h4', 14)]);
     }
 
     /** The same line for an account in no project yet. @returns {HTMLElement} */

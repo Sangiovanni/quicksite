@@ -17,7 +17,6 @@
     const container = document.getElementById('preview-container');
     const workspace = document.querySelector('.preview-workspace');
     const wrapper = document.getElementById('preview-frame-wrapper');
-    const previewResizeHandle = document.getElementById('preview-resize-handle');
     const loading = document.getElementById('preview-loading');
     const targetSelect = document.getElementById('preview-target');  // Unified page/component dropdown
 
@@ -33,6 +32,7 @@
                 placeholder: '— Select page or component —',
                 searchPlaceholder: 'Search pages, components, layout…',
                 emptyText: 'No matches',
+                fitOptions: true,
             });
         } catch (e) {
             console.warn('[Preview] Failed to mount QSSearchableSelect on preview-target:', e);
@@ -45,7 +45,7 @@
     const pageTitleInput = document.getElementById('preview-page-title');
     const reloadBtn = document.getElementById('preview-reload');
     const deviceBtns = document.querySelectorAll('.preview-device-btn');
-    const modeBtns = document.querySelectorAll('.preview-sidebar-tool[data-mode]');
+    const modeBtns = document.querySelectorAll('.preview-tool[data-mode]');
     
     // Contextual area elements
     const contextualArea = document.getElementById('preview-contextual-area');
@@ -164,31 +164,17 @@
     const addBackToSelect = document.getElementById('add-back-to-select');
     
     // Tools show names checkbox
-    const sidebarTools = document.getElementById('preview-sidebar-tools');
+    const toolsRow = document.getElementById('preview-tools');
     const toolsShowNames = document.getElementById('preview-tools-show-names');
     
     // Drag tool options — DOM refs and logic extracted to preview-drag.js (window.PreviewDrag)
     
-    // Mobile sections elements (low-width mode)
-    const mobileSections = document.getElementById('preview-mobile-sections');
-    const mobileSectionInfo = document.getElementById('mobile-section-info');
-    const mobileSectionActions = document.getElementById('mobile-section-actions');
-    const mobileInfoSummary = document.getElementById('mobile-info-summary');
-    const mobileActionsMode = document.getElementById('mobile-actions-mode');
-    const mobileCtxId = document.getElementById('mobile-ctx-id');
-    const mobileCtxTag = document.getElementById('mobile-ctx-tag');
-    const mobileCtxClasses = document.getElementById('mobile-ctx-classes');
-    const mobileCtxChildren = document.getElementById('mobile-ctx-children');
-    const mobileCtxTextKeyRow = document.getElementById('mobile-ctx-textkey-row');
-    const mobileCtxTextKey = document.getElementById('mobile-ctx-textkey');
-    const mobileCtxComponentRow = document.getElementById('mobile-ctx-component-row');
-    const mobileCtxComponent = document.getElementById('mobile-ctx-component');
-    const mobileCtxAdd = document.getElementById('mobile-ctx-add');
-    const mobileCtxEditParams = document.getElementById('mobile-ctx-edit-params');
-    const mobileCtxDuplicate = document.getElementById('mobile-ctx-duplicate');
-    const mobileCtxDelete = document.getElementById('mobile-ctx-delete');
-    
-    // Global Element Info Bar (at bottom of preview area)
+    // The options panel, and the bar under it that opens and closes it where it folds away
+    const optionsPanel = document.getElementById('preview-sidebar');
+    const panelToggle = document.getElementById('preview-panel-toggle');
+    const panelToggleName = document.getElementById('preview-panel-toggle-name');
+
+    // Global Element Info Bar (its own row, above the workspace)
     const globalElementInfo = document.getElementById('preview-element-info');
     const globalElementInfoToggle = document.getElementById('preview-element-info-toggle');
     const globalElementInfoSummary = document.getElementById('preview-element-info-summary');
@@ -1625,9 +1611,7 @@
         iframe.src = buildUrl(editType, editName);
         
         // Reset tool state: switch back to select mode and clear selection.
-        // Preview mode is sticky across navigation (it's the "just look at
-        // the site" mode — no reason to drop the user back into editor).
-        if (currentMode !== 'select' && currentMode !== 'preview' && !(opts && opts.keepMode)) {
+        if (currentMode !== 'select' && !(opts && opts.keepMode)) {
             setMode('select');
         }
         hideNodePanel();
@@ -1875,7 +1859,7 @@
      * Text mode is hidden when editing components (use Add Tag modal for text content)
      */
     function updateTextModeVisibility(editType) {
-        const textModeBtn = document.querySelector('.preview-sidebar-tool[data-mode="text"]');
+        const textModeBtn = document.querySelector('.preview-tool[data-mode="text"]');
         if (!textModeBtn) return;
         
         const isComponent = editType === 'component';
@@ -2251,6 +2235,7 @@
         wrapper.style.width = size.width;
         wrapper.style.height = size.height;
         container.classList.toggle('preview-container--device', device !== 'desktop');
+        container.dataset.device = device;
     }
     
     // ==================== Editor Mode ====================
@@ -2279,35 +2264,20 @@
     /** setMode() once nothing is left to ask. */
     function switchMode(mode, preselect) {
         isSwitchingMode = true;
-        
-        // "Preview" mode: just reload the iframe to show the page as a real
-        // visitor would see it (no selection / hover overlays, navigation
-        // still blocked by the iframe-inject capture-phase guard). After
-        // the reload, the overlay re-injection + overlayReady handler will
-        // re-send setMode('preview') so the iframe stays in preview mode.
         currentMode = mode;
         
-        if (mode === 'preview') {
-            // Clear any current selection/panels before reloading.
-            hideNodePanel();
-            // Trigger a fresh fetch of the page.
-            reloadPreview();
-        }
-        
         modeBtns.forEach(btn => {
-            btn.classList.toggle('preview-sidebar-tool--active', btn.dataset.mode === mode);
+            btn.classList.toggle('preview-tool--active', btn.dataset.mode === mode);
         });
         
-        // Update workspace data-mode for mobile CSS (contextual area visibility)
+        // Update workspace data-mode for the phone's Add overlay
         if (workspace) workspace.dataset.mode = mode;
         
-        // Sync mobile tool buttons
-        const mobileBtns = document.querySelectorAll('.preview-mobile-tool');
-        mobileBtns.forEach(btn => {
-            // For add mode, keep select highlighted since it's a sub-mode
-            const effectiveMode = (mode === 'add') ? 'select' : mode;
-            btn.classList.toggle('preview-mobile-tool--active', btn.dataset.mode === effectiveMode);
-        });
+        // The panel opens with a tool that holds its options, and with Select while an element is selected.
+        const tool = Array.from(modeBtns).find(btn => btn.dataset.mode === mode);
+        setPanelOpen(!!tool && (tool.hasAttribute('data-panel-opens')
+            || (mode === 'select' && selectedStruct != null && selectedNode != null)));
+        if (panelToggleName && tool) panelToggleName.textContent = tool.textContent.trim();
         
         // Update container class for mode-specific styling
         container.dataset.mode = mode;
@@ -2315,7 +2285,7 @@
         // Send mode change to iframe. AI tools mode reuses select-mode
         // behavior in the iframe (hover highlight + click to select) so
         // the user can pick elements directly while seeing Suggested
-        // tools in the rail — without round-tripping through select mode.
+        // tools in the panel — without round-tripping through select mode.
         sendToIframe('setMode', { mode: mode === 'ai-tools' ? 'select' : mode });
         
         // Store preselection for style mode (for the selector browser)
@@ -2329,9 +2299,6 @@
         
         // Update contextual area sections
         updateContextualSection(mode);
-        
-        // Update mobile actions label
-        updateMobileActionsMode(mode);
         
         // Hide node panel when switching away from select mode (but not for add which needs the selection)
         if (mode !== 'select' && mode !== 'add') {
@@ -2389,6 +2356,39 @@
         requestAnimationFrame(() => {
             isSwitchingMode = false;
         });
+    }
+    
+    // ==================== The options panel ====================
+    
+    // Its state is a class at every width, and only the phone block gives it a meaning: there the panel
+    // is one of the rows, and the class is what shows it. No script reads a width.
+    function setPanelOpen(open) {
+        if (!workspace) return;
+        const wasOpen = workspace.classList.contains('preview-workspace--panel-open');
+        workspace.classList.toggle('preview-workspace--panel-open', open);
+        if (panelToggle) panelToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        // The page just got shorter under whatever is selected in it: the frame has its new height
+        // once the box is read, so what is selected comes back into view.
+        if (open && !wasOpen && panelFolds() && previewContainer && previewContainer.offsetHeight) {
+            sendToIframe('revealSelection', {});
+        }
+    }
+
+    /** Opens a closed panel and closes an open one; what it holds stays as it is. */
+    function togglePanel() {
+        setPanelOpen(!workspace.classList.contains('preview-workspace--panel-open'));
+    }
+
+    /** Whether the panel folds away, as one of the rows: the phone block's own answer, read from the box. */
+    function panelFolds() {
+        return !!workspace && getComputedStyle(workspace).display === 'contents';
+    }
+
+    /** While a Save form is up, the phone block gives it the whole window. */
+    function syncSaveFormFills() {
+        if (!workspace) return;
+        const isUp = form => !!form && form.style.display !== 'none';
+        workspace.classList.toggle('preview-workspace--panel-fills', isUp(saveSnippetForm) || isUp(saveComponentForm));
     }
     
     // ==================== Contextual Area ====================
@@ -2475,77 +2475,6 @@
         _i18nPanelsMerged.add(panelName);
     }
 
-    // ==================== Preview Resize ====================
-    
-    const PREVIEW_HEIGHT_KEY = 'quicksite-preview-height';
-    const MIN_PREVIEW_HEIGHT = 200;
-    const MAX_PREVIEW_HEIGHT = window.innerHeight - 150; // Leave space for toolbar
-    
-    /**
-     * Initialize preview area resize functionality
-     */
-    function initPreviewResize() {
-        if (!previewResizeHandle || !container) return;
-        
-        // Restore saved height
-        const savedHeight = localStorage.getItem(PREVIEW_HEIGHT_KEY);
-        if (savedHeight) {
-            const height = parseInt(savedHeight, 10);
-            if (height >= MIN_PREVIEW_HEIGHT && height <= MAX_PREVIEW_HEIGHT) {
-                container.style.setProperty('--preview-height', height + 'px');
-            }
-        }
-        
-        let isResizing = false;
-        let startY = 0;
-        let startHeight = 0;
-        
-        previewResizeHandle.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            isResizing = true;
-            startY = e.clientY;
-            startHeight = container.offsetHeight;
-            
-            container.classList.add('preview-container--resizing');
-            previewResizeHandle.classList.add('preview-resize-handle--active');
-            
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
-        
-        function onMouseMove(e) {
-            if (!isResizing) return;
-            
-            // Handle at bottom: dragging DOWN = larger, dragging UP = smaller
-            const deltaY = e.clientY - startY;
-            let newHeight = startHeight + deltaY;
-            
-            // Clamp to min/max
-            const currentMax = window.innerHeight - 150;
-            newHeight = Math.max(MIN_PREVIEW_HEIGHT, Math.min(currentMax, newHeight));
-            
-            container.style.setProperty('--preview-height', newHeight + 'px');
-        }
-        
-        function onMouseUp(e) {
-            if (!isResizing) return;
-            
-            isResizing = false;
-            container.classList.remove('preview-container--resizing');
-            previewResizeHandle.classList.remove('preview-resize-handle--active');
-            
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
-            
-            // Save the final height
-            const finalHeight = container.offsetHeight;
-            localStorage.setItem(PREVIEW_HEIGHT_KEY, finalHeight.toString());
-        }
-    }
-    
-    // Initialize preview resize
-    initPreviewResize();
-    
     function showContextualInfo(data) {
         // Format structure name for display
         let structDisplay = data.struct || '-';
@@ -2588,15 +2517,12 @@
         // Expand contextual area if collapsed
         if (contextualArea) contextualArea.classList.remove('preview-contextual-area--collapsed');
         
-        // Update mobile sections (low-width mode)
-        updateMobileSections(data);
-        
-        // Update global element info bar (at bottom of preview)
+        // Update global element info bar
         updateGlobalElementInfo(data);
     }
     
     /**
-     * Update global element info bar at bottom of preview area
+     * Update global element info bar
      */
     function updateGlobalElementInfo(data) {
         if (!globalElementInfo) return;
@@ -2682,77 +2608,6 @@
         if (globalInfoNodeParamsRow) globalInfoNodeParamsRow.style.display = 'none';
     }
     
-    /**
-     * Update mobile sections with selection data
-     */
-    function updateMobileSections(data) {
-        if (!mobileSections) return;
-        
-        // Update info section
-        if (mobileCtxId) mobileCtxId.textContent = data.isComponent ? data.componentNode : (data.node === '' ? '(root)' : data.node || '-');
-        if (mobileCtxTag) mobileCtxTag.textContent = data.tag || '-';
-        if (mobileCtxClasses) mobileCtxClasses.textContent = data.classes || '-';
-        if (mobileCtxChildren) mobileCtxChildren.textContent = data.childCount !== undefined ? data.childCount : '-';
-        
-        // Summary for collapsed state
-        if (mobileInfoSummary) {
-            mobileInfoSummary.textContent = `${data.tag || '-'}${data.classes ? '.' + data.classes.split(' ')[0] : ''}`;
-        }
-        
-        // Component row
-        if (data.isComponent && data.component) {
-            if (mobileCtxComponent) mobileCtxComponent.textContent = data.component;
-            if (mobileCtxComponentRow) mobileCtxComponentRow.style.display = '';
-        } else {
-            if (mobileCtxComponentRow) mobileCtxComponentRow.style.display = 'none';
-        }
-        
-        // Text key row
-        if (data.textKeys && data.textKeys.length > 0) {
-            if (mobileCtxTextKey) mobileCtxTextKey.textContent = data.textKeys.join(', ');
-            if (mobileCtxTextKeyRow) mobileCtxTextKeyRow.style.display = '';
-        } else {
-            if (mobileCtxTextKeyRow) mobileCtxTextKeyRow.style.display = 'none';
-        }
-        
-        // Show mobile sections
-        mobileSections.classList.add('preview-mobile-sections--visible');
-    }
-    
-    /**
-     * Hide mobile sections
-     */
-    function hideMobileSections() {
-        if (mobileSections) {
-            mobileSections.classList.remove('preview-mobile-sections--visible');
-        }
-    }
-    
-    /**
-     * Update mobile actions mode label
-     */
-    function updateMobileActionsMode(mode) {
-        if (!mobileActionsMode) return;
-        
-        const modeLabels = {
-            'select': PreviewConfig.i18n?.modeSelect || 'Select',
-            'add': PreviewConfig.i18n?.modeAdd || 'Add',
-            'drag': PreviewConfig.i18n?.modeDrag || 'Drag',
-            'text': PreviewConfig.i18n?.modeText || 'Text',
-            'style': PreviewConfig.i18n?.modeStyle || 'Style',
-            'js': PreviewConfig.i18n?.modeJs || 'JS'
-        };
-        mobileActionsMode.textContent = modeLabels[mode] || mode;
-        
-        // Show/hide action groups based on mode
-        // Note: 'add' is a sub-mode of 'select' - keep select actions visible
-        const effectiveMode = (mode === 'add') ? 'select' : mode;
-        const actionGroups = document.querySelectorAll('.preview-mobile-section__action-group[data-mode]');
-        actionGroups.forEach(group => {
-            group.style.display = group.dataset.mode === effectiveMode ? '' : 'none';
-        });
-    }
-    
     function hideContextualInfo() {
         // Show default message, hide info
         if (ctxSelectDefault) ctxSelectDefault.style.display = '';
@@ -2777,11 +2632,11 @@
         const nodeActions = document.getElementById('ctx-node-actions');
         if (nodeActions) nodeActions.style.display = '';
         
-        // Hide mobile sections
-        hideMobileSections();
-        
         // Hide global element info bar
         hideGlobalElementInfo();
+        
+        // Select with nothing selected has nothing but a hint: the page comes back.
+        if (currentMode === 'select') setPanelOpen(false);
     }
     
     // ==================== Theme Variables ====================
@@ -3028,6 +2883,8 @@
             return;
         }
         
+        setPanelOpen(true);
+
         // Store selection info for edit/copy actions
         selectedStruct = data.struct || null;
         selectedNode = data.isComponent ? data.componentNode : data.node;
@@ -3630,6 +3487,7 @@
                 handleTextEdited(e.data);
             }
             if (e.data.action === 'styleSelected') {
+                setPanelOpen(true);
                 updateGlobalElementInfo(e.data.element);
                 
                 // Filter the selector browser to show only this element's selectors
@@ -3642,6 +3500,7 @@
                 }
             }
             if (e.data.action === 'interactionSelected') {
+                setPanelOpen(true);
                 showJsPanel(e.data);
                 updateGlobalElementInfo(e.data.element);
                 // Mirror the selection into the shared selectedStruct/Node
@@ -4153,7 +4012,19 @@
         }
         
         reloadBtn.addEventListener('click', reloadPreview);
-        
+
+        // The button beside Reload: the rows and the panel away, and back as they were. Not stored: a
+        // page opened anew has the editor's rows.
+        const rowsToggle = document.getElementById('preview-rows-toggle');
+        const previewPage = document.getElementById('preview-page');
+        if (rowsToggle && previewPage) {
+            rowsToggle.addEventListener('click', function() {
+                const hidden = previewPage.classList.toggle('preview-page--rows-hidden');
+                this.setAttribute('aria-pressed', String(hidden));
+                this.title = hidden ? this.dataset.titleShow : this.dataset.titleHide;
+            });
+        }
+
         deviceBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 setDevice(this.dataset.device);
@@ -4162,26 +4033,18 @@
         
         modeBtns.forEach(btn => {
             btn.addEventListener('click', function() {
+                // Where the panel folds away, the tool in use opens and closes its panel and keeps what it holds.
+                if (this.dataset.mode === currentMode && panelFolds()) {
+                    togglePanel();
+                    return;
+                }
                 setMode(this.dataset.mode);
             });
         });
         
-        // (The former dedicated #preview-tool-refresh listener is gone:
-        // the refresh button is now a real mode tool [data-mode="preview"]
-        // and is wired by the modeBtns loop above. Entering preview mode
-        // triggers reloadPreview() inside setMode().)
-        
-        // Mobile tool buttons (bottom toolbar on small screens)
-        const mobileBtns = document.querySelectorAll('.preview-mobile-tool');
-        mobileBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                // Update active state for mobile buttons
-                mobileBtns.forEach(b => b.classList.remove('preview-mobile-tool--active'));
-                this.classList.add('preview-mobile-tool--active');
-                // Also sync desktop buttons
-                setMode(this.dataset.mode);
-            });
-        });
+        if (panelToggle) {
+            panelToggle.addEventListener('click', togglePanel);
+        }
         
         // Drag tool button events are handled by PreviewDrag module (preview-drag.js)
     }
@@ -4323,7 +4186,7 @@
         ctxTextDelete.addEventListener('click', deleteTextOnlyNode);
     }
     
-    // Delete the selected node: the contextual area's and the mobile row's Delete buttons, and the Delete key
+    // Delete the selected node: the contextual area's Delete button, and the Delete key
     async function deleteSelectedNode() {
         if (selectedStruct == null || selectedNode == null) return;
         if (selectedNode === '') {
@@ -4539,19 +4402,19 @@
         }
         
         // Tools show names checkbox
-        if (toolsShowNames && sidebarTools) {
+        if (toolsShowNames && toolsRow) {
             // Restore state from localStorage (default: show names = true)
             const showNames = localStorage.getItem('quicksite-tools-show-names') !== 'false';
             toolsShowNames.checked = showNames;
             if (!showNames) {
-                sidebarTools.classList.add('preview-sidebar__tools--icons-only');
+                toolsRow.classList.add('preview-tools--icons-only');
             }
             
             toolsShowNames.addEventListener('change', function() {
                 if (this.checked) {
-                    sidebarTools.classList.remove('preview-sidebar__tools--icons-only');
+                    toolsRow.classList.remove('preview-tools--icons-only');
                 } else {
-                    sidebarTools.classList.add('preview-sidebar__tools--icons-only');
+                    toolsRow.classList.add('preview-tools--icons-only');
                 }
                 localStorage.setItem('quicksite-tools-show-names', this.checked);
             });
@@ -4674,49 +4537,13 @@
             deleteSnippetBtn.addEventListener('click', deleteSelectedSnippet);
         }
         
-        // Mobile section toggle handlers
-        document.querySelectorAll('.preview-mobile-section__toggle').forEach(toggle => {
-            toggle.addEventListener('click', function() {
-                const section = this.closest('.preview-mobile-section');
-                if (section) {
-                    section.classList.toggle('preview-mobile-section--expanded');
-                }
-            });
-        });
-        
-        // Global element info bar toggle (at bottom of preview)
+        // Global element info bar toggle
         if (globalElementInfoToggle) {
             globalElementInfoToggle.addEventListener('click', function() {
                 if (globalElementInfo) {
                     globalElementInfo.classList.toggle('preview-element-info--expanded');
                 }
             });
-        }
-        
-        // Mobile action buttons (wire to same handlers)
-        if (mobileCtxAdd) {
-            mobileCtxAdd.addEventListener('click', function() {
-                if (selectedStruct == null || selectedNode == null) {
-                    showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
-                    return;
-                }
-                setMode('add');
-                showSidebarAddForm();
-            });
-        }
-        
-        if (mobileCtxEditParams) {
-            mobileCtxEditParams.addEventListener('click', function() {
-                showSidebarEditParamsForm();
-            });
-        }
-
-        if (mobileCtxDuplicate) {
-            mobileCtxDuplicate.addEventListener('click', duplicateSelectedNode);
-        }
-        
-        if (mobileCtxDelete) {
-            mobileCtxDelete.addEventListener('click', deleteSelectedNode);
         }
     }
     
@@ -8097,6 +7924,7 @@
             const selectInfo = document.getElementById('contextual-select-info');
             if (selectInfo) selectInfo.style.display = 'none';
             saveSnippetForm.style.display = '';
+            syncSaveFormFills();
 
             // Reset form fields
             if (saveSnippetName) saveSnippetName.value = '';
@@ -8122,9 +7950,10 @@
         if (!saveSnippetForm) return;
         
         saveSnippetForm.style.display = 'none';
+        syncSaveFormFills();
         const selectInfo = document.getElementById('contextual-select-info');
         if (selectInfo) selectInfo.style.display = '';
-        
+
         // Clear state
         saveSnippetStructureData = null;
         saveSnippetTranslationsData = null;
@@ -8148,6 +7977,7 @@
             const selectInfo = document.getElementById('contextual-select-info');
             if (selectInfo) selectInfo.style.display = 'none';
             saveComponentForm.style.display = '';
+            syncSaveFormFills();
 
             // Reset form fields
             if (saveComponentName) saveComponentName.value = '';
@@ -8170,6 +8000,7 @@
         if (!saveComponentForm) return;
 
         saveComponentForm.style.display = 'none';
+        syncSaveFormFills();
         const selectInfo = document.getElementById('contextual-select-info');
         if (selectInfo) selectInfo.style.display = '';
 
@@ -8534,7 +8365,8 @@
         // Also hide snippet/component forms if open
         if (saveSnippetForm) saveSnippetForm.style.display = 'none';
         if (saveComponentForm) saveComponentForm.style.display = 'none';
-        
+        syncSaveFormFills();
+
         variablesPanel.style.display = '';
         
         // Show loading
@@ -9317,7 +9149,8 @@
         if (emulationPanel) emulationPanel.style.display = 'none';
         if (saveSnippetForm) saveSnippetForm.style.display = 'none';
         if (saveComponentForm) saveComponentForm.style.display = 'none';
-        
+        syncSaveFormFills();
+
         enumsPanel.style.display = '';
         
         // Show loading
@@ -10017,6 +9850,7 @@
         if (enumsPanel) enumsPanel.style.display = 'none';
         if (saveSnippetForm) saveSnippetForm.style.display = 'none';
         if (saveComponentForm) saveComponentForm.style.display = 'none';
+        syncSaveFormFills();
 
         emulationPanel.style.display = '';
 

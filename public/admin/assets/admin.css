@@ -80,7 +80,6 @@
     --admin-header-height: 5.625rem;
     --admin-sidebar-width: 280px;
     --admin-content-max-width: 1400px;
-    --admin-mobile-toolbar-height: 100px;
     --admin-primary: var(--admin-accent);
     --admin-primary-bg: var(--admin-accent-muted);
 }
@@ -433,6 +432,46 @@ code,
 .admin-account__who {
     display: none;
 }
+/* The panel's language, one of the menu's lines. */
+.admin-account__lang {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    color: var(--admin-text-light);
+    font-size: var(--font-size-sm);
+}
+
+.admin-account__lang-label {
+    opacity: 0.7;
+    margin-right: var(--space-xs);
+}
+
+.admin-account__lang-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: var(--font-size-xs);
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-light);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.admin-account__lang-btn:hover {
+    background: var(--admin-bg-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-primary);
+}
+
+.admin-account__lang-btn--active,
+.admin-account__lang-btn--active:hover {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-on-accent);
+    cursor: default;
+}
 
 /* The menu button: a phone's way to the panel. */
 .admin-header__menu-button {
@@ -582,14 +621,6 @@ code,
     font-size: var(--font-size-sm);
 }
 
-.admin-footer__content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-}
-
 .admin-footer__content p,
 .admin-definition-list,
 .admin-modal__title,
@@ -600,7 +631,6 @@ code,
     margin: 0;
 }
 
-.admin-footer__lang,
 .sitemap__tree-header,
 .storage-overview__legend-item,
 .admin-ai-execution-summary__item,
@@ -611,35 +641,6 @@ code,
     display: flex;
     align-items: center;
     gap: var(--space-xs);
-}
-
-.admin-footer__lang-label {
-    opacity: 0.7;
-    margin-right: var(--space-xs);
-}
-
-.admin-footer__lang-btn {
-    padding: 0.25rem 0.5rem;
-    font-size: var(--font-size-xs);
-    background: transparent;
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm);
-    color: var(--admin-text-light);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-}
-
-.admin-footer__lang-btn:hover {
-    background: var(--admin-bg-primary);
-    border-color: var(--admin-primary);
-    color: var(--admin-primary);
-}
-
-.admin-footer__lang-btn--active {
-    background: var(--admin-primary);
-    border-color: var(--admin-primary);
-    color: var(--admin-on-accent);
-    cursor: default;
 }
 
 /* =============================================================================
@@ -1085,7 +1086,7 @@ input.admin-checkbox {
 .manage-space__toggle:hover,
 .ai-auto-option:hover,
 .preview-toolbar__toggle:hover .preview-toolbar__toggle-label,
-.preview-sidebar__tools-label:hover,
+.preview-tools__show-names:hover,
 .preview-animated-selector-group__toggle:hover,
 .preview-js-interaction__body strong,
 .preview-contextual-js-form-advanced-toggle:hover {
@@ -1137,11 +1138,12 @@ input.admin-checkbox {
 .admin-ai-section[data-visible="false"],
 .admin-details__summary::-webkit-details-marker,
 .admin-btn--icon-only span,
-.preview-sidebar__tools--icons-only .preview-sidebar-tool span,
+.preview-tools--icons-only .preview-tool span,
 .preview-contextual-area--sidebar .preview-contextual-toggle,
 .preview-contextual-area--collapsed .preview-contextual-toggle__icon--collapse,
 .preview-contextual-section,
-.preview-page--miniplayer .preview-contextual-area,
+.preview-page--miniplayer .preview-sidebar,
+.preview-page--miniplayer .preview-element-info,
 .preview-keyframe-modal__property-name--hidden,
 .preview-contextual-js-form-api-section,
 .preview-contextual-form__tab span,
@@ -1319,7 +1321,6 @@ input.admin-checkbox {
     opacity: 1;
 }
 
-.preview-mobile-section__action-group,
 .preview-theme-grid,
 .asset-tabs {
     display: flex;
@@ -1728,6 +1729,7 @@ kbd {
 .apply-keyframe-modal,
 .add-transition-modal,
 .preview-translate-csv-modal,
+.qs-easing-picker,
 .sitemap-edit-title-modal,
 .sitemap-resolver-modal,
 .sitemap-resolver-list-modal,
@@ -2516,7 +2518,6 @@ kbd {
 }
 
 .admin-datetime-picker,
-.preview-sidebar__tools-buttons,
 .transition-editor__timing-row,
 .transition-editor__add-property-form,
 .transition-editor__animation-config,
@@ -2949,7 +2950,6 @@ kbd {
 .manage-space__toggle--open .manage-space__chevron,
 .admin-category--open .admin-category__toggle,
 .admin-nav__group--open .admin-nav__group-arrow,
-.preview-mobile-section--expanded .preview-mobile-section__arrow,
 .preview-element-info--expanded .preview-element-info__arrow,
 .preview-property-selector__trigger--open svg,
 .qs-property-selector__trigger--open svg,
@@ -3015,7 +3015,6 @@ kbd {
 .manage-space__item:last-child,
 .admin-ai-execution-details__item:last-child,
 .admin-file-list__item:last-child,
-.preview-mobile-section:last-child,
 .preview-keyframe-item:last-child,
 .preview-animated-selector:last-child,
 .preview-animated-selector-group:last-child,
@@ -5546,8 +5545,6 @@ kbd {
     overflow: hidden;
 }
 
-/* On mobile, account for fixed bottom toolbar */
-
 /* Footer is hidden in PHP for preview page - see layout.php */
 
 /* Full-height preview page - use all available space */
@@ -5570,7 +5567,7 @@ kbd {
     flex-shrink: 0;
 }
 
-/* Row 1: Context (structure/language) + Actions (reload/miniplayer) */
+/* Row 1: Context (structure/language) + Actions (reload/miniplayer). What the left holds wraps, so every control stays in reach. */
 .preview-toolbar--row1 {
     justify-content: space-between;
 }
@@ -5584,19 +5581,23 @@ kbd {
     gap: var(--space-md);
 }
 
-/* Row 2: Device + Tools */
-.preview-toolbar--row2 {
-    gap: var(--space-lg);
-    border-bottom: none;
-    background: var(--admin-bg-secondary);
-    padding: var(--space-xs) var(--space-md);
+.preview-toolbar__left {
+    flex: 1 1 0;
+    flex-wrap: wrap;
+    min-width: 0;
+    row-gap: var(--space-xs);
 }
 
-/* Separator between device and tools */
-.preview-toolbar__separator {
-    width: 1px;
-    height: 24px;
-    background: var(--admin-border);
+.preview-toolbar__right {
+    flex-shrink: 0;
+}
+
+/* Row 2: the tools, then the device switch at its right end. It wraps, so no tool is out of reach. */
+.preview-toolbar--row2 {
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
+    background: var(--admin-bg-secondary);
+    padding: var(--space-xs) var(--space-md);
 }
 
 .preview-toolbar__group--grow {
@@ -5714,6 +5715,7 @@ kbd {
 
 /* Route Layout Toggles (menu/footer visibility per page) */
 .preview-toolbar__layout-toggles {
+    flex-wrap: wrap;
     border-left: 1px solid var(--admin-border);
     padding-left: var(--space-sm);
     gap: var(--space-sm);
@@ -5745,6 +5747,7 @@ kbd {
 /* Device Toggle Buttons */
 .preview-toolbar__devices {
     display: flex;
+    margin-left: auto;
     gap: 2px;
     background: var(--admin-surface);
     padding: 2px;
@@ -5770,10 +5773,8 @@ kbd {
 
 .preview-device-btn:hover,
 .preview-mode-btn:hover,
-.preview-sidebar-tool:hover,
+.preview-tool:hover,
 .preview-element-info__toggle:hover,
-.preview-mobile-tool:hover,
-.preview-mobile-tool:active,
 .preview-contextual-toggle:hover,
 .preview-selectors-search__clear:hover,
 .preview-style-editor__back:hover,
@@ -5826,15 +5827,15 @@ kbd {
     overflow: hidden;
 }
 
+/* setDevice() writes the frame's size inline: it shrinks by flex to what the rows leave. */
 .preview-container--device .preview-frame-wrapper {
-    flex: none;
-    height: auto;
+    flex: 0 1 auto;
+    max-width: 100%;
     border-radius: 16px;
     box-shadow: 
         0 0 0 8px #333333,
         0 0 0 10px #555555,
         0 20px 40px #00000066;
-    max-height: calc(100vh - 350px);
 }
 
 /* Preview Iframe */
@@ -5939,6 +5940,7 @@ kbd {
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-workspace {
+    position: relative; /* What the element info's details lie over */
     display: flex;
     flex-direction: row; /* Sidebar left, main right */
     flex: 1; /* Take all available space */
@@ -5946,12 +5948,13 @@ kbd {
     overflow: hidden;
 }
 
-/* Sidebar - Tools + Tool Options */
+/* Sidebar - the options panel */
 .preview-sidebar {
     display: flex;
     flex-direction: column;
-    width: 240px;
-    min-width: 180px;
+    box-sizing: border-box; /* The stored width is the box's, so it comes back the same */
+    width: min(20rem, 40vw);
+    min-width: min(20rem, 40vw); /* A narrower panel is too tight to work in; a tablet's page keeps the rest */
     max-width: 50vw; /* Max half viewport width */
     flex-shrink: 0; /* Don't shrink */
     background: var(--admin-surface);
@@ -5968,6 +5971,7 @@ kbd {
     width: 5px;
     height: 100%;
     cursor: ew-resize;
+    touch-action: none; /* A finger on it drags it, and does not scroll */
     background: transparent;
     z-index: 100;
     transition: background 0.15s ease;
@@ -5976,6 +5980,24 @@ kbd {
 .preview-sidebar__resize:hover,
 .preview-sidebar__resize--active {
     background: var(--admin-primary);
+}
+
+/* A grip on the edge says it moves, before a mouse reaches it and for a finger, which has no hover */
+.preview-sidebar__resize::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 1px;
+    width: 3px;
+    height: 2.5rem;
+    transform: translateY(-50%);
+    border-radius: var(--radius-full);
+    background: var(--admin-text-light);
+}
+
+.preview-sidebar__resize:hover::after,
+.preview-sidebar__resize--active::after {
+    background: var(--admin-on-accent);
 }
 
 /* Prevent selection while resizing */
@@ -5993,34 +6015,15 @@ kbd {
     pointer-events: none;
 }
 
-/* Sidebar Tools Section */
-.preview-sidebar__tools {
+/* The tools: one button each, in the second row. */
+.preview-tools__buttons {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: var(--space-sm);
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--admin-border);
-}
-
-/* Tools buttons container - default vertical */
-
-/* Icons-only mode: horizontal flex row */
-.preview-sidebar__tools--icons-only .preview-sidebar__tools-buttons {
-    flex-direction: row;
     flex-wrap: wrap;
     gap: var(--space-xs);
+    min-width: 0;
 }
 
-.preview-sidebar-tool--action {
-    opacity: 0.7;
-}
-
-.preview-sidebar-tool--action:hover {
-    opacity: 1;
-}
-
-.preview-sidebar__tools--icons-only .preview-sidebar-tool {
+.preview-tools--icons-only .preview-tool {
     width: 36px;
     height: 36px;
     padding: 0;
@@ -6028,32 +6031,29 @@ kbd {
 }
 
 /* Checkbox label for show names toggle */
-.preview-sidebar__tools-label {
+.preview-tools__show-names {
     display: flex;
     align-items: center;
     gap: var(--space-xs);
-    padding: var(--space-xs) 0;
-    margin-bottom: var(--space-xs);
     font-size: var(--font-size-xs);
     color: var(--admin-text-muted);
     cursor: pointer;
     user-select: none;
+    white-space: nowrap;
 }
 
-.preview-sidebar__tools-label input[type="checkbox"] {
+.preview-tools__show-names input[type="checkbox"] {
     width: 14px;
     height: 14px;
     accent-color: var(--admin-primary);
     cursor: pointer;
 }
 
-/* Sidebar Tool Buttons - Vertical layout with labels */
-.preview-sidebar-tool {
+.preview-tool {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    width: 100%;
-    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
@@ -6062,26 +6062,19 @@ kbd {
     font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: all 0.2s ease;
-    text-align: left;
+    white-space: nowrap;
 }
 
-.preview-sidebar-tool svg {
+.preview-tool svg {
     width: 18px;
     height: 18px;
     flex-shrink: 0;
 }
 
-.preview-sidebar-tool--active {
+.preview-tool--active {
     color: var(--admin-primary);
     background: var(--admin-bg-secondary);
     border-color: var(--admin-primary);
-}
-
-/* Sidebar Divider */
-.preview-sidebar__divider {
-    height: 1px;
-    background: var(--admin-border);
-    margin: var(--space-xs) var(--space-sm);
 }
 
 /* Sidebar Options Panel (Tool Options) */
@@ -6090,6 +6083,30 @@ kbd {
     min-height: 0; /* Critical: allow shrinking in flex column */
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+/* The bar that opens and closes the panel where it folds away: the tool's name with an arrow, drawn by the phone block alone. */
+.preview-sidebar__toggle {
+    display: none;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    min-height: 2.75rem;
+    padding: var(--space-xs) var(--space-md);
+    background: var(--admin-bg-secondary);
+    border: none;
+    border-top: 1px solid var(--admin-border);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+}
+
+.preview-sidebar__toggle svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
 }
 
 /* Tool Options Bar (lock/undo/redo for drag mode) */
@@ -6162,17 +6179,6 @@ kbd {
     overflow: visible;
 }
 
-/* Device Row (above preview) */
-.preview-device-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-xs) var(--space-md);
-    background: var(--admin-bg-secondary);
-    border-bottom: 1px solid var(--admin-border);
-    flex-shrink: 0;
-}
-
 /* Contextual Area in Sidebar Mode */
 .preview-contextual-area--sidebar {
     position: static;
@@ -6182,54 +6188,10 @@ kbd {
     background: transparent;
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   PREVIEW RESPONSIVE - Tablet & Mobile Layouts
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-
-/* Tablet: Icon-only sidebar */
-
-/* Mobile: Bottom toolbar, hide sidebar */
-
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   MOBILE SECTIONS - Independent collapsible sections for info & actions (mobile only)
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-
-.preview-mobile-sections {
-    display: none; /* Hidden on desktop, shown on mobile via media query */
-    flex-direction: column;
-    flex-shrink: 0;
-    background: var(--admin-surface);
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.2s ease;
-}
-
-.preview-mobile-sections--visible {
-    max-height: 400px; /* Enough for all sections expanded */
-}
-
-/* Each section is independently collapsible */
-.preview-mobile-section,
 .preview-animated-selector-group {
     border-bottom: 1px solid var(--admin-border);
 }
 
-/* Section toggle header */
-.preview-mobile-section__toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    width: 100%;
-    padding: var(--space-xs) var(--space-sm);
-    background: var(--admin-bg-secondary);
-    border: none;
-    color: var(--admin-text);
-    font-size: var(--font-size-xs);
-    cursor: pointer;
-    text-align: left;
-}
-
-.preview-mobile-section__toggle:active,
 .preview-selectors-group__header:hover,
 .preview-var-dropdown__item:hover,
 .preview-property-selector__item:hover,
@@ -6249,55 +6211,7 @@ kbd {
     background: var(--admin-surface-hover);
 }
 
-.preview-mobile-section__arrow {
-    width: 12px;
-    height: 12px;
-    flex-shrink: 0;
-    color: var(--admin-text-muted);
-    transition: transform 0.2s;
-}
-
-.preview-mobile-section__title {
-    font-weight: var(--font-weight-medium);
-    color: var(--admin-text-muted);
-    text-transform: uppercase;
-    font-size: 10px;
-    letter-spacing: 0.5px;
-}
-
-.preview-mobile-section__summary {
-    flex: 1;
-    font-family: var(--font-family-mono, monospace);
-    font-size: var(--font-size-xs);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--admin-text);
-    text-align: right;
-}
-
-.preview-mobile-section__mode-label {
-    margin-left: auto;
-    padding: 2px 6px;
-    background: var(--admin-primary);
-    color: var(--admin-on-accent);
-    border-radius: var(--radius-sm);
-    font-size: 10px;
-    font-weight: var(--font-weight-medium);
-    text-transform: capitalize;
-}
-
-/* Section content - hidden by default */
-.preview-mobile-section__content {
-    display: none;
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: var(--space-xs) var(--space-sm) var(--space-sm);
-    background: var(--admin-surface);
-}
-
-.preview-mobile-section--expanded .preview-mobile-section__content,
-.preview-element-info--expanded .preview-element-info__details,
+.preview-element-info--expanded + .preview-workspace > .preview-element-info__details,
 .preview-keyframe-modal.preview-keyframe-modal--visible,
 .transition-editor__property:hover .transition-editor__property-actions,
 .preview-contextual-js-page-events__actions,
@@ -6305,28 +6219,6 @@ kbd {
     display: flex;
 }
 
-/* Info rows */
-.preview-mobile-section__row {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-sm);
-    font-size: var(--font-size-xs);
-}
-
-.preview-mobile-section__label {
-    color: var(--admin-text-muted);
-    flex-shrink: 0;
-    min-width: 55px;
-}
-
-.preview-mobile-section__value {
-    color: var(--admin-text);
-    font-family: var(--font-family-mono, monospace);
-    word-break: break-all;
-}
-
-.preview-mobile-section__value--textkey,
-.preview-mobile-tool--active,
 .position-picker__option input:checked + .position-picker__visual .position-picker__label,
 .preview-variable-card__path:hover,
 .tag-selector__card.selected .tag-selector__card-tag,
@@ -6334,41 +6226,16 @@ kbd {
     color: var(--admin-primary);
 }
 
-/* Action groups */
-
-.preview-mobile-section__action-group .admin-btn {
-    flex: 1;
-    min-width: 70px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-xs);
-}
-
-.preview-mobile-section__action-group .admin-btn span {
-    font-size: 10px;
-}
-
-.preview-mobile-section__hint {
-    text-align: center;
-    font-size: var(--font-size-xs);
-    color: var(--admin-text-muted);
-    font-style: italic;
-    padding: var(--space-xs) 0;
-}
-
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   GLOBAL ELEMENT INFO BAR - Bottom of workspace, visible for all tools
+   GLOBAL ELEMENT INFO BAR - A row above the workspace, visible for all tools
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-element-info {
-    position: relative; /* anchor for the bottom-up details dropdown */
     display: flex;
     flex-direction: column;
     background: var(--admin-surface);
-    border-top: 1px solid var(--admin-border);
+    border-bottom: 1px solid var(--admin-border);
     flex-shrink: 0;
-    min-height: 45px; /* Ensure always visible */
 }
 
 .preview-element-info__toggle {
@@ -6403,24 +6270,47 @@ kbd {
 }
 
 .preview-element-info__details {
-    /* Opens UP from the toggle bar like a bottom-anchored dropdown.
-       Absolute positioning keeps expansion from pushing layout or being
-       clipped by ancestors; max-height + overflow-y handle tall content. */
+    /* Opens downward from the row, over the panel and the page. The workspace holds it, so it is
+       never cut: no taller than the workspace, and it scrolls inside itself. */
     display: none;
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 100%;
+    top: 0;
+    box-sizing: border-box;
     padding: var(--space-sm) var(--space-md);
-    max-height: 60vh;
+    max-height: min(60vh, 100%);
     overflow-y: auto;
     gap: var(--space-xs);
     flex-direction: column;
     background: var(--admin-bg-secondary);
-    border-top: 1px solid var(--admin-border);
     border-bottom: 1px solid var(--admin-border);
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.12);
-    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    z-index: 101; /* above the panel's resize handle */
+}
+
+.preview-page--miniplayer .preview-workspace > .preview-element-info__details {
+    display: none;
+}
+
+/* The button beside Reload: every row but this one and the panel go, and the page has what they held.
+   The tool in use, the selection and the panel's state stay as they are underneath. */
+.preview-page--rows-hidden .preview-toolbar__left,
+.preview-page--rows-hidden #preview-miniplayer-toggle,
+.preview-page--rows-hidden .preview-toolbar--row2,
+.preview-page--rows-hidden .preview-element-info,
+.preview-page--rows-hidden .preview-sidebar,
+.preview-page--rows-hidden .preview-workspace > .preview-element-info__details {
+    display: none;
+}
+
+.preview-rows-toggle__show,
+.preview-page--rows-hidden .preview-rows-toggle__hide {
+    display: none;
+}
+
+.preview-page--rows-hidden .preview-rows-toggle__show {
+    display: block;
 }
 
 .preview-element-info__row {
@@ -6444,49 +6334,10 @@ kbd {
     text-overflow: ellipsis;
 }
 
-/* Responsive: compact on mobile */
-
-/* Mobile Bottom Toolbar */
-.preview-mobile-toolbar {
-    display: none; /* Hidden by default, shown on mobile */
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    background: var(--admin-surface);
-    border-top: 1px solid var(--admin-border);
-    padding: var(--space-xs) var(--space-sm);
-    padding-bottom: calc(var(--space-xs) + env(safe-area-inset-bottom, 0px));
-    gap: var(--space-xs);
-    justify-content: space-around;
-    max-height: var(--admin-mobile-toolbar-height);
-}
-
-.preview-mobile-tool {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: var(--space-xs) var(--space-sm);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-md);
-    color: var(--admin-text-muted);
-    font-size: 10px;
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 48px;
-}
-
-.preview-mobile-tool svg,
 .preview-keyframe-modal__close svg {
     width: 20px;
     height: 20px;
 }
-
-/* Adjust preview container for mobile bottom toolbar */
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    COMPONENT WARNING BANNER - Shown when editing a component template
@@ -8044,7 +7895,7 @@ code.preview-contextual-info__value {
 
 .qs-easing-picker__dialog {
     position: relative;
-    width: 320px;
+    width: min(320px, 100%);
     margin: 80px auto;
     background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);

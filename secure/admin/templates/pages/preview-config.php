@@ -178,13 +178,6 @@ window.PreviewConfig = {
         saving: <?= json_encode(__admin('common.saving', 'Saving')) ?>,
         search: <?= json_encode(__admin('common.search', 'Search')) ?>,
 
-        // ── Mode toolbar ──
-        modeSelect: <?= json_encode(__admin('preview.modeSelect', 'Select')) ?>,
-        modeDrag: <?= json_encode(__admin('preview.modeDrag', 'Drag')) ?>,
-        modeStyle: <?= json_encode(__admin('preview.modeStyle', 'Style')) ?>,
-        modeAdd: <?= json_encode(__admin('preview.modeAdd', 'Add')) ?>,
-        modeText: <?= json_encode(__admin('preview.modeText', 'Text')) ?>,
-        modeJs: <?= json_encode(__admin('preview.modeJs', 'JS')) ?>,
         miniplayer: <?= json_encode(__admin('preview.miniplayer', 'Miniplayer')) ?>,
 
         // ── Node / element management ──

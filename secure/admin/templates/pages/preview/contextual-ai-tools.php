@@ -4,14 +4,19 @@
     <!-- List view (default; switches to runner view when a tool is picked) -->
     <div class="preview-contextual-ai-tools__list-view" id="ai-tools-list-view">
 
-        <div class="preview-contextual-ai-tools__backup-banner" role="alert">
+        <div class="preview-contextual-ai-tools__backup-banner" id="ai-tools-backup-banner" role="alert">
             <div class="preview-contextual-ai-tools__backup-banner-text">
                 <strong><?= __admin('preview.aiToolsBackupWarning', 'AI tools modify your site directly. Changes cannot be easily reverted.') ?></strong>
                 <span><?= __admin('preview.aiToolsBackupRecommendation', "We recommend creating a backup before running any workflow you're not sure about.") ?></span>
             </div>
-            <button type="button" class="preview-contextual-ai-tools__backup-btn" id="ai-tools-backup-btn">
-                <?= __admin('preview.aiToolsBackupBtn', 'Create backup now') ?>
-            </button>
+            <div class="preview-contextual-ai-tools__backup-actions">
+                <button type="button" class="preview-contextual-ai-tools__backup-btn" id="ai-tools-backup-btn">
+                    <?= __admin('preview.aiToolsBackupBtn', 'Create backup now') ?>
+                </button>
+                <button type="button" class="preview-contextual-ai-tools__backup-hide" id="ai-tools-backup-hide">
+                    <?= __admin('preview.aiToolsBackupHide', "Don't show this message again") ?>
+                </button>
+            </div>
         </div>
 
         <div class="preview-contextual-ai-tools__search-row">

@@ -39,7 +39,8 @@
     }
     .admin-nav__link,
     .admin-nav__group-toggle,
-    .admin-user-badge {
+    .admin-user-badge,
+    .admin-account__lang-btn {
         box-sizing: border-box;
         min-height: 2.75rem;
     }
@@ -73,16 +74,122 @@
         display: none;
     }
 
-    /* The editor */
+    /* The editor: its bottom edge is what the browser shows, and where the rows leave too little
+       the column scrolls, with the page keeping its room. A control a finger presses has room for it. */
+    .admin-body[data-page="preview"] .admin-main {
+        height: calc(100dvh - var(--admin-header-height));
+    }
+    .preview-page {
+        overflow-y: auto;
+    }
+    .preview-workspace {
+        flex: 1 0 20rem;
+    }
+    .preview-toolbar__right {
+        align-self: flex-start;
+    }
+    /* The tools' row wraps as one flow, so a narrow window does not give the switch a line of its own */
+    .preview-tools__buttons {
+        display: contents;
+    }
+    .preview-tool,
+    .preview-tools__show-names,
+    .preview-device-btn {
+        min-height: 2.75rem;
+    }
+    .preview-tools--icons-only .preview-tool {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+    .preview-element-info__toggle {
+        min-height: 2.75rem;
+    }
+    .preview-sidebar__resize {
+        width: 0.75rem;
+    }
+    /* A tablet shows the page at its own width: no tablet device, whichever one a computer chose
+       (setDevice() writes the frame's size inline) */
+    .preview-device-btn[data-device="tablet"] {
+        display: none;
+    }
+    .preview-container--device[data-device="tablet"] {
+        padding: 0;
+        align-items: stretch;
+    }
+    .preview-container--device[data-device="tablet"] .preview-frame-wrapper {
+        flex: 1;
+        width: 100% !important;
+        height: auto !important;
+        border-radius: 0;
+        box-shadow: none;
+    }
     .preview-sidebar__options,
     .preview-contextual-area--sidebar .preview-contextual-content {
         padding: var(--space-xs);
     }
-    .preview-sidebar-tool {
-        justify-content: center;
+    /* What the page's room leaves Source's toolbar, and the panel's Translations: they wrap */
+    .preview-source-canvas__toolbar,
+    .preview-source-canvas__search,
+    .preview-source-canvas__restore-banner,
+    .preview-source-canvas__restore-actions,
+    .preview-iframe-warning,
+    .preview-contextual-translation__chips,
+    .preview-selector-selected__actions {
+        flex-wrap: wrap;
     }
-    .preview-sidebar-tool span {
-        display: none;
+    .preview-source-canvas__restore-actions {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+    .preview-source-canvas__toolbar {
+        gap: var(--space-xs);
+    }
+    .preview-source-canvas__search {
+        flex: 1 1 14rem;
+        min-width: 0;
+    }
+    .preview-source-canvas__search-input-wrap {
+        flex: 1 1 8rem;
+        min-width: 0;
+    }
+    .preview-source-canvas__search-input {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .preview-contextual-translation__chips {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+    /* What a narrow panel holds gives way: a long word breaks, a row wraps, a name shrinks */
+    .preview-sidebar__options {
+        overflow-wrap: break-word;
+    }
+    .qs-fs-field-row__line,
+    .preview-contextual-js-state-stores__card,
+    .preview-contextual-ai-tools__runner-section-header,
+    .position-picker,
+    .preview-theme-actions,
+    .preview-source-sidebar__actions,
+    .preview-animations-section__header,
+    .preview-contextual-js-page-events__actions,
+    .preview-emulation-panel__actions,
+    .preview-contextual-translation__filter-row {
+        flex-wrap: wrap;
+    }
+    .preview-sidebar__options .admin-checkbox > span,
+    .preview-contextual-js-page-events__code,
+    .preview-contextual-ai-tools__toggle,
+    .preview-source-canvas__restore-title,
+    .preview-source-canvas__restore-detail,
+    .class-combobox__chip-text {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .class-combobox__chip {
+        max-width: 100%;
+    }
+    .class-combobox__chip-text {
+        white-space: normal;
     }
 
     /* AI connections */
@@ -112,8 +219,17 @@
     .asset-card__rename,
     .asset-card__star,
     .asset-card__favicon,
-    .asset-video-overlay {
+    .asset-video-overlay,
+    .preview-style-property__delete,
+    .preview-contextual-js-response-bindings__row-delete,
+    .preview-contextual-translation__row-actions {
         opacity: 1;
+    }
+    .preview-contextual-js-page-events__delete {
+        opacity: 0.7;
+    }
+    .transition-editor__property-actions {
+        display: flex;
     }
 }
 
@@ -251,49 +367,170 @@
         box-shadow: none;
     }
 
-    /* The editor */
-    .preview-frame-wrapper {
-        height: 400px;
+    /* The editor: the rows, then the page right after them. Row 1 wraps as one flow with what its
+       left holds. A phone has no device switch: it shows the page at its own width, whichever
+       device a computer chose (setDevice() writes the frame's size inline). */
+    .preview-toolbar {
+        flex-wrap: wrap;
+        gap: var(--space-xs) var(--space-sm);
+        padding: var(--space-xs) var(--space-sm);
     }
-    .preview-contextual-info {
-        flex-direction: column;
+    .preview-toolbar__left {
+        display: contents;
     }
-    .preview-contextual-area,
+    .preview-toolbar__right {
+        order: 1;
+        margin-left: auto;
+        gap: var(--space-xs);
+    }
+    #preview-page-title-group,
+    #preview-theme-toggle-group,
+    .preview-toolbar__layout-toggles {
+        order: 2;
+    }
+    .preview-toolbar__layout-toggles {
+        border-left: none;
+        padding-left: 0;
+    }
+    /* A list shows what it holds, and a field does not: only the title keeps its word */
     .preview-toolbar__label {
         display: none;
     }
-    .preview-workspace[data-mode="add"] .preview-sidebar {
-        display: block !important;
+    #preview-page-title-group .preview-toolbar__label {
+        display: inline;
+    }
+    .preview-toolbar__group,
+    .preview-toolbar__group .qs-searchable-select {
+        min-width: 0;
+        max-width: 100%;
+    }
+    .preview-toolbar__group .qs-searchable-select {
+        flex: 1 1 10rem;
+    }
+    #preview-page-title-group {
+        flex: 1 1 100%;
+    }
+    .preview-toolbar__input {
+        flex: 1 1 0;
+        width: auto;
+        min-width: 0;
+    }
+    .preview-toolbar__devices {
+        display: none;
+    }
+    .preview-container--device {
+        padding: 0;
+        align-items: stretch;
+    }
+    .preview-container--device .preview-frame-wrapper {
+        flex: 1;
+        width: 100% !important;
+        height: auto !important;
+        border-radius: 0;
+        box-shadow: none;
+    }
+    .preview-element-info__row {
+        align-items: baseline;
+    }
+    .preview-element-info__value {
+        min-width: 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    /* A tool's panel is one of the rows, under the tools and before the thin row: its bar is always
+       there, naming the tool in use, and what it holds shows while its class says it is open. It
+       pushes the page down and covers nothing, so the page is still there to tap. As wide as the
+       window (the stored width is a computer's, written inline), about a third of the screen at
+       most, and scrolling inside itself. The bar and the tool in use open and close it. No box is
+       left of the workspace, so its order is the page's. */
+    .preview-workspace {
+        display: contents;
+    }
+    .preview-element-info,
+    .preview-element-info__details,
+    .preview-main {
+        order: 1;
+    }
+    .preview-main {
+        flex: 1 0 20rem;
+    }
+    .preview-workspace--panel-open .preview-main {
+        flex-basis: 14rem;
+    }
+    .preview-sidebar {
+        flex-shrink: 0;
+        width: 100% !important;
+        max-width: none;
+        max-height: max(35dvh, 12rem);
+        border-right: none;
+        border-bottom: 1px solid var(--admin-border);
+    }
+    /* The element's details open as a row too, whole, and push the page down with the rest */
+    .preview-element-info__details {
+        position: static;
+        flex-shrink: 0;
+        max-height: 40dvh;
+        box-shadow: none;
+    }
+    .preview-sidebar__options {
+        display: none;
+        flex: 0 1 auto;
+    }
+    .preview-workspace--panel-open .preview-sidebar__options {
+        display: block;
+    }
+    .preview-sidebar__toggle {
+        display: flex;
+        border-top: none;
+    }
+    .preview-workspace--panel-open .preview-sidebar__toggle {
+        border-top: 1px solid var(--admin-border);
+    }
+    .preview-workspace--panel-open .preview-sidebar__toggle svg {
+        transform: rotate(180deg);
+    }
+    .preview-sidebar__resize {
+        display: none;
+    }
+    /* The dialogs behind the tools: their buttons wrap */
+    .preview-keyframe-modal__footer,
+    .preview-keyframe-modal__footer-right,
+    .apply-keyframe-modal__footer,
+    .add-transition-modal__footer,
+    .preview-translate-csv-modal__footer,
+    .qs-easing-picker__footer {
+        flex-wrap: wrap;
+    }
+    /* Add, Edit Params and the two Save forms fill the window, and their own Back, x or Cancel leaves them */
+    .preview-workspace[data-mode="add"] .preview-sidebar,
+    .preview-workspace--panel-fills .preview-sidebar {
+        display: block;
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        bottom: 60px;
+        bottom: 0;
         z-index: 1000;
-        width: 100% !important;
-        max-width: none !important;
+        max-height: none;
         overflow-y: auto;
     }
-    .preview-workspace[data-mode="add"] .preview-sidebar__tools,
-    .preview-workspace[data-mode="add"] .preview-sidebar__divider,
-    .preview-workspace[data-mode="add"] .preview-sidebar__resize {
-        display: none !important;
+    .preview-workspace[data-mode="add"] .preview-sidebar__options,
+    .preview-workspace--panel-fills .preview-sidebar__options {
+        display: block;
     }
-    .preview-main {
-        width: 100%;
+    .preview-workspace[data-mode="add"] .preview-sidebar__toggle,
+    .preview-workspace--panel-fills .preview-sidebar__toggle {
+        display: none;
     }
-    .preview-mobile-toolbar,
-    .preview-mobile-sections {
-        display: flex !important;
+    /* AI tools: three tags and the count of the rest */
+    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag--past-phone,
+    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle-count {
+        display: none;
     }
-    .preview-workspace[data-mode="add"] .preview-contextual-area {
-        display: block !important;
-    }
-    .preview-toolbar__select {
-        width: 100%;
-    }
-    .preview-page {
-        padding-bottom: 60px;
+    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle--phone-only,
+    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle-count--phone {
+        display: inline;
     }
 
     /* Media */

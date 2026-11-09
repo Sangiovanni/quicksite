@@ -104,12 +104,37 @@
 
 /* The chosen option, whole, above the search (the currentOnTop option). */
 .qs-searchable-select__current {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
     padding: 8px 10px;
     border-bottom: 1px solid var(--admin-border);
     color: var(--admin-text);
     font-size: 13px;
     font-weight: 600;
     overflow-wrap: anywhere;
+}
+
+/* Copies the chosen option's value (the currentCopy option) */
+.qs-searchable-select__current-copy {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+
+.qs-searchable-select__current-copy:hover {
+    color: var(--admin-text);
+    border-color: var(--admin-text-muted);
 }
 
 .qs-searchable-select__search {

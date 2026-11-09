@@ -3,15 +3,15 @@
  * 
  * Handles sidebar width resizing with drag support.
  * - Drag handle to resize sidebar
- * - Min/max width constraints (180px to 50% of viewport)
+ * - Min/max width constraints (the panel's CSS min-width to 50% of viewport)
  * - State persistence via localStorage
+ * - Pointer events, so a finger drags the handle as a mouse does
  * 
  * Auto-initializes when DOM is ready.
  */
 (function() {
     'use strict';
     
-    const SIDEBAR_MIN_WIDTH = 180;
     const SIDEBAR_STORAGE_KEY = 'quicksite_sidebar_width';
     
     // DOM references
@@ -36,6 +36,13 @@
     function getMaxWidth() {
         return Math.floor(window.innerWidth * 0.5);
     }
+
+    /**
+     * Get minimum allowed width: the stylesheet's, its one place
+     */
+    function getMinWidth() {
+        return parseFloat(getComputedStyle(sidebar).minWidth) || 0;
+    }
     
     /**
      * Load saved width from localStorage
@@ -46,7 +53,7 @@
             if (savedWidth) {
                 const width = parseInt(savedWidth, 10);
                 const maxWidth = getMaxWidth();
-                if (width >= SIDEBAR_MIN_WIDTH && width <= maxWidth) {
+                if (width >= getMinWidth() && width <= maxWidth) {
                     sidebar.style.width = width + 'px';
                 }
             }
@@ -78,8 +85,9 @@
         sidebarResize.classList.add('preview-sidebar__resize--active');
         workspace.classList.add('preview-workspace--resizing');
         
-        document.addEventListener('mousemove', onResizeMove);
-        document.addEventListener('mouseup', onResizeEnd);
+        document.addEventListener('pointermove', onResizeMove);
+        document.addEventListener('pointerup', onResizeEnd);
+        document.addEventListener('pointercancel', onResizeEnd);
     }
     
     /**
@@ -93,7 +101,7 @@
         
         // Clamp to min/max (max is 50% of viewport)
         const maxWidth = getMaxWidth();
-        newWidth = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxWidth, newWidth));
+        newWidth = Math.max(getMinWidth(), Math.min(maxWidth, newWidth));
         
         sidebar.style.width = newWidth + 'px';
     }
@@ -108,14 +116,15 @@
         sidebarResize.classList.remove('preview-sidebar__resize--active');
         workspace.classList.remove('preview-workspace--resizing');
         
-        document.removeEventListener('mousemove', onResizeMove);
-        document.removeEventListener('mouseup', onResizeEnd);
-        
+        document.removeEventListener('pointermove', onResizeMove);
+        document.removeEventListener('pointerup', onResizeEnd);
+        document.removeEventListener('pointercancel', onResizeEnd);
+
         saveWidth();
     }
-    
+
     // Setup event listener
-    sidebarResize.addEventListener('mousedown', onResizeStart);
+    sidebarResize.addEventListener('pointerdown', onResizeStart);
     
     // Load saved width on init
     loadSavedWidth();
@@ -127,7 +136,7 @@
         getWidth: () => sidebar.offsetWidth,
         setWidth: (width) => {
             const maxWidth = getMaxWidth();
-            width = Math.max(SIDEBAR_MIN_WIDTH, Math.min(maxWidth, width));
+            width = Math.max(getMinWidth(), Math.min(maxWidth, width));
             sidebar.style.width = width + 'px';
             saveWidth();
         },

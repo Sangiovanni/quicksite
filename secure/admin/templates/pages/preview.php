@@ -87,12 +87,13 @@ if (is_dir($componentsDir)) {
 
 <!-- Preview Controls - Toolbar -->
 <?php include __DIR__ . '/preview/toolbar.php'; ?>
+<?php include __DIR__ . '/preview/tools.php'; ?>
+<?php include __DIR__ . '/preview/element-info.php'; ?>
 
 <div class="preview-workspace">
+    <?php include __DIR__ . '/preview/element-info-details.php'; ?>
+
     <aside class="preview-sidebar" id="preview-sidebar">
-        <!-- Sidebar Tool Icons -->
-        <?php include __DIR__ . '/preview/sidebar-tools.php'; ?>
-        
         <div class="preview-sidebar__options" id="preview-sidebar-options">
 
 <div class="preview-contextual-area preview-contextual-area--sidebar" id="preview-contextual-area">
@@ -124,12 +125,21 @@ if (is_dir($componentsDir)) {
 </div><!-- End preview-contextual-area -->
 
         </div><!-- End preview-sidebar__options -->
-        <div class="preview-sidebar__resize" id="sidebar-resize"></div>
+        <!-- Opens and closes the panel where it folds away (the phone block draws it, and turns the arrow); its words are the tool's name -->
+        <button type="button" class="preview-sidebar__toggle" id="preview-panel-toggle" aria-expanded="false" aria-controls="preview-sidebar-options">
+            <span id="preview-panel-toggle-name"></span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+            </svg>
+        </button>
+        <div class="preview-sidebar__resize" id="sidebar-resize" title="<?= adminAttr(__admin('preview.resizePanel', 'Drag to widen or narrow this panel')) ?>"></div>
     </aside><!-- End preview-sidebar -->
     
     <!-- Main Preview Area -->
     <?php include __DIR__ . '/preview/main-area.php'; ?>
 </div><!-- End preview-workspace -->
+
+</div><!-- End preview-page wrapper -->
 
 <!-- Modals (top-level so position:fixed isn't constrained by any ancestor containing block) -->
 <?php include __DIR__ . '/preview/modals/keyframe.php'; ?>
@@ -141,5 +151,3 @@ if (is_dir($componentsDir)) {
 
 <script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/components/colorpicker.js') ?>"></script>
 <?php include __DIR__ . '/preview-config.php'; ?>
-
-</div><!-- End preview-page wrapper -->

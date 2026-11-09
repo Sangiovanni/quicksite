@@ -110,5 +110,19 @@
                 <path d="M9 3v18M3 9h18"/>
             </svg>
         </button>
+        <!-- Hides the editor's rows and panel, and brings them back: the page alone under the header -->
+        <button type="button" id="preview-rows-toggle" class="admin-btn admin-btn--ghost admin-btn--icon-only" aria-pressed="false"
+                title="<?= adminEscape(__admin('preview.rowsHide', "Hide the editor's rows and show the whole page")) ?>"
+                data-title-hide="<?= adminEscape(__admin('preview.rowsHide', "Hide the editor's rows and show the whole page")) ?>"
+                data-title-show="<?= adminEscape(__admin('preview.rowsShow', "Show the editor's rows")) ?>">
+            <svg class="admin-btn__icon preview-rows-toggle__hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="17 11 12 6 7 11"/>
+                <polyline points="17 18 12 13 7 18"/>
+            </svg>
+            <svg class="admin-btn__icon preview-rows-toggle__show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="7 13 12 18 17 13"/>
+                <polyline points="7 6 12 11 17 6"/>
+            </svg>
+        </button>
     </div>
 </div>
