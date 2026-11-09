@@ -2056,7 +2056,6 @@
         "language": "Language"
     },
     "preview": {
-        "title": "Visual Editor",
         "subtitle": "Preview and interact with your website in real-time",
         "device": "Device",
         "language": "Language",
@@ -2365,9 +2364,6 @@
         "nodeParams": "Params",
         "editStructure": "Edit Structure",
         "copyNodeId": "Copy Node ID",
-        "miniplayer": "Miniplayer",
-        "expand": "Expand",
-        "miniplayerClose": "Close Miniplayer",
         "addElement": "Add Element",
         "addNode": "Add Element",
         "duplicateNode": "Duplicate Element",

@@ -993,11 +993,6 @@ $langNames = [
         }
     })();
     </script>
-
-    <!-- Global Miniplayer (not on preview page, it has its own) -->
-    <?php if ($currentPage !== 'preview'): ?>
-        <?php require __DIR__ . '/partials/_miniplayer.php'; ?>
-    <?php endif; ?>
     <?php endif; ?>
 </body>
 </html>

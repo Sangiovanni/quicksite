@@ -1142,18 +1142,10 @@ input.admin-checkbox {
 .preview-contextual-area--sidebar .preview-contextual-toggle,
 .preview-contextual-area--collapsed .preview-contextual-toggle__icon--collapse,
 .preview-contextual-section,
-.preview-page--miniplayer .preview-sidebar,
-.preview-page--miniplayer .preview-element-info,
 .preview-keyframe-modal__property-name--hidden,
 .preview-contextual-js-form-api-section,
 .preview-contextual-form__tab span,
-.tag-selector__panel,
-.preview-miniplayer-icon--expand,
-.preview-miniplayer-text--expand,
-.preview-page--miniplayer .preview-toolbar,
-.preview-page--miniplayer .admin-page-header,
-.preview-page--miniplayer .preview-miniplayer-icon--minimize,
-.preview-page--miniplayer .preview-miniplayer-text--minimize {
+.tag-selector__panel {
     display: none;
 }
 
@@ -1164,8 +1156,7 @@ input.admin-checkbox {
 .admin-nav__group--open .admin-nav__group-dropdown,
 .preview-contextual-section--active,
 .preview-theme-panel,
-.tag-selector__panel.active,
-.preview-page--miniplayer .preview-miniplayer-icon--expand {
+.tag-selector__panel.active {
     display: block;
 }
 
@@ -1704,8 +1695,7 @@ kbd {
 .admin-datetime-picker__inputs,
 .preview-toolbar__tools,
 .preview-keyframe-modal__frame-actions,
-.position-picker,
-.global-miniplayer__controls {
+.position-picker {
     display: flex;
     gap: var(--space-xs);
 }
@@ -2189,9 +2179,7 @@ kbd {
 }
 
 .sitemap__tree-toggle:hover,
-.preview-contextual-js-form-close:hover,
-.preview-miniplayer-controls__btn:hover,
-.global-miniplayer__btn:hover {
+.preview-contextual-js-form-close:hover {
     background: var(--admin-bg-tertiary);
     color: var(--admin-text);
 }
@@ -4953,8 +4941,7 @@ kbd {
     border-radius: 50%;
 }
 
-.admin-modal-dialog__icon svg,
-.preview-page--miniplayer .preview-iframe {
+.admin-modal-dialog__icon svg {
     width: 100%;
     height: 100%;
 }
@@ -5567,7 +5554,7 @@ kbd {
     flex-shrink: 0;
 }
 
-/* Row 1: Context (structure/language) + Actions (reload/miniplayer). What the left holds wraps, so every control stays in reach. */
+/* Row 1: Context (structure/language) + Actions (reload, hide the rows). What the left holds wraps, so every control stays in reach. */
 .preview-toolbar--row1 {
     justify-content: space-between;
 }
@@ -5689,9 +5676,7 @@ kbd {
 .transition-editor__anim-checkbox input,
 .preview-contextual-js-page-events__chevron,
 .preview-contextual-form__back-btn svg,
-.snippet-selector__category svg,
-.preview-miniplayer-controls__btn svg,
-.global-miniplayer__btn svg {
+.snippet-selector__category svg {
     width: 14px;
     height: 14px;
 }
@@ -5839,8 +5824,7 @@ kbd {
 }
 
 /* Preview Iframe */
-.preview-iframe,
-.global-miniplayer__iframe {
+.preview-iframe {
     width: 100%;
     height: 100%;
     border: none;
@@ -6010,8 +5994,7 @@ kbd {
     cursor: ew-resize !important;
 }
 
-.preview-workspace--resizing iframe,
-.global-miniplayer--dragging .global-miniplayer__iframe {
+.preview-workspace--resizing iframe {
     pointer-events: none;
 }
 
@@ -6214,8 +6197,7 @@ kbd {
 .preview-element-info--expanded + .preview-workspace > .preview-element-info__details,
 .preview-keyframe-modal.preview-keyframe-modal--visible,
 .transition-editor__property:hover .transition-editor__property-actions,
-.preview-contextual-js-page-events__actions,
-.preview-page--miniplayer .preview-miniplayer-controls {
+.preview-contextual-js-page-events__actions {
     display: flex;
 }
 
@@ -6289,14 +6271,9 @@ kbd {
     z-index: 101; /* above the panel's resize handle */
 }
 
-.preview-page--miniplayer .preview-workspace > .preview-element-info__details {
-    display: none;
-}
-
 /* The button beside Reload: every row but this one and the panel go, and the page has what they held.
    The tool in use, the selection and the panel's state stay as they are underneath. */
 .preview-page--rows-hidden .preview-toolbar__left,
-.preview-page--rows-hidden #preview-miniplayer-toggle,
 .preview-page--rows-hidden .preview-toolbar--row2,
 .preview-page--rows-hidden .preview-element-info,
 .preview-page--rows-hidden .preview-sidebar,
@@ -7093,8 +7070,6 @@ code.preview-contextual-info__value {
     color: var(--admin-text);
     background: var(--admin-hover);
 }
-
-/* Hide contextual area when in miniplayer mode */
 
 /* Responsive adjustments */
 
@@ -13880,8 +13855,7 @@ code.preview-contextual-info__value {
     color: #ffffff;
 }
 
-.tag-selector__category-label,
-.preview-page--miniplayer .preview-miniplayer-text--expand {
+.tag-selector__category-label {
     display: inline;
 }
 
@@ -14842,227 +14816,6 @@ code.preview-contextual-info__value {
 
 .preview-container[data-mode="text"] {
     cursor: text;
-}
-
-/* ========================================
-   MINIPLAYER STYLES
-   ======================================== */
-
-/* Miniplayer toggle button icon states */
-
-/* Miniplayer mode - floating window */
-.preview-page--miniplayer .preview-container {
-    position: fixed;
-    bottom: var(--space-lg);
-    right: var(--space-lg);
-    width: 400px;
-    height: 300px;
-    z-index: 1000;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px #0000004d;
-    border: 2px solid var(--admin-border);
-    background: var(--admin-bg);
-    resize: both;
-    overflow: hidden;
-    min-width: 280px;
-    min-height: 200px;
-    max-width: 90vw;
-    max-height: 80vh;
-}
-
-.preview-page--miniplayer .preview-container::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 28px;
-    background: var(--admin-bg-secondary);
-    border-bottom: 1px solid var(--admin-border);
-    cursor: move;
-    z-index: 1;
-}
-
-.preview-page--miniplayer .preview-frame-wrapper {
-    position: absolute;
-    top: 28px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100% !important;
-    height: calc(100% - 28px) !important;
-}
-
-/* Hide toolbar in miniplayer mode */
-
-/* Hide header content in miniplayer (show floating controls instead) */
-
-/* Hide node panel in miniplayer */
-
-/* Miniplayer floating controls */
-.preview-miniplayer-controls {
-    position: absolute;
-    top: 4px;
-    right: 8px;
-    display: none;
-    gap: var(--space-xs);
-    z-index: 2;
-}
-
-.preview-miniplayer-controls__btn {
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--admin-text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
-}
-
-/* Resize handle indicator */
-.preview-page--miniplayer .preview-container::after {
-    content: '';
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 12px;
-    height: 12px;
-    background: linear-gradient(135deg, transparent 50%, var(--admin-text-muted) 50%);
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-/* Dragging state */
-.preview-container.preview-container--dragging {
-    opacity: 0.9;
-    cursor: move;
-}
-
-/* Toggle button state in miniplayer mode */
-
-/* Responsive miniplayer */
-
-/* ========================================
-   GLOBAL MINIPLAYER (Layout-Level)
-   Floating preview that persists across pages
-   ======================================== */
-
-.global-miniplayer {
-    position: fixed;
-    bottom: var(--space-lg);
-    right: var(--space-lg);
-    width: 400px;
-    height: 300px;
-    z-index: 9999;
-    border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px #00000066;
-    border: 2px solid var(--admin-border);
-    background: var(--admin-bg);
-    resize: both;
-    overflow: hidden;
-    min-width: 280px;
-    min-height: 200px;
-    max-width: 90vw;
-    max-height: 80vh;
-    display: none;
-    flex-direction: column;
-}
-
-/* Header / drag handle */
-.global-miniplayer__header {
-    height: 32px;
-    min-height: 32px;
-    background: var(--admin-bg-secondary);
-    border-bottom: 1px solid var(--admin-border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 var(--space-sm);
-    cursor: move;
-    user-select: none;
-}
-
-.global-miniplayer__title {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: var(--admin-text-secondary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.global-miniplayer__btn {
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--admin-text-secondary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
-}
-
-/* Content / iframe area */
-.global-miniplayer__content {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-}
-
-/* Loading overlay */
-.global-miniplayer__loading {
-    position: absolute;
-    inset: 0;
-    background: var(--admin-bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.global-miniplayer__spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--admin-border);
-    border-top-color: var(--admin-accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-/* Resize handle indicator */
-.global-miniplayer__resize-handle {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 12px;
-    height: 12px;
-    background: linear-gradient(135deg, transparent 50%, var(--admin-text-muted) 50%);
-    opacity: 0.5;
-    pointer-events: none;
-}
-
-/* Active state - must come AFTER base .global-miniplayer { display: none } */
-.global-miniplayer.global-miniplayer--active {
-    display: flex;
-}
-
-/* Dragging state */
-.global-miniplayer.global-miniplayer--dragging {
-    opacity: 0.9;
-    cursor: move;
-}
-
-/* Hide global miniplayer on preview page (preview page has its own) */
-body[data-page="preview"] .global-miniplayer {
-    display: none !important;
 }
 
 /* =============================================================================

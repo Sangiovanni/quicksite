@@ -1491,7 +1491,6 @@
         "language": "Langue"
     },
     "preview": {
-        "title": "Éditeur Visuel",
         "subtitle": "Prévisualisez et interagissez avec votre site en temps réel",
         "device": "Appareil",
         "language": "Langue",
@@ -1697,9 +1696,6 @@
         "nodeChildren": "Enfants",
         "editStructure": "Modifier Structure",
         "copyNodeId": "Copier ID Nœud",
-        "miniplayer": "Mini-lecteur",
-        "expand": "Agrandir",
-        "miniplayerClose": "Fermer le mini-lecteur",
         "addElement": "Ajouter un élément",
         "addNode": "Ajouter un élément",
         "duplicateNode": "Dupliquer l'élément",

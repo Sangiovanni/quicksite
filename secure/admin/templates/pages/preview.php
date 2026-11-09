@@ -82,7 +82,7 @@ if (is_dir($componentsDir)) {
 }
 ?>
 
-<!-- Preview Page Wrapper (for miniplayer state) -->
+<!-- Preview Page Wrapper: the button that hides the rows marks it (preview-page--rows-hidden) -->
 <div class="preview-page" id="preview-page">
 
 <!-- Preview Controls - Toolbar -->

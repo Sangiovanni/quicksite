@@ -443,14 +443,6 @@ window.QuickSiteAPI = (function() {
                 return clientError('client.empty_response', nonJsonMessage(response.status), response.status);
             }
 
-            // Dispatch event for successful write operations (non-GET)
-            // This allows miniplayer to auto-reload preview
-            if (response.ok && method !== 'GET') {
-                window.dispatchEvent(new CustomEvent('quicksite:command-executed', {
-                    detail: { command, method, success: true }
-                }));
-            }
-
             // A 401 with auth.invalid_credentials is a COMMAND-level credential
             // check (e.g. the account password change's current password) — the session
             // itself is alive, so surface it to the caller. Any other 401
@@ -661,13 +653,6 @@ window.QuickSiteAPI = (function() {
                     window.location.href = config.adminBase + '/login';
                 }
                 return { ok: false, status: 401, data: result };
-            }
-
-            // Dispatch event for successful uploads
-            if (response.ok) {
-                window.dispatchEvent(new CustomEvent('quicksite:command-executed', {
-                    detail: { command, method: 'POST', success: true }
-                }));
             }
 
             return {

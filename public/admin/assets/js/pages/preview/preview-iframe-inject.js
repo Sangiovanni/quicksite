@@ -109,6 +109,10 @@
             if (e.data.action === 'selectNode') {
                 selectByNode(e.data.struct, e.data.node);
             }
+            if (e.data.action === 'revealNode') {
+                const revealed = document.querySelector(qsNodeSel(e.data.struct, e.data.node));
+                if (revealed) revealed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
             if (e.data.action === 'insertNode') {
                 insertNodeIntoDom(e.data.struct, e.data.targetNode, e.data.position, e.data.html, e.data.newNodeId, e.data.movedText || 0);
             }
@@ -826,7 +830,6 @@
     
     /**
      * Select a node by struct+node, notify parent, and scroll to it.
-     * Used for auto-selecting layout elements (menu/footer) after navigation.
      */
     function selectByNode(struct, node) {
         clearSelection();
