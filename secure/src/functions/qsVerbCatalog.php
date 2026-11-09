@@ -209,7 +209,7 @@ function qsVerbCatalog(): array {
                 ['name' => 'dataField', 'type' => 'string', 'required' => true, 'description' => 'Where the list is in the last fetch result, such as files or data.items (a dot-notation path).'],
                 ['name' => 'emptyText', 'type' => 'string', 'required' => false, 'description' => 'What to show when the list is empty, such as No files found.']
             ],
-            'description' => 'Show a list from the last fetch, one copy of a pattern for each entry: the container\'s first child is copied for each item. Use data-bind="fieldName" and data-bind-attr="attrName" on child elements to say what each copy shows.',
+            'description' => 'Show a list from the last fetch, one copy of a pattern for each entry: the container\'s first child is copied for each item. Use data-bind="fieldName" and data-bind-attr="attrName" on child elements to say what each copy shows. data-bind-attr never sets an event handler, srcdoc, or an iframe\'s src or sandbox, and a link or image address outside http, https, mailto and tel becomes #.',
             'example' => '{{call:renderList:.files-list,files,No files found}}',
             'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onload', 'onsubmit']
         ],

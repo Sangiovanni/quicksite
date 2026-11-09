@@ -11570,6 +11570,15 @@ code.preview-contextual-info__value {
     gap: 6px;
     align-items: center;
 }
+/* A note or a hint in the bottom row takes a line of its own, under the label and the input: beside
+   them, its sentence would take the width the input needs. */
+.preview-contextual-js-response-bindings__row-bottom {
+    flex-wrap: wrap;
+}
+.preview-contextual-js-response-bindings__row-bottom > .preview-contextual-js-response-bindings__notice,
+.preview-contextual-js-response-bindings__row-bottom > .preview-contextual-js-response-bindings__row-list-hint {
+    flex-basis: 100%;
+}
 .preview-contextual-js-response-bindings__row select,
 .preview-contextual-js-response-bindings__row input {
     width: 100%;

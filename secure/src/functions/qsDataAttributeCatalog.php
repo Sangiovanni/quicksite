@@ -308,7 +308,7 @@ function qsDataAttributeCatalog(): array {
         ],
         [
             'name' => 'data-bind-attr',
-            'description' => 'Variant of data-bind that sets the named ATTRIBUTE instead of textContent. Pair with data-bind to pick which field provides the value.',
+            'description' => 'Variant of data-bind that sets the named ATTRIBUTE instead of textContent. Pair with data-bind to pick which field provides the value. It names only an attribute an author could write on the page: never an event handler, srcdoc, or an iframe\'s src or sandbox, which a save refuses and the browser does not write; and a URL attribute (href, src and the like) whose value names a scheme other than http, https, mailto and tel is written as #.',
             'category' => 'template',
             'valueShape' => 'plain-string',
             'valuePlaceholder' => 'src',

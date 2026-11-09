@@ -21,6 +21,9 @@ require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
  *   - qs_first_unsafe_structure_param() a WHOLE structure — every node a render
  *     can reach, plus the rule only a node's full attribute list can answer:
  *     no attribute named twice in any mix of letter case.
+ * And what a binding may name (qs_binding_attribute_refusal()): the first layer
+ * applies it to `data-bind-attr`, and ApiEndpointManager to a response binding's
+ * `attribute`, as qs.js applies it in the browser.
  *
  * ⚠ EVERY COMMAND THAT WRITES A STRUCTURE calls the second on exactly what it
  * is about to write, and refuses with qs_unsafe_structure_param_response().
@@ -32,11 +35,60 @@ require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
  * a request or a stored file reaches them.
  */
 
+if (!function_exists('qs_binding_attribute_refusal')) {
+    /**
+     * WHAT A BINDING MAY WRITE, on the write side. A binding names an attribute
+     * that qs.js sets in the browser, after the page is rendered, with a value
+     * from data: a list item's `data-bind-attr`, an endpoint's scalar response
+     * binding. It may name only what an author could write in the page's
+     * structure, judged as the render gate judges that structure:
+     *   - a name outside `html_attribute_name` is refused;
+     *   - an event-handler name, in any letter case: the render gate compiles a
+     *     handler only from {{call:...}} written in the page, and a value from
+     *     data is never compiled;
+     *   - `srcdoc` on any element, and `src` or `sandbox` on an iframe: the
+     *     render paths decide a frame's sandbox from the src and srcdoc they
+     *     render (IframeSandbox), and nothing decides it again in the browser.
+     * A URL attribute stays nameable: its VALUE comes from data, so only the
+     * runtime can hold it to UrlPolicy's allowlist.
+     *
+     * THE RUNTIME IS THE GATE (qs.js _qsBoundAttributeRefusal(), the same
+     * verdict): a structure stored before this rule, a name a placeholder fills
+     * at render and an element only a selector finds all reach the browser
+     * unjudged here. What this adds is an immediate error for the author. Change
+     * the two together.
+     *
+     * @param string      $name the attribute a binding would write
+     * @param string|null $tag  the element's tag, when the caller knows it; null
+     *                          judges what the name alone can tell
+     * @return string|null why it is refused, in words an author reads; null when it may be written
+     */
+    function qs_binding_attribute_refusal(string $name, ?string $tag = null): ?string {
+        if (!TagRegistry::isRenderableAttributeName($name)) {
+            return "'{$name}' is not a valid HTML attribute name (letters, digits, underscore, colon and hyphen only).";
+        }
+        // The name passed the charset above, so it is ASCII and strtolower folds it as a browser does.
+        $folded = strtolower($name);
+        if (preg_match('/^on[a-z]+$/D', $folded)) {
+            return "'{$name}' is an event handler, which takes only {{call:...}} written in the page, never a value from data.";
+        }
+        if ($folded === 'srcdoc') {
+            return "'{$name}' would put a whole page from data into a frame.";
+        }
+        if (($folded === 'src' || $folded === 'sandbox') && $tag !== null && strtolower($tag) === 'iframe') {
+            return "an iframe's '{$name}' is fixed when the page is served, as its sandbox follows the address the page holds then.";
+        }
+        return null;
+    }
+}
+
 /**
  * Returns a human-readable error for the first unsafe param, or null if clean.
+ * $tag, when the caller knows the node's, lets a binding's target be judged
+ * against it (an iframe's src); without it the name alone is judged.
  */
 if (!function_exists('firstUnsafeParam')) {
-    function firstUnsafeParam(array $params): ?string {
+    function firstUnsafeParam(array $params, ?string $tag = null): ?string {
         foreach ($params as $name => $value) {
             // ── THE NAME, BEFORE THE VALUE GUARD ──────────────────────────
             //
@@ -57,6 +109,29 @@ if (!function_exists('firstUnsafeParam')) {
             if (!TagRegistry::isRenderableAttributeName($name)) {
                 return "Attribute name '{$name}' is not a valid HTML attribute name "
                      . '(letters, digits, underscore, colon and hyphen only).';
+            }
+
+            // ── A BINDING'S TARGET, BEFORE THE VALUE GUARD TOO ────────────
+            //
+            // `data-bind-attr` names the attribute qs.js writes with a value
+            // from data, so its VALUE is a name, judged by the binding rule
+            // above. A number renders as its digits and is judged as that
+            // text; `true` renders the bare name, which names nothing. The
+            // renderer drops a `__LIT__` prefix from any value, so the name
+            // judged is the one the page will hold. A value holding a
+            // placeholder is filled when the page is served, so only the
+            // runtime can judge it: it passes here, and qs.js refuses it there.
+            if (strtolower($name) === 'data-bind-attr' && (is_string($value) || is_int($value) || is_float($value))) {
+                $target = (string) $value;
+                if (strpos($target, '__LIT__') === 0) {
+                    $target = substr($target, 7);
+                }
+                if ($target !== '' && strpos($target, '{{') === false) {
+                    $refusal = qs_binding_attribute_refusal($target, $tag);
+                    if ($refusal !== null) {
+                        return "Attribute '{$name}' names '{$target}', which a binding cannot write: {$refusal}";
+                    }
+                }
             }
 
             if (!is_string($value) || $value === '') {
@@ -156,9 +231,14 @@ if (!function_exists('qs_first_unsafe_node_param')) {
 
         if (isset($node['params']) && is_array($node['params'])) {
             $seen = [];
+            // The tag the node renders with, so a binding is judged against it (an
+            // iframe's src). A component instance's params land on the root of
+            // the component's file, a tag this walk does not read: the runtime
+            // judges those.
+            $tag = isset($node['tag']) && is_string($node['tag']) ? $node['tag'] : null;
             foreach ($node['params'] as $name => $value) {
                 $name = (string) $name;
-                $unsafe = firstUnsafeParam([$name => $value]);
+                $unsafe = firstUnsafeParam([$name => $value], $tag);
                 if ($unsafe !== null) {
                     return ['node' => $path, 'attribute' => $name, 'message' => $unsafe];
                 }

@@ -1353,7 +1353,12 @@ field list is exactly what you declared.
 **Persisted shape**
 
 The picker writes to the endpoint's `responseBindings` array via
-`editApi`. Component-list bindings have this shape:
+`editApi`. A binding that sets an attribute (its **Attribute** field) names
+one an author could write on the page: an event handler (`onclick` and the
+like), `srcdoc` or a malformed name is refused, and the save stops with
+*Error saving bindings* naming the binding. The browser holds every binding
+to the same rule, as described for `data-bind-attr` in §9.6. Component-list
+bindings have this shape:
 
 ```json
 {
@@ -2385,6 +2390,13 @@ init / `setState` / `fetchState`:
     the matching field on each item; `data-bind-attr="attr"` sets an attribute
     instead. *This is the same `data-bind` mechanism used by componentList
     bindings — see §9.2 for the full template-population reference.*
+  - A binding sets only what an author could write on the page. It never sets
+    an event handler, `srcdoc`, or an iframe's `src` or `sandbox`: saving one
+    is refused with a message naming the node, and the browser writes nothing
+    and says so once on the console. A URL attribute (`href`, `src` and the
+    like) whose value names a scheme other than `http`, `https`, `mailto` and
+    `tel` is written as `#`, so an image or a link from an API keeps to the
+    addresses a page may hold.
   - An optional `data-state-empty="some text"` on the container provides the
     text shown when the array is empty (replaces the empty container content
     with that string).
@@ -3973,7 +3985,7 @@ deep-dive.
 | `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open; its row shows while the category has a declared key | §9.10 |
 | `data-consent-asks` | consent | `true` / `false` | Shows the element only on a site that asks its visitors anything, or with `false` only on a site with nothing to ask, followed at each page load; left alone with the layer off and in the visual editor. The generated cookie policy puts it on its preferences button's paragraph and the consent record's row, and when that row is the table's only row on the table, with a line valued `false` beside it | §9.10 |
 | `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
-| `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent | §9.2 |
+| `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent; never an event handler, `srcdoc`, or an iframe's `src` or `sandbox`, and a URL with a scheme outside the allowlist is written as `#` | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |
 | `data-error-for` | form | field `name` | Container for `QS.validate` error messages — set value to the input's `name` | §8.7 (field-row / form-scaffold) |
 | `data-qs-complex` | complex | `table` (today) | Marks a complex-element subtree root — enables Translate-from-CSV | §8.7 (Translate from CSV) |

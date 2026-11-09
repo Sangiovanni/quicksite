@@ -917,6 +917,11 @@ class ApiEndpointManager {
             return ['valid' => false, 'error' => $headerProblem];
         }
 
+        $bindingProblem = $this->responseBindingProblem($endpoint['responseBindings'] ?? null);
+        if ($bindingProblem !== null) {
+            return ['valid' => false, 'error' => $bindingProblem];
+        }
+
         // Validate `parameters` shape + cross-check against :placeholders in path
         $paramValidation = $this->validateParameters($endpoint);
         if (!$paramValidation['valid']) {
@@ -924,6 +929,47 @@ class ApiEndpointManager {
         }
 
         return ['valid' => true, 'error' => null];
+    }
+
+    /**
+     * The first response binding whose `attribute` a binding may not write, as an
+     * author reads it, or null. Every write of an endpoint is validated here, so
+     * this is every write of its bindings that goes through this class.
+     *
+     * A scalar binding (no renderMode, or one qs.js does not read as a list or a
+     * count) sets its `attribute` in the browser with a value from the response:
+     * the name is held to what an author could write in a page, by the binding
+     * rule (qs_binding_attribute_refusal(), the runtime's verdict). Its selector
+     * can reach any element of the page, so no tag is known here: an iframe's
+     * `src` stays the runtime's to refuse. Like `headers`, the field is otherwise
+     * kept as it is sent.
+     *
+     * @param mixed $bindings the endpoint's `responseBindings`
+     */
+    private function responseBindingProblem($bindings): ?string {
+        if (!is_array($bindings)) {
+            return null;
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+        foreach (array_values($bindings) as $i => $binding) {
+            if (!is_array($binding) || in_array($binding['renderMode'] ?? null, ['list', 'componentList', 'count'], true)) {
+                continue;
+            }
+            // What qs.js reads as no attribute: the binding writes text instead.
+            $attribute = $binding['attribute'] ?? null;
+            if ($attribute === null || $attribute === '' || $attribute === false || $attribute === 0 || $attribute === 0.0) {
+                continue;
+            }
+            $which = 'Response binding ' . ($i + 1);
+            if (!is_string($attribute)) {
+                return "{$which}: its attribute must be text, the name of an attribute such as src or href.";
+            }
+            $refusal = qs_binding_attribute_refusal($attribute);
+            if ($refusal !== null) {
+                return "{$which} cannot write the attribute '{$attribute}': {$refusal}";
+            }
+        }
+        return null;
     }
 
     /**

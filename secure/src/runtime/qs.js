@@ -211,7 +211,8 @@
     /**
      * Schemes a navigation target may name explicitly. Mirrors the server-side
      * UrlPolicy::ALLOWED_SCHEMES, which guards every URL ATTRIBUTE (href, src,
-     * action, …) on the render and compile paths. `location.href = "javascript:…"`
+     * action, …) on the render and compile paths, as QS_URL_ATTRIBUTES below
+     * mirrors its list of those attributes. `location.href = "javascript:…"`
      * executes in the page's own origin, and the surface-B CSP cannot stop it
      * (engine pages need script-src 'unsafe-inline' for their own inline
      * handlers, and that permits javascript: URIs too) — so the check has to be
@@ -223,6 +224,16 @@
      * is supplied by whoever wrote the link, not by the author.
      */
     var QS_ALLOWED_URL_SCHEMES = ['http', 'https', 'mailto', 'tel'];
+
+    /**
+     * Attributes a browser resolves as a URL. Mirrors UrlPolicy::URL_ATTRIBUTES,
+     * and _qsIsUrlAttribute() mirrors UrlPolicy::isUrlAttribute(): this list, and
+     * any name ending in `:href` or `:src` (xlink:href). A binding that writes one
+     * of them holds its value to the schemes above, as the server holds the same
+     * attribute written in a page's structure. Both change with the server's.
+     */
+    var QS_URL_ATTRIBUTES = ['href', 'src', 'srcset', 'poster', 'action', 'formaction',
+        'cite', 'data', 'ping', 'background', 'longdesc'];
 
     /**
      * Is this navigation target safe to assign to location.href? Relative paths,
@@ -238,6 +249,78 @@
         var m = /^([a-z][a-z0-9+.\-]*):/i.exec(probe);
         if (!m) return true;                       // relative / anchor / //host
         return QS_ALLOWED_URL_SCHEMES.indexOf(m[1].toLowerCase()) !== -1;
+    }
+
+    /** Is this attribute one a browser resolves as a URL? Mirrors UrlPolicy::isUrlAttribute(). */
+    function _qsIsUrlAttribute(name) {
+        var n = String(name).toLowerCase();
+        return QS_URL_ATTRIBUTES.indexOf(n) !== -1 || /(?:^|:)(?:href|src)$/.test(n);
+    }
+
+    /**
+     * WHAT A BINDING MAY WRITE. A binding sets an attribute whose name and value
+     * come from data, after the server has rendered the page: a list item's
+     * data-bind-attr, an endpoint's scalar response binding, an <img>'s default
+     * src. It may set only what an author could have written in the page's
+     * structure, judged as the server judges that structure. The write side's
+     * copy of this verdict is qs_binding_attribute_refusal() in nodeParamPolicy.php,
+     * so an author is told at once; this one is the gate, as a stored page or a
+     * name filled from data reaches the browser unjudged. Change the two together.
+     *
+     * Refused, whatever the value: a name outside the server's attribute-name
+     * characters (RegexPatterns `html_attribute_name`, where setAttribute would
+     * throw and stop the rest of a list); an event handler in any letter case, as
+     * the server compiles a handler only from {{call:...}} written in the page;
+     * srcdoc on any element, and src or sandbox on an iframe, as the server
+     * decided the frame's sandbox from the src and srcdoc it rendered and nothing
+     * decides it again here. Answers why, or null when the name may be written.
+     */
+    function _qsBoundAttributeRefusal(el, name) {
+        if (!/^[a-z0-9_:-]+$/i.test(name)) return 'refused a name that is not a valid attribute name';
+        var n = name.toLowerCase();
+        if (/^on[a-z]+$/.test(n)) return 'refused an event-handler attribute';
+        if (n === 'srcdoc') return 'refused srcdoc';
+        if ((n === 'src' || n === 'sandbox') && el && String(el.localName || '').toLowerCase() === 'iframe') {
+            return 'refused an iframe\'s src or sandbox';
+        }
+        return null;
+    }
+
+    // One console line per page for each name and reason, however many items a list binds.
+    var _qsBindingWarned = {};
+    function _qsBindingWarn(reason, name) {
+        var key = reason + '|' + name;
+        if (_qsBindingWarned[key]) return;
+        _qsBindingWarned[key] = true;
+        console.warn('[QS] binding: ' + reason + ':', name);
+    }
+
+    /**
+     * Write one bound attribute, by the rule above. A URL attribute's value is held
+     * to the allowlist, and a refused one writes `#`, as UrlPolicy::sanitize() does:
+     * an element bound twice keeps no stale link. Anything else is written as it
+     * comes. A refusal writes nothing, says so on the console and throws nothing,
+     * so the rest of a list renders. Answers whether the attribute was written.
+     */
+    function _qsSetBoundAttribute(el, name, value) {
+        name = String(name);
+        var refusal = _qsBoundAttributeRefusal(el, name);
+        if (refusal) {
+            _qsBindingWarn(refusal, name);
+            return false;
+        }
+        var v = String(value);
+        if (_qsIsUrlAttribute(name) && !_qsSafeNavigationUrl(v)) {
+            _qsBindingWarn('refused a URL with a disallowed scheme and wrote # in', name);
+            v = '#';
+        }
+        try {
+            el.setAttribute(name, v);
+        } catch (e) {
+            _qsBindingWarn('the browser refused the attribute name', name);
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -1094,7 +1177,10 @@
     // {{call:...}} verb syntax, SVG is sanitised, no .html may enter a project),
     // so qs.js is the only path from a page to storage. That premise is load-
     // bearing and has to be DEFENDED, not assumed: QS.redirect's scheme guard
-    // exists because `{{call:redirect:javascript:…}}` was one way around it. If
+    // exists because `{{call:redirect:javascript:…}}` was one way around it, and
+    // a binding, which writes an attribute named by data after the page is
+    // rendered, goes through _qsSetBoundAttribute() because it was another: no
+    // handler, no srcdoc, no iframe src or sandbox, no URL outside the allowlist. If
     // author-supplied JavaScript is ever reintroduced deliberately, this stops
     // being a boundary and becomes a naming convention.
     //
@@ -1852,7 +1938,7 @@
             const elements = getElements(selector);
             elements.forEach(el => {
                 if (attribute) {
-                    el.setAttribute(attribute, value);
+                    _qsSetBoundAttribute(el, attribute, value);
                 } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
                     el.value = value;
                 } else {
@@ -2035,12 +2121,12 @@
 
         const bindAttr = el.getAttribute('data-bind-attr');
         if (bindAttr) {
-            el.setAttribute(bindAttr, String(value));
+            _qsSetBoundAttribute(el, bindAttr, value);
         } else if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
             el.value = String(value);
         } else if (el.tagName === 'IMG' && !bindAttr) {
             // For <img>, if no explicit bind-attr, default to src
-            el.setAttribute('src', String(value));
+            _qsSetBoundAttribute(el, 'src', value);
         } else {
             el.textContent = String(value);
         }
