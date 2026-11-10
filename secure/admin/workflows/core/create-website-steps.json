@@ -1,11 +1,11 @@
 {
     "$schema": "../schema.json",
-    "id": "create-website-v2",
+    "id": "create-website-steps",
     "version": "1.0.0",
     "meta": {
         "icon": "🌐",
-        "titleKey": "ai.specs.createWebsiteV2.title",
-        "descriptionKey": "ai.specs.createWebsiteV2.description",
+        "titleKey": "ai.specs.createWebsiteSteps.title",
+        "descriptionKey": "ai.specs.createWebsiteSteps.description",
         "category": "creation",
         "tags": ["create", "website", "multi-page", "single-page", "landing", "from-scratch", "phased"],
         "difficulty": "advanced"
@@ -167,5 +167,5 @@
             "request": "parent"
         }
     ],
-    "promptTemplate": "create-website-v2.md"
+    "promptTemplate": "create-website-steps.md"
 }

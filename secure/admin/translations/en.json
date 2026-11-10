@@ -1876,8 +1876,8 @@
                 }
             },
             "createWebsite": {
-                "title": "Create Website",
-                "description": "Generate a complete website: several pages with navigation, or one page whose menu links to its sections, with a shared header and footer and consistent styling.",
+                "title": "Create Website: one AI request",
+                "description": "Generate a complete website in one AI request: several pages with navigation, or one page whose menu links to its sections, with a shared header and footer, the texts of every language and consistent styling.",
                 "params": {
                     "onePage": {
                         "label": "One page only",
@@ -1904,9 +1904,9 @@
                     "agency": { "title": "Creative Agency", "prompt": "Create a creative agency website with home, work, services, team, blog, contact" }
                 }
             },
-            "createWebsiteV2": {
-                "title": "Create Website v2",
-                "description": "Builds the site in several shorter AI answers: the pages and their texts in the default language, then each other language, then the look. A shorter answer is less likely to be cut, and a cut one costs one part."
+            "createWebsiteSteps": {
+                "title": "Create Website: several AI requests",
+                "description": "Builds the site in several AI requests: the pages and their texts in the default language, then each other language, then the look. A cut answer costs only its own part."
             },
             "fitCookieBanner": {
                 "title": "Fit my cookie banner",

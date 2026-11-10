@@ -1333,8 +1333,8 @@
                 }
             },
             "createWebsite": {
-                "title": "Créer un Site Multi-Pages",
-                "description": "Générer un site web multi-pages complet avec navigation, plusieurs pages, en-tête/pied de page partagés et style cohérent.",
+                "title": "Créer un site : une seule requête à l'IA",
+                "description": "Générer un site web complet en une seule requête à l'IA : plusieurs pages avec navigation, ou une page dont le menu mène à ses sections, avec un en-tête et un pied de page partagés, les textes de chaque langue et un style cohérent.",
                 "params": {
                     "multilingual": {
                         "label": "Activer le multilingue",
@@ -1356,6 +1356,10 @@
                     "restaurant": { "title": "Restaurant", "prompt": "Créer un site de restaurant avec accueil, menu, à propos, galerie, réservations, contact" },
                     "agency": { "title": "Agence Créative", "prompt": "Créer un site d'agence créative avec accueil, réalisations, services, équipe, blog, contact" }
                 }
+            },
+            "createWebsiteSteps": {
+                "title": "Créer un site : plusieurs requêtes à l'IA",
+                "description": "Construit le site en plusieurs requêtes à l'IA : les pages et leurs textes dans la langue par défaut, puis chaque autre langue, puis l'apparence. Une réponse coupée ne coûte que sa propre partie."
             },
             "addPage": {
                 "title": "Ajouter une Page",
