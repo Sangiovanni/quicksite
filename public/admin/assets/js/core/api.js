@@ -377,7 +377,7 @@ window.QuickSiteAPI = (function() {
      * const result = await QuickSiteAPI.request('getCommandHistory', 'GET', null, [], { limit: 50, offset: 0 });
      *
      * // Target a SPECIFIC project (the dashboard's bin on a row): opts.project sets the marker
-     * const result = await QuickSiteAPI.request('deleteProject', 'POST', { confirm: true }, [], {}, { project: 'prj_x' });
+     * const result = await QuickSiteAPI.request('deleteProject', 'POST', { confirm: true }, [], {}, false, { project: 'prj_x' });
      *
      * @param {Object} [opts] - { project?: string } marker override for this call
      */
@@ -441,14 +441,6 @@ window.QuickSiteAPI = (function() {
             // would report work nobody did, and `data: null` would throw in the caller.
             if (result === null) {
                 return clientError('client.empty_response', nonJsonMessage(response.status), response.status);
-            }
-
-            // Dispatch event for successful write operations (non-GET)
-            // This allows miniplayer to auto-reload preview
-            if (response.ok && method !== 'GET') {
-                window.dispatchEvent(new CustomEvent('quicksite:command-executed', {
-                    detail: { command, method, success: true }
-                }));
             }
 
             // A 401 with auth.invalid_credentials is a COMMAND-level credential
@@ -661,13 +653,6 @@ window.QuickSiteAPI = (function() {
                     window.location.href = config.adminBase + '/login';
                 }
                 return { ok: false, status: 401, data: result };
-            }
-
-            // Dispatch event for successful uploads
-            if (response.ok) {
-                window.dispatchEvent(new CustomEvent('quicksite:command-executed', {
-                    detail: { command, method: 'POST', success: true }
-                }));
             }
 
             return {

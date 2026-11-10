@@ -548,11 +548,7 @@ class AdminRouter {
     /**
      * The absolute URL a project's own site is served at — its surface-B view `/p/<id>`.
      *
-     * THE single answer to "where does this project live, as a URL?". Five places used to
-     * hand-roll this same concatenation (this method, the header's back-to-site link, the
-     * miniplayer, the preview iframe, and PreviewConfig.previewBase) — each with its own
-     * "…unless it is the served project, then the root" branch. The served project is gone
-     * and so are the branches; the derivation lives here once (CLAUDE.md: centralize).
+     * THE single answer to "where does this project live, as a URL?"
      *
      * Returned WITHOUT a trailing slash so callers append '/assets/...' the way they do
      * with baseUrl. Callers that navigate a browser there add the slash themselves.

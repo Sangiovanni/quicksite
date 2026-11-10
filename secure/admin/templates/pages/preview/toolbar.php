@@ -37,9 +37,8 @@
             </button>
         </div>
         
-        <!-- Language Selector (for multilingual sites) -->
-        <?php if ($isMultilingual && count($languages) > 1): ?>
-        <div class="preview-toolbar__group">
+        <!-- Language Selector: shown for a project with more than one language. A run can change that while the page is open, so it is always there (preview.js rebuildLanguageList()) -->
+        <div class="preview-toolbar__group"<?= $isMultilingual && count($languages) > 1 ? '' : ' style="display: none;"' ?>>
             <label class="preview-toolbar__label" for="preview-lang"><?= __admin('preview.language') ?>:</label>
             <select id="preview-lang" class="preview-toolbar__select preview-toolbar__select--sm">
                 <?php foreach ($languages as $lang): ?>
@@ -47,7 +46,6 @@
                 <?php endforeach; ?>
             </select>
         </div>
-        <?php endif; ?>
 
         <!-- Page title: the page's title in the language shown (shown while a page is the edit target) -->
         <div class="preview-toolbar__group" id="preview-page-title-group" style="display: none;">
@@ -96,18 +94,6 @@
                 <polyline points="23 4 23 10 17 10"/>
                 <polyline points="1 20 1 14 7 14"/>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-        </button>
-        <!-- Miniplayer Toggle -->
-        <button type="button" id="preview-miniplayer-toggle" class="admin-btn admin-btn--ghost admin-btn--icon-only" title="<?= __admin('preview.miniplayer') ?>">
-            <svg class="admin-btn__icon preview-miniplayer-icon--minimize" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="14" y="14" width="8" height="8" rx="1"/>
-                <path d="M4 4h12v12H4z" opacity="0.3"/>
-                <path d="M20 10V4h-6"/>
-            </svg>
-            <svg class="admin-btn__icon preview-miniplayer-icon--expand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <path d="M9 3v18M3 9h18"/>
             </svg>
         </button>
         <!-- Hides the editor's rows and panel, and brings them back: the page alone under the header -->

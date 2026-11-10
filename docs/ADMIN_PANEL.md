@@ -18,7 +18,7 @@ secure/admin/templates/pages/<page>.php      → page shell + page-specific
                                                config injection
 public/admin/assets/js/core/                 → api.js, utils.js, storage-keys.js
 public/admin/assets/admin.js                 → window.QuickSiteAdmin singleton
-public/admin/assets/js/components/           → colorpicker.js, miniplayer.js
+public/admin/assets/js/components/           → colorpicker.js
 public/admin/assets/js/pages/                → page controllers
 public/admin/assets/js/pages/ai/             → AI sub-pages
 public/admin/assets/js/pages/preview/        → visual editor subsystem
@@ -44,7 +44,7 @@ The requirement lives at the shared account-creation path rather than in the pag
 4. `core/searchable-select.js` → the type-ahead select widget.
 5. `core/bubble.js` → the panel's hover bubble (§5.1, *Tooltips*). Defines no global: it listens on the document and builds its element on first use.
 6. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST come before the scripts below, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
-7. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
+7. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
 8. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, the panel's dialogs `confirm()` and `prompt()`, escaping, prefs, pending messages).
 9. `core/members-badge.js` → the membership counts behind the Members nav badge.
 10. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, the header's menus and height, page utility delegation).
@@ -80,15 +80,13 @@ Five custom events, each with one emitter:
 
 | Event | Emitted by | Listened for by |
 |---|---|---|
-| `quicksite:command-executed` | `js/core/api.js`, after a successful non-GET command | `js/components/miniplayer.js` — reloads the floating preview iframe |
 | `quicksite:write-rate` | `js/core/api.js`, when a counted command's answer carries the write allowance | `admin.js` — the header's figure; `js/pages/preview/preview-ai-tools.js` — the kept steps' Run button |
-| `quicksite:workflow-complete` | `js/pages/preview/preview-ai-tools.js`, after a workflow batch runs | `js/components/miniplayer.js` |
 | `quicksite:routes-changed` | `js/pages/preview/preview.js` `refreshEditList()`, after a wizard's setup and after a phase of a run that changed something | the page's other copies of the routes: `preview-js-interactions.js` (the route pickers), `contextual-complex/route-input.js` (the links' suggestions), `contextual-complex/complex-oauth-button.js` |
 | `quicksite:memberships-changed` | the membership pages, after a roster or inbox action | `js/core/members-badge.js` — recomputes the counts |
 | `quicksite:membership-counts-updated` | `js/core/members-badge.js`, once counts are recomputed | `js/pages/dashboard-memberships.js` — fills the dashboard card |
+| `quicksite:stars-changed` | `admin.js` `setProjectStar()`, on `document`, once the server answers with the account's starred projects (`detail.starred`) | `admin.js` `bindStarToggle()` — each star button; `layout.php` — the header's project list; `js/pages/memberships.js` — its project list |
 
-`quicksite:command-executed` carries `{ detail: { command, response } }`. Payload
-shapes are implicit — there is no schema or version field on any of them.
+Payload shapes are implicit — there is no schema or version field on any of them.
 
 ---
 
@@ -100,7 +98,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
-| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
+| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
@@ -209,7 +207,6 @@ whose click it holds is followed afterwards, a mode or tab switch happens afterw
 | File | Purpose |
 |---|---|
 | `js/components/colorpicker.js` | `QSColorPicker` widget (used by preview style/theme tools). |
-| `js/components/miniplayer.js` | Floating preview iframe; listens to `quicksite:command-executed`. |
 
 ### 5.3 Top-level page controllers
 
@@ -257,7 +254,6 @@ There is no workflow browser or spec-runner page: both are subsumed by the visua
 | `preview-navigation.js` | Route / language / device switching. |
 | `preview-iframe-inject.js` | Iframe DOM injection + cross-doc messaging. |
 | `preview-sidebar-resize.js` | Sidebar resize + persistence. |
-| `preview-miniplayer.js` | Preview-page floating player. |
 | `preview-style-selectors.js` | Selector browser. |
 | `preview-style-editor.js` | Property editor (color picker, `var()` support). |
 | `preview-style-motion.js` | Animation / keyframe editor (§8.11). |
@@ -390,7 +386,7 @@ This pointer is **not** a command. Which project a person has open is a fact abo
 
 An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
 
-The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §8), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" and the floating miniplayer resolve to that same view. Private projects authenticate on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a private project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
+The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §8), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" resolves to that same view. Private projects authenticate on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a private project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
 
@@ -405,6 +401,8 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. An element's event list offers the events the interaction commands accept, in two groups: **Common for** the element's tag, and **Less common**. |
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **AI tools** | `ai-tools` | In-editor workflow runner. Searchable + tag-filtered list of workflow specs grouped by category; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
+
+**Picking a target.** Picking the Menu or the Footer in the Edit list selects nothing, as picking a page does, and scrolls it into view in the frame. The frame shows a page with its menu and footer around it, so in Select a click on an element outside the target, whichever of the three it is, asks whether to switch: a yes moves the Edit list there with nothing selected, and a no leaves the outline and the panel on what was selected before. AI tools asks nothing, as a selection there acts on nothing, and Select does not take over a selection another tool made outside the target.
 
 **Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. An element added *inside* one that holds text takes that text (`addNode` moves the target's text into the new element when the new element can hold children), and the canvas shows it there at once, the text once, without a reload. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
 
@@ -1026,7 +1024,7 @@ An answer may only send `setStyleRule`. A rule must begin with the part's own se
 - **Batch (collapsible)** — the run's phases, each a group whose header names it, where it runs (`before` / `after` the workflow), its number of steps and whether they delete or change content, its rows below; a run of one phase is its rows alone. It shows the plan before Run (drawn again a moment after each parameter change), and an AI phase's commands once its answer parses (`Its commands appear when the AI answers.` until then). A row shows the command name, a `Deletes` (red) or `Changes` (amber) mark when the step does either, and a truncated `key: "value" • …` params summary; clicking the row toggles the full params JSON inline. State header cycles `Idle` → `N commands ready` → `Running 2/N · {phase}` → `Done (N succeeded)` or `Done (X/N succeeded, Y failed)`. A run that ends with no step to run also says so in a green toast: `No changes were needed here.`
 - **Execute button** — the AI answer's, while an answer that parses is ready for a phase that can take it and Run without stopping is off. Its label says what the answer does: `Delete and run` (red) when a command deletes, `Change and run` when one changes content, `Execute commands` otherwise; it waits for the server's reading of the answer
 
-After each phase that succeeded in at least one command, the iframe reloads via `window.PreviewManager.reload()`, so a review shows what the last phase did. The `quicksite:workflow-complete` window event fires once, when a run that sent commands ends, for any listening sibling module (the miniplayer, etc.).
+After each phase that succeeded in at least one command, the iframe reloads via `window.PreviewManager.reload()`, so a review shows what the last phase did. The Edit list and the toolbar's Language list are read again first (`refreshEditList()`), so a phase that turns the project's languages on or off, or adds or deletes one, leaves the frame on an address the project has, with the page, the tool and the run as they were.
 
 #### A run, phase by phase
 
@@ -1361,7 +1359,12 @@ field list is exactly what you declared.
 **Persisted shape**
 
 The picker writes to the endpoint's `responseBindings` array via
-`editApi`. Component-list bindings have this shape:
+`editApi`. A binding that sets an attribute (its **Attribute** field) names
+one an author could write on the page: an event handler (`onclick` and the
+like), `srcdoc` or a malformed name is refused, and the save stops with
+*Error saving bindings* naming the binding. The browser holds every binding
+to the same rule, as described for `data-bind-attr` in §9.6. Component-list
+bindings have this shape:
 
 ```json
 {
@@ -2393,6 +2396,13 @@ init / `setState` / `fetchState`:
     the matching field on each item; `data-bind-attr="attr"` sets an attribute
     instead. *This is the same `data-bind` mechanism used by componentList
     bindings — see §9.2 for the full template-population reference.*
+  - A binding sets only what an author could write on the page. It never sets
+    an event handler, `srcdoc`, or an iframe's `src` or `sandbox`: saving one
+    is refused with a message naming the node, and the browser writes nothing
+    and says so once on the console. A URL attribute (`href`, `src` and the
+    like) whose value names a scheme other than `http`, `https`, `mailto` and
+    `tel` is written as `#`, so an image or a link from an API keeps to the
+    addresses a page may hold.
   - An optional `data-state-empty="some text"` on the container provides the
     text shown when the array is empty (replaces the empty container content
     with that string).
@@ -3982,7 +3992,7 @@ deep-dive.
 | `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open; its row shows while the category has a declared key | §9.10 |
 | `data-consent-asks` | consent | `true` / `false` | Shows the element only on a site that asks its visitors anything, or with `false` only on a site with nothing to ask, followed at each page load; left alone with the layer off and in the visual editor. The generated cookie policy puts it on its preferences button's paragraph and the consent record's row, and when that row is the table's only row on the table, with a line valued `false` beside it | §9.10 |
 | `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
-| `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent | §9.2 |
+| `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent; never an event handler, `srcdoc`, or an iframe's `src` or `sandbox`, and a URL with a scheme outside the allowlist is written as `#` | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |
 | `data-error-for` | form | field `name` | Container for `QS.validate` error messages — set value to the input's `name` | §8.7 (field-row / form-scaffold) |
 | `data-qs-complex` | complex | `table` (today) | Marks a complex-element subtree root — enables Translate-from-CSV | §8.7 (Translate from CSV) |

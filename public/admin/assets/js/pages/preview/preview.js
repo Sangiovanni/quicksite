@@ -398,8 +398,9 @@
     const previewBase = PreviewConfig.previewBase || PreviewConfig.baseUrl;
     const adminUrl = PreviewConfig.adminUrl;
     const structureUrl = PreviewConfig.structureUrl;
-    const multilingual = PreviewConfig.multilingual;
-    const defaultLang = PreviewConfig.defaultLang;
+    // Both follow a run that changes the project's languages (rebuildLanguageList()).
+    let multilingual = PreviewConfig.multilingual;
+    let defaultLang = PreviewConfig.defaultLang;
     
     // Initialize PreviewState module with DOM references
     if (window.PreviewState) {
@@ -426,7 +427,7 @@
     let currentEditType = 'page';     // 'page', 'component', or 'layout'
     let currentEditName = '';         // route name for pages, component name for components, 'menu'/'footer' for layout
     let overlayInjected = false;
-    let layoutAutoSelectTarget = null; // 'menu' or 'footer' - auto-select after iframe loads
+    let layoutToReveal = null; // 'menu' or 'footer': scrolled into view once the iframe has loaded
     
     // Which Style-tool tab is showing: 'theme' or 'selectors'.
     let activeStyleTab = 'theme';
@@ -1636,12 +1637,9 @@
         // The page title field follows the page and the language shown
         updatePageTitleField(editType, editName);
         
-        // For layout (menu/footer), auto-select the element after iframe loads
-        if (editType === 'layout') {
-            layoutAutoSelectTarget = editName; // 'menu' or 'footer'
-        } else {
-            layoutAutoSelectTarget = null;
-        }
+        // A menu or a footer is brought into view once the iframe has loaded, as it can be below the
+        // fold. Nothing is selected, as on a page: the tool's panel waits for a click.
+        layoutToReveal = editType === 'layout' ? editName : null;
     }
     
     // ==================== The Edit list ====================
@@ -1723,18 +1721,55 @@
         showToast(PreviewConfig.i18n.editTargetGone.replace('{name}', gone).replace('{now}', shown ? shown.textContent : ''), 'info');
     }
 
-    /** One reading of the list. Answers whether the target was gone and the editor moved off it. */
+    /** What getLangList answers, or null: the languages then stay as they were. */
+    async function readLanguages() {
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getLangList', 'GET');
+            const data = result.ok && result.data ? result.data.data : null;
+            return data && Array.isArray(data.languages) ? data : null;
+        } catch (error) {
+            console.warn('[Preview] getLangList failed, the languages stay as they were:', error);
+            return null;
+        }
+    }
+
+    /**
+     * The languages this page holds follow the project's: a workflow can turn them on or off, or add
+     * or delete one, while the page stays open, and the frame's address carries the language. The same
+     * rule as the toolbar's first draw. Answers whether that address changed, in which case the page
+     * in the frame is one the project no longer has.
+     */
+    function rebuildLanguageList(data) {
+        const shownBefore = multilingual ? getCurrentLang() : null;
+        multilingual = !!data.multilingual_enabled;
+        defaultLang = data.default_language;
+        PreviewConfig.multilingual = multilingual;
+        PreviewConfig.defaultLang = defaultLang;
+        if (translateCsvLang) translateCsvLang._loaded = false;
+        const codes = multilingual ? data.languages : [defaultLang];
+        const keep = codes.includes(langSelect.value) ? langSelect.value : defaultLang;
+        langSelect.replaceChildren(...codes.map((code) => _renderOption(code, code.toUpperCase())));
+        langSelect.value = keep;
+        langSelect.closest('.preview-toolbar__group').style.display = multilingual && codes.length > 1 ? '' : 'none';
+        return (multilingual ? getCurrentLang() : null) !== shownBefore;
+    }
+
+    /** One reading of the list. Answers whether the editor moved, off a target that is gone or to the address the languages now give it. */
     async function rebuildEditList() {
-        const [routes, components] = await Promise.all([
+        const [routes, components, languages] = await Promise.all([
             readEditListPart('getRoutes', 'flat_routes'),
             readEditListPart('listComponents', 'components'),
+            readLanguages(),
         ]);
+        const addressMoved = languages ? rebuildLanguageList(languages) : false;
         if (routes) rebuildEditListPages(routes);
         if (components) rebuildEditListComponents(components);
         const target = currentEditType + ':' + currentEditName;
         if (Array.from(targetSelect.options).some((option) => option.value === target)) {
             showEditTarget(target);
-            return false;
+            if (!addressMoved) return false;
+            navigateTo(currentEditType, currentEditName, { keepMode: currentMode === 'ai-tools' });
+            return true;
         }
         leaveVanishedTarget();
         return true;
@@ -1744,11 +1779,11 @@
     let editListChanged = false;    // something changed while it read, so it reads again
 
     /**
-     * The Edit list follows what changed under it: the one rebuild, called by what changes a route or
-     * a component on this page without going through the list's own buttons (a wizard's setup, a
-     * workflow's phase), before the preview reloads. It tells the page's other copies of the routes
-     * (quicksite:routes-changed), and answers whether the editor moved off a target that is gone: the
-     * move has loaded the preview, so the caller does not reload it.
+     * The Edit list follows what changed under it: the one rebuild, called by what changes a route, a
+     * component or a language on this page without going through the list's own buttons (a wizard's
+     * setup, a workflow's phase), before the preview reloads. It tells the page's other copies of the
+     * routes (quicksite:routes-changed), and answers whether the editor moved, off a target that is
+     * gone or to a new address: the move has loaded the preview, so the caller does not reload it.
      */
     function refreshEditList() {
         componentsLoaded = false;
@@ -2263,6 +2298,9 @@
 
     /** setMode() once nothing is left to ask. */
     function switchMode(mode, preselect) {
+        // A tool that selects without asking (AI tools, Interactions) may hold an element outside the
+        // target. Select acts on what it holds, so it does not start from one.
+        if (mode === 'select' && switchFor(selectedStruct)) hideNodePanel();
         isSwitchingMode = true;
         currentMode = mode;
         
@@ -2845,41 +2883,53 @@
     let selectedElementTag = null;      // For style mode preselection
     let selectedHoldsChildren = true;   // Whether the Add panel may offer "Inside" (the iframe's answer)
     let selectedIsInline = false;       // Whether text beside it continues its line: the Text tab's Before / After
+    let selectedFrameNode = null;       // The selection's own node in the frame: a component's inner node is not one
+
+    /**
+     * The switch a struct calls for, when it is outside what the Edit list names: the frame shows a
+     * page with its menu and footer around it, whichever of them is the target. Null on the target.
+     */
+    function switchFor(struct) {
+        if (struct === 'menu' || struct === 'footer') {
+            if (currentEditType === 'layout' && currentEditName === struct) return null;
+            const message = struct === 'menu'
+                ? PreviewConfig.i18n.switchToMenuConfirm
+                : PreviewConfig.i18n.switchToFooterConfirm;
+            return { message: message, type: 'layout', name: struct };
+        }
+        if (struct && currentEditType === 'layout' && struct.startsWith('page-')) {
+            const page = struct.substring(5);
+            return { message: PreviewConfig.i18n.switchToPageConfirm.replace('{page}', page), type: 'page', name: page };
+        }
+        return null;
+    }
+
+    /**
+     * A click outside what the Edit list names asks to switch to it. On a no, the frame goes back to
+     * what the panel holds, so the outline, the Edit list and the actions never disagree.
+     */
+    function askToSwitchTarget(target) {
+        QuickSiteUtils.confirm(target.message).then(ok => {
+            if (ok) {
+                if (targetSelect) showEditTarget(target.type + ':' + target.name);
+                navigateTo(target.type, target.name);
+            } else if (selectedStruct != null && selectedFrameNode != null) {
+                sendToIframe('selectNode', { struct: selectedStruct, node: selectedFrameNode });
+            } else {
+                sendToIframe('clearSelection', {});
+            }
+        });
+    }
 
     function showNodePanel(data) {
-        // Check if user clicked a menu/footer element while editing a different target
-        const clickedStruct = data.struct || null;
         // AI tools mode forwards click handling as select-mode in the iframe
         // but doesn't care which structure is being edited — selection is
         // purely informational (no edit-context switch). Skip the
         // structure-mismatch prompts entirely when in ai-tools mode.
-        const skipStructPrompts = (currentMode === 'ai-tools');
-        if (!skipStructPrompts && clickedStruct && currentEditType !== 'layout') {
-            // User is editing a page/component but clicked on menu or footer
-            if (clickedStruct === 'menu' || clickedStruct === 'footer') {
-                const msg = clickedStruct === 'menu'
-                    ? PreviewConfig.i18n.switchToMenuConfirm
-                    : PreviewConfig.i18n.switchToFooterConfirm;
-                QuickSiteUtils.confirm(msg).then(ok => {
-                    if (!ok) return;
-                    // Switch dropdown and navigate to layout target
-                    if (targetSelect) showEditTarget('layout:' + clickedStruct);
-                    navigateTo('layout', clickedStruct);
-                });
-                // Either way, don't process this selection (it came from the wrong context)
-                return;
-            }
-        }
-
-        // Reverse: user is editing layout (menu/footer) but clicked a page element
-        if (!skipStructPrompts && clickedStruct && currentEditType === 'layout' && clickedStruct.startsWith('page-')) {
-            const routeName = clickedStruct.substring(5);
-            const msg = PreviewConfig.i18n.switchToPageConfirm.replace('{page}', routeName);
-            QuickSiteUtils.confirm(msg).then(ok => {
-                if (!ok) return;
-                if (targetSelect) showEditTarget('page:' + routeName);
-                navigateTo('page', routeName);
-            });
+        const outside = currentMode === 'ai-tools' ? null : switchFor(data.struct || null);
+        if (outside) {
+            askToSwitchTarget(outside);
+            // Either way, don't process this selection (it came from the wrong context)
             return;
         }
         
@@ -2888,6 +2938,7 @@
         // Store selection info for edit/copy actions
         selectedStruct = data.struct || null;
         selectedNode = data.isComponent ? data.componentNode : data.node;
+        selectedFrameNode = data.node;
         selectedComponent = data.component || null;
         selectedElementClasses = data.classes || null;  // Store classes for style mode
         selectedElementTag = data.tag || null;          // Store tag for style mode
@@ -3462,13 +3513,13 @@
                         }
                     }
                     
-                    // Auto-select layout target (menu/footer) after navigation
-                    if (layoutAutoSelectTarget) {
-                        const struct = layoutAutoSelectTarget; // 'menu' or 'footer'
-                        layoutAutoSelectTarget = null;
+                    // Bring the layout target (menu/footer) into view after navigation
+                    if (layoutToReveal) {
+                        const struct = layoutToReveal; // 'menu' or 'footer'
+                        layoutToReveal = null;
                         // Small extra delay to ensure DOM is rendered
                         setTimeout(() => {
-                            sendToIframe('selectNode', { struct: struct, node: '0' });
+                            sendToIframe('revealNode', { struct: struct, node: '0' });
                         }, 100);
                     }
                     
@@ -7444,6 +7495,11 @@
         const config = (typeof addComplexController.getConfig === 'function')
             ? addComplexController.getConfig() : {};
 
+        const structInfo = parseStruct(selectedStruct);
+        if (!structInfo || !structInfo.type) {
+            throw new Error('Invalid structure type');
+        }
+
         // The targetNodeId / structType plumbing mirrors addNode/addComponentNode: the
         // structure's own root is selected as '' (its data-qs-node) and sent as 'root'.
         const isRoot = !selectedNode && selectedNode !== 0;
@@ -7452,9 +7508,8 @@
         const body = {
             kind: kind,
             config: config,
-            structType: currentEditType,
-            pageName: (currentEditType === 'page' || currentEditType === 'component')
-                ? currentEditName : undefined,
+            structType: structInfo.type,
+            pageName: structInfo.name || undefined,
             targetNodeId: targetNodeId,
             position: position
         };
@@ -10664,28 +10719,10 @@
                 ? String(selectedElementClasses).split(/\s+/).filter(Boolean)
                 : []
         }),
-        // Miniplayer API — delegates to preview-miniplayer.js module
-        toggleMiniplayer: () => window.PreviewMiniplayer && window.PreviewMiniplayer.toggle(),
-        isMiniplayer: () => window.PreviewMiniplayer ? window.PreviewMiniplayer.isEnabled() : false,
-        toggleGlobalMiniplayer: () => window.PreviewMiniplayer && window.PreviewMiniplayer.toggleGlobal(),
-        isGlobalMiniplayerEnabled: () => window.PreviewMiniplayer ? window.PreviewMiniplayer.isGlobalEnabled() : false
     };
     
     // Initial state
     startLoadingTimeout();
-    
-    // Initialize miniplayer module (preview-miniplayer.js, loaded before preview.js)
-    if (window.PreviewMiniplayer) {
-        window.PreviewMiniplayer.init({
-            container: container,
-            previewPage: document.getElementById('preview-page'),
-            targetSelect: targetSelect,
-            langSelect: langSelect,
-            showToast: showToast,
-            reloadPreview: reloadPreview,
-            i18n: PreviewConfig.i18n
-        });
-    }
     
     // Check for deep-link target from URL parameter (e.g., ?target=page-home)
     const urlTarget = new URLSearchParams(window.location.search).get('target');

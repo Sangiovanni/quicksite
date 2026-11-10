@@ -2407,12 +2407,6 @@ window.PreviewAiTools = (function () {
             _renderYourPromptFields();
             _updateActionStates();
             _renderKept();
-            // Notify the rest of the editor that a workflow ran (the miniplayer and others refresh).
-            if (run.ran) {
-                try {
-                    window.dispatchEvent(new CustomEvent('quicksite:workflow-complete'));
-                } catch (_e) { /* ignore */ }
-            }
         }
     }
 
