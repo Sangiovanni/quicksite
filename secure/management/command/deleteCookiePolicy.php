@@ -70,17 +70,8 @@ if (consentRouteExists($routeTrim)) {
     $routeDeleted = true;
 }
 
-// Forget the route + drop the banner's policy link (regenerate without it).
-saveConsentConfig(array_merge($cfg, ['policyRoute' => null]));
-qs_small_write_send_refusal();
-if (file_exists(consentBannerPath())) {
-    $banner = buildConsentBannerStructure(null);
-    $bannerFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
-    if (!qs_small_write_guard(consentBannerPath(), qs_json_size($banner, $bannerFlags, "\n"))) {
-        qs_small_write_send_refusal();
-    }
-    qs_json_write(consentBannerPath(), $banner, $bannerFlags, LOCK_EX, "\n");
-}
+// Forget the route + drop the banner's policy link.
+consentForgetPolicyRoute($cfg);
 
 ApiResponse::create(200, 'success')
     ->withMessage($routeDeleted ? "Cookie-policy page deleted ($route)" : "Cleared stale cookie-policy route ($route)")

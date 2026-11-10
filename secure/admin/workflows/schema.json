@@ -276,6 +276,26 @@
       "type": "string",
       "description": "Filename of the .md prompt template (same folder as spec)"
     },
+    "answerRules": {
+      "type": "object",
+      "description": "What an AI answer of this workflow may run. Whatever the rules refuse is left out of the run, and the panel says so. With none of them, an answer sends only the commands relatedCommands names.",
+      "properties": {
+        "anyCommand": {
+          "type": "boolean",
+          "description": "The answer may send any command, not only those relatedCommands names (each still passes the user's role)."
+        },
+        "selectorStarts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Where a step names a selector, every selector of its list must begin with one of these, as a whole name: '#a b' begins with '#a', '#a-b' does not. A + or ~ straight after the start's own part, an escape or a comment is refused."
+        },
+        "forbiddenProperties": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A step whose styles declare one of these CSS properties is left out, an object's values read as declarations too. A property name with anything but letters, digits, - and _ is refused."
+        }
+      }
+    },
     "steps": {
       "type": "array",
       "description": "For manual workflows: commands to execute directly (no AI). Presence of steps without promptTemplate makes this a manual workflow.",

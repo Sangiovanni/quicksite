@@ -194,6 +194,29 @@ function countNestedTranslationKeys(array $arr): int {
 }
 
 /**
+ * The named groups of a translation tree, as a tree of their own: each path is dotted ('consent',
+ * 'storage.desc'), and a path the tree does not hold is skipped.
+ */
+function qs_translation_groups(array $tree, array $paths): array {
+    $groups = [];
+    foreach ($paths as $path) {
+        $parts = explode('.', $path);
+        $value = $tree;
+        foreach ($parts as $part) {
+            if (!is_array($value) || !array_key_exists($part, $value)) {
+                continue 2;
+            }
+            $value = $value[$part];
+        }
+        foreach (array_reverse($parts) as $part) {
+            $value = [$part => $value];
+        }
+        $groups = mergeTranslations($groups, $value);
+    }
+    return $groups;
+}
+
+/**
  * Load → optional collision check → merge → write a translation file,
  * with optional default.json sync. Callers handle higher-level input
  * validation (language code format, payload depth/size) — this function
@@ -213,9 +236,18 @@ function countNestedTranslationKeys(array $arr): int {
  *                        'message' => string] — every file the command
  *                        wrote is put back (qs_small_write_guard)
  */
-function writeTranslationsToFile(string $language, array $newNested, bool $replaceMode = false): array {
+function writeTranslationsToFile(string $language, array $newNested, bool $replaceMode = false, array $keep = []): array {
     $translationsFile = PROJECT_PATH . '/translate/' . $language . '.json';
     $isDefault = ($language === 'default');
+
+    // Replace mode with groups to keep: what the file holds under them goes into the new payload,
+    // which wins where it names the same key.
+    if ($replaceMode && $keep !== [] && file_exists($translationsFile)) {
+        $current = json_decode((string) @file_get_contents($translationsFile), true);
+        if (is_array($current)) {
+            $newNested = mergeTranslations(qs_translation_groups($current, $keep), $newNested);
+        }
+    }
 
     // Load existing (skip in replace mode — the new payload replaces it)
     $existingTranslations = [];

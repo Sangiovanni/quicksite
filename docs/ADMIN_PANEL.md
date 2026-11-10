@@ -985,6 +985,12 @@ An amber-bordered banner sits at the top of the panel: `⚠ AI tools modify your
 
 *Translate Site*, listed on its own too, translates every text of the site from one of its languages (**Translate from**, the default language unless another is chosen) into another (**Language to write**), for a language just added, whose texts are still a copy of the default's. Its AI answers one `setTranslationKeys` per group of texts, merged, so a cut answer keeps every whole group. Both fields show the project's languages by name and send their codes. **Language to write** never offers the **Translate from** language, so it opens on another, and a change of Translate from that takes its language moves it to the first one left; on a project of one language it has no option, says `Required`, and Run waits.
 
+#### Fit my cookie banner and Fit my consent pages
+
+Each gives a part of the site that QuickSite generated the site's look: *Fit my cookie banner* the banner and its popup, *Fit my consent pages* the cookie policy page and the privacy page. Generate them first, on the Compliance pages. Each is one short AI answer of style rules: the prompt states the elements' structure, gives the site's stylesheet and QuickSite's default styles for those elements, and asks for rules that follow the first and override the second. Its box **Colours only** sends the site's CSS variables instead of its stylesheet: a much shorter prompt, with no corners, shadows or buttons to match.
+
+An answer may only send `setStyleRule`. A rule must begin with the part's own selector, `#qs-consent-banner` or `#qs-consent-popup`, or `.qs-cookie-policy-page` or `.qs-privacy-policy-page`, since the default styles reach the page after the site's stylesheet and a plainer rule would lose to them. It may style what is inside the part, not what follows it: a `+` or `~` straight after its selector is left out. A rule that sets `display`, `visibility`, `position`, `z-index` or `all` is left out: QuickSite shows, hides and places these elements, and `all` would reset that. The rules go into the site's stylesheet, so generating the banner or a page again keeps them; a Fresh Start or a Restyle that replaces the stylesheet can lose them, and running the workflow again brings them back.
+
 #### Runner — INPUTS zone (accent border)
 
 - **Your prompt** — one field per request of the run (*A run, phase by phase* below): an AI phase's own, or its parent's when its sub-workflow entry says `"request": "parent"` ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*), so *Create Website v2* shows one for its AI phases. Named by its workflow when the run has more than one, none for a run with no AI phase. It is the user's request, appended to the prompt of every phase that takes it after a `**User Request:**` marker. It is read when a phase that takes it starts, and locked while that phase runs and for good once the last one has started; before each phase that takes it, the review shows it again, editable for the phases still to run (`Your prompt — shared by this run's AI phases` when several take it)
@@ -999,7 +1005,7 @@ An amber-bordered banner sits at the top of the panel: `⚠ AI tools modify your
 #### Runner — AI EXCHANGE zone (dashed border, a run with an AI phase only)
 
 - **General prompt** — read-only textarea showing the assembled final prompt (rendered template + user prompt). Copy button. Filled when the run reaches an AI phase: its prompt is built then, from the project as the earlier phases left it. With several AI phases the zone serves each in turn, its header naming it (`AI exchange — {name}`)
-- **AI response** — textarea that doubles as paste target (no BYOK) or live stream sink (BYOK). It takes an answer only when a phase can: before the run when its first phase is the AI one, else once the run reaches that phase (until then: `Run first: the parts before it prepare the project, then its prompt is built.`). Status line below the textarea cycles through `Sending to {model}… (X.Xs)` → `Receiving from {model}… (N chars, X.Xs)` → `N commands ready ✓` (green) or `Invalid JSON: …` / `No commands found in response.` (red). An answer that cannot run says why, in red, and none of it runs:
+- **AI response** — textarea that doubles as paste target (no BYOK) or live stream sink (BYOK). It takes an answer only when a phase can: before the run when its first phase is the AI one, else once the run reaches that phase (until then: `Run first: the parts before it prepare the project, then its prompt is built.`). Status line below the textarea cycles through `Sending to {model}… (X.Xs)` → `Receiving from {model}… (N chars, X.Xs)` → `N commands ready ✓` (green) or `Invalid JSON: …` / `No commands found in response.` (red). Once the server has read an answer, N is what will run: a command the workflow does not name, a style rule outside what it may style, or a rule setting what it may not change is left out, each named under the status line, and `Nothing in this answer can run.` (red) takes the place of N when none is left. An answer that cannot run says why, in red, and none of it runs:
   - `The answer was cut at the connection's output limit (N tokens), so none of it runs. Raise the limit in AI connections, or ask for less.` when the provider cut it at the limit;
   - `The AI stopped its answer early (reason), so none of it runs.` when the provider stopped it for another reason (a safety filter, say);
   - `The answer broke off after N characters: …` when the connection broke while it arrived;
@@ -3361,7 +3367,8 @@ its provider from the address lists every provider the project has keys for, in
 either set — and a legal-review note. The route is recorded in `consent.json`; once a page
 exists the modal locks the route and offers **Update** + **Delete page**
 (`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
-policy page and no accidental duplicates. Overwriting an existing route asks for
+policy page and no accidental duplicates. A policy page's route deleted any other way, on the sitemap or by
+Fresh Start, is forgotten the same way, and the banner loses its link. Overwriting an existing route asks for
 confirmation. Left empty, the layer is generated with no page and a banner links to
 none, and a yellow toast says so.
 

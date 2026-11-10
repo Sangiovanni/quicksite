@@ -305,6 +305,12 @@ foreach ($routesToDelete as $routeSegments) {
 }
 
 // ============================================================================
+// CLEAN UP POLICY RECORDS
+// ============================================================================
+
+$policyRecordsCleared = cleanPolicyRoutesForRoutes($deletedRouteNames);
+
+// ============================================================================
 // SUCCESS RESPONSE
 // ============================================================================
 
@@ -319,6 +325,7 @@ ApiResponse::create(200, 'route.deleted')
         'aliases_removed' => $deletedAliases,
         'page_events_cleaned' => $pageEventsCleanup['cleaned'] ?? [],
         'resolvers_cleaned' => $deletedResolverRoutes,
+        'policy_records_cleared' => $policyRecordsCleared,
     ])
     ->send();
 

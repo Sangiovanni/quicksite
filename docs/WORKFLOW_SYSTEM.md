@@ -308,7 +308,9 @@ up:
 time against the Management API, and a failure part-way leaves the earlier
 commands applied. Test a destructive workflow on a project you can throw away, or take a backup
 first — the shipped `fresh-start` deletes every route, asset, language and
-component before it resets styles.
+component before it resets styles. It keeps the words the consent layer and the storage and privacy
+registries own, as those outlive the pages: its `setTranslationKeys` steps name them in `keep`. A workflow
+that replaces a language's texts does the same.
 
 ---
 
@@ -464,7 +466,7 @@ Hardcoded data available as `data.*` in steps and templates:
 ```
 
 #### `relatedCommands` (array of strings)
-List of API command names. Used for two things:
+List of API command names. Used for three things:
 
 1. **Deciding whether the workflow is listed at all.** The panel hides a workflow
    from anyone whose role does not grant every command in `relatedCommands` — and
@@ -476,9 +478,23 @@ List of API command names. Used for two things:
 2. **Building command documentation into the prompt** — `{{> command.X}}`,
    `{{> command.$relatedCommands}}` and the `{{#each commands}}` context all draw
    on help data fetched for these names.
+3. **Bounding an AI answer** — an answer runs only the commands named here, unless
+   `answerRules` says otherwise. A command it does not name is left out, and the
+   panel says so before anything runs.
 
 #### `promptTemplate` (string)
 Filename of the markdown template (e.g., `"create-website.md"`). Loaded from the same folder as the JSON spec.
+
+#### `answerRules` (object)
+What an AI answer of this workflow may run, beyond its `relatedCommands`. `WorkflowManager::answerSteps()` reads
+them each time an answer comes back: a step they refuse never becomes a step, and the answer's status line in the
+panel names it. Each is optional.
+
+| Rule | What it does | Example |
+|------|--------------|---------|
+| `anyCommand` | The answer may send any command, each still passing the user's role. For a workflow whose purpose is any command. | `run-batch` |
+| `selectorStarts` | Where a step names a `selector`, every selector of its list begins with one of these, as a whole name: `#a b` begins with `#a`, `#a-b` does not. A `+` or `~` straight after the start's own part is refused, as it selects what follows the element, not what is inside it; one deeper in is not. A selector with an escape or a comment is refused, as a browser reads it otherwise than its text. | `["#qs-consent-banner", "#qs-consent-popup"]` |
+| `forbiddenProperties` | A step whose `styles` declare one of these is left out, whatever the case of its name. An object's values are read as declarations too, and a property name with anything but letters, digits, `-` and `_` (an escape, say) is refused, as a browser could read it as one of these. | `["display", "position"]` |
 
 #### `steps` (array)
 For manual workflows. Each step:
@@ -623,7 +639,7 @@ Then wire styles:
 {{> command.editStyles}}
 ```
 
-The partial form routes to `formatCommandFull()`, which writes the description, the method, the parameters with their types and one fenced example.
+The partial form routes to `formatCommandFull()`, which writes the description, the method, the parameters with their types and one fenced example: the first `example_*` of the command's help, as `{"command": …, "params": …}` when its line shows a request's body, the shape an answer uses, and as the line itself when it shows none.
 
 ### Pass 3: JSON Export — `{{json}}`
 
@@ -700,8 +716,9 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
    connection is configured, otherwise copied out and pasted back
 7. Client validates the JSON response structure
 8. The same request with { phase, answer } reads the commands back, with what each
-   deletes or changes; each is POSTed to /management/p/<projectId>/{command} in turn,
-   results shown per-row in the Batch panel
+   deletes or changes and, in "refused", what the workflow does not allow; each kept
+   command is POSTed to /management/p/<projectId>/{command} in turn, results shown
+   per-row in the Batch panel
 9. Each post-workflow phase runs
 ```
 

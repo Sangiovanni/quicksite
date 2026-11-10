@@ -1836,6 +1836,10 @@
         "specs": {
             "shared": {
                 "params": {
+                    "coloursOnly": {
+                        "label": "Colours only",
+                        "help": "Sends the site's CSS variables instead of its whole stylesheet: a much shorter prompt, but the AI cannot see the corners, shadows and buttons to match."
+                    },
                     "includeAssets": {
                         "label": "Include my starred assets in the prompt",
                         "help": "The AI will use your starred assets (images, fonts, etc.) instead of placeholders. Star them on the Media page first."
@@ -1903,6 +1907,14 @@
             "createWebsiteV2": {
                 "title": "Create Website v2",
                 "description": "Builds the site in several shorter AI answers: the pages and their texts in the default language, then each other language, then the look. A shorter answer is less likely to be cut, and a cut one costs one part."
+            },
+            "fitCookieBanner": {
+                "title": "Fit my cookie banner",
+                "description": "Gives the cookie banner and its popup your site's look. Generate the banner first, on the Compliance page."
+            },
+            "fitConsentPages": {
+                "title": "Fit my consent pages",
+                "description": "Gives the cookie policy and privacy pages your site's look. Generate them first, on the Compliance page."
             },
             "translateSite": {
                 "title": "Translate Site",
@@ -2268,6 +2280,10 @@
         "aiToolsWhatTranslationFiles": "Translation files of languages the project no longer has",
         "aiToolsAnswerCut": "The answer was cut at the connection's output limit ({n} tokens), so none of it runs. Raise the limit in AI connections, or ask for less.",
         "aiToolsAnswerStopped": "The AI stopped its answer early ({reason}), so none of it runs.",
+        "aiToolsAnswerNothingRuns": "Nothing in this answer can run.",
+        "aiToolsAnswerLeftOutCommand": "Left out, as this workflow does not send them: {list}",
+        "aiToolsAnswerLeftOutSelector": "Left out, as this workflow only styles its own elements: {list}",
+        "aiToolsAnswerLeftOutProperty": "Left out, as this workflow may not set: {list}",
         "aiToolsAnswerBrokeOff": "The answer broke off after {chars} characters: {error}",
         "aiToolsContinueAnswer": "Continue the answer",
         "aiToolsContinueAnswerTitle": "Keeps the commands that arrived whole ({n}) and asks the AI only for the rest, from the command that was cut. The answer put together runs only when you click Execute.",

@@ -1,0 +1,48 @@
+{
+    "$schema": "../schema.json",
+    "id": "fit-cookie-banner",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🍪",
+        "titleKey": "workflows.specs.fitCookieBanner.title",
+        "descriptionKey": "workflows.specs.fitCookieBanner.description",
+        "category": "style",
+        "tags": ["cookie", "consent", "banner", "style"],
+        "difficulty": "beginner"
+    },
+    "parameters": [
+        {
+            "id": "coloursOnly",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.shared.params.coloursOnly.label",
+            "helpKey": "workflows.specs.shared.params.coloursOnly.help",
+            "default": false
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "rootVariables",
+            "command": "getRootVariables",
+            "extract": "data.variables",
+            "condition": "coloursOnly === true"
+        },
+        {
+            "id": "styles",
+            "command": "getStyles",
+            "extract": "data",
+            "condition": "coloursOnly !== true"
+        },
+        {
+            "id": "helpSetStyleRule",
+            "command": "help",
+            "urlParams": ["setStyleRule"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setStyleRule"],
+    "answerRules": {
+        "selectorStarts": ["#qs-consent-banner", "#qs-consent-popup"],
+        "forbiddenProperties": ["display", "visibility", "position", "z-index", "all"]
+    },
+    "promptTemplate": "fit-cookie-banner.md"
+}

@@ -49,6 +49,25 @@ function consentLayerGenerated(): bool {
     return file_exists(consentBannerPath()) && file_exists(consentPopupPath());
 }
 
+/**
+ * Forget the cookie policy's route, and regenerate the banner without its link: the banner has no dead
+ * link once the page is gone. Each write passes the size check (qs_small_write_guard), so the caller
+ * answers qs_small_write_send_refusal() as it does for its own.
+ */
+function consentForgetPolicyRoute(array $config): void {
+    require_once __DIR__ . '/quota.php';
+    saveConsentConfig(array_merge($config, ['policyRoute' => null]));
+    qs_small_write_send_refusal();
+    if (file_exists(consentBannerPath())) {
+        $banner = buildConsentBannerStructure(null);
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+        if (!qs_small_write_guard(consentBannerPath(), qs_json_size($banner, $flags, "\n"))) {
+            qs_small_write_send_refusal();
+        }
+        qs_json_write(consentBannerPath(), $banner, $flags, LOCK_EX, "\n");
+    }
+}
+
 /** Whether a route (slash path) currently exists in the ROUTES structure. */
 function consentRouteExists(string $route): bool {
     if (!defined('ROUTES') || !is_array(ROUTES)) return false;

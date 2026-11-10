@@ -50,6 +50,12 @@ class WorkflowManager {
     /** A command whose name begins so adds something new: a run is never warned about it. */
     private const CREATE_NAME = '/^(add|create|upload|insert|duplicate)/';
 
+    /**
+     * A property name as an answer's bound reads it: letters, digits, `-` and `_`, or a custom property
+     * (--name). A name with an escape or any other character could read in a browser as one it refuses.
+     */
+    private const PLAIN_PROPERTY = '/^(?:--[A-Za-z0-9_-]+|-?[A-Za-z_][A-Za-z0-9_-]*)$/D';
+
     /** The categories whose writes change the site's content: such a write that neither deletes nor adds is warned as a change. */
     private const CONTENT_CATEGORIES = [
         'content.write', 'translation.write', 'route.write', 'asset.write',
@@ -622,7 +628,7 @@ class WorkflowManager {
      * and nothing is resolved — a condition or a forEach that reads the project's data planned another run.
      *
      * @return array|null ['index', 'kind', 'workflowId', 'key', 'title', 'icon', 'ai', 'requestFrom', 'steps',
-     *                    'count', 'effects', 'prompt'?, 'validationErrors'?], ['planChanged' => true], or null
+     *                    'count', 'effects', 'prompt'?, 'validationErrors'?, 'refused'?], ['planChanged' => true], or null
      *                    when the run has no such phase (and no key was given)
      */
     public function resolvePhase(array $workflow, array $userParams, int $index, array $options = []): ?array {
@@ -650,7 +656,7 @@ class WorkflowManager {
         ];
         $steps = [];
         if ($ai && isset($options['answer']) && is_array($options['answer'])) {
-            $steps = $this->answerSteps($options['answer']);
+            [$steps, $resolved['refused']] = $this->answerSteps($options['answer'], $workflow);
         }
         // An AI phase reads its data only for its prompt.
         if (!$ai || !empty($options['prompt'])) {
@@ -696,10 +702,14 @@ class WorkflowManager {
 
     /**
      * The commands an AI answered, as a phase's steps: each entry that names a command, with its method,
-     * its parameters and the execution options the runner honours; anything else is left out.
+     * its parameters and the execution options the runner honours; anything else is left out. A step its
+     * workflow does not allow never becomes a step: it goes on the list of what was refused (answerRefusal()).
+     *
+     * @return array [the steps, the refusals]
      */
-    private function answerSteps(array $answer): array {
+    private function answerSteps(array $answer, array $workflow): array {
         $steps = [];
+        $refused = [];
         foreach ($answer as $entry) {
             if (!is_array($entry)) continue;
             $command = $entry['command'] ?? $entry['name'] ?? null;
@@ -714,9 +724,144 @@ class WorkflowManager {
                     $step[$prop] = $entry[$prop];
                 }
             }
+            $refusal = $this->answerRefusal($step, $workflow);
+            if ($refusal !== null) {
+                $refused[] = $refusal;
+                continue;
+            }
             $steps[] = $step;
         }
-        return $steps;
+        return [$steps, $refused];
+    }
+
+    /**
+     * Why a workflow does not let its AI answer hold this step, or null when it may. An answer sends only
+     * the commands its workflow names in relatedCommands, unless answerRules.anyCommand opens that. Where
+     * a step names a CSS selector, answerRules.selectorStarts holds it to the elements the workflow is about,
+     * and answerRules.forbiddenProperties keeps it from declaring what the workflow must not change, or a
+     * property whose name the bound cannot read plainly (PLAIN_PROPERTY).
+     *
+     * @return array|null ['reason' => 'command'|'selector'|'property', 'command' => the step's, 'target' => what was refused]
+     */
+    private function answerRefusal(array $step, array $workflow): ?array {
+        $rules = is_array($workflow['answerRules'] ?? null) ? $workflow['answerRules'] : [];
+        $command = $step['command'];
+        if (empty($rules['anyCommand']) && !in_array($command, $workflow['relatedCommands'] ?? [], true)) {
+            return ['reason' => 'command', 'command' => $command, 'target' => $command];
+        }
+        $params = $step['params'];
+        if (!empty($rules['selectorStarts']) && array_key_exists('selector', $params)) {
+            $selector = $params['selector'];
+            if (!is_string($selector) || !$this->selectorStaysWithin($selector, $rules['selectorStarts'])) {
+                return ['reason' => 'selector', 'command' => $command, 'target' => is_string($selector) ? $selector : ''];
+            }
+        }
+        if (!empty($rules['forbiddenProperties'])) {
+            $forbidden = array_map(static fn($name) => strtolower((string) $name), $rules['forbiddenProperties']);
+            foreach ($this->declaredProperties($params['styles'] ?? null) as $name) {
+                $plain = preg_match(self::PLAIN_PROPERTY, $name) === 1;
+                if (!$plain || in_array(strtolower($name), $forbidden, true)) {
+                    return ['reason' => 'property', 'command' => $command, 'target' => $plain ? strtolower($name) : $name];
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether every selector of a CSS selector list begins with one of the given starts, as a whole name,
+     * and stays inside it: `#a b` and `#a > b` begin with `#a`, `#a-b` does not, and `#a + b` or `#a ~ b`
+     * select what follows `#a`, not what is in it. A comma, a `+` or a `~` inside a string, brackets or
+     * parentheses is not the list's (selectorTopLevel()). A selector with an escape or a comment is refused:
+     * a browser reads those as other characters, and this reads the text as it is written.
+     */
+    private function selectorStaysWithin(string $selectorList, array $starts): bool {
+        if (str_contains($selectorList, '\\') || str_contains($selectorList, '/*')) return false;
+        $top = $this->selectorTopLevel($selectorList);
+        if ($top === null) return false;
+        $length = strlen($selectorList);
+        $from = 0;
+        for ($i = 0; $i <= $length; $i++) {
+            if ($i < $length && !($selectorList[$i] === ',' && $top[$i])) continue;
+            if (!$this->selectorPartStaysWithin($selectorList, $top, $from, $i, $starts)) return false;
+            $from = $i + 1;
+        }
+        return true;
+    }
+
+    /**
+     * One selector of a list, its bytes from $from up to $to, as selectorStaysWithin() reads it: it begins
+     * with a start as a whole name (a name goes on with a letter, a digit, `-`, `_` or any byte of a
+     * non-ASCII character), and the start's compound is not followed by `+` or `~`.
+     */
+    private function selectorPartStaysWithin(string $list, array $top, int $from, int $to, array $starts): bool {
+        $space = " \t\n\r\f";
+        while ($from < $to && str_contains($space, $list[$from])) $from++;
+        foreach ($starts as $start) {
+            $start = (string) $start;
+            $end = $from + strlen($start);
+            if ($start === '' || $end > $to || substr_compare($list, $start, $from, strlen($start)) !== 0) continue;
+            if ($end < $to && (ctype_alnum($list[$end]) || $list[$end] === '-' || $list[$end] === '_' || ord($list[$end]) >= 0x80)) continue;
+            $i = $end;
+            while ($i < $to && !($top[$i] && str_contains($space . '>+~', $list[$i]))) $i++;
+            while ($i < $to && str_contains($space, $list[$i])) $i++;
+            return $i >= $to || ($list[$i] !== '+' && $list[$i] !== '~');
+        }
+        return false;
+    }
+
+    /**
+     * Which bytes of a selector stand outside every string, bracket and parenthesis: one flag per byte.
+     * Null when one is left open, a bracket is closed by the other kind, or a string runs onto a new line,
+     * where a browser and this reading could part ways.
+     */
+    private function selectorTopLevel(string $selector): ?array {
+        $top = [];
+        $open = [];
+        $quote = null;
+        $length = strlen($selector);
+        for ($i = 0; $i < $length; $i++) {
+            $char = $selector[$i];
+            if ($quote !== null) {
+                $top[$i] = false;
+                if ($char === "\n" || $char === "\r" || $char === "\f") return null;
+                if ($char === $quote) $quote = null;
+                continue;
+            }
+            $top[$i] = $open === [];
+            if ($char === '"' || $char === "'") {
+                $quote = $char;
+            } elseif ($char === '(' || $char === '[') {
+                $open[] = $char === '(' ? ')' : ']';
+            } elseif ($char === ')' || $char === ']') {
+                if (array_pop($open) !== $char) return null;
+            }
+        }
+        return $quote === null && $open === [] ? $top : null;
+    }
+
+    /**
+     * The property names a command's styles declare, as written. An object is read as setStyleRule writes
+     * it, `name: value;` for each entry, so a value holding a `;` declares what follows it too. The text is
+     * cut at every `;`, one in a string included, so no declaration hides inside another, and a whole
+     * comment in a name is dropped. The caller lowers the case and checks each against PLAIN_PROPERTY.
+     */
+    private function declaredProperties($styles): array {
+        if (is_array($styles)) {
+            $text = '';
+            foreach ($styles as $name => $value) {
+                $text .= $name . ': ' . (is_scalar($value) ? (string) $value : '') . ';';
+            }
+            $styles = $text;
+        }
+        if (!is_string($styles)) return [];
+        $names = [];
+        foreach (explode(';', $styles) as $declaration) {
+            $colon = strpos($declaration, ':');
+            if ($colon === false) continue;
+            $names[] = trim((string) preg_replace('#/\*.*?\*/#s', '', substr($declaration, 0, $colon)));
+        }
+        return $names;
     }
 
     /**
@@ -1850,13 +1995,13 @@ class WorkflowManager {
     /**
      * Format a single command's help data as clean markdown for inclusion in an AI prompt.
      *
-     * Used by the {{> command.X}} partial resolver. Default `$concise = true` keeps prompts tight;
-     * verbose mode adds error_responses and a fuller example block.
+     * Used by the {{> command.X}} partial resolver. Default `$concise = true` keeps prompts tight, with
+     * the first example; verbose mode adds error_responses and every example.
      *
      * @param string $command   Command name (used for the heading)
      * @param array  $helpData  Output of `help` command for this command (description, method,
-     *                          parameters, example, notes, error_responses, ...)
-     * @param bool   $concise   When true (default) drop error_responses and trim the example.
+     *                          parameters, example_*, notes, error_responses, ...)
+     * @param bool   $concise   When true (default) drop error_responses and keep one example.
      * @return string Markdown block (no trailing newline)
      */
     public function formatCommandFull(string $command, array $helpData, bool $concise = true): string {
@@ -1888,18 +2033,23 @@ class WorkflowManager {
             }
         }
         
-        // Example — pick the smallest meaningful one in concise mode.
-        $example = $helpData['example'] ?? ($helpData['examples'][0] ?? null);
-        if ($example !== null) {
-            $out[] = '';
-            $out[] = '**Example:**';
+        // Examples — the first in concise mode, each as an answer writes it where help shows a body.
+        $examples = $this->helpExamples($command, $helpData);
+        if ($concise) {
+            $examples = array_slice($examples, 0, 1);
+        }
+        foreach ($examples as $index => $example) {
+            if ($index === 0) {
+                $out[] = '';
+                $out[] = '**Example:**';
+            }
             if (is_array($example)) {
                 $out[] = '```json';
-                $out[] = json_encode($example, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $out[] = json_encode($example, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 $out[] = '```';
             } else {
                 $out[] = '```';
-                $out[] = (string)$example;
+                $out[] = $example;
                 $out[] = '```';
             }
         }
@@ -1920,6 +2070,59 @@ class WorkflowManager {
         return implode("\n", $out);
     }
     
+    /**
+     * A command's examples from its help entry: every key beginning `example`, in the entry's order. Each
+     * is {command, params} when the line shows a request's body, the shape an AI answer uses; a line that
+     * shows none stays as it is.
+     *
+     * @return array Of arrays and strings
+     */
+    private function helpExamples(string $command, array $helpData): array {
+        $examples = [];
+        foreach ($helpData as $key => $value) {
+            if (strncmp((string) $key, 'example', 7) !== 0) continue;
+            if (is_array($value)) {
+                $examples[] = $value;
+                continue;
+            }
+            $line = (string) $value;
+            $body = $this->firstJsonObject($line, (int) strpos($line, 'with body:'));
+            $examples[] = strpos($line, 'with body:') !== false && $body !== null
+                ? ['command' => $command, 'params' => $body]
+                : $line;
+        }
+        return $examples;
+    }
+
+    /** The first whole JSON object of a text from an offset, decoded; null when there is none. */
+    private function firstJsonObject(string $text, int $from): ?array {
+        $start = strpos($text, '{', $from);
+        if ($start === false) return null;
+        $depth = 0;
+        $inString = false;
+        $length = strlen($text);
+        for ($i = $start; $i < $length; $i++) {
+            $char = $text[$i];
+            if ($inString) {
+                if ($char === '\\') {
+                    $i++;
+                } elseif ($char === '"') {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ($char === '"') {
+                $inString = true;
+            } elseif ($char === '{') {
+                $depth++;
+            } elseif ($char === '}' && --$depth === 0) {
+                $decoded = json_decode(substr($text, $start, $i - $start + 1), true);
+                return is_array($decoded) ? $decoded : null;
+            }
+        }
+        return null;
+    }
+
     /**
      * Look up help data for a single command, going through the per-render cache first.
      * Returns null if neither cache nor live fetch yields data.

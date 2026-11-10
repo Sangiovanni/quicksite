@@ -1063,6 +1063,11 @@
     color: #ef4444;
     word-break: break-word;
 }
+.preview-contextual-ai-tools__ai-response-left-out {
+    margin-top: 2px;
+    color: #f59e0b;
+    word-break: break-word;
+}
 
 /* Footer (Model + Touches) — discreet inline line */
 

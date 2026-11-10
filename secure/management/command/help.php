@@ -99,7 +99,8 @@ $GLOBALS['__help_commands'] = [
                 'failed_files' => [],
                 'aliases_removed' => ['/old-guides'],
                 'page_events_cleaned' => ['guides'],
-                'resolvers_cleaned' => ['guides']
+                'resolvers_cleaned' => ['guides'],
+                'policy_records_cleared' => []
             ]
         ],
         'error_responses' => [
@@ -111,7 +112,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.',
             '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.'
         ],
-        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config and the resolvers of every route it deletes. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned.'
+        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config and the resolvers of every route it deletes. A deleted route that held a generated policy page has its record forgotten, so the cookie banner stops linking to it: policy_records_cleared names which, cookie or privacy. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned.'
     ],
     
     'setRouteLayout' => [
@@ -1188,6 +1189,13 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'true',
                 'default' => false,
                 'validation' => 'Boolean value'
+            ],
+            'keep' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'With replace only: dotted groups of the file that survive the replace. The translations sent win where they name the same key. A group the file does not hold is skipped.',
+                'example' => '["consent", "storage.desc"]',
+                'validation' => 'A list of dotted group names; refused without replace: true'
             ]
         ],
         'example_patch' => 'PATCH /management/p/<projectId>/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',

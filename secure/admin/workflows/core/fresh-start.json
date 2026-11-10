@@ -1,7 +1,7 @@
 {
     "$schema": "../schema.json",
     "id": "fresh-start",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "meta": {
         "icon": "🧹",
         "titleKey": "workflows.specs.freshStart.title",
@@ -159,11 +159,12 @@
             }
         },
         {
-            "comment": "=== 6. SET MINIMAL TRANSLATIONS (default language - REPLACE) ===",
+            "comment": "=== 6. SET MINIMAL TRANSLATIONS (default language - REPLACE, keeping the words the consent layer and the storage and privacy registries own: they outlive the pages) ===",
             "command": "setTranslationKeys",
             "params": {
                 "language": "{{langData.default_language}}",
                 "replace": true,
+                "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy"],
                 "translations": {
                     "site": {
                         "name": "My Website"
@@ -183,11 +184,12 @@
             }
         },
         {
-            "comment": "=== 6b. SET MINIMAL TRANSLATIONS (default.json - REPLACE) ===",
+            "comment": "=== 6b. SET MINIMAL TRANSLATIONS (default.json - REPLACE, keeping the same words) ===",
             "command": "setTranslationKeys",
             "params": {
                 "language": "default",
                 "replace": true,
+                "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy"],
                 "translations": {
                     "site": {
                         "name": "My Website"

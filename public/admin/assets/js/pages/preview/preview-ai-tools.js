@@ -3884,8 +3884,9 @@ window.PreviewAiTools = (function () {
             _executeBtnEl.className = deletes
                 ? 'preview-contextual-ai-tools__action-btn--primary preview-contextual-ai-tools__action-btn--danger'
                 : 'preview-contextual-ai-tools__action-btn--primary';
-            // Not before the answer is classified: the label must say what it does.
-            _executeBtnEl.disabled = hasParamErrors || !_answerPhase || (_executing && !_answerWaiter);
+            // Not before the answer is classified: the label must say what it does. Not when nothing in it can run.
+            _executeBtnEl.disabled = hasParamErrors || !_answerPhase || (_answerPhase.steps || []).length === 0
+                || (_executing && !_answerWaiter);
         }
         if (_aiResponseTextarea) {
             // An answer is pasted only when a phase can take it: before the run when its first phase is
@@ -4194,6 +4195,7 @@ window.PreviewAiTools = (function () {
         _fetchPhase(params, index, extra).then(function (phase) {
             if (seq !== _answerSeq) return;
             _answerPhase = phase;
+            _updateAiResponseStatusUI();
             if (_run) _showPhaseInBatch(index); else _renderBatch(index);
             _updateActionStates();
             _scheduleAutoExecute();
@@ -4245,6 +4247,7 @@ window.PreviewAiTools = (function () {
         if (_answerTargetIndex() === null || !_answerPhase) return;
         if (_aiResponseStatus.type !== 'ok') return;
         if (!_currentCommands || _currentCommands.length === 0) return;
+        if ((_answerPhase.steps || []).length === 0) return;
 
         if (_autoExecHintEl) {
             _autoExecHintEl.textContent = _t('autoExecHint', 'Auto-executing in 1.5s — edit response to cancel');
@@ -4288,12 +4291,19 @@ window.PreviewAiTools = (function () {
         if (_aiResponseStatus.type === 'idle') {
             _aiResponseStatusEl.textContent = '';
         } else if (_aiResponseStatus.type === 'ok') {
+            // Once the server has read the answer, what runs is what it kept.
+            var runnable = _answerPhase ? (_answerPhase.steps || []).length : _aiResponseStatus.commandCount;
+            var refused = (_answerPhase && _answerPhase.refused) || [];
             var tpl = _answerParts > 1
                 ? _t('assembledReady', '{n} commands ready, put together from {parts} answers: they run only when you click Execute.')
                 : _t('aiResponseValid', '{n} commands ready');
-            _aiResponseStatusEl.textContent = tpl.replace('{n}', String(_aiResponseStatus.commandCount))
-                .replace('{parts}', String(_answerParts));
-            _aiResponseStatusEl.classList.add('preview-contextual-ai-tools__ai-response-status--ok');
+            _aiResponseStatusEl.textContent = runnable === 0 && refused.length > 0
+                ? _t('answerNothingRuns', 'Nothing in this answer can run.')
+                : tpl.replace('{n}', String(runnable)).replace('{parts}', String(_answerParts));
+            _aiResponseStatusEl.classList.add(runnable === 0 && refused.length > 0
+                ? 'preview-contextual-ai-tools__ai-response-status--error'
+                : 'preview-contextual-ai-tools__ai-response-status--ok');
+            if (refused.length > 0) _aiResponseStatusEl.appendChild(_renderAnswerLeftOut(refused));
         } else {
             var errTpl = _t('aiResponseInvalid', 'Invalid JSON: {error}');
             // An answer that does not parse says so; a failure to get one (a send, a reading) is said as it is.
@@ -4302,6 +4312,27 @@ window.PreviewAiTools = (function () {
                 : errTpl.replace('{error}', _aiResponseStatus.message);
             _aiResponseStatusEl.classList.add('preview-contextual-ai-tools__ai-response-status--error');
         }
+    }
+
+    /** What the server left out of an answer, one line per reason, naming what it refused. */
+    function _renderAnswerLeftOut(refused) {
+        var words = {
+            command: _t('answerLeftOutCommand', 'Left out, as this workflow does not send them: {list}'),
+            selector: _t('answerLeftOutSelector', 'Left out, as this workflow only styles its own elements: {list}'),
+            property: _t('answerLeftOutProperty', 'Left out, as this workflow may not set: {list}')
+        };
+        var box = document.createElement('div');
+        box.className = 'preview-contextual-ai-tools__ai-response-left-out';
+        Object.keys(words).forEach(function (reason) {
+            var targets = refused.filter(function (r) { return r.reason === reason; })
+                .map(function (r) { return r.target; })
+                .filter(function (target, i, all) { return all.indexOf(target) === i; });
+            if (targets.length === 0) return;
+            var line = document.createElement('div');
+            line.textContent = words[reason].replace('{list}', targets.join(', '));
+            box.appendChild(line);
+        });
+        return box;
     }
 
     // ──────────────────────────── BYOK detection ────────────────────────

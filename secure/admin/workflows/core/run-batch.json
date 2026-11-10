@@ -14,5 +14,6 @@
     "dataRequirements": [],
     "relatedCommands": [],
     "pasteOnly": true,
+    "answerRules": { "anyCommand": true },
     "promptTemplate": "run-batch.md"
 }
