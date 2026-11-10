@@ -11,8 +11,6 @@
  * Dependencies:
  * - PreviewConfig global (from preview-config.php)
  * - PreviewState global (from preview-state.js)
- *
- * @version 1.1.0
  */
 (function() {
     'use strict';
@@ -411,7 +409,7 @@
                 QSDom.el('span', { text: PreviewConfig.i18n.addTransition || 'Add transition' })
             ]);
             transitionsList.replaceChildren(addBtn, ...(transitions.length === 0
-                ? [QSDom.el('p', { class: 'preview-animated-empty', text: PreviewConfig.i18n.noTransitions })]
+                ? [QSDom.el('p', { text: PreviewConfig.i18n.noTransitions })]
                 : transitions.map(item => _renderAnimatedSelectorGroup(item, 'transition'))));
         }
 
@@ -420,7 +418,7 @@
             const animations = animatedSelectorsData.animations || [];
             animationsCount.textContent = animations.length;
             animationsList.replaceChildren(...(animations.length === 0
-                ? [QSDom.el('p', { class: 'preview-animated-empty', text: PreviewConfig.i18n.noAnimations })]
+                ? [QSDom.el('p', { text: PreviewConfig.i18n.noAnimations })]
                 : animations.map(item => _renderAnimatedSelectorGroup(item, 'animation'))));
         }
 

@@ -21,7 +21,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             var star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -106,7 +105,6 @@
     function _renderOptionRow(data, labelPickers) {
         var d = data || {};
         var row = document.createElement('div');
-        row.className = 'qs-cb-option-row';
         row.style.display = 'flex';
         row.style.gap = '8px';
         row.style.alignItems = 'flex-start';
@@ -120,7 +118,6 @@
         if (d.value !== undefined) valueInput.value = d.value;
 
         var labelMount = document.createElement('div');
-        labelMount.className = 'qs-cb-option-row__label-mount';
         labelMount.style.flex = '1';
         labelMount.style.minWidth = '0';
 
@@ -140,7 +137,6 @@
 
     function renderWizard(container) {
         var wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--checkbox-group';
 
         // -- name --
         var nameInput = _renderTextInput('ce-cb-name', 'e.g. prefs (letters/digits/_/- only)');

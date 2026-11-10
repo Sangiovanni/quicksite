@@ -8,8 +8,6 @@
  *  - Applying selected edits and saving via editStyles / setRootVariables
  *
  * Depends on: window.CSSRefiner (css-parser.js, utils.js, analyzers/*.js, ui/diff-view.js)
- *
- * @version 1.0.0
  */
 
 (function () {
@@ -385,7 +383,7 @@
             'aria-expanded': 'true'
         }, [
             arrow,
-            QSDom.el('span', { class: 'optimize-analyzer-label', text: label }),
+            QSDom.el('span', { text: label }),
             QSDom.el('span', {
                 class: 'optimize-analyzer-count',
                 text: '(' + suggestions.length + ')'
@@ -398,13 +396,13 @@
         header.appendChild(QSDom.el('div', { class: 'optimize-analyzer-actions' }, [
             QSDom.el('button', {
                 type: 'button',
-                class: 'admin-btn admin-btn--small admin-btn--ghost optimize-btn-select-all',
+                class: 'admin-btn admin-btn--ghost optimize-btn-select-all',
                 'data-analyzer': analyzerId,
                 text: t('optimize.cssRefiner.selectAll')
             }),
             QSDom.el('button', {
                 type: 'button',
-                class: 'admin-btn admin-btn--small admin-btn--ghost optimize-btn-skip-all',
+                class: 'admin-btn admin-btn--ghost optimize-btn-skip-all',
                 'data-analyzer': analyzerId,
                 text: t('optimize.cssRefiner.skipAll')
             })
@@ -458,7 +456,7 @@
         ]));
         item.appendChild(QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--small admin-btn--ghost optimize-btn-diff',
+            class: 'admin-btn admin-btn--ghost optimize-btn-diff',
             text: t('optimize.cssRefiner.diff')
         }));
         item.appendChild(QSDom.el('div', {
@@ -531,7 +529,7 @@
             }),
             QSDom.el('button', {
                 type: 'button',
-                class: 'admin-btn admin-btn--small admin-btn--secondary optimize-btn-write-token',
+                class: 'admin-btn optimize-btn-write-token',
                 text: t('optimize.cssRefiner.writeToRoot')
             })
         ]);

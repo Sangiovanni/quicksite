@@ -14,8 +14,6 @@
  * @param bool $delete_backup Optional - delete the backup once it is restored whole (default false)
  * @param string $name Optional - project name (defaults to active project)
  * @return ApiResponse Restore result info
- * 
- * @version 1.0.0
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

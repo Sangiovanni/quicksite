@@ -15,8 +15,6 @@
  * Building the DOM instead means the page does not depend on it (CLAUDE.md).
  *
  * Dependencies: QuickSiteAdmin (admin.js), QSDom (core/dom.js), QuickSiteUtils.
- *
- * @version 2.0.0
  */
 
 (function () {
@@ -107,7 +105,7 @@
     function renderPublisherCell(entry) {
         const name = publisherName(entry);
         const id = publisherId(entry);
-        if (!name && !id) return el('span', { class: 'admin-muted', text: '—' });
+        if (!name && !id) return el('span', { text: '—' });
         if (name && id) return el('span', { text: name, title: id });
         return el('span', { text: name || id });
     }
@@ -226,7 +224,7 @@
             el('td', { text: (entry.duration_ms ?? '?') + 'ms' }),
             el('td', null, [
                 el('button', {
-                    class: 'admin-btn admin-btn--ghost admin-btn--sm',
+                    class: 'admin-btn admin-btn--ghost',
                     type: 'button',
                     title: t('history.columns.details', 'Details'),
                     dataset: { action: 'show-detail', entryId: String(entry.id) }
@@ -311,7 +309,7 @@
             detailRow(t('history.detail.publisher', 'Publisher'),
                 el('span', { text: name || '—' })),
             detailRow(t('history.detail.userId', 'User ID'),
-                id ? el('code', { text: id }) : el('span', { class: 'admin-muted', text: '—' }))
+                id ? el('code', { text: id }) : el('span', { text: '—' }))
         ]);
 
         clearNode(detailContent);
@@ -535,7 +533,6 @@
         });
         clearPreview.appendChild(list);
         clearPreview.appendChild(el('div', {
-            class: 'admin-form-hint',
             text: t('history.clear.dayGranularHint',
                 'History is stored one file per day and is deleted a whole day at a time, '
                 + 'so a day only disappears once the date you pick is after it. '

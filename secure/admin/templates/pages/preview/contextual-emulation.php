@@ -1,5 +1,5 @@
 <!-- Variable Emulation Panel (component-only, shown when Emulation button clicked) -->
-<div class="preview-contextual-form preview-emulation-panel" id="contextual-emulation-panel" style="display: none;">
+<div class="preview-contextual-form" id="contextual-emulation-panel" style="display: none;">
     <div class="preview-contextual-form__header">
         <h4>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">
@@ -16,7 +16,7 @@
 
     <!-- Loading state -->
     <div class="preview-emulation-panel__loading" id="emulation-panel-loading">
-        <span class="admin-spinner admin-spinner--sm"></span>
+        <span class="admin-spinner"></span>
         <span><?= __admin('common.loading') ?? 'Loading...' ?></span>
     </div>
 
@@ -33,7 +33,7 @@
 
     <!-- Action buttons -->
     <div class="preview-emulation-panel__actions" id="emulation-panel-actions" style="display: none;">
-        <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="emulation-apply-btn">
+        <button type="button" class="admin-btn admin-btn--primary" id="emulation-apply-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
@@ -42,13 +42,13 @@
         <!-- Live-data toggle. Visible only for page-edit
              mode; component emulation has no resolver to go live against.
              preview.js shows/hides per currentEditType. -->
-        <button type="button" class="admin-btn admin-btn--sm admin-btn--outline" id="emulation-live-btn" style="display: none;" data-active="false">
+        <button type="button" class="admin-btn admin-btn--outline" id="emulation-live-btn" style="display: none;" data-active="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/>
             </svg>
             <span data-emulation-live-label><?= __admin('preview.emulationUseLive') ?? 'Use Live Data' ?></span>
         </button>
-        <button type="button" class="admin-btn admin-btn--sm admin-btn--outline" id="emulation-reset-btn">
+        <button type="button" class="admin-btn admin-btn--outline" id="emulation-reset-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
             </svg>

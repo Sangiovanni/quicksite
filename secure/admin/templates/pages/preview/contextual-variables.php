@@ -16,7 +16,7 @@
 
     <!-- Loading state -->
     <div class="preview-variables-panel__loading" id="variables-panel-loading">
-        <span class="admin-spinner admin-spinner--sm"></span>
+        <span class="admin-spinner"></span>
         <span><?= __admin('common.loading') ?? 'Loading...' ?></span>
     </div>
 

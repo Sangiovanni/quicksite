@@ -29,7 +29,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             var star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -110,7 +109,6 @@
     function renderWizard(container) {
         var t = function (key) { return window.QSComplexWizard.t('pagedNavigator.' + key); };
         var wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--paged-navigator';
 
         // -- store picker --
         var storeGroup = _renderGroup();

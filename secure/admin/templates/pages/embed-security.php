@@ -6,8 +6,6 @@
  * and cannot be changed from the panel; this page shows what is in force so an
  * author whose embed is sandboxed can see why and who to ask. All rendering is
  * driven by embed-security.js from getIframeSandbox.
- *
- * @version 2.0.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -35,7 +33,7 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
 </div>
 
 <!-- Read-only notice: where the policy lives and who can change it -->
-<div class="admin-card admin-card--info">
+<div class="admin-card">
     <div class="admin-card__body">
         <p><strong><?= __admin('embedSecurity.readonlyNotice') ?></strong></p>
         <p class="admin-hint"><?= str_replace(':path', '<code>' . htmlspecialchars('<secure>/management/config/embed-policy.json', ENT_QUOTES, 'UTF-8') . '</code>', __admin('embedSecurity.policyLocation')) ?></p>

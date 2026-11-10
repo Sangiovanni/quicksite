@@ -97,11 +97,11 @@
                 <?= __admin('preview.textTypeLabel') ?? 'Text type' ?>:
             </label>
             <div class="preview-contextual-form__field">
-                <label class="admin-radio">
+                <label>
                     <input type="radio" name="add-text-type" value="key" checked>
                     <span><?= __admin('preview.textTypeKey') ?? 'Translation key' ?></span>
                 </label>
-                <label class="admin-radio">
+                <label>
                     <input type="radio" name="add-text-type" value="raw">
                     <span><?= __admin('preview.textTypeRaw') ?? 'RAW (literal)' ?></span>
                 </label>
@@ -238,7 +238,7 @@
                            autocomplete="off" spellcheck="false">
                 </div>
                 <div class="class-combobox__dropdown" id="add-class-dropdown" style="display: none;">
-                    <div class="class-combobox__suggestions" id="add-class-suggestions"></div>
+                    <div id="add-class-suggestions"></div>
                 </div>
             </div>
             <input type="hidden" id="add-class" value="">
@@ -294,7 +294,7 @@
                 <?= __admin('preview.translationKeyParams', 'Translated attributes') ?>
                 <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:
             </label>
-            <div class="preview-contextual-form__transkey-fields" id="add-transkey-params-container">
+            <div id="add-transkey-params-container">
                 <!-- Dynamically populated -->
             </div>
         </div>

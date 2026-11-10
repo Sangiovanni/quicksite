@@ -8,8 +8,6 @@
  *
  * DOM is built with createElement + textContent through QSDom and named
  * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
- *
- * @version 1.0.0
  */
 
 (function() {
@@ -319,7 +317,6 @@
             tbody.appendChild(QSDom.el('tr', null, [
                 QSDom.el('td', {
                     colspan: String(headCells.length),
-                    class: 'admin-text-muted',
                     style: 'text-align: center; padding: var(--space-md);',
                     text: t('apis.noEndpoints')
                 })
@@ -336,7 +333,6 @@
         const body = QSDom.el('div', { class: 'api-card__body', style: 'display: none;' });
         if (api.description) {
             body.appendChild(QSDom.el('p', {
-                class: 'admin-text-muted',
                 style: 'margin-bottom: var(--space-md);',
                 text: api.description
             }));
@@ -370,7 +366,7 @@
                     QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 20, 'api-card__chevron'),
                     QSDom.el('div', { class: 'api-card__text' }, [
                         heading,
-                        QSDom.el('p', { class: 'admin-text-muted api-card__meta' }, [
+                        QSDom.el('p', { class: 'api-card__meta' }, [
                             QSDom.el('code', { text: apiId }),
                             ' · ' + api.baseUrl + ' · ' + t(endpoints.length !== 1
                                 ? 'apis.endpointCountMany'
@@ -410,7 +406,7 @@
     function _renderApiAction(action, apiId, title, iconPath, extraClass) {
         return QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--sm admin-btn--ghost'
+            class: 'admin-btn admin-btn--ghost'
                 + (extraClass ? ' ' + extraClass : ''),
             'data-action': action,
             'data-api': apiId,
@@ -437,7 +433,7 @@
                 }),
                 QSDom.el('button', {
                     type: 'button',
-                    class: 'admin-btn admin-btn--sm admin-btn--ghost api-auth-token__toggle',
+                    class: 'admin-btn admin-btn--ghost api-auth-token__toggle',
                     'data-api': apiId,
                     title: t('apis.test.showHide')
                 }, [
@@ -446,7 +442,7 @@
                 ]),
                 QSDom.el('button', {
                     type: 'button',
-                    class: 'admin-btn admin-btn--sm admin-btn--ghost api-auth-token__save',
+                    class: 'admin-btn admin-btn--ghost api-auth-token__save',
                     'data-api': apiId,
                     title: t('apis.test.saveToken')
                 }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.save, 16)])
@@ -480,7 +476,7 @@
         }
         idCell.appendChild(QSDom.el('br'));
         idCell.appendChild(QSDom.el('small', {
-            class: 'admin-text-muted', text: endpoint.name || ''
+            text: endpoint.name || ''
         }));
 
         const cells = [
@@ -1371,7 +1367,7 @@
         QSDom.clear(document.getElementById('test-response-status'));
         document.getElementById('test-response-time').textContent = '';
         _setResponseBody(QSDom.el('span', {
-            class: 'admin-text-muted', text: t('apis.test.noResponse')
+            text: t('apis.test.noResponse')
         }));
         _renderDraftOffer(null);
 
@@ -1395,7 +1391,6 @@
             if (!paramsForm) return;
             container = document.createElement('div');
             container.id = 'test-path-params-form';
-            container.className = 'apis-test-path-params';
             paramsForm.parentNode.insertBefore(container, paramsForm);
         }
 
@@ -1423,11 +1418,11 @@
                 class: 'admin-label', for: fieldId
             }, [
                 ':' + name + ' ',
-                QSDom.el('small', { class: 'admin-text-muted', text: '(' + type + ')' })
+                QSDom.el('small', { text: '(' + type + ')' })
             ]);
             if (def.required) {
                 label.appendChild(document.createTextNode(' '));
-                label.appendChild(QSDom.el('span', { class: 'admin-text-danger', text: '*' }));
+                label.appendChild(QSDom.el('span', { text: '*' }));
             }
 
             const input = QSDom.el('input', {
@@ -1478,7 +1473,7 @@
         if (!schema || !schema.properties || Object.keys(schema.properties).length === 0) {
             QSDom.clear(container);
             container.appendChild(QSDom.el('p', {
-                class: 'admin-text-muted admin-hint', text: t('apis.test.noSchemaParams')
+                class: 'admin-hint', text: t('apis.test.noSchemaParams')
             }));
             return;
         }
@@ -1496,7 +1491,7 @@
             });
             if (isRequired) {
                 label.appendChild(document.createTextNode(' '));
-                label.appendChild(QSDom.el('span', { class: 'admin-text-danger', text: '*' }));
+                label.appendChild(QSDom.el('span', { text: '*' }));
             }
 
             const wrapper = QSDom.el('div', {
@@ -1764,7 +1759,7 @@
         QSDom.clear(document.getElementById('test-response-status'));
         document.getElementById('test-response-time').textContent = t('apis.test.executing');
         _setResponseBody(QSDom.el('span', {
-            class: 'admin-text-muted', text: t('apis.test.waiting')
+            text: t('apis.test.waiting')
         }));
 
         // Collect :placeholder values for path substitution
@@ -1806,14 +1801,13 @@
                     _setResponseBody(QSDom.el('pre', { text: text }));
                 } else {
                     _setResponseBody(QSDom.el('span', {
-                        class: 'admin-text-muted', text: t('apis.test.emptyResponse')
+                        text: t('apis.test.emptyResponse')
                     }));
                 }
                 _renderDraftOffer(testResult);
             } else {
                 _setResponseStatus(t('apis.test.errorBadge'), 'admin-badge--danger');
                 _setResponseBody(QSDom.el('pre', {
-                    class: 'admin-text-danger',
                     text: response.data?.message || t('apis.test.requestFailed')
                 }));
             }
@@ -1821,7 +1815,7 @@
             console.error('Test failed:', error);
             _setResponseStatus(t('apis.test.errorBadge'), 'admin-badge--danger');
             _setResponseBody(QSDom.el('pre', {
-                class: 'admin-text-danger', text: error.message
+                text: error.message
             }));
         } finally {
             btn.disabled = false;
@@ -1856,7 +1850,7 @@
         }
         box.appendChild(QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--sm admin-btn--secondary',
+            class: 'admin-btn',
             id: 'btn-use-draft',
             text: t('apis.draft.offer'),
             onClick: () => _useDraft(draft)
@@ -2335,10 +2329,8 @@
             : t('apis.importModal.formatUnknown');
 
         const root = document.createElement('div');
-        root.className = 'apis-import-summary';
 
         const line = document.createElement('p');
-        line.className = 'apis-import-summary__line';
         line.appendChild(document.createTextNode(t('apis.importModal.detectedFormat') + ' '));
         const strong = document.createElement('strong');
         strong.textContent = fmtLabel;
@@ -2360,7 +2352,6 @@
         const priv = _computeImportPrivacy(apis);
         if (priv.datums || priv.hosts || priv.mappings || priv.flags.length) {
             const pLine = document.createElement('p');
-            pLine.className = 'apis-import-summary__line';
             pLine.appendChild(document.createTextNode(t('apis.importModal.privacySummary', {
                 datums: priv.datums,
                 hosts: t(priv.hosts === 1
@@ -2376,7 +2367,6 @@
         const allNotes = notes.concat(priv.flags.map(f => '⚠ ' + f));
         if (allNotes.length) {
             const list = document.createElement('ul');
-            list.className = 'apis-import-notes';
             for (const note of allNotes) {
                 const li = document.createElement('li');
                 li.textContent = note;
@@ -2418,7 +2408,6 @@
         const apiIds = Object.keys(apis);
         if (apiIds.length === 0) {
             const empty = document.createElement('p');
-            empty.className = 'admin-text-muted';
             empty.textContent = t('apis.importModal.noApis');
             host.appendChild(empty);
             return;
@@ -2431,7 +2420,7 @@
 
     function _renderImportTreeApi(apiId, apiData) {
         const section = document.createElement('div');
-        section.className = 'admin-card import-tree-api';
+        section.className = 'admin-card';
         section.dataset.apiId = apiId;
         section.style.padding = 'var(--space-sm)';
         section.style.marginBottom = 'var(--space-sm)';
@@ -2440,7 +2429,6 @@
 
         // ─ Header: select-all + name + apiId + endpoint count ────────────
         const header = document.createElement('div');
-        header.className = 'import-tree-api__header';
         header.style.display = 'flex';
         header.style.alignItems = 'center';
         header.style.gap = 'var(--space-sm)';
@@ -2459,13 +2447,13 @@
         titleWrap.appendChild(title);
         titleWrap.appendChild(document.createTextNode(' '));
         const idCode = document.createElement('code');
-        idCode.style.fontSize = 'var(--font-sm)';
+        idCode.style.fontSize = 'var(--font-size-sm)';
         idCode.textContent = apiId;
         titleWrap.appendChild(idCode);
         header.appendChild(titleWrap);
 
         const countBadge = document.createElement('span');
-        countBadge.className = 'admin-badge admin-badge--default';
+        countBadge.className = 'admin-badge';
         header.appendChild(countBadge);
 
         section.appendChild(header);
@@ -2504,9 +2492,8 @@
         // ─ Endpoint list ────────────────────────────────────────────────
         if (total === 0) {
             const note = document.createElement('p');
-            note.className = 'admin-text-muted';
             note.style.margin = '0';
-            note.style.fontSize = 'var(--font-sm)';
+            note.style.fontSize = 'var(--font-size-sm)';
             note.textContent = t('apis.importModal.noEndpointsInApi');
             section.appendChild(note);
             refreshState();
@@ -2514,7 +2501,6 @@
         }
 
         const list = document.createElement('ul');
-        list.className = 'import-tree-endpoints';
         list.style.listStyle = 'none';
         list.style.padding = '0';
         list.style.margin = '0';
@@ -2531,7 +2517,6 @@
 
     function _renderImportTreeEndpoint(apiId, endpoint, apiAuthType, onToggle) {
         const li = document.createElement('li');
-        li.className = 'import-tree-endpoint';
         li.style.display = 'flex';
         li.style.alignItems = 'center';
         li.style.gap = 'var(--space-xs)';
@@ -2554,13 +2539,12 @@
         li.appendChild(methodBadge);
 
         const idCode = document.createElement('code');
-        idCode.style.fontSize = 'var(--font-sm)';
+        idCode.style.fontSize = 'var(--font-size-sm)';
         idCode.textContent = endpoint.id || '';
         li.appendChild(idCode);
 
         const pathCode = document.createElement('code');
-        pathCode.className = 'admin-text-muted';
-        pathCode.style.fontSize = 'var(--font-sm)';
+        pathCode.style.fontSize = 'var(--font-size-sm)';
         pathCode.style.flex = '1';
         pathCode.textContent = endpoint.path || '';
         li.appendChild(pathCode);
@@ -2570,7 +2554,7 @@
         // API has auth, but in the preview we want the converter's intent
         // visible so the author can spot scheme-divergence at a glance.
         const authEl = document.createElement('span');
-        authEl.className = 'admin-badge admin-badge--default';
+        authEl.className = 'admin-badge';
         authEl.style.fontSize = '0.7em';
         const epAuth = endpoint.auth || 'inherit';
         if (epAuth === 'none') {

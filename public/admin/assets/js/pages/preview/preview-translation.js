@@ -784,7 +784,7 @@ window.PreviewTranslation = (function () {
 
         var cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
-        cancelBtn.className = 'admin-btn admin-btn--small admin-btn--secondary';
+        cancelBtn.className = 'admin-btn';
         cancelBtn.textContent = i18n.translationEditCancel || 'Cancel';
         if (_busyKey === entry.key) cancelBtn.disabled = true;
         cancelBtn.addEventListener('click', _handleCancelEdit);
@@ -792,7 +792,7 @@ window.PreviewTranslation = (function () {
 
         var saveBtn = document.createElement('button');
         saveBtn.type = 'button';
-        saveBtn.className = 'admin-btn admin-btn--small admin-btn--primary';
+        saveBtn.className = 'admin-btn admin-btn--primary';
         if (_busyKey === entry.key) {
             saveBtn.textContent = i18n.translationEditSaving || 'Saving…';
             saveBtn.disabled = true;
@@ -915,7 +915,7 @@ window.PreviewTranslation = (function () {
 
         var cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
-        cancelBtn.className = 'admin-btn admin-btn--small admin-btn--secondary';
+        cancelBtn.className = 'admin-btn';
         cancelBtn.textContent = i18n.translationEditCancel || 'Cancel';
         if (_busyKey === entry.key) cancelBtn.disabled = true;
         cancelBtn.addEventListener('click', _handleCancelEdit);
@@ -923,7 +923,7 @@ window.PreviewTranslation = (function () {
 
         var deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
-        deleteBtn.className = 'admin-btn admin-btn--small admin-btn--danger';
+        deleteBtn.className = 'admin-btn admin-btn--danger';
         if (_busyKey === entry.key) {
             deleteBtn.textContent = i18n.translationDeleting || 'Deleting…';
             deleteBtn.disabled = true;
@@ -1193,7 +1193,7 @@ window.PreviewTranslation = (function () {
 
         var cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
-        cancelBtn.className = 'admin-btn admin-btn--secondary';
+        cancelBtn.className = 'admin-btn';
         cancelBtn.textContent = i18n.translationEditCancel || 'Cancel';
         if (_bulkBusy) cancelBtn.disabled = true;
         cancelBtn.addEventListener('click', _handleCancelBulkDelete);

@@ -101,7 +101,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
-| `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
+| `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM — and `followPointer()`, the one drag routine of the panel's handles (the editor's options panel, the device frame's edges), on pointer events. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge, and each share on its entry (My memberships, Project members); the queue's count also per project (`adjudicationByProject`), which the Project members page names; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
@@ -251,7 +251,7 @@ There is no workflow browser or spec-runner page: both are subsumed by the visua
 |---|---|
 | `preview.js` | Main orchestrator — mode/node/iframe/layout/component/snippet/drag/mobile. **Monolith.** |
 | `preview-state.js` | Shared state hub (getter/setter/listener). |
-| `preview-navigation.js` | Route / language / device switching. |
+| `preview-navigation.js` | Element navigation: to the parent, a sibling or the first child, by button and arrow key. |
 | `preview-iframe-inject.js` | Iframe DOM injection + cross-doc messaging. |
 | `preview-sidebar-resize.js` | Sidebar resize + persistence. |
 | `preview-style-selectors.js` | Selector browser. |
@@ -323,7 +323,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 
 | Constant | Storage | Used by |
 |---|---|---|
-| `adminPrefs` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
+| `adminPrefs` | localStorage | `utils.js`, `admin.js`, `settings.js` |
 | `pendingMessage` | sessionStorage | `utils.js`, `admin.js` |
 | `apiAuthTokens` | localStorage, per project (the key gets `:<project>` appended): a panel key, which no page of any project reaches. The panel reads nothing under `qsp_`, so what a page keeps under the bare name `qs_api_auth_tokens` is the page's own | `apis.js` |
 | `aiConnectionsV3` | localStorage | `connections-store.js` (canonical), `ai-connections.js` |
@@ -334,6 +334,8 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `aiAutoExecute` | localStorage | `preview-ai-tools.js`, `ai-connections.js`, `settings.js` — **Run without stopping**: on only once `'true'` is stored (all three read it so) |
 | `aiKeptSteps` | localStorage | `preview-ai-tools.js` — what a stopped run did not reach, per account and project (the key gets `:<account>:<project>` appended): the workflow and the run's parameters, the steps of the phase it stopped in that did not run, and its later phases (by name, resolved when the kept run reaches them); offered again from the panel's banner, never run on their own (§8.12) |
 | `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
+| `sidebarWidth` | localStorage | `preview-sidebar-resize.js` — the visual editor's options panel's width in pixels, as its handle left it; stored as `quicksite_sidebar_width` |
+| `previewFrame` | localStorage | `preview.js` — the visual editor's device and each device frame's last size, as JSON (`{"device": "mobile", "sizes": {"mobile": [375, 667], "tablet": [768, 1024]}}`); one per browser, for every project. A missing, malformed or out-of-range part gives that part's default (§8.3) |
 | `updateCheckAt` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
 | `updateNoticeHidden` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
 | `updateLastSeen` | localStorage | `update-notice.js` — the newest version the last check reported, so the banner can re-render inside the throttle window without another call |
@@ -430,7 +432,7 @@ While a page is the edit target, the toolbar's **Title** field holds that page's
 
 ### 8.3 Device preview
 
-Three device widths: Desktop, Tablet (768 x 1024) and Mobile (375 x 667). Desktop is the iframe's full available width rather than a fixed pixel size, so it follows the window; the other two resize the iframe. The project's media queries apply automatically. The switch sits at the right end of the tools' row. A tablet has no Tablet button and shows the page at its own width unless Mobile is chosen; a phone has no switch and shows the page at its own width. A device chosen on a wider window comes back when the window is widened.
+Three devices: Desktop, Tablet and Mobile. Desktop is the iframe's full available width rather than a fixed pixel size, so it follows the window. Tablet and Mobile show the page in a frame of the size it is given, in CSS pixels, 768 x 1024 and 375 x 667 the first time, and the frame keeps that size: smaller than the room around it, it is centred across it and starts at its top; larger, the room scrolls both ways, and the frame's top-left stays in reach. A slim bar at the top of the room, in view as the room scrolls, sets the size, as do handles on the frame's right edge, bottom edge and corner, which a mouse or a finger drags. The bar holds a list of common sizes of the device chosen, each set in the orientation it is listed in (Mobile: 360 x 800, 375 x 667, 390 x 844, 430 x 932; Tablet: 768 x 1024, 810 x 1080, 820 x 1180, 1024 x 1366), a width box and a height box, applied on Enter or on leaving the box, and a button that swaps the two. The list shows the entry that matches the frame either way round, and the frame's own size first when none does. A size is held to 200 x 200 at least and 3840 x 10000 at most: a value past a limit becomes that limit, the box showing what was applied, and anything not a number puts the size back. Each device keeps its own last size. The device chosen and both sizes are remembered by the browser, for every project (`previewFrame`, §6). The project's media queries apply automatically, and the tools work in a frame as they do on Desktop. The switch sits at the right end of the tools' row. A tablet has no Tablet button and shows the page at its own width unless Mobile is chosen, which it shows in its frame, with the bar and the handles; a phone has no switch, bar or handle and shows the page at its own width. A device chosen on a wider window comes back when the window is widened.
 
 ### 8.4 Shared regions
 

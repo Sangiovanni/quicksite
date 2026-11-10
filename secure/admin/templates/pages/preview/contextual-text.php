@@ -10,7 +10,7 @@
     </div>
     <!-- Text-only node actions (shown when a text-only node is selected) -->
     <div class="preview-contextual-info" id="contextual-text-info" style="display: none;">
-        <div class="preview-contextual-info__summary" id="ctx-text-summary">
+        <div id="ctx-text-summary">
             <span class="preview-contextual-info__label"><?= __admin('preview.textKey') ?? 'Text key' ?>:</span>
             <code id="ctx-text-key">-</code>
         </div>

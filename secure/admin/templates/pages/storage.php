@@ -31,8 +31,8 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
 
 <p id="storage-desclang-hint" class="admin-hint storage-desclang-hint" hidden></p>
 
-<div class="admin-toolbar storage-toolbar">
-    <div class="admin-toolbar__left">
+<div>
+    <div>
         <button type="button" class="admin-btn admin-btn--primary" id="btn-add-storage-item">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -59,7 +59,7 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
             Refresh
         </button>
     </div>
-    <div class="admin-toolbar__right">
+    <div>
         <div id="storage-desc-lang-bar" class="storage-desc-lang-bar"></div>
         <div id="storage-filter-bar"></div>
     </div>
@@ -68,7 +68,7 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
 <div id="storage-scan-panel" class="storage-scan" role="region" aria-label="Storage scan results" hidden></div>
 
 <div id="storage-list" class="storage-list" role="region" aria-label="Storage registry list">
-    <div class="storage-list__loading" style="padding: 24px; color: var(--admin-text-muted, #555);">Loading storage registry…</div>
+    <div style="padding: 24px; color: var(--admin-text-muted, #555);">Loading storage registry…</div>
 </div>
 
 <div id="storage-modal-root" data-storage-modal-root></div>

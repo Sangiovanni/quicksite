@@ -50,7 +50,7 @@
 
     /** The red asterisk a required field's label carries. */
     function requiredMark() {
-        return QSDom.el('span', { class: 'admin-text-danger', text: '*' });
+        return QSDom.el('span', { text: '*' });
     }
 
     window.QSComplexWizard = window.QSComplexWizard || {};

@@ -20,7 +20,7 @@
                 <p class="preview-contextual-js-empty"><?= __admin('preview.noPageEvents') ?? 'No page-level events.' ?></p>
             </div>
             <div class="preview-contextual-js-page-events__actions">
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-page-event-add">
+                <button type="button" class="admin-btn admin-btn--ghost" id="js-page-event-add">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                         <line x1="12" y1="5" x2="12" y2="19"/>
                         <line x1="5" y1="12" x2="19" y2="12"/>
@@ -55,8 +55,8 @@
                     </div>
                     <!-- Show-all toggle for the page-event picker. Same role as
                          the element-level one above — bypass the event filter. -->
-                    <div class="preview-contextual-js-form-row preview-contextual-js-form-row--inline">
-                        <label class="preview-contextual-js-form-toggle">
+                    <div class="preview-contextual-js-form-row">
+                        <label>
                             <input type="checkbox" id="js-page-event-function-show-all">
                             <span><?= __admin('preview.showAllFunctions') ?? 'Show all functions' ?></span>
                         </label>
@@ -94,10 +94,10 @@
                     <code class="preview-contextual-js-form-code" id="js-page-event-preview">-</code>
                 </div>
                 <div class="preview-contextual-js-form-actions">
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-page-event-cancel">
+                    <button type="button" class="admin-btn admin-btn--ghost" id="js-page-event-cancel">
                         <?= __admin('common.cancel') ?? 'Cancel' ?>
                     </button>
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-page-event-save" disabled>
+                    <button type="button" class="admin-btn admin-btn--primary" id="js-page-event-save" disabled>
                         <?= __admin('preview.addPageEvent') ?? 'Add' ?>
                     </button>
                 </div>
@@ -106,7 +106,7 @@
     </div>
 
     <!-- State stores section (always visible, independent of element selection) -->
-    <div class="preview-contextual-js-page-events preview-contextual-js-state-stores" id="js-state-stores">
+    <div class="preview-contextual-js-page-events" id="js-state-stores">
         <div class="preview-contextual-js-page-events__header">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="preview-contextual-js-page-events__icon">
                 <ellipse cx="12" cy="5" rx="8" ry="3"/>
@@ -126,14 +126,14 @@
                 <p class="preview-contextual-js-empty"><?= __admin('preview.noStateStores') ?? 'No state stores yet.' ?></p>
             </div>
             <div class="preview-contextual-js-page-events__actions">
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-add">
+                <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-add">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                         <line x1="12" y1="5" x2="12" y2="19"/>
                         <line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
                     <?= __admin('preview.addStateStore') ?? 'New store' ?>
                 </button>
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-import" title="<?= __admin('preview.stateStoreImportPick') ?? 'Pick a store from another page' ?>">
+                <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-import" title="<?= __admin('preview.stateStoreImportPick') ?? 'Pick a store from another page' ?>">
                     <!-- "download / import" arrow into a tray -->
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                         <path d="M12 3v12"/>
@@ -156,8 +156,8 @@
                     <input type="text" class="preview-contextual-js-form-input" id="js-state-store-import-rename-input" autocomplete="off">
                 </div>
                 <div class="preview-contextual-js-form-actions">
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-import-cancel"><?= __admin('common.cancel') ?? 'Cancel' ?></button>
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-state-store-import-confirm" disabled><?= __admin('preview.stateStoreImportConfirm') ?? 'Import' ?></button>
+                    <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-import-cancel"><?= __admin('common.cancel') ?? 'Cancel' ?></button>
+                    <button type="button" class="admin-btn admin-btn--primary" id="js-state-store-import-confirm" disabled><?= __admin('preview.stateStoreImportConfirm') ?? 'Import' ?></button>
                 </div>
             </div>
             <!-- New / edit store wizard -->
@@ -195,10 +195,10 @@
                     <code class="preview-contextual-js-form-code" id="js-state-store-preview">-</code>
                 </div>
                 <div class="preview-contextual-js-form-actions">
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-state-store-cancel">
+                    <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-cancel">
                         <?= __admin('common.cancel') ?? 'Cancel' ?>
                     </button>
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-state-store-save" disabled>
+                    <button type="button" class="admin-btn admin-btn--primary" id="js-state-store-save" disabled>
                         <?= __admin('preview.saveStateStore') ?? 'Save store' ?>
                     </button>
                 </div>
@@ -214,7 +214,7 @@
     </div>
     
     <!-- JS Info (shown when element selected) -->
-    <div class="preview-contextual-js-info" id="contextual-js-info" style="display: none;">
+    <div id="contextual-js-info" style="display: none;">
         <div class="preview-contextual-js-element">
             <span class="preview-contextual-js-label"><?= __admin('preview.element') ?? 'Element' ?>:</span>
             <code class="preview-contextual-js-value" id="js-element-info">-</code>
@@ -288,8 +288,8 @@
                 <!-- Show-all toggle: by default the function list is filtered to verbs
                      that declare the chosen event in their qsVerbCatalog `events` field.
                      Authors hitting an unusual case toggle this to see every verb. -->
-                <div class="preview-contextual-js-form-row preview-contextual-js-form-row--inline">
-                    <label class="preview-contextual-js-form-toggle">
+                <div class="preview-contextual-js-form-row">
+                    <label>
                         <input type="checkbox" id="js-form-function-show-all">
                         <span><?= __admin('preview.showAllFunctions') ?? 'Show all functions' ?></span>
                     </label>
@@ -367,7 +367,7 @@
                      path has :placeholders. Each placeholder becomes one
                      row (param name + value or selector). Compiled into
                      `paramName=value` kwargs on the call. -->
-                <div class="preview-contextual-js-form-row preview-contextual-js-form-path-params" id="js-form-path-params-row" style="display: none;">
+                <div class="preview-contextual-js-form-row" id="js-form-path-params-row" style="display: none;">
                     <label class="preview-contextual-js-form-label"><?= __admin('preview.pathParams') ?? 'Path params' ?></label>
                     <div class="preview-contextual-js-form-path-params-rows" id="js-form-path-params-rows"></div>
                 </div>
@@ -459,10 +459,10 @@
             </div>
             
             <div class="preview-contextual-js-form-actions">
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="js-form-cancel">
+                <button type="button" class="admin-btn admin-btn--ghost" id="js-form-cancel">
                     <?= __admin('common.cancel') ?? 'Cancel' ?>
                 </button>
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-form-save" disabled>
+                <button type="button" class="admin-btn admin-btn--primary" id="js-form-save" disabled>
                     <?= __admin('preview.addInteraction') ?? 'Add' ?>
                 </button>
             </div>
@@ -470,7 +470,7 @@
         
         <!-- Add button -->
         <div class="preview-contextual-js-actions" id="js-panel-actions">
-            <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="js-add-interaction">
+            <button type="button" class="admin-btn admin-btn--primary" id="js-add-interaction">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>

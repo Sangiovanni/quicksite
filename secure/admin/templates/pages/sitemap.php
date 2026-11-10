@@ -3,8 +3,6 @@
  * Admin Sitemap Page
  * 
  * Visual route tree, reachability graph, and route management.
- * 
- * @version 1.0.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -21,7 +19,7 @@ window.QS_SITEMAP_I18N = <?= qs_inline_script_json(AdminTranslation::getInstance
 <?php include __DIR__ . '/sitemap-resolver-list.php'; ?>
 
 <div class="admin-page-header">
-    <div class="admin-page-header__row">
+    <div>
         <div>
             <h1 class="admin-page-header__title">
                 <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -64,9 +62,9 @@ window.QS_SITEMAP_I18N = <?= qs_inline_script_json(AdminTranslation::getInstance
     <h2 class="admin-section__title"><?= __admin('sitemapPage.sitemapFile') ?></h2>
     <div class="admin-card">
         <div class="admin-card__body" id="sitemap-generator-container">
-            <div class="sitemap-generator">
+            <div>
                 <p class="sitemap-generator__desc"><?= __admin('sitemapPage.sitemapFileDesc') ?></p>
-                <div class="sitemap-generator__controls">
+                <div>
                     <label class="sitemap-generator__label" for="sitemap-base-url"><?= __admin('sitemapPage.baseUrl') ?></label>
                     <div class="sitemap-generator__row">
                         <input type="url" class="admin-input sitemap-generator__input" id="sitemap-base-url"
@@ -103,7 +101,7 @@ window.QS_SITEMAP_I18N = <?= qs_inline_script_json(AdminTranslation::getInstance
                     </div>
                     <pre class="sitemap-generator__preview-content" id="sitemap-file-text"></pre>
                     <div class="sitemap-generator__actions">
-                        <button type="button" class="admin-btn admin-btn--secondary" id="sitemap-file-copy"
+                        <button type="button" class="admin-btn" id="sitemap-file-copy"
                                 data-copied="<?= adminEscape(__admin('common.copied')) ?>">
                             <?= __admin('common.copy') ?>
                         </button>

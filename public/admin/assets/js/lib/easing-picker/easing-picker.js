@@ -269,12 +269,12 @@
         footer.className = 'qs-easing-picker__footer';
         _cancelBtn = document.createElement('button');
         _cancelBtn.type = 'button';
-        _cancelBtn.className = 'admin-btn admin-btn--ghost admin-btn--sm';
+        _cancelBtn.className = 'admin-btn admin-btn--ghost';
         _cancelBtn.textContent = i18n('cancel', 'Cancel');
         _cancelBtn.addEventListener('click', handleCancel);
         _applyBtn = document.createElement('button');
         _applyBtn.type = 'button';
-        _applyBtn.className = 'admin-btn admin-btn--primary admin-btn--sm';
+        _applyBtn.className = 'admin-btn admin-btn--primary';
         _applyBtn.textContent = i18n('apply', 'Apply');
         _applyBtn.addEventListener('click', handleApply);
         footer.appendChild(_cancelBtn);

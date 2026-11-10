@@ -18,8 +18,6 @@
  *
  * The OpenAI parser is reused for `openai-compatible` (Ollama / LM Studio /
  * LiteLLM / vLLM in OpenAI mode all emit identical SSE).
- *
- * @version 1.0.0
  */
 (function () {
     'use strict';

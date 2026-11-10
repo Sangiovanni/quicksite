@@ -5,8 +5,6 @@
  * Dependencies:
  * - PreviewConfig global (from preview-config.php)
  * - PreviewState global (from preview-state.js)
- * 
- * @version 1.0.0
  */
 (function() {
     'use strict';

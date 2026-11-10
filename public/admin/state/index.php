@@ -21,8 +21,6 @@
  * the per-session token as `Authorization: Bearer`. The header is what proves
  * the call came from something that could READ a panel page, which is what
  * stops a foreign site driving this endpoint through the visitor's browser.
- *
- * @version 1.0.0
  */
 
 require_once __DIR__ . '/../../init.php';

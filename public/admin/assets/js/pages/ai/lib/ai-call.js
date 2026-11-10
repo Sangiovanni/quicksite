@@ -18,8 +18,6 @@
  *
  * On HTTP error, throws a typed error with .category from
  * QSProviderCatalog.categorizeError plus .status, .body and .message.
- *
- * @version 1.0.0
  */
 (function () {
     'use strict';

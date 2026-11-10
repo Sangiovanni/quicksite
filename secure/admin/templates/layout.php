@@ -4,8 +4,6 @@
  * 
  * Main template wrapper for all admin pages.
  * Uses the site's CSS variables but with darker admin theme.
- * 
- * @version 1.7.0
  */
 
 // qs_inline_script_json(), the encoder for a value in an inline script.

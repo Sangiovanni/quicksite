@@ -15,8 +15,6 @@
  * @param string $name Optional - project name (defaults to active project)
  * @param int $max_backups Optional - maximum backups to keep (default: 5, 0 = unlimited)
  * @return ApiResponse Backup info with path, size, and backup count
- * 
- * @version 1.0.0
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

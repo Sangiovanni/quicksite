@@ -4,7 +4,7 @@
      modal "State & Animation Editor" and never says "transition editor" — the
      file name and the label differ, so write test steps from this file.
      Wired by: public/admin/assets/js/pages/preview/preview-transition-editor.js -->
-<div class="preview-keyframe-modal transition-editor" id="transition-editor-modal">
+<div class="preview-keyframe-modal" id="transition-editor-modal">
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content transition-editor__content">
         <div class="preview-keyframe-modal__header">
@@ -41,13 +41,13 @@
                             <?= __admin('preview.addProperty') ?? 'Add Property' ?>
                         </button>
                         <div class="transition-editor__add-property-form" id="transition-base-add-form" style="display: none;">
-                            <div class="transition-editor__property-selector" id="transition-base-prop-selector"></div>
+                            <div id="transition-base-prop-selector"></div>
                             <div class="transition-editor__add-property-row">
                                 <div class="transition-editor__value-container" id="transition-base-value-container"></div>
                             </div>
                             <div class="transition-editor__add-property-actions">
-                                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="transition-base-add-cancel"><?= __admin('common.cancel') ?></button>
-                                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="transition-base-add-confirm">
+                                <button type="button" class="admin-btn admin-btn--ghost" id="transition-base-add-cancel"><?= __admin('common.cancel') ?></button>
+                                <button type="button" class="admin-btn admin-btn--primary" id="transition-base-add-confirm">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                                     </svg>
@@ -91,13 +91,13 @@
                             <span id="transition-trigger-add-text"><?= __admin('preview.addProperty') ?? 'Add Property' ?></span>
                         </button>
                         <div class="transition-editor__add-property-form" id="transition-trigger-add-form" style="display: none;">
-                            <div class="transition-editor__property-selector" id="transition-trigger-prop-selector"></div>
+                            <div id="transition-trigger-prop-selector"></div>
                             <div class="transition-editor__add-property-row">
                                 <div class="transition-editor__value-container" id="transition-trigger-value-container"></div>
                             </div>
                             <div class="transition-editor__add-property-actions">
-                                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="transition-trigger-add-cancel"><?= __admin('common.cancel') ?></button>
-                                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="transition-trigger-add-confirm">
+                                <button type="button" class="admin-btn admin-btn--ghost" id="transition-trigger-add-cancel"><?= __admin('common.cancel') ?></button>
+                                <button type="button" class="admin-btn admin-btn--primary" id="transition-trigger-add-confirm">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                                     </svg>
@@ -205,20 +205,20 @@
                     <div class="transition-editor__row">
                         <div class="transition-editor__row-property"></div>
                         <div class="transition-editor__input-group">
-                            <input type="number" class="admin-input transition-editor__row-duration" value="0.3" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
-                            <select class="transition-editor__unit-select transition-editor__row-duration-unit" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
+                            <input type="number" class="admin-input" value="0.3" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
+                            <select class="transition-editor__unit-select" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
                                 <option value="s">s</option>
                                 <option value="ms">ms</option>
                             </select>
                         </div>
                         <div class="transition-editor__input-group">
-                            <input type="number" class="admin-input transition-editor__row-delay" value="0" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
-                            <select class="transition-editor__unit-select transition-editor__row-delay-unit" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
+                            <input type="number" class="admin-input" value="0" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
+                            <select class="transition-editor__unit-select" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
                                 <option value="s">s</option>
                                 <option value="ms">ms</option>
                             </select>
                         </div>
-                        <select class="transition-editor__timing-select transition-editor__row-timing" title="<?= adminEscape(__admin('preview.timingFunction')) ?>">
+                        <select class="transition-editor__timing-select" title="<?= adminEscape(__admin('preview.timingFunction')) ?>">
                             <option value="ease">ease</option>
                             <option value="linear">linear</option>
                             <option value="ease-in">ease-in</option>
@@ -376,8 +376,8 @@
         </div>
         
         <div class="preview-keyframe-modal__footer">
-            <div class="preview-keyframe-modal__footer-left">
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="transition-preview-btn">
+            <div>
+                <button type="button" class="admin-btn" id="transition-preview-btn">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>

@@ -213,6 +213,47 @@ window.QSDom = (function () {
         return option;
     }
 
+    /**
+     * Follow a pointer from a press on a handle until it is let go: the one drag
+     * routine of the panel's handles (the editor's options panel, the edges of its
+     * device frame). A mouse, a pen and a finger run the same code; the handle
+     * carries `touch-action: none` in the stylesheet, so a finger drags it rather
+     * than scrolling. The handle captures the pointer, so a pointer that crosses a
+     * frame's page mid-drag keeps reporting here; a caller still sets
+     * `pointer-events: none` on that frame while it drags, for a browser that
+     * would not hold the capture across it.
+     *
+     * @param {PointerEvent} press   the pointerdown on the handle
+     * @param {function(number, number, PointerEvent)} onMove  the distance from
+     *        the press, across and down, with the move itself
+     * @param {function(PointerEvent)} [onEnd]  once: on release, or when the
+     *        browser takes the pointer for itself
+     */
+    function followPointer(press, onMove, onEnd) {
+        var handle = press.currentTarget || press.target;
+        var doc = handle.ownerDocument || document;
+        var id = press.pointerId;
+        var x0 = press.clientX;
+        var y0 = press.clientY;
+        press.preventDefault();
+        try { handle.setPointerCapture(id); } catch (e) { /* the pointer is already gone: the release still ends it */ }
+        function move(e) {
+            if (e.pointerId === id) onMove(e.clientX - x0, e.clientY - y0, e);
+        }
+        function end(e) {
+            if (e.pointerId !== id) return;
+            doc.removeEventListener('pointermove', move);
+            doc.removeEventListener('pointerup', end);
+            doc.removeEventListener('pointercancel', end);
+            doc.removeEventListener('lostpointercapture', end);
+            if (onEnd) onEnd(e);
+        }
+        doc.addEventListener('pointermove', move);
+        doc.addEventListener('pointerup', end);
+        doc.addEventListener('pointercancel', end);
+        doc.addEventListener('lostpointercapture', end);
+    }
+
     return {
         el: el,
         svgIcon: svgIcon,
@@ -220,6 +261,7 @@ window.QSDom = (function () {
         tableWrapper: tableWrapper,
         clear: clear,
         setSelectPlaceholder: setSelectPlaceholder,
-        setButtonBusy: setButtonBusy
+        setButtonBusy: setButtonBusy,
+        followPointer: followPointer
     };
 })();

@@ -1,5 +1,5 @@
 <!-- Animation Preview Modal -->
-<div class="preview-keyframe-modal animation-preview" id="animation-preview-modal">
+<div class="preview-keyframe-modal" id="animation-preview-modal">
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content animation-preview__content">
         <div class="preview-keyframe-modal__header">
@@ -44,7 +44,7 @@
                          the select's current value pre-loaded; confirm adds the
                          resulting cubic-bezier as a new option + selects it. -->
                     <button type="button"
-                            class="admin-btn admin-btn--ghost admin-btn--sm"
+                            class="admin-btn admin-btn--ghost"
                             id="animation-preview-timing-custom"
                             title="<?= __admin('preview.easingPickerTitle', 'Easing curve') ?>">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
@@ -85,8 +85,8 @@
         </div>
         
         <div class="preview-keyframe-modal__footer">
-            <div class="preview-keyframe-modal__footer-left">
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="animation-preview-play">
+            <div>
+                <button type="button" class="admin-btn admin-btn--primary" id="animation-preview-play">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>

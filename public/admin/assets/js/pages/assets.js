@@ -3,8 +3,6 @@
  * 
  * Full-featured asset manager: upload zone, browser grid, edit area, batch delete.
  * Uses existing API commands: listAssets, uploadAsset, editAsset, deleteAsset.
- * 
- * @version 1.0.0
  */
 (function() {
     'use strict';

@@ -259,7 +259,7 @@
         item.appendChild(desc);
 
         item.addEventListener('mouseenter', function () {
-            item.style.background = 'var(--admin-bg-hover, #333)';
+            item.style.background = 'var(--admin-surface-hover)';
         });
         item.addEventListener('mouseleave', function () {
             item.style.background = '';
@@ -541,7 +541,7 @@
             entry.companion.forEach(function (n) {
                 var btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'admin-btn admin-btn--sm admin-btn--ghost qs-data-attr-companion-btn';
+                btn.className = 'admin-btn admin-btn--ghost';
                 btn.style.fontFamily = 'monospace';
                 btn.style.fontSize = '0.75rem';
                 btn.style.padding = '2px 8px';
@@ -593,7 +593,7 @@
     function renderEnumWidget(entry, valueInput) {
         if (!entry.valueOptions || !entry.valueOptions.length) return null;
         var sel = document.createElement('select');
-        sel.className = 'admin-select admin-select--sm';
+        sel.className = 'admin-select';
         sel.style.maxWidth = '260px';
 
         var ph = document.createElement('option');
@@ -659,7 +659,7 @@
             }
 
             var storeSel = document.createElement('select');
-            storeSel.className = 'admin-select admin-select--sm';
+            storeSel.className = 'admin-select';
             storeSel.style.maxWidth = '160px';
             var phS = document.createElement('option');
             phS.value = '';
@@ -681,7 +681,7 @@
                 wrap.appendChild(dot);
 
                 fieldSel = document.createElement('select');
-                fieldSel.className = 'admin-select admin-select--sm';
+                fieldSel.className = 'admin-select';
                 fieldSel.style.maxWidth = '160px';
                 fieldSel.disabled = true;
                 var phF = document.createElement('option');
@@ -752,7 +752,7 @@
     // saved value stays exactly as it is until the author changes something here.
 
     function _renderSpecSelect(values, label) {
-        return QSDom.el('select', { class: 'admin-select admin-select--sm', 'aria-label': label },
+        return QSDom.el('select', { class: 'admin-select', 'aria-label': label },
             values.map(function (v) { return QSDom.el('option', { value: v, text: v }); }));
     }
 

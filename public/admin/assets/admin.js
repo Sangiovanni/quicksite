@@ -4,7 +4,6 @@
  * Handles client-side functionality for the admin interface.
  * Delegates to core modules (QuickSiteAPI, QuickSiteUtils) for shared functionality.
  * 
- * @version 1.6.0
  * @requires js/core/api.js
  * @requires js/core/utils.js
  */
@@ -1037,7 +1036,7 @@ const QuickSiteAdmin = {
     _renderResponseBody(responseJson) {
         const copyBtn = QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--ghost admin-btn--sm',
+            class: 'admin-btn admin-btn--ghost',
             onclick: () => this.copyResponse(copyBtn)
         }, [
             QSDom.iconEl(window.QuickSiteUtils.ICON_PATHS.copy, 16),
@@ -1263,7 +1262,7 @@ const QuickSiteAdmin = {
     _renderJsonToolbar() {
         const btn = (action, label) => QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--small admin-btn--secondary',
+            class: 'admin-btn',
             dataset: { action: action },
             text: label
         });

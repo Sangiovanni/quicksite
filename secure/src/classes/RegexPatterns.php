@@ -22,8 +22,6 @@
  *     nothing, and a broad whitespace class in it widens what it refuses.
  *   - A pattern is added together with its caller. The catalogue holds only
  *     patterns something uses.
- * 
- * @version 1.1.0
  */
 
 class RegexPatterns

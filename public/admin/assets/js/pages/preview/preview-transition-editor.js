@@ -17,8 +17,6 @@
  * - PreviewConfig (for i18n and URLs)
  * - QSPropertySelector, QSValueInput (property selection components)
  * - QSColorPicker (color picker)
- * 
- * @version 1.0.0
  */
 window.PreviewTransitionEditor = (function() {
     'use strict';
@@ -640,10 +638,10 @@ window.PreviewTransitionEditor = (function() {
         return QSDom.el('div', {
             class: 'animation-picker-dropdown__item',
             'data-name': name,
-            style: 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--qsb-border, #404040);'
+            style: 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--admin-border);'
         }, [
-            QSDom.el('span', { style: 'color: var(--qsb-accent, #4fc3f7);', text: '@keyframes' }),
-            QSDom.el('span', { style: 'color: var(--qsb-text, #fff);', text: name })
+            QSDom.el('span', { style: 'color: var(--admin-accent);', text: '@keyframes' }),
+            QSDom.el('span', { style: 'color: var(--admin-text);', text: name })
         ]);
     }
 
@@ -1015,8 +1013,8 @@ window.PreviewTransitionEditor = (function() {
             position: fixed;
             left: ${rect.left}px;
             top: ${rect.bottom + 4}px;
-            background: var(--qsb-bg-secondary, #2d2d2d);
-            border: 1px solid var(--qsb-border, #404040);
+            background: var(--admin-bg-secondary);
+            border: 1px solid var(--admin-border);
             border-radius: 6px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             z-index: 100002;
@@ -1034,7 +1032,7 @@ window.PreviewTransitionEditor = (function() {
                 dropdown.remove();
             });
             item.addEventListener('mouseenter', () => {
-                item.style.background = 'var(--qsb-bg-hover, #3a3a3a)';
+                item.style.background = 'var(--admin-surface-hover)';
             });
             item.addEventListener('mouseleave', () => {
                 item.style.background = '';

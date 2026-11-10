@@ -16,7 +16,7 @@
     background: var(--admin-accent);
     color: var(--admin-on-accent);
     font-size: 11px;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     line-height: 1;
 }
 /* An explicit `display` defeats the UA `[hidden] { display:none }` (equal
@@ -74,7 +74,7 @@
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     line-height: 1.5;
     text-transform: lowercase;
     background: var(--admin-surface);
@@ -93,19 +93,19 @@
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     line-height: 1.5;
     background: var(--admin-surface);
     color: var(--admin-text-muted);
 }
 .members-chip--owned   { background: var(--admin-warning-bg); color: var(--admin-warning); }
-.members-chip--editing { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
-.members-chip--you     { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
+.members-chip--editing,
+.members-chip--you { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
 .members-chip--invite   { background: var(--admin-info-bg); color: var(--admin-info); }
 .members-chip--request  { background: var(--admin-warning-bg); color: var(--admin-warning); }
 .members-chip--proposal { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
-.members-chip--refused  { background: var(--admin-error-bg); color: var(--admin-error); }
-.members-chip--removed  { background: var(--admin-error-bg); color: var(--admin-error); }
+.members-chip--refused,
+.members-chip--removed { background: var(--admin-error-bg); color: var(--admin-error); }
 .members-chip--deleted  { background: var(--admin-surface); color: var(--admin-text-light); }
 .members-chip--approved { background: var(--admin-success-bg); color: var(--admin-success); }
 .members-chip--picked   { background: var(--admin-success-bg); color: var(--admin-success); margin-left: 0; margin-right: 8px; }
@@ -124,7 +124,7 @@
     background: var(--admin-accent-muted);
     color: var(--admin-accent-hover);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     vertical-align: middle;
 }
 /* Same [hidden] re-assertion as the nav badge (see above). */
@@ -238,9 +238,6 @@
     border-color: var(--admin-success);
     background: var(--admin-success-bg);
 }
-.members-match-row .members-row__id {
-    flex: 1;
-}
 
 /* ---- Contacts shortcut, above the lookup on both forms ----
    Set apart from the search results below it so the two are never read as one
@@ -253,8 +250,8 @@
 }
 .members-contacts__title {
     margin: 0 0 4px;
-    font-size: 0.95rem;
-    font-weight: 600;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
 }
 .members-contacts .admin-hint {
     margin: 0 0 10px;
@@ -273,6 +270,7 @@
     gap: 16px;
     align-items: flex-start;
 }
+.members-match-row .members-row__id,
 .members-form-row__note {
     flex: 1;
 }
@@ -307,7 +305,7 @@
     gap: 12px;
 }
 .members-visibility__badge {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: 0.6px;
     padding: 3px 10px;
@@ -316,11 +314,11 @@
 }
 .members-visibility__badge--public {
     background: var(--admin-error);
-    color: #fff;
+    color: #ffffff;
 }
 .members-visibility__badge--private {
     background: var(--admin-success);
-    color: #fff;
+    color: #ffffff;
 }
 .members-visibility__meaning {
     margin: 0;
@@ -346,7 +344,7 @@
     margin: 8px 0;
 }
 .members-policy-value {
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     font-size: 0.9em;
 }

@@ -7,8 +7,6 @@
  *
  * Usage:
  *   localStorage.getItem(QuickSiteStorageKeys.aiKeysV2)
- *
- * @version 1.0.0
  */
 window.QuickSiteStorageKeys = Object.freeze({
     // Auth / session — nothing auth-related touches browser storage. The
@@ -37,6 +35,17 @@ window.QuickSiteStorageKeys = Object.freeze({
     // edits so the user can recover if they navigate away or refresh
     // before saving. Cleared on successful save or explicit discard.
     styleSourceDraft:    'qs_style_source_draft',
+
+    // Visual editor — the options panel's width in pixels, as dragged by its
+    // handle. The name predates the registry and stays, so no width is lost.
+    sidebarWidth:        'quicksite_sidebar_width',
+
+    // Visual editor — the device frame: the device chosen and each frame's last
+    // size, as JSON {"device": "mobile", "sizes": {"mobile": [375, 667],
+    // "tablet": [768, 1024]}}. One per browser, for every project: a way of
+    // looking, not the project's. A missing, malformed or out-of-range part
+    // gives that part's default.
+    previewFrame:        'qs_preview_frame',
 
     // Operator update notice. Written only in a browser signed in as an account
     // named in operator.php — nobody else runs update-notice.js at all.

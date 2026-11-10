@@ -337,7 +337,7 @@ window.QuickSiteUtils = (function() {
 
             const overlay = QSDom.el('div', { class: 'admin-modal-overlay admin-modal-overlay--dialog' });
             const modal = QSDom.el('div', {
-                class: 'admin-modal-dialog ' + (withInput ? 'admin-modal-dialog--prompt' : 'admin-modal-dialog--confirm'),
+                class: 'admin-modal-dialog' + (withInput ? ' admin-modal-dialog--prompt' : ''),
                 role: 'dialog',
                 'aria-modal': 'true',
                 'aria-labelledby': id + '-title',
@@ -371,13 +371,12 @@ window.QuickSiteUtils = (function() {
             }
             const cancelBtn = QSDom.el('button', {
                 type: 'button',
-                class: 'admin-btn admin-btn--secondary admin-modal-dialog__cancel',
+                class: 'admin-btn admin-modal-dialog__cancel',
                 text: options.cancelText || tCommon('cancel')
             });
             const confirmBtn = QSDom.el('button', {
                 type: 'button',
-                class: 'admin-btn admin-btn--' + (options.confirmClass || (type === 'danger' ? 'danger' : 'primary'))
-                    + ' admin-modal-dialog__confirm',
+                class: 'admin-btn admin-btn--' + (options.confirmClass || (type === 'danger' ? 'danger' : 'primary')),
                 text: options.confirmText || tCommon('confirm')
             });
             content.appendChild(QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [cancelBtn, confirmBtn]));

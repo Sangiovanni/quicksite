@@ -5,7 +5,6 @@
  * This class allows calling command functions directly from PHP code,
  * useful for AI specs, batch operations, and internal tooling.
  * 
- * @version 1.0.0
  * @since December 2025
  */
 

@@ -3,8 +3,6 @@
  * Admin Settings Page
  * 
  * Displays current configuration and allows viewing system info.
- * 
- * @version 1.7.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -131,7 +129,7 @@ window.QS_SETTINGS_I18N = <?= json_encode($qsSettingsI18n, JSON_HEX_TAG | JSON_H
             </svg>
             <?= __admin('settings.ai.title') ?>
         </h2>
-        <a href="<?= $router->url('ai-settings') ?>" class="admin-btn admin-btn--small admin-btn--secondary">
+        <a href="<?= $router->url('ai-settings') ?>" class="admin-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9"/>
@@ -147,7 +145,7 @@ window.QS_SETTINGS_I18N = <?= json_encode($qsSettingsI18n, JSON_HEX_TAG | JSON_H
             </div>
         </div>
         
-        <div class="admin-form-group" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--color-border);">
+        <div class="admin-form-group" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--admin-border);">
             <label class="admin-label"><?= __admin('settings.ai.automationOptions') ?></label>
             <p class="admin-hint" style="margin-bottom: var(--space-sm);"><?= __admin('settings.ai.automationHint') ?></p>
             

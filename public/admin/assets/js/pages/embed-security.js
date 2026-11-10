@@ -13,8 +13,6 @@
  * Strings come from window.QS_EMBED_SECURITY_I18N (the `embedSecurity` sub-tree),
  * emitted by embed-security.php under the same dot paths PHP uses; read through
  * t(), never directly. DOM is built with QSDom (createElement + textContent).
- *
- * @version 5.0.0
  */
 
 (function() {
@@ -64,7 +62,7 @@
             });
         } else {
             box.appendChild(QSDom.el('span', {
-                class: 'admin-muted', text: t('embedSecurity.blockEverything')
+                text: t('embedSecurity.blockEverything')
             }));
         }
         return box;
@@ -76,7 +74,7 @@
      */
     function _renderHostCard({ name, parameters }) {
         return QSDom.el('div', {
-            class: 'admin-card admin-card--nested',
+            class: 'admin-card',
             style: 'margin-bottom: var(--space-sm);'
         }, [
             QSDom.el('div', { class: 'admin-card__body' }, [
@@ -101,7 +99,7 @@
 
         if (hosts.length === 0) {
             container.appendChild(QSDom.el('p', {
-                class: 'admin-muted', text: t('embedSecurity.noRules')
+                text: t('embedSecurity.noRules')
             }));
             return;
         }
@@ -131,7 +129,7 @@
 
     function showError(container, msg) {
         QSDom.clear(container);
-        container.appendChild(QSDom.el('p', { class: 'admin-error', text: msg }));
+        container.appendChild(QSDom.el('p', { text: msg }));
     }
 
     // ── Init ─────────────────────────────────────────────────

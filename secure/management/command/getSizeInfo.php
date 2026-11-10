@@ -9,8 +9,6 @@
  * @route /management/getSizeInfo
  * @auth required
  * @return ApiResponse Size information for all folders
- * 
- * @version 1.0.0
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

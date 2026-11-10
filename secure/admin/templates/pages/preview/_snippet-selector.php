@@ -15,7 +15,7 @@
 $selectorId = $selectorId ?? 'add';
 ?>
 
-<div class="snippet-selector" id="<?= $selectorId ?>-snippet-selector">
+<div id="<?= $selectorId ?>-snippet-selector">
     <!-- Searchable Dropdown (tag-dropdown pattern) -->
     <div class="tag-dropdown" id="<?= $selectorId ?>-snippet-dropdown">
         <!-- Trigger button (shows current selection) -->
@@ -44,7 +44,7 @@ $selectorId = $selectorId ?? 'add';
             <!-- Scrollable options list (populated by JS from listSnippets API) -->
             <div class="tag-dropdown__options" id="<?= $selectorId ?>-snippet-options">
                 <div class="snippet-selector__loading">
-                    <div class="spinner"></div>
+                    <div></div>
                     <?= __admin('common.loading', 'Loading...') ?>
                 </div>
             </div>
@@ -115,7 +115,7 @@ $selectorId = $selectorId ?? 'add';
         </div><!-- End snippet-selector__css-status -->
         <!-- Actions for non-core snippets -->
         <div class="snippet-selector__preview-actions" id="<?= $selectorId ?>-snippet-preview-actions" style="display: none;">
-            <button type="button" class="admin-btn admin-btn--sm admin-btn--danger" id="delete-snippet-btn">
+            <button type="button" class="admin-btn admin-btn--danger" id="delete-snippet-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                     <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                     <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>

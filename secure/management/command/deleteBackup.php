@@ -10,8 +10,6 @@
  * @param string $backup Required - backup name (timestamp folder)
  * @param string $name Optional - project name (defaults to active project)
  * @return ApiResponse Delete result info
- * 
- * @version 1.0.0
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

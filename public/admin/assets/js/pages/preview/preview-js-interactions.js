@@ -4,8 +4,6 @@
  * 
  * Dependencies:
  * - PreviewConfig global (from preview-config.php)
- * 
- * @version 1.0.0
  */
 (function() {
     'use strict';
@@ -91,7 +89,6 @@
     let jsFormClose = null;
     let jsPanelActions = null;
     let jsAddBtn = null;
-    let contextualArea = null;
     
     // Page events DOM references
     let peContainer = null;
@@ -230,7 +227,6 @@
         jsFormClose = document.getElementById('js-form-close');
         jsPanelActions = document.getElementById('js-panel-actions');
         jsAddBtn = document.getElementById('js-add-interaction');
-        contextualArea = document.getElementById('preview-contextual-area');
         
         // Page events DOM references
         peContainer = document.getElementById('js-page-events');
@@ -554,11 +550,6 @@
         if (jsContentEl) jsContentEl.style.display = '';
         if (jsPanelActionsEl) jsPanelActionsEl.style.display = 'flex';
         
-        // Expand contextual area if collapsed
-        if (contextualArea) {
-            contextualArea.classList.remove('preview-contextual-area--collapsed');
-        }
-        
         // Load selectors data if needed (for searchable picker)
         if (getSelectorsLoadedFn && loadSelectorsDataFn && !getSelectorsLoadedFn()) {
             await loadSelectorsDataFn();
@@ -657,7 +648,7 @@
     function _renderEmptyNote(text, isError) {
         const p = document.createElement('p');
         p.className = 'preview-contextual-js-empty';
-        if (isError) p.style.color = 'var(--danger)';
+        if (isError) p.style.color = 'var(--admin-error)';
         p.textContent = text;
         return p;
     }
@@ -679,7 +670,7 @@
                 QSDom.el('div', { class: 'preview-js-interaction__function', text: interaction.function + '(' + (interaction.params?.join(', ') || '') + ')' })
             ]),
             QSDom.el('div', { class: 'preview-js-interaction__actions' }, [
-                button('admin-btn--secondary js-edit-btn', PreviewConfig.i18n?.edit || 'Edit'),
+                button('js-edit-btn', PreviewConfig.i18n?.edit || 'Edit'),
                 ' ',
                 button('admin-btn--danger js-delete-btn', PreviewConfig.i18n?.delete || 'Delete')
             ])
@@ -728,7 +719,7 @@
             byEvent[event].push(interaction);
         });
         
-        listEl.replaceChildren(QSDom.el('div', { class: 'preview-js-interactions' },
+        listEl.replaceChildren(QSDom.el('div', {},
             Object.entries(byEvent).map(([event, interactions]) => _renderEventGroup(event, interactions))));
         
         // Attach event listeners to edit/delete buttons
@@ -2220,7 +2211,7 @@
         wrap.dataset.routePickerMode = 'picker';
 
         var sel = document.createElement('select');
-        sel.className = 'preview-contextual-js-form-input qs-route-picker__select';
+        sel.className = 'preview-contextual-js-form-input';
         sel.dataset.paramIndex = paramIndex;
         sel.dataset.paramName = arg.name || '';
         sel.dataset.inputType = 'route';
@@ -4509,7 +4500,8 @@
                 return;
             }
             
-            if (peFormPreview) peFormPreview.textContent = '{{call:fetch:@' + apiName + '/' + endpointName + '}}';
+            var peKept = _pageEventUnshownParams('api', 1, 'fetch');
+            if (peFormPreview) peFormPreview.textContent = '{{call:fetch:' + ['@' + apiName + '/' + endpointName].concat(peKept).join(',') + '}}';
             if (peFormSave) peFormSave.disabled = false;
         } else {
             var fnName = peFormFunction?.value || '';
@@ -4524,6 +4516,7 @@
             paramInputs.forEach(function(input) {
                 if (input.value.trim()) params.push(input.value.trim());
             });
+            params = params.concat(_pageEventUnshownParams('function', paramInputs.length, fnName));
             
             var preview = '{{call:' + fnName;
             if (params.length > 0) preview += ':' + params.join(',');
@@ -4532,6 +4525,23 @@
             if (peFormPreview) peFormPreview.textContent = preview;
             if (peFormSave) peFormSave.disabled = false;
         }
+    }
+    
+    /**
+     * What an edited page event holds that its form does not show, to be written back exactly as it was saved: for an
+     * API call, every argument after the endpoint (`silent`, a toast, a body…), whichever endpoint is picked; for a
+     * function, every argument past the form's last input, while the function picked is the one saved. A new event,
+     * and an event whose kind the form changed, have none.
+     */
+    function _pageEventUnshownParams(kind, shownCount, fnName) {
+        var saved = editingPageEvent && editingPageEvent.interaction;
+        if (!saved || !Array.isArray(saved.params)) return [];
+        var savedIsApi = saved.function === 'fetch'
+            && typeof saved.params[0] === 'string'
+            && saved.params[0].charAt(0) === '@';
+        if (kind === 'api') return savedIsApi ? saved.params.slice(shownCount) : [];
+        if (savedIsApi || saved.function !== fnName) return [];
+        return saved.params.slice(shownCount);
     }
     
     /**
@@ -4552,7 +4562,7 @@
                 return;
             }
             fnName = 'fetch';
-            params = ['@' + apiName + '/' + endpointName];
+            params = ['@' + apiName + '/' + endpointName].concat(_pageEventUnshownParams('api', 1, fnName));
             
             // Save response bindings if any
             var bindings = collectBindings(peBindingsRows);
@@ -4582,6 +4592,11 @@
             }
             _clearArgErrors(peFormParams);
             params = _collectPositionalParams(peParamInputs);
+            var peUnshown = _pageEventUnshownParams('function', peParamInputs.length, fnName);
+            if (peUnshown.length > 0) {
+                // The inputs keep their places, an empty one included, so what follows them stays where it was
+                params = Array.from(peParamInputs).map(function(input) { return (input.value || '').trim(); }).concat(peUnshown);
+            }
         }
         
         var isEdit = !!editingPageEvent;
@@ -6183,7 +6198,6 @@
         root.appendChild(fmWrap);
 
         var warnSlot = document.createElement('div');
-        warnSlot.className = 'preview-contextual-js-response-bindings__cl-warn-slot';
         root.appendChild(warnSlot);
 
         // ── Populate the component dropdown asynchronously ──

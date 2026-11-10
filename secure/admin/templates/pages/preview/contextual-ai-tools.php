@@ -1,5 +1,5 @@
 <!-- AI TOOLS MODE Content -->
-<div class="preview-contextual-section preview-contextual-section--ai-tools" id="contextual-ai-tools" data-mode="ai-tools" style="display: none;">
+<div class="preview-contextual-section" id="contextual-ai-tools" data-mode="ai-tools" style="display: none;">
 
     <!-- List view (default; switches to runner view when a tool is picked) -->
     <div class="preview-contextual-ai-tools__list-view" id="ai-tools-list-view">
@@ -43,7 +43,7 @@
             <!-- Tag chips inserted by JS -->
         </div>
 
-        <div class="preview-contextual-ai-tools__section preview-contextual-ai-tools__section--all" id="ai-tools-all-section">
+        <div class="preview-contextual-ai-tools__section" id="ai-tools-all-section">
             <div class="preview-contextual-ai-tools__categories" id="ai-tools-all-list">
                 <div class="preview-contextual-ai-tools__loading" id="ai-tools-loading">
                     <?= __admin('preview.aiToolsLoading', 'Loading…') ?>

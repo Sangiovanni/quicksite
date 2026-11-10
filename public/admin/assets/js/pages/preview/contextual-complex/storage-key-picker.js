@@ -143,7 +143,7 @@
 
         // ---- DOM ---------------------------------------------------------
         const select = QSDom.el('select', {
-            class: 'admin-input qs-storage-key-picker__select',
+            class: 'admin-input',
             'aria-label': t('label'),
         });
         const note = QSDom.el('div', { class: 'qs-storage-key-picker__note', hidden: 'hidden' });
@@ -157,14 +157,14 @@
         const categorySelect = QSDom.el('select', { class: 'admin-input', 'aria-label': t('categoryLabel') });
         // Optional: asked here so the author does not have to remember it on the Storage page.
         const descInput = QSDom.el('input', {
-            type: 'text', class: 'admin-input qs-storage-key-picker__desc', placeholder: t('descPlaceholder'),
+            type: 'text', class: 'admin-input', placeholder: t('descPlaceholder'),
             'aria-label': t('descPlaceholder'),
         });
         const createBtn = QSDom.el('button', {
-            type: 'button', class: 'admin-btn admin-btn--primary admin-btn--sm', text: t('create'), onclick: create,
+            type: 'button', class: 'admin-btn admin-btn--primary', text: t('create'), onclick: create,
         });
         const cancelBtn = QSDom.el('button', {
-            type: 'button', class: 'admin-btn admin-btn--ghost admin-btn--sm', text: QuickSiteUtils.tCommon('cancel'),
+            type: 'button', class: 'admin-btn admin-btn--ghost', text: QuickSiteUtils.tCommon('cancel'),
             onclick: function () { createForm.hidden = true; },
         });
         const errorLine = QSDom.el('span', { class: 'qs-storage-key-picker__err' });
