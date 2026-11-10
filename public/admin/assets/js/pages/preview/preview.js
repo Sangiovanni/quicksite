@@ -414,12 +414,16 @@
         });
     }
     
-    // Device sizes
-    const devices = {
-        desktop: { width: '100%', height: '100%' },
-        tablet: { width: '768px', height: '1024px' },
-        mobile: { width: '375px', height: '667px' }
-    };
+    // The device frame's common sizes, in CSS pixels, each kind's default marked: the bar's list offers the kind chosen,
+    // labelled by the numbers. Desktop has no size: it fills the room. A tablet frame and a phone frame of one size
+    // render alike, as nothing but the panel's own stylesheet reads which button was pressed.
+    const FRAME_SIZES = Object.freeze({
+        mobile: Object.freeze({ sizes: [[360, 800], [375, 667], [390, 844], [430, 932]], default: 1 }),
+        tablet: Object.freeze({ sizes: [[768, 1024], [810, 1080], [820, 1180], [1024, 1366]], default: 0 }),
+    });
+    // The limits of a frame, [width, height]: the handles stop at them, and a typed, picked, rotated or stored size is held to them
+    const FRAME_MIN = Object.freeze([200, 200]);
+    const FRAME_MAX = Object.freeze([3840, 10000]);
     
     // State
     let currentDevice = 'desktop';
@@ -2259,18 +2263,193 @@
     
     // ==================== Device ====================
     
-    function setDevice(device) {
+    // The frame keeps the size it is given, and the room around it scrolls. Each kind keeps its own last size, its
+    // default the first time; the device and both sizes are remembered per browser (QuickSiteStorageKeys.previewFrame).
+    // Which of them shows at a width is the stylesheet's alone: a tablet shows a Tablet at its own width, a phone
+    // every device, and the bar and the handles go with the frame.
+    const frameBar = document.getElementById('preview-frame-bar');
+    const frameSizesSelect = document.getElementById('preview-frame-sizes');
+    const frameWidthInput = document.getElementById('preview-frame-width');
+    const frameHeightInput = document.getElementById('preview-frame-height');
+    const frameRotateBtn = document.getElementById('preview-frame-rotate');
+    const frameSize = { mobile: frameDefault('mobile'), tablet: frameDefault('tablet') };
+
+    function frameDefault(kind) {
+        const k = FRAME_SIZES[kind];
+        return k.sizes[k.default].slice();
+    }
+
+    /** A length held to the limits of its axis (0 the width, 1 the height), in whole pixels. */
+    function clampFrame(value, axis) {
+        return Math.min(FRAME_MAX[axis], Math.max(FRAME_MIN[axis], Math.round(value)));
+    }
+
+    function isFramePair(pair) {
+        return Array.isArray(pair) && pair.length === 2
+            && pair.every((v, axis) => Number.isInteger(v) && v >= FRAME_MIN[axis] && v <= FRAME_MAX[axis]);
+    }
+
+    /** What this browser remembers: a part that is missing, malformed or out of the limits gives that part's default. */
+    function readStoredFrame() {
+        let stored = null;
+        try {
+            stored = JSON.parse(localStorage.getItem(QuickSiteStorageKeys.previewFrame) || 'null');
+        } catch (e) {
+            stored = null;
+        }
+        const own = (o, k) => o !== null && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k);
+        const sizes = {};
+        Object.keys(FRAME_SIZES).forEach(kind => {
+            const pair = own(stored, 'sizes') && own(stored.sizes, kind) ? stored.sizes[kind] : null;
+            sizes[kind] = isFramePair(pair) ? pair.slice() : frameDefault(kind);
+        });
+        const device = own(stored, 'device') && (stored.device === 'desktop' || own(FRAME_SIZES, stored.device)) ? stored.device : 'desktop';
+        return { device: device, sizes: sizes };
+    }
+
+    function storeFrame() {
+        try {
+            localStorage.setItem(QuickSiteStorageKeys.previewFrame, JSON.stringify({ device: currentDevice, sizes: frameSize }));
+        } catch (e) {
+            // Storage refused: the frame works, and is not remembered
+        }
+    }
+
+    function setDevice(device, remember = true) {
         currentDevice = device;
-        const size = devices[device];
         
         deviceBtns.forEach(btn => {
             btn.classList.toggle('preview-device-btn--active', btn.dataset.device === device);
         });
         
-        wrapper.style.width = size.width;
-        wrapper.style.height = size.height;
         container.classList.toggle('preview-container--device', device !== 'desktop');
         container.dataset.device = device;
+        applyFrameSize();
+        if (remember) storeFrame();
+    }
+
+    /** The frame's size, inline: the kind's own, or none for Desktop, which fills the room. The bar follows. */
+    function applyFrameSize() {
+        const size = frameSize[currentDevice];
+        wrapper.style.width = size ? size[0] + 'px' : '';
+        wrapper.style.height = size ? size[1] + 'px' : '';
+        syncFrameBar();
+    }
+
+    function frameLabel(pair) {
+        return pair[0] + ' × ' + pair[1];
+    }
+
+    /**
+     * The bar shows the frame's size: the two boxes, and the list's entry that matches it either way round. When none
+     * does, the list's first entry is the frame's own size, so the list never shows a size the frame is not.
+     */
+    function syncFrameBar() {
+        const size = frameSize[currentDevice];
+        if (!size || !frameBar) return;
+        frameWidthInput.value = size[0];
+        frameHeightInput.value = size[1];
+        const list = FRAME_SIZES[currentDevice].sizes;
+        const match = list.find(p => (p[0] === size[0] && p[1] === size[1]) || (p[0] === size[1] && p[1] === size[0]));
+        const options = list.map(p => _renderOption(p[0] + 'x' + p[1], frameLabel(p)));
+        if (!match) options.unshift(_renderOption('', frameLabel(size)));
+        frameSizesSelect.replaceChildren(...options);
+        frameSizesSelect.value = match ? match[0] + 'x' + match[1] : '';
+    }
+
+    /** A new size for the frame shown, held to the limits; it is remembered unless a drag is still under way. */
+    function setFrameSize(width, height, remember = true) {
+        if (!frameSize[currentDevice]) return;
+        frameSize[currentDevice] = [clampFrame(width, 0), clampFrame(height, 1)];
+        applyFrameSize();
+        if (remember) storeFrame();
+    }
+
+    /** A box's value, on Enter or on leaving it: a number is held to the limits; anything else puts the size back. */
+    function applyTypedFrame(input, axis) {
+        const size = frameSize[currentDevice];
+        if (!size) return;
+        const typed = input.value.trim() === '' ? NaN : Number(input.value);
+        if (!Number.isFinite(typed)) {
+            input.value = size[axis];
+            return;
+        }
+        const next = size.slice();
+        next[axis] = typed;
+        setFrameSize(next[0], next[1]);
+    }
+
+    /**
+     * Sizes the frame so that its right edge (axis 0) or its bottom edge (axis 1) lands where the pointer holds it. A
+     * frame narrower than the room is centred in it, so its width moves its right edge by half as much; a wider one
+     * starts at the room's start, and so does every frame's top. A few passes settle the change from one to the other
+     * and the scroll a frame gives back as it shrinks.
+     */
+    function followFrameEdge(axis, target) {
+        const size = frameSize[currentDevice];
+        for (let pass = 0; pass < 3; pass++) {
+            const rect = wrapper.getBoundingClientRect();
+            const miss = target - (axis === 0 ? rect.right : rect.bottom);
+            if (Math.abs(miss) < 0.5) return;
+            const centred = axis === 0 && wrapper.offsetLeft > parseFloat(getComputedStyle(container).paddingLeft) + 0.5;
+            const next = clampFrame(size[axis] + miss * (centred ? 2 : 1), axis);
+            if (next === size[axis]) return;
+            size[axis] = next;
+            wrapper.style[axis === 0 ? 'width' : 'height'] = next + 'px';
+            (axis === 0 ? frameWidthInput : frameHeightInput).value = next;
+        }
+    }
+
+    /** A press on a handle: the edge it holds follows the pointer until it is let go, and the size is then remembered. */
+    function startFrameDrag(e) {
+        if (!frameSize[currentDevice]) return;
+        const edge = this.dataset.edge;
+        const rect = wrapper.getBoundingClientRect();
+        const holdX = e.clientX - rect.right;
+        const holdY = e.clientY - rect.bottom;
+        container.dataset.sizing = edge;
+        QSDom.followPointer(e, function(dx, dy, move) {
+            if (edge !== 'bottom') followFrameEdge(0, move.clientX - holdX);
+            if (edge !== 'right') followFrameEdge(1, move.clientY - holdY);
+        }, function() {
+            delete container.dataset.sizing;
+            syncFrameBar();
+            storeFrame();
+        });
+    }
+
+    /** The bar and the handles answer, and the remembered device and sizes come back with no transition. */
+    function initFrame() {
+        if (frameBar) {
+            [frameWidthInput, frameHeightInput].forEach((input, axis) => {
+                input.min = FRAME_MIN[axis];
+                input.max = FRAME_MAX[axis];
+                input.addEventListener('change', () => applyTypedFrame(input, axis));
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyTypedFrame(input, axis);
+                    }
+                });
+            });
+            frameSizesSelect.addEventListener('change', function() {
+                const pair = this.value.split('x').map(Number);
+                if (pair.length === 2) setFrameSize(pair[0], pair[1]);
+            });
+            frameRotateBtn.addEventListener('click', function() {
+                const size = frameSize[currentDevice];
+                if (size) setFrameSize(size[1], size[0]);
+            });
+            wrapper.querySelectorAll('.preview-frame-handle').forEach(handle => {
+                handle.addEventListener('pointerdown', startFrameDrag);
+            });
+        }
+        const stored = readStoredFrame();
+        Object.assign(frameSize, stored.sizes);
+        wrapper.style.transition = 'none';
+        setDevice(stored.device, false);
+        void wrapper.offsetWidth;
+        wrapper.style.transition = '';
     }
     
     // ==================== Editor Mode ====================
@@ -3092,21 +3271,29 @@
         return lines.map(l => l.split(sep).map(c => c.trim()));
     }
 
+    /** The language the editor shows, which the dialog's language picker starts on at every opening. */
+    function _translateCsvShownLang() {
+        const sel = document.getElementById('preview-lang');
+        return sel && sel.value ? sel.value : (window.PreviewConfig && window.PreviewConfig.defaultLang) || 'en';
+    }
+
     // Populate the language picker the FIRST time the modal opens. Result
-    // is cached on the select element itself so subsequent opens reuse it.
+    // is cached on the select element itself so subsequent opens reuse it,
+    // each starting on the language shown at that opening.
     function _ensureTranslateCsvLangsLoaded() {
         if (!translateCsvLang) return Promise.resolve();
-        if (translateCsvLang._loaded) return Promise.resolve();
+        if (translateCsvLang._loaded) {
+            const shown = _translateCsvShownLang();
+            if (Array.from(translateCsvLang.options).some(o => o.value === shown)) translateCsvLang.value = shown;
+            return Promise.resolve();
+        }
         const api = window.QuickSiteAdmin;
         if (!api) return Promise.resolve();
         return api.apiRequest('getLangList', 'GET').then(function (res) {
             // res shape: {ok, status, data: <envelope>}; envelope = {status, code, data: {languages, ...}}
             const payload = (res && res.data && (res.data.data || res.data)) || {};
             const langs = Array.isArray(payload.languages) ? payload.languages : ['en'];
-            const currentEditorLang = (function () {
-                const sel = document.getElementById('preview-lang-select');
-                return sel && sel.value ? sel.value : (window.PreviewConfig && window.PreviewConfig.defaultLang) || 'en';
-            })();
+            const currentEditorLang = _translateCsvShownLang();
             translateCsvLang.replaceChildren();
             langs.forEach(function (lang) {
                 const opt = document.createElement('option');
@@ -4065,12 +4252,16 @@
         reloadBtn.addEventListener('click', reloadPreview);
 
         // The button beside Reload: the rows and the panel away, and back as they were. Not stored: a
-        // page opened anew has the editor's rows.
+        // page opened anew has the editor's rows. Where the column scrolls (a tablet, a phone), it comes
+        // back where it was: hiding the rows shortens it, and the browser drops its scroll.
         const rowsToggle = document.getElementById('preview-rows-toggle');
         const previewPage = document.getElementById('preview-page');
         if (rowsToggle && previewPage) {
+            let rowsScrollTop = 0;
             rowsToggle.addEventListener('click', function() {
+                if (!previewPage.classList.contains('preview-page--rows-hidden')) rowsScrollTop = previewPage.scrollTop;
                 const hidden = previewPage.classList.toggle('preview-page--rows-hidden');
+                if (!hidden) previewPage.scrollTop = rowsScrollTop;
                 this.setAttribute('aria-pressed', String(hidden));
                 this.title = hidden ? this.dataset.titleShow : this.dataset.titleHide;
             });
@@ -4081,6 +4272,7 @@
                 setDevice(this.dataset.device);
             });
         });
+        initFrame();
         
         modeBtns.forEach(btn => {
             btn.addEventListener('click', function() {
@@ -8217,6 +8409,8 @@
     
     // Stored full component structure when Variables panel is open
     let variablesPanelStructure = null;
+    // The struct it was read from, which the frame names a card's node by
+    let variablesPanelStruct = null;
     // Cached flat list of translation key names
     let variablesPanelTranslationKeys = [];
     // Cached map of translation key → first-language value (for preview)
@@ -8432,7 +8626,8 @@
         
         try {
             // Fetch component structure AND translation keys in parallel
-            const structInfo = parseStruct(selectedStruct || ('component-' + currentEditName));
+            variablesPanelStruct = selectedStruct || ('component-' + currentEditName);
+            const structInfo = parseStruct(variablesPanelStruct);
             if (!structInfo) throw new Error('Invalid struct');
             
             const urlParams = [structInfo.type];
@@ -8816,9 +9011,9 @@
             pathEl.title = PreviewConfig.i18n?.variablesClickToSelect || 'Click to select this node';
             pathEl.addEventListener('click', function() {
                 hideVariablesPanel();
-                // Try to select this node in the overlay
+                // Select this node in the frame, by the struct the panel read
                 if (item.nodeId) {
-                    sendToIframe('selectNode', { nodeId: item.nodeId });
+                    sendToIframe('selectNode', { struct: variablesPanelStruct, node: item.nodeId });
                 }
             });
             card.appendChild(pathEl);

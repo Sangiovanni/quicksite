@@ -139,10 +139,29 @@
         </div>
     </div>
 
-    <!-- Preview Frame Container -->
+    <!-- Preview Frame Container: with a device, the room around the frame, which keeps its size while the room scrolls -->
     <div class="preview-container" id="preview-container">
+        <!-- The frame's size, shown while a frame shows: the common sizes of the device chosen, the width and the height in
+             CSS pixels, and a button that swaps them. preview.js fills the list and the two boxes. -->
+        <div class="preview-frame-bar" id="preview-frame-bar" role="group" aria-label="<?= adminAttr(__admin('preview.frameSize')) ?>">
+            <select class="preview-frame-bar__sizes" id="preview-frame-sizes"
+                    title="<?= adminAttr(__admin('preview.frameSizes')) ?>" aria-label="<?= adminAttr(__admin('preview.frameSizes')) ?>"></select>
+            <input type="number" class="preview-frame-bar__number" id="preview-frame-width" step="1" inputmode="numeric"
+                   title="<?= adminAttr(__admin('preview.frameWidth')) ?>" aria-label="<?= adminAttr(__admin('preview.frameWidth')) ?>">
+            <span class="preview-frame-bar__times" aria-hidden="true">&times;</span>
+            <input type="number" class="preview-frame-bar__number" id="preview-frame-height" step="1" inputmode="numeric"
+                   title="<?= adminAttr(__admin('preview.frameHeight')) ?>" aria-label="<?= adminAttr(__admin('preview.frameHeight')) ?>">
+            <button type="button" class="preview-frame-bar__rotate" id="preview-frame-rotate"
+                    title="<?= adminAttr(__admin('preview.rotate')) ?>" aria-label="<?= adminAttr(__admin('preview.rotate')) ?>">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <rect x="2" y="10" width="13" height="10" rx="1.5"/>
+                    <path d="M9 3h3a7 7 0 0 1 7 7v3"/>
+                    <polyline points="16 10 19 13 22 10"/>
+                </svg>
+            </button>
+        </div>
         <div class="preview-frame-wrapper" id="preview-frame-wrapper">
-            <iframe 
+            <iframe
                 id="preview-iframe"
                 class="preview-iframe"
                 src="<?= $siteUrl ?>"
@@ -154,9 +173,11 @@
                 <div class="preview-loading__spinner"></div>
                 <span><?= __admin('common.loading') ?></span>
             </div>
-        </div>
 
-<!-- Device Frame (for tablet/mobile) -->
-        <div class="preview-device-frame" id="preview-device-frame"></div>
+            <!-- The frame's handles, shown with the bar: its right edge, its bottom edge and its corner -->
+            <div class="preview-frame-handle preview-frame-handle--right" data-edge="right" title="<?= adminAttr(__admin('preview.frameDragWidth')) ?>"></div>
+            <div class="preview-frame-handle preview-frame-handle--bottom" data-edge="bottom" title="<?= adminAttr(__admin('preview.frameDragHeight')) ?>"></div>
+            <div class="preview-frame-handle preview-frame-handle--corner" data-edge="corner" title="<?= adminAttr(__admin('preview.frameDragSize')) ?>"></div>
+        </div>
     </div>
 </div>

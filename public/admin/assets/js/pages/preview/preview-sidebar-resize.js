@@ -4,15 +4,16 @@
  * Handles sidebar width resizing with drag support.
  * - Drag handle to resize sidebar
  * - Min/max width constraints (the panel's CSS min-width to 50% of viewport)
- * - State persistence via localStorage
- * - Pointer events, so a finger drags the handle as a mouse does
- * 
+ * - State persistence via localStorage (QuickSiteStorageKeys.sidebarWidth)
+ * - Pointer events, so a finger drags the handle as a mouse does: the panel's
+ *   one drag routine, QSDom.followPointer(), which the device frame's handles share
+ *
  * Auto-initializes when DOM is ready.
  */
 (function() {
     'use strict';
     
-    const SIDEBAR_STORAGE_KEY = 'quicksite_sidebar_width';
+    const SIDEBAR_STORAGE_KEY = QuickSiteStorageKeys.sidebarWidth;
     
     // DOM references
     const sidebarResize = document.getElementById('sidebar-resize');
@@ -24,11 +25,6 @@
         console.warn('[SidebarResize] Required elements not found');
         return;
     }
-    
-    // State
-    let isResizing = false;
-    let startX = 0;
-    let startWidth = 0;
     
     /**
      * Get maximum allowed width (50% of viewport)
@@ -74,53 +70,22 @@
     }
     
     /**
-     * Handle resize start
+     * A press on the handle: the panel follows the pointer, clamped to its minimum and to half the
+     * window, and its width is stored once the pointer is let go
      */
     function onResizeStart(e) {
-        e.preventDefault();
-        isResizing = true;
-        startX = e.clientX;
-        startWidth = sidebar.offsetWidth;
+        const startWidth = sidebar.offsetWidth;
         
         sidebarResize.classList.add('preview-sidebar__resize--active');
         workspace.classList.add('preview-workspace--resizing');
         
-        document.addEventListener('pointermove', onResizeMove);
-        document.addEventListener('pointerup', onResizeEnd);
-        document.addEventListener('pointercancel', onResizeEnd);
-    }
-    
-    /**
-     * Handle resize drag
-     */
-    function onResizeMove(e) {
-        if (!isResizing) return;
-        
-        const deltaX = e.clientX - startX;
-        let newWidth = startWidth + deltaX;
-        
-        // Clamp to min/max (max is 50% of viewport)
-        const maxWidth = getMaxWidth();
-        newWidth = Math.max(getMinWidth(), Math.min(maxWidth, newWidth));
-        
-        sidebar.style.width = newWidth + 'px';
-    }
-    
-    /**
-     * Handle resize end
-     */
-    function onResizeEnd() {
-        if (!isResizing) return;
-        
-        isResizing = false;
-        sidebarResize.classList.remove('preview-sidebar__resize--active');
-        workspace.classList.remove('preview-workspace--resizing');
-        
-        document.removeEventListener('pointermove', onResizeMove);
-        document.removeEventListener('pointerup', onResizeEnd);
-        document.removeEventListener('pointercancel', onResizeEnd);
-
-        saveWidth();
+        QSDom.followPointer(e, function(deltaX) {
+            sidebar.style.width = Math.max(getMinWidth(), Math.min(getMaxWidth(), startWidth + deltaX)) + 'px';
+        }, function() {
+            sidebarResize.classList.remove('preview-sidebar__resize--active');
+            workspace.classList.remove('preview-workspace--resizing');
+            saveWidth();
+        });
     }
 
     // Setup event listener

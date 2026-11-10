@@ -433,7 +433,7 @@
         // getCurrentLang() mirrors text-key-picker.js's getCurrentLang.
         function _getCurrentLang() {
             try {
-                var sel = document.getElementById('preview-lang-select');
+                var sel = document.getElementById('preview-lang');
                 if (sel && sel.value) return sel.value;
             } catch (e) {}
             try {

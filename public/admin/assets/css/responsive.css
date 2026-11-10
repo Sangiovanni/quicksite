@@ -115,13 +115,42 @@
     .preview-container--device[data-device="tablet"] {
         padding: 0;
         align-items: stretch;
+        overflow: visible;
     }
     .preview-container--device[data-device="tablet"] .preview-frame-wrapper {
         flex: 1;
         width: 100% !important;
         height: auto !important;
+        overflow: hidden;
         border-radius: 0;
         box-shadow: none;
+    }
+    .preview-container--device[data-device="tablet"] .preview-frame-bar,
+    .preview-container--device[data-device="tablet"] .preview-frame-handle {
+        display: none;
+    }
+    /* The Phone frame's bar and handles have room for a finger */
+    .preview-frame-bar__sizes,
+    .preview-frame-bar__number,
+    .preview-frame-bar__rotate {
+        min-height: 2.75rem;
+    }
+    .preview-frame-bar__rotate {
+        min-width: 2.75rem;
+    }
+    .preview-frame-handle--right {
+        right: -2.75rem;
+        width: 2.75rem;
+    }
+    .preview-frame-handle--bottom {
+        bottom: -2.75rem;
+        height: 2.75rem;
+    }
+    .preview-frame-handle--corner {
+        right: -2.75rem;
+        bottom: -2.75rem;
+        width: 2.75rem;
+        height: 2.75rem;
     }
     .preview-sidebar__options,
     .preview-contextual-area--sidebar .preview-contextual-content {
@@ -421,13 +450,19 @@
     .preview-container--device {
         padding: 0;
         align-items: stretch;
+        overflow: visible;
     }
     .preview-container--device .preview-frame-wrapper {
         flex: 1;
         width: 100% !important;
         height: auto !important;
+        overflow: hidden;
         border-radius: 0;
         box-shadow: none;
+    }
+    .preview-container--device .preview-frame-bar,
+    .preview-container--device .preview-frame-handle {
+        display: none;
     }
     .preview-element-info__row {
         align-items: baseline;

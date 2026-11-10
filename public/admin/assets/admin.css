@@ -5792,10 +5792,12 @@ kbd {
     overflow: visible; /* Allow element info bar to be visible */
 }
 
+/* A device: the room around the frame, which scrolls both ways when the frame is larger than it */
 .preview-container--device {
     padding: var(--space-lg);
     align-items: center;
-    background: 
+    overflow: auto;
+    background:
         linear-gradient(90deg, var(--admin-surface) 1px, transparent 1px) 0 0 / 20px 20px,
         linear-gradient(0deg, var(--admin-surface) 1px, transparent 1px) 0 0 / 20px 20px,
         var(--admin-bg-secondary);
@@ -5812,15 +5814,207 @@ kbd {
     overflow: hidden;
 }
 
-/* setDevice() writes the frame's size inline: it shrinks by flex to what the rows leave. */
+/* setDevice() writes the frame's size inline, and the frame keeps it. Its auto margins centre it across a room
+   wider than it and fall to nothing in a narrower one, so its start stays in reach; it starts at the room's top. */
 .preview-container--device .preview-frame-wrapper {
-    flex: 0 1 auto;
-    max-width: 100%;
+    flex: none;
+    margin: 0 auto;
+    overflow: visible; /* Its handles sit on its edges */
     border-radius: 16px;
-    box-shadow: 
+    box-shadow:
         0 0 0 8px #333333,
         0 0 0 10px #555555,
         0 20px 40px #00000066;
+}
+
+/* What the frame holds takes its corners, as the frame no longer clips */
+.preview-container--device .preview-iframe,
+.preview-container--device .preview-loading {
+    border-radius: inherit;
+}
+
+/* While a handle drags (preview.js sets data-sizing): no transition, and the page under the pointer takes nothing */
+.preview-container[data-sizing] {
+    user-select: none;
+}
+
+.preview-container[data-sizing] .preview-frame-wrapper {
+    transition: none;
+}
+
+.preview-container[data-sizing] .preview-iframe {
+    pointer-events: none;
+}
+
+/* Over a tool's own cursor, as the panel's handle does */
+.preview-container[data-sizing="right"],
+.preview-container[data-sizing="right"] * {
+    cursor: ew-resize !important;
+}
+
+.preview-container[data-sizing="bottom"],
+.preview-container[data-sizing="bottom"] * {
+    cursor: ns-resize !important;
+}
+
+.preview-container[data-sizing="corner"],
+.preview-container[data-sizing="corner"] * {
+    cursor: nwse-resize !important;
+}
+
+/* The frame's size: a slim bar at the top of the room, in view as the room scrolls under it, shown while a frame
+   shows. It wraps, so nothing in it is cut. */
+.preview-frame-bar {
+    display: none;
+}
+
+.preview-container--device .preview-frame-bar {
+    position: sticky;
+    top: calc(-1 * var(--space-lg)); /* The room's own edge, over its padding */
+    left: calc(-1 * var(--space-lg));
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-self: stretch;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    margin: calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg)) var(--space-lg);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--admin-surface);
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.preview-frame-bar__sizes,
+.preview-frame-bar__number {
+    min-height: 2rem;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+}
+
+.preview-frame-bar__sizes {
+    cursor: pointer;
+}
+
+.preview-frame-bar__number {
+    box-sizing: border-box;
+    width: 6rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.preview-frame-bar__sizes:focus,
+.preview-frame-bar__number:focus {
+    outline: none;
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px #d9770633;
+}
+
+.preview-frame-bar__times {
+    color: var(--admin-text-muted);
+}
+
+.preview-frame-bar__rotate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0;
+    color: var(--admin-text-muted);
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+}
+
+.preview-frame-bar__rotate:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface-hover);
+}
+
+.preview-frame-bar__rotate svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* The frame's handles, on its right edge, its bottom edge and its corner, shown with the bar: a strip over the
+   frame's border and beyond it, with a grip. A finger drags them as a mouse does. */
+.preview-frame-handle {
+    display: none;
+    position: absolute;
+    z-index: 1;
+    touch-action: none;
+}
+
+.preview-container--device .preview-frame-handle {
+    display: block;
+}
+
+.preview-frame-handle--right {
+    top: 0;
+    bottom: 0;
+    right: -1.25rem;
+    width: 1.25rem;
+    cursor: ew-resize;
+}
+
+.preview-frame-handle--bottom {
+    left: 0;
+    right: 0;
+    bottom: -1.25rem;
+    height: 1.25rem;
+    cursor: ns-resize;
+}
+
+.preview-frame-handle--corner {
+    right: -1.25rem;
+    bottom: -1.25rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    z-index: 2;
+    cursor: nwse-resize;
+}
+
+.preview-frame-handle::after {
+    content: "";
+    position: absolute;
+    border-radius: var(--radius-full);
+    background: var(--admin-text-light);
+}
+
+.preview-frame-handle--right::after {
+    top: 50%;
+    left: 50%;
+    width: 3px;
+    height: 2.5rem;
+    transform: translate(-50%, -50%);
+}
+
+.preview-frame-handle--bottom::after {
+    top: 50%;
+    left: 50%;
+    width: 2.5rem;
+    height: 3px;
+    transform: translate(-50%, -50%);
+}
+
+.preview-frame-handle--corner::after {
+    top: 50%;
+    left: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    transform: translate(-50%, -50%);
+}
+
+.preview-frame-handle:hover::after,
+.preview-container[data-sizing="right"] .preview-frame-handle--right::after,
+.preview-container[data-sizing="bottom"] .preview-frame-handle--bottom::after,
+.preview-container[data-sizing="corner"] .preview-frame-handle--corner::after {
+    background: var(--admin-primary);
 }
 
 /* Preview Iframe */

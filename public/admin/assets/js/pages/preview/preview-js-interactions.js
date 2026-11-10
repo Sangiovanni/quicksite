@@ -4509,7 +4509,8 @@
                 return;
             }
             
-            if (peFormPreview) peFormPreview.textContent = '{{call:fetch:@' + apiName + '/' + endpointName + '}}';
+            var peKept = _pageEventUnshownParams('api', 1, 'fetch');
+            if (peFormPreview) peFormPreview.textContent = '{{call:fetch:' + ['@' + apiName + '/' + endpointName].concat(peKept).join(',') + '}}';
             if (peFormSave) peFormSave.disabled = false;
         } else {
             var fnName = peFormFunction?.value || '';
@@ -4524,6 +4525,7 @@
             paramInputs.forEach(function(input) {
                 if (input.value.trim()) params.push(input.value.trim());
             });
+            params = params.concat(_pageEventUnshownParams('function', paramInputs.length, fnName));
             
             var preview = '{{call:' + fnName;
             if (params.length > 0) preview += ':' + params.join(',');
@@ -4532,6 +4534,23 @@
             if (peFormPreview) peFormPreview.textContent = preview;
             if (peFormSave) peFormSave.disabled = false;
         }
+    }
+    
+    /**
+     * What an edited page event holds that its form does not show, to be written back exactly as it was saved: for an
+     * API call, every argument after the endpoint (`silent`, a toast, a body…), whichever endpoint is picked; for a
+     * function, every argument past the form's last input, while the function picked is the one saved. A new event,
+     * and an event whose kind the form changed, have none.
+     */
+    function _pageEventUnshownParams(kind, shownCount, fnName) {
+        var saved = editingPageEvent && editingPageEvent.interaction;
+        if (!saved || !Array.isArray(saved.params)) return [];
+        var savedIsApi = saved.function === 'fetch'
+            && typeof saved.params[0] === 'string'
+            && saved.params[0].charAt(0) === '@';
+        if (kind === 'api') return savedIsApi ? saved.params.slice(shownCount) : [];
+        if (savedIsApi || saved.function !== fnName) return [];
+        return saved.params.slice(shownCount);
     }
     
     /**
@@ -4552,7 +4571,7 @@
                 return;
             }
             fnName = 'fetch';
-            params = ['@' + apiName + '/' + endpointName];
+            params = ['@' + apiName + '/' + endpointName].concat(_pageEventUnshownParams('api', 1, fnName));
             
             // Save response bindings if any
             var bindings = collectBindings(peBindingsRows);
@@ -4582,6 +4601,11 @@
             }
             _clearArgErrors(peFormParams);
             params = _collectPositionalParams(peParamInputs);
+            var peUnshown = _pageEventUnshownParams('function', peParamInputs.length, fnName);
+            if (peUnshown.length > 0) {
+                // The inputs keep their places, an empty one included, so what follows them stays where it was
+                params = Array.from(peParamInputs).map(function(input) { return (input.value || '').trim(); }).concat(peUnshown);
+            }
         }
         
         var isEdit = !!editingPageEvent;

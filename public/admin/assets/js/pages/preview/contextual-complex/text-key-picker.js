@@ -98,7 +98,7 @@
     function getCurrentLang() {
         // Mirrors preview.js — falls back to 'en' if nothing else is available.
         try {
-            const sel = document.getElementById('preview-lang-select');
+            const sel = document.getElementById('preview-lang');
             if (sel && sel.value) return sel.value;
         } catch (e) {}
         try {
