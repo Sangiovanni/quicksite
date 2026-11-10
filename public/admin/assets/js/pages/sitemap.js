@@ -2,8 +2,6 @@
  * Sitemap Page JavaScript
  * 
  * Visual route tree, reachability graph, route CRUD, and layout management.
- * 
- * @version 1.0.0
  */
 
 (function() {
@@ -244,7 +242,7 @@
 
         const ctxBtn = document.createElement('button');
         ctxBtn.type = 'button';
-        ctxBtn.className = 'sitemap-action sitemap-action--menu';
+        ctxBtn.className = 'sitemap-action';
         ctxBtn.setAttribute('data-action', 'context-menu');
         ctxBtn.setAttribute('data-route', routePath);
         ctxBtn.setAttribute('data-is-home', String(isHome));
@@ -402,7 +400,7 @@
 
         if (!multilingual || languages.length <= 1) {
             const ghost = document.createElement('span');
-            ghost.className = 'badge badge--ghost';
+            ghost.className = 'badge';
             ghost.textContent = languages[0]?.toUpperCase() || 'EN';
             return ghost;
         }
@@ -721,14 +719,14 @@
 
         const createBtn = document.createElement('button');
         createBtn.type = 'button';
-        createBtn.className = 'admin-btn admin-btn--primary admin-btn--sm';
+        createBtn.className = 'admin-btn admin-btn--primary';
         createBtn.id = 'sitemap-create-btn';
         createBtn.textContent = t('create', 'Create');
         form.appendChild(createBtn);
 
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
-        cancelBtn.className = 'admin-btn admin-btn--ghost admin-btn--sm';
+        cancelBtn.className = 'admin-btn admin-btn--ghost';
         cancelBtn.id = 'sitemap-cancel-btn';
         cancelBtn.textContent = t('cancel', 'Cancel');
         form.appendChild(cancelBtn);
@@ -1063,7 +1061,7 @@
         } else {
             const routeTree = buildRouteTree(routes);
             const routesWrap = document.createElement('div');
-            routesWrap.className = 'sitemap__routes sitemap__routes--flat sitemap__routes--tree';
+            routesWrap.className = 'sitemap__routes sitemap__routes--flat';
             routesWrap.appendChild(renderRouteTree(routeTree));
             treeContainer.replaceChildren(renderSummary(sd, vd), routesWrap);
         }
@@ -1337,7 +1335,7 @@
         const route = routeTxt.replace(/^"|"$/g, '');
         if (!route) {
             refs.status.textContent = 'Could not determine target route — close and try again.';
-            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.status.style.color = 'var(--admin-error)';
             return;
         }
 
@@ -1400,7 +1398,7 @@
         } catch (err) {
             console.error('[sitemap] edit-title save failed:', err);
             refs.status.textContent = 'Save failed — see console.';
-            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.status.style.color = 'var(--admin-error)';
             refs.save.disabled = false;
         }
     }
@@ -2070,7 +2068,7 @@
         // Remove button (× icon).
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'sitemap-resolver-input-row__remove admin-btn admin-btn--ghost admin-btn--sm';
+        removeBtn.className = 'sitemap-resolver-input-row__remove admin-btn admin-btn--ghost';
         removeBtn.title = t('resolverRemoveInput', 'Remove input');
         removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         removeBtn.addEventListener('click', () => row.remove());
@@ -2128,7 +2126,7 @@
 
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
-        addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost admin-btn--sm';
+        addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost';
         addBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 14));
         addBtn.appendChild(document.createTextNode(' ' + t('resolverInputAdd', 'Add input')));
         addBtn.addEventListener('click', () => {
@@ -2162,8 +2160,7 @@
         if (exposeWrap && exposeWrap.querySelector('.sitemap-resolver-expose-row--error')) return;
         const c = (refs.status.style.color || '');
         const isErrorStatus = c.indexOf('rgb') === 0
-            || c.indexOf('var(--admin-danger') >= 0
-            || c === 'var(--admin-danger, #b3261e)';
+            || c.indexOf('var(--admin-error') >= 0;
         if (isErrorStatus) {
             refs.status.textContent = '';
             refs.status.style.color = '';
@@ -2308,7 +2305,6 @@
         // Path cell — rendered by _refreshPathCell so endpoint-change
         // can re-render in place.
         const pathCell = document.createElement('span');
-        pathCell.className = 'sitemap-resolver-expose-row__path-cell';
         row.appendChild(pathCell);
 
         function _refreshPathCell(paths) {
@@ -2371,7 +2367,7 @@
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'sitemap-resolver-expose-row__remove admin-btn admin-btn--ghost admin-btn--sm';
+        removeBtn.className = 'sitemap-resolver-expose-row__remove admin-btn admin-btn--ghost';
         removeBtn.title = t('resolverRemoveExpose', 'Remove expose');
         removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         removeBtn.addEventListener('click', () => row.remove());
@@ -2434,7 +2430,7 @@
 
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
-        addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost admin-btn--sm';
+        addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost';
         addBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 14));
         addBtn.appendChild(document.createTextNode(' ' + t('resolverExposeAdd', 'Add expose')));
         addBtn.addEventListener('click', () => {
@@ -2878,7 +2874,7 @@
                 return sectionLabel + (withRow ? ' ' + e.rowNumber : '') + ': ' + reasonLabel;
             });
             refs.status.textContent = msgs.join('; ');
-            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.status.style.color = 'var(--admin-error)';
             // Focus the first errant element so the user knows where to fix.
             if (allErrors[0] && allErrors[0].element) {
                 try { allErrors[0].element.focus(); } catch (e) {}
@@ -2938,13 +2934,13 @@
                     ? errors.map((e) => e.hint || e.reason || e.field).filter(Boolean).join(' · ')
                     : ((res.data && res.data.message) || 'Save failed');
                 refs.status.textContent = summary;
-                refs.status.style.color = 'var(--admin-danger, #b3261e)';
+                refs.status.style.color = 'var(--admin-error)';
                 refs.save.disabled = false;
                 refs.clear.disabled = false;
             }
         } catch (err) {
             refs.status.textContent = err.message || 'Save failed';
-            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.status.style.color = 'var(--admin-error)';
             refs.save.disabled = false;
             refs.clear.disabled = false;
         }
@@ -2975,13 +2971,13 @@
                 await refreshAll();
             } else {
                 refs.status.textContent = (res.data && res.data.message) || 'Clear failed';
-                refs.status.style.color = 'var(--admin-danger, #b3261e)';
+                refs.status.style.color = 'var(--admin-error)';
                 refs.clear.disabled = false;
                 refs.save.disabled = !refs.endpoint.value;
             }
         } catch (err) {
             refs.status.textContent = err.message || 'Clear failed';
-            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.status.style.color = 'var(--admin-error)';
             refs.clear.disabled = false;
             refs.save.disabled = !refs.endpoint.value;
         }
@@ -3152,14 +3148,14 @@
 
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
-        editBtn.className = 'sitemap-resolver-list-row__edit admin-btn admin-btn--ghost admin-btn--sm';
+        editBtn.className = 'sitemap-resolver-list-row__edit admin-btn admin-btn--ghost';
         editBtn.textContent = t('resolverListEdit', 'Edit');
         editBtn.addEventListener('click', () => _handleResolverListEdit(idx));
         row.appendChild(editBtn);
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'sitemap-resolver-list-row__remove admin-btn admin-btn--ghost admin-btn--sm';
+        removeBtn.className = 'sitemap-resolver-list-row__remove admin-btn admin-btn--ghost';
         removeBtn.title = t('resolverListRemove', 'Remove this resolver');
         removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         removeBtn.addEventListener('click', () => _handleResolverListRemove(idx));
@@ -3269,11 +3265,11 @@
                 openResolverListModal(route);
             } else {
                 refs.status.textContent = (res.data && res.data.message) || 'Remove failed';
-                refs.status.style.color = 'var(--admin-danger, #b3261e)';
+                refs.status.style.color = 'var(--admin-error)';
             }
         } catch (err) {
             refs.status.textContent = err.message || 'Remove failed';
-            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.status.style.color = 'var(--admin-error)';
         }
     }
 
@@ -3309,11 +3305,11 @@
                 openResolverListModal(route);
             } else {
                 refs.status.textContent = (res.data && res.data.message) || 'Reorder failed';
-                refs.status.style.color = 'var(--admin-danger, #b3261e)';
+                refs.status.style.color = 'var(--admin-error)';
             }
         } catch (err) {
             refs.status.textContent = err.message || 'Reorder failed';
-            refs.status.style.color = 'var(--admin-danger, #b3261e)';
+            refs.status.style.color = 'var(--admin-error)';
         }
     }
 

@@ -113,10 +113,10 @@
             </div>
         </div>
         <div class="add-transition-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="add-transition-modal-cancel">
+            <button type="button" class="admin-btn admin-btn--ghost" id="add-transition-modal-cancel">
                 <?= __admin('common.cancel') ?? 'Cancel' ?>
             </button>
-            <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="add-transition-modal-submit" disabled>
+            <button type="button" class="admin-btn admin-btn--primary" id="add-transition-modal-submit" disabled>
                 <?= __admin('preview.addTransitionSubmit', 'Add transition') ?>
             </button>
         </div>

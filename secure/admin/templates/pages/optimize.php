@@ -4,8 +4,6 @@
  *
  * Dedicated section for CSS and project optimization tools.
  * First tool: CSS Refiner — client-side JS analysis, admin-native UI.
- *
- * @version 1.0.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -90,10 +88,10 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
         </aside>
 
         <!-- Main Panel -->
-        <main class="optimize-main">
+        <main>
 
             <!-- CSS Refiner Panel -->
-            <section class="optimize-tool-panel admin-card" id="optimize-panel-css-refiner">
+            <section class="admin-card" id="optimize-panel-css-refiner">
                 <div class="admin-card__header">
                     <h2 class="admin-card__title">
                         <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -124,7 +122,7 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
                             </svg>
                             <?= __admin('optimize.cssRefiner.autoRefine') ?>
                         </button>
-                        <button type="button" class="admin-btn admin-btn--secondary" id="optimize-btn-analyze">
+                        <button type="button" class="admin-btn" id="optimize-btn-analyze">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                             </svg>
@@ -137,7 +135,7 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
                     </div>
 
                     <!-- Results area -->
-                    <div id="optimize-results" class="optimize-results" style="display:none">
+                    <div id="optimize-results" style="display:none">
                         <!-- Populated by optimize.js -->
                     </div>
 
@@ -176,7 +174,7 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
             </div>
             <div class="admin-modal__footer">
                 <p class="optimize-modal__note"><?= __admin('optimize.cssRefiner.autoRefineModal.backupNote') ?></p>
-                <button type="button" class="admin-btn admin-btn--secondary" id="optimize-modal-cancel">
+                <button type="button" class="admin-btn" id="optimize-modal-cancel">
                     <?= __admin('common.cancel') ?>
                 </button>
                 <button type="button" class="admin-btn admin-btn--primary" id="optimize-modal-confirm">

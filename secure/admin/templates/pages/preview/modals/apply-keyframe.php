@@ -32,10 +32,10 @@
             </div>
         </div>
         <div class="apply-keyframe-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="apply-keyframe-modal-cancel">
+            <button type="button" class="admin-btn admin-btn--ghost" id="apply-keyframe-modal-cancel">
                 <?= __admin('common.cancel') ?? 'Cancel' ?>
             </button>
-            <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="apply-keyframe-modal-apply" disabled>
+            <button type="button" class="admin-btn admin-btn--primary" id="apply-keyframe-modal-apply" disabled>
                 <?= __admin('preview.applyKeyframeAction', 'Apply') ?>
             </button>
         </div>

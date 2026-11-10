@@ -4,8 +4,6 @@
  * 
  * Shows the form to execute a specific command.
  * Dynamically generates form fields based on help.php documentation.
- * 
- * @version 1.6.0
  */
 
 // $selectedCommand is already set from command.php

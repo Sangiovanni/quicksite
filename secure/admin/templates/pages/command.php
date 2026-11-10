@@ -9,8 +9,6 @@
  * something an operator can switch off.
  * AdminRouter redirects the old ?tab=history URL there, so nothing that linked
  * to the tab is broken.
- *
- * @version 1.8.0
  */
 
 $selectedCommand = $router->getCommand();
@@ -41,7 +39,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
 <div class="admin-page-header">
-    <div class="admin-page-header__main">
+    <div>
         <h1 class="admin-page-header__title">
             <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="16 18 22 12 16 6"/>
@@ -124,7 +122,7 @@ $baseUrl = rtrim(BASE_URL, '/');
                class="admin-command-link" 
                data-command="<?= adminAttr($command) ?>">
                 <span class="admin-command-link__name"><?= adminEscape($command) ?></span>
-                <svg class="admin-command-link__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <polyline points="9 18 15 12 9 6"/>
                 </svg>
             </a>

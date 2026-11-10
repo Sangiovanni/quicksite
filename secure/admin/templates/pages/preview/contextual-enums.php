@@ -1,5 +1,5 @@
 <!-- Enums Panel (component-only, shown when Enums button clicked) -->
-<div class="preview-contextual-form preview-enums-panel" id="contextual-enums-panel" style="display: none;">
+<div class="preview-contextual-form" id="contextual-enums-panel" style="display: none;">
     <div class="preview-contextual-form__header">
         <h4>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">
@@ -16,7 +16,7 @@
 
     <!-- Loading state -->
     <div class="preview-enums-panel__loading" id="enums-panel-loading">
-        <span class="admin-spinner admin-spinner--sm"></span>
+        <span class="admin-spinner"></span>
         <span><?= __admin('common.loading') ?? 'Loading...' ?></span>
     </div>
 
@@ -33,7 +33,7 @@
 
     <!-- Add enum button -->
     <div class="preview-enums-panel__add" id="enums-panel-add" style="display: none;">
-        <button type="button" class="admin-btn admin-btn--sm admin-btn--success" id="enums-panel-add-btn">
+        <button type="button" class="admin-btn admin-btn--success" id="enums-panel-add-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>

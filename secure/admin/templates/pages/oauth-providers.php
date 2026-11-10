@@ -69,8 +69,8 @@ window.QS_OAUTH_I18N = <?= qs_inline_script_json([
     <p class="admin-page-header__subtitle"><?= htmlspecialchars(__admin('oauthProviders.subtitle')) ?></p>
 </div>
 
-<div class="admin-toolbar oauth-providers-toolbar">
-    <div class="admin-toolbar__left">
+<div>
+    <div>
         <button type="button" class="admin-btn admin-btn--ghost" id="btn-refresh-oauth-providers">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M23 4v6h-6M1 20v-6h6"/>

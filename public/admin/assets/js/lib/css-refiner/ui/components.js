@@ -71,9 +71,8 @@
      * Build a tool tab button.
      */
     function createTab(toolId, label, count, isActive, onClick) {
-        var countBadge = el('span', { className: 'cr-tab__count', textContent: String(count) });
+        var countBadge = el('span', { textContent: String(count) });
         var btn = el('button', {
-            className: 'cr-tab' + (isActive ? ' cr-tab--active' : ''),
             type:      'button',
             role:      'tab',
             'aria-selected': isActive ? 'true' : 'false',
@@ -91,69 +90,63 @@
      */
     function createResultsHeader(count, onSelectAll, onDeselectAll) {
         var countSpan = el('span', {
-            className:   'cr-results-count',
             textContent: t('results.found', { count: count })
         });
 
-        var actions = el('div', { className: 'cr-results-actions' }, [
+        var actions = el('div', {}, [
             el('button', {
-                className:   'cr-btn cr-btn--small cr-btn--ghost',
                 type:        'button',
                 textContent: t('results.selectAll'),
                 onClick:     onSelectAll
             }),
             el('button', {
-                className:   'cr-btn cr-btn--small cr-btn--ghost',
                 type:        'button',
                 textContent: t('results.deselectAll'),
                 onClick:     onDeselectAll
             })
         ]);
 
-        return el('div', { className: 'cr-results-header' }, [countSpan, actions]);
+        return el('div', {}, [countSpan, actions]);
     }
 
     /**
      * Build a suggestion list item with checkbox, description, meta, diff toggle.
      */
     function createSuggestionItem(suggestion, onToggle, onDiffToggle, onValueEdit) {
-        var checkbox = el('label', { className: 'cr-checkbox' }, [
+        var checkbox = el('label', {}, [
             el('input', {
                 type:    'checkbox',
                 checked: suggestion.enabled,
                 onChange: function () { onToggle(suggestion.id, this.checked); }
             }),
-            el('span', { className: 'cr-checkbox__mark' })
+            el('span', {})
         ]);
 
         var textParts = [
-            el('span', { className: 'cr-suggestion__desc', textContent: suggestion.description })
+            el('span', { textContent: suggestion.description })
         ];
 
         if (suggestion.meta) {
-            textParts.push(el('div', { className: 'cr-suggestion__meta', textContent: suggestion.meta }));
+            textParts.push(el('div', { textContent: suggestion.meta }));
         }
 
         /* Editable suggested value (for fuzzy tool) */
         if (suggestion.suggestedValue !== undefined && onValueEdit) {
             var editLabel = el('span', {
-                className: 'cr-suggestion__meta',
                 textContent: t('tools.fuzzyValues.suggestedValue') + ' '
             });
             var editInput = el('input', {
-                className:   'cr-suggestion__edit-value',
                 type:        'text',
                 value:       suggestion.suggestedValue,
                 onChange:     function () { onValueEdit(suggestion.id, this.value); }
             });
-            textParts.push(el('div', { className: 'cr-suggestion__meta' }, [editLabel, editInput]));
+            textParts.push(el('div', {}, [editLabel, editInput]));
         }
 
-        var textWrap = el('div', { className: 'cr-suggestion__text' }, textParts);
+        var textWrap = el('div', {}, textParts);
 
-        var diffContainer = el('div', { className: 'cr-suggestion__diff', hidden: true });
+        var diffContainer = el('div', { hidden: true });
         var toggleBtn = el('button', {
-            className: 'cr-suggestion__toggle',
             type:      'button',
             textContent: t('results.showDiff'),
             onClick: function () {
@@ -166,12 +159,11 @@
             }
         });
 
-        var header = el('div', { className: 'cr-suggestion__header' }, [
+        var header = el('div', {}, [
             checkbox, textWrap, toggleBtn
         ]);
 
         var li = el('li', {
-            className: 'cr-suggestion' + (suggestion.enabled ? '' : ' cr-suggestion--disabled'),
             'data-id': suggestion.id
         }, [header, diffContainer]);
 
@@ -183,12 +175,10 @@
      */
     function createSliderSetting(label, value, min, max, unit, onChange) {
         var valueDisplay = el('span', {
-            className:   'cr-setting__value',
             textContent: value + (unit || '')
         });
 
         var slider = el('input', {
-            className: 'cr-slider',
             type:      'range',
             value:     String(value),
             'min':     String(min),
@@ -199,8 +189,8 @@
             }
         });
 
-        return el('div', { className: 'cr-setting' }, [
-            el('span', { className: 'cr-setting__label', textContent: label }),
+        return el('div', {}, [
+            el('span', { textContent: label }),
             slider,
             valueDisplay
         ]);
@@ -208,7 +198,6 @@
 
     function createNumberSetting(label, value, min, max, unit, onChange) {
         var input = el('input', {
-            className: 'cr-number-input',
             type:      'number',
             value:     String(value),
             'min':     String(min),
@@ -224,12 +213,11 @@
         });
 
         var unitSpan = unit ? el('span', {
-            className:   'cr-setting__label',
             textContent: unit
         }) : null;
 
-        return el('div', { className: 'cr-setting' }, [
-            el('span', { className: 'cr-setting__label', textContent: label }),
+        return el('div', {}, [
+            el('span', { textContent: label }),
             input,
             unitSpan
         ].filter(Boolean));
@@ -239,8 +227,8 @@
      * Build an empty state message.
      */
     function createEmptyState(icon, message) {
-        return el('div', { className: 'cr-empty' }, [
-            el('div', { className: 'cr-empty__icon', textContent: icon }),
+        return el('div', {}, [
+            el('div', { textContent: icon }),
             el('div', { textContent: message })
         ]);
     }
@@ -250,12 +238,10 @@
      */
     function createSliderWithInput(label, value, min, max, unit, onChange) {
         var valueDisplay = el('span', {
-            className:   'cr-setting__value',
             textContent: value + (unit || '')
         });
 
         var numInput = el('input', {
-            className: 'cr-number-input cr-number-input--sync',
             type:      'number',
             value:     String(value),
             'min':     String(min),
@@ -263,7 +249,6 @@
         });
 
         var slider = el('input', {
-            className: 'cr-slider',
             type:      'range',
             value:     String(value),
             'min':     String(min),
@@ -288,8 +273,8 @@
             onChange(v);
         });
 
-        return el('div', { className: 'cr-setting' }, [
-            el('span', { className: 'cr-setting__label', textContent: label }),
+        return el('div', {}, [
+            el('span', { textContent: label }),
             slider,
             numInput,
             valueDisplay
@@ -300,7 +285,7 @@
      * Select dropdown setting.
      */
     function createSelectSetting(label, currentValue, options, onChange) {
-        var select = el('select', { className: 'cr-select cr-select--small' });
+        var select = el('select', {});
 
         for (var i = 0; i < options.length; i++) {
             var opt = el('option', {
@@ -317,8 +302,8 @@
             onChange(this.value);
         });
 
-        return el('div', { className: 'cr-setting' }, [
-            el('span', { className: 'cr-setting__label', textContent: label }),
+        return el('div', {}, [
+            el('span', { textContent: label }),
             select
         ]);
     }
@@ -327,15 +312,14 @@
      * Ignore-properties collapsible checklist.
      */
     function createIgnorePropsControl(label, allProps, currentIgnored, onChange) {
-        var wrapper = el('div', { className: 'cr-ignore-props' });
+        var wrapper = el('div', {});
 
         var toggleBtn = el('button', {
-            className:   'cr-btn cr-btn--small cr-btn--ghost',
             type:        'button',
             textContent: label + ' (' + currentIgnored.length + ')'
         });
 
-        var listDiv = el('div', { className: 'cr-ignore-props__list', hidden: true });
+        var listDiv = el('div', { hidden: true });
 
         toggleBtn.addEventListener('click', function () {
             listDiv.hidden = !listDiv.hidden;
@@ -360,7 +344,7 @@
                     toggleBtn.textContent = label + ' (' + ignored.length + ')';
                     onChange(ignored);
                 });
-                var lbl = el('label', { className: 'cr-ignore-props__item' }, [
+                var lbl = el('label', {}, [
                     cb,
                     document.createTextNode(' ' + prop)
                 ]);

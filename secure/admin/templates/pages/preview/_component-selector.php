@@ -15,7 +15,7 @@
 $selectorId = $selectorId ?? 'add';
 ?>
 
-<div class="component-selector" id="<?= $selectorId ?>-component-selector">
+<div id="<?= $selectorId ?>-component-selector">
     <!-- Searchable Dropdown (tag-dropdown pattern) -->
     <div class="tag-dropdown" id="<?= $selectorId ?>-component-dropdown">
         <!-- Trigger button -->
@@ -44,7 +44,7 @@ $selectorId = $selectorId ?? 'add';
             <!-- Options list (populated by JS from listComponents API) -->
             <div class="tag-dropdown__options" id="<?= $selectorId ?>-component-options">
                 <div class="snippet-selector__loading">
-                    <div class="spinner"></div>
+                    <div></div>
                     <?= __admin('common.loading', 'Loading...') ?>
                 </div>
             </div>

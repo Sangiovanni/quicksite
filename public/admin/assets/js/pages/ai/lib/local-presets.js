@@ -3,8 +3,6 @@
  *
  * Prefill values for "Add connection" wizard when a user picks a known local
  * runtime. All speak OpenAI-compatible chat completions.
- *
- * @version 1.0.0
  */
 (function () {
     'use strict';

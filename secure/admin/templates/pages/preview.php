@@ -5,8 +5,6 @@
  * Live preview of the website with responsive controls.
  * 
  * Refactored: Split into partial files for maintainability.
- * 
- * @version 2.1.0
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // the edited project's languages

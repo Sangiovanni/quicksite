@@ -6,8 +6,6 @@
  * - PreviewConfig global (set by inline script in preview.php)
  * - QuickSiteAdmin global (from admin.js)
  * - ColorPicker (from colorpicker.js)
- * 
- * @version 1.0.0
  */
 (function() {
     'use strict';
@@ -48,8 +46,6 @@
     const modeBtns = document.querySelectorAll('.preview-tool[data-mode]');
     
     // Contextual area elements
-    const contextualArea = document.getElementById('preview-contextual-area');
-    const contextualToggle = document.getElementById('preview-contextual-toggle');
     const contextualSections = document.querySelectorAll('.preview-contextual-section');
     const ctxSelectDefault = document.getElementById('contextual-select-default');
     const ctxSelectInfo = document.getElementById('contextual-select-info');
@@ -2668,10 +2664,6 @@
             }
         }
     }
-    
-    function toggleContextualArea() {
-        contextualArea.classList.toggle('preview-contextual-area--collapsed');
-    }
 
     // ==================== i18n Panel Merging ====================
 
@@ -2731,9 +2723,6 @@
         if (ctxSelectDefault) ctxSelectDefault.style.display = 'none';
         if (ctxSelectInfo) ctxSelectInfo.style.display = '';
         
-        // Expand contextual area if collapsed
-        if (contextualArea) contextualArea.classList.remove('preview-contextual-area--collapsed');
-        
         // Update global element info bar
         updateGlobalElementInfo(data);
     }
@@ -2778,7 +2767,6 @@
                 globalInfoNodeParams.textContent = '';
                 entries.forEach(function (pair) {
                     const line = document.createElement('div');
-                    line.className = 'preview-element-info__param-line';
                     line.textContent = pair[0] + '="' + pair[1] + '"';
                     globalInfoNodeParams.appendChild(line);
                 });
@@ -3425,7 +3413,7 @@
             let color = '';
             if (v.severity === 'ok')        color = 'var(--admin-success, #2c7a3f)';
             else if (v.severity === 'warning') color = 'var(--admin-warning, #b3691e)';
-            else if (v.severity === 'error')   color = 'var(--admin-danger, #b3261e)';
+            else if (v.severity === 'error')   color = 'var(--admin-error)';
             translateCsvStatus.style.color = color;
         }
         if (translateCsvApply) {
@@ -4027,7 +4015,7 @@
     /** The line a panel shows when it failed to load: "Error: <message>". */
     function _renderPanelError(error) {
         return QSDom.el('div', {
-            style: 'color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);',
+            style: 'color:var(--admin-error);font-size:var(--font-size-sm);padding:var(--space-sm);',
             text: (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message
         });
     }
@@ -4044,7 +4032,7 @@
     /** The spinner a component or snippet list shows while it loads. */
     function _renderSelectorLoading() {
         return QSDom.el('div', { class: 'snippet-selector__loading' }, [
-            QSDom.el('div', { class: 'spinner' }),
+            QSDom.el('div', {}),
             PreviewConfig.i18n.loading || 'Loading...'
         ]);
     }
@@ -4056,7 +4044,7 @@
 
     /** The Complex tab's line when a kind cannot draw its wizard. */
     function _renderComplexError(text) {
-        return QSDom.el('p', { class: 'admin-hint admin-text-danger', text: text });
+        return QSDom.el('p', { class: 'admin-hint', text: text });
     }
 
     /** A section title of a component's variables in the Add form. */
@@ -4075,7 +4063,7 @@
         const group = QSDom.el('div', { class: 'preview-contextual-form__param-input-group' }, [input]);
         if (browseCategory !== null) {
             group.append(' ', QSDom.el('button', {
-                type: 'button', class: 'admin-btn admin-btn--sm admin-btn--outline preview-asset-browse-btn',
+                type: 'button', class: 'admin-btn admin-btn--outline preview-asset-browse-btn',
                 'data-category': browseCategory, title: PreviewConfig.i18n.browseAssets
             }, ['📁']));
         }
@@ -4355,7 +4343,6 @@
             if (ctxTextKey) ctxTextKey.textContent = (data.textKeys && data.textKeys[0]) || '-';
             if (ctxTextDefault) ctxTextDefault.style.display = 'none';
             if (ctxTextInfo) ctxTextInfo.style.display = '';
-            if (contextualArea) contextualArea.classList.remove('preview-contextual-area--collapsed');
         } else {
             resetTextModeInfo();
         }
@@ -4604,11 +4591,6 @@
     // ==================== Contextual Area Event Listeners ====================
     
     function initContextualBindings() {
-        // Toggle collapse/expand
-        if (contextualToggle) {
-            contextualToggle.addEventListener('click', toggleContextualArea);
-        }
-        
         // Contextual area action buttons (wire to same handlers as floating panel)
         if (ctxNodeAdd) {
             ctxNodeAdd.addEventListener('click', function() {
@@ -8818,7 +8800,7 @@
             
             const createBtn = document.createElement('button');
             createBtn.type = 'button';
-            createBtn.className = 'admin-btn admin-btn--success admin-btn--sm';
+            createBtn.className = 'admin-btn admin-btn--success';
             createBtn.textContent = PreviewConfig.i18n?.variablesCreateKey || 'Create';
             
             createBtn.addEventListener('click', async () => {
@@ -9106,7 +9088,7 @@
     function renderParamCards(paramNodes, container) {
         paramNodes.forEach(item => {
             const card = document.createElement('div');
-            card.className = 'preview-variable-card preview-variable-card--param';
+            card.className = 'preview-variable-card';
             card.dataset.paramName = item.paramName;
             
             // Detect initial type: enum, variable, or string
@@ -9690,7 +9672,7 @@
         // Add option button
         const addOptionBtn = document.createElement('button');
         addOptionBtn.type = 'button';
-        addOptionBtn.className = 'admin-btn admin-btn--sm admin-btn--outline preview-enum-card__add-option';
+        addOptionBtn.className = 'admin-btn admin-btn--outline preview-enum-card__add-option';
         addOptionBtn.append(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.plus, 12), ' ' + (PreviewConfig.i18n?.enumAddOption || 'Add Option'));
         addOptionBtn.addEventListener('click', () => {
             const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'literal';
@@ -9705,13 +9687,13 @@
         
         const saveBtn = document.createElement('button');
         saveBtn.type = 'button';
-        saveBtn.className = 'admin-btn admin-btn--sm admin-btn--primary';
+        saveBtn.className = 'admin-btn admin-btn--primary';
         saveBtn.textContent = PreviewConfig.i18n?.save || 'Save';
         saveBtn.addEventListener('click', () => saveEnumCard(card, varName));
         
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
-        deleteBtn.className = 'admin-btn admin-btn--sm admin-btn--danger';
+        deleteBtn.className = 'admin-btn admin-btn--danger';
         deleteBtn.appendChild(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.trash, 14));
         deleteBtn.title = PreviewConfig.i18n?.delete || 'Delete';
         deleteBtn.addEventListener('click', () => deleteEnumCard(varName));

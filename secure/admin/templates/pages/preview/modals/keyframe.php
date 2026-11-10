@@ -14,7 +14,7 @@
         <div class="preview-keyframe-modal__body">
             <!-- Keyframe Name -->
             <div class="preview-keyframe-modal__field">
-                <label for="keyframe-name"><?= __admin('preview.keyframeName') ?? 'Name' ?> <span class="admin-required">*</span>:</label>
+                <label for="keyframe-name"><?= __admin('preview.keyframeName') ?? 'Name' ?> <span>*</span>:</label>
                 <input type="text" id="keyframe-name" class="admin-input" placeholder="fadeIn" required>
                 <small class="preview-keyframe-modal__hint"><?= __admin('preview.keyframeNameHint') ?? 'Letters, numbers, hyphens. Start with letter.' ?></small>
             </div>
@@ -23,7 +23,7 @@
             <div class="preview-keyframe-modal__timeline-section">
                 <div class="preview-keyframe-modal__timeline-header">
                     <label><?= __admin('preview.keyframeTimeline') ?? 'Timeline' ?>:</label>
-                    <small class="preview-keyframe-modal__timeline-hint"><?= __admin('preview.clickToAddFrame') ?? 'Click on timeline to add frames' ?></small>
+                    <small><?= __admin('preview.clickToAddFrame') ?? 'Click on timeline to add frames' ?></small>
                 </div>
                 <div class="preview-keyframe-modal__timeline" id="keyframe-timeline">
                     <!-- Timeline markers populated by JS -->

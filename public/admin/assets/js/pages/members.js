@@ -125,7 +125,7 @@
         parts.forEach(function (p) {
             if (p == null || p === '') return;
             if (wrap.childNodes.length > 0) {
-                wrap.appendChild(el('span', { class: 'members-row__meta-sep', text: ' · ' }));
+                wrap.appendChild(el('span', { text: ' · ' }));
             }
             wrap.appendChild(document.createTextNode(String(p)));
         });
@@ -134,7 +134,7 @@
 
     function _renderActionBtn(label, iconD, kind, onClick) {
         var b = el('button', {
-            class: 'admin-btn admin-btn--sm ' + (kind === 'danger' ? 'admin-btn--danger' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
+            class: 'admin-btn ' + (kind === 'danger' ? 'admin-btn--danger' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
             type: 'button',
             onclick: onClick,
         });
@@ -168,7 +168,7 @@
             },
         }, [confirmLabel]);
 
-        var modal = el('div', { class: 'admin-modal members-modal-open' }, [
+        var modal = el('div', { class: 'admin-modal' }, [
             el('div', { class: 'admin-modal__backdrop', onclick: close }),
             el('div', { class: 'admin-modal__content' }, [
                 el('div', { class: 'admin-modal__header' }, [
@@ -187,7 +187,7 @@
     }
 
     function _renderRoleSelect(id, roles) {
-        var sel = el('select', { class: 'admin-input admin-input--select', id: id });
+        var sel = el('select', { class: 'admin-input', id: id });
         roles.forEach(function (r) {
             sel.appendChild(el('option', { value: r, text: r }));
         });

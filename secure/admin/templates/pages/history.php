@@ -22,7 +22,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
 <div class="admin-page-header">
-    <div class="admin-page-header__main">
+    <div>
         <h1 class="admin-page-header__title">
             <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/>
@@ -105,7 +105,7 @@ window.QS_HISTORY_I18N = <?= json_encode([
                 <label class="admin-label" for="filter-date"><?= __admin('history.filters.date') ?></label>
                 <div style="display: flex; gap: var(--space-xs); align-items: center;">
                     <input type="date" id="filter-date" class="admin-input" style="flex: 1;">
-                    <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="clear-date-filter"
+                    <button type="button" class="admin-btn admin-btn--ghost" id="clear-date-filter"
                             title="<?= adminAttr(__admin('history.filters.showAllDates')) ?>">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -155,8 +155,8 @@ window.QS_HISTORY_I18N = <?= json_encode([
             </svg>
             <?= __admin('history.title') ?>
         </h2>
-        <div class="admin-card__actions">
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="history-export">
+        <div>
+            <button type="button" class="admin-btn admin-btn--ghost" id="history-export">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
@@ -164,7 +164,7 @@ window.QS_HISTORY_I18N = <?= json_encode([
                 </svg>
                 <?= __admin('history.exportCsv', 'Export CSV') ?>
             </button>
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm admin-btn--danger"
+            <button type="button" class="admin-btn admin-btn--ghost admin-btn--danger"
                     id="history-clear" data-requires-command="clearCommandHistory">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <polyline points="3 6 5 6 21 6"/>
@@ -247,7 +247,7 @@ window.QS_HISTORY_I18N = <?= json_encode([
             <div class="admin-filter-group" style="margin: var(--space-md) 0;">
                 <label class="admin-label" for="clear-before"><?= __admin('history.clear.beforeLabel', 'Delete whole days before') ?></label>
                 <input type="date" id="clear-before" class="admin-input">
-                <small class="admin-form-hint"><?= __admin('history.clear.beforeHint', 'History is stored one file per day and is deleted a whole day at a time. Days from this date onwards are kept, so today is never deleted.') ?></small>
+                <small><?= __admin('history.clear.beforeHint', 'History is stored one file per day and is deleted a whole day at a time. Days from this date onwards are kept, so today is never deleted.') ?></small>
             </div>
 
             <div id="clear-preview" class="admin-alert admin-alert--info"></div>

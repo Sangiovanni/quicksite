@@ -1643,7 +1643,7 @@ window.PreviewAiTools = (function () {
         holder.className = 'preview-contextual-ai-tools__tag-search';
         var field = document.createElement('input');
         field.type = 'search';
-        field.className = 'preview-contextual-ai-tools__param-input preview-contextual-ai-tools__tag-search-field';
+        field.className = 'preview-contextual-ai-tools__param-input';
         field.id = _paramControlId(param.id);
         field.placeholder = _commonWord('search');
         field.autocomplete = 'off';
@@ -2240,7 +2240,6 @@ window.PreviewAiTools = (function () {
     /** A phase's cost: its lines, where its calls came from, and how its answer ended. */
     function _renderCostPhase(phase, named) {
         var item = document.createElement('div');
-        item.className = 'preview-contextual-ai-tools__cost-phase';
         if (named) item.appendChild(_renderCostLine(phase.title, 'cost-phase-name'));
         _costLines(phase, phase.unit).forEach(function (text) { item.appendChild(_renderCostLine(text)); });
         var source = _costSource(phase);
@@ -2848,14 +2847,14 @@ window.PreviewAiTools = (function () {
         actions.className = 'preview-contextual-ai-tools__review-actions';
         var go = document.createElement('button');
         go.type = 'button';
-        go.className = 'admin-btn admin-btn--small ' + (deletes ? 'admin-btn--danger' : 'admin-btn--primary');
+        go.className = 'admin-btn ' + (deletes ? 'admin-btn--danger' : 'admin-btn--primary');
         var word = _effectWord(warned);
         go.textContent = word === 'delete' ? _t('reviewContinueDelete', 'Delete and continue')
             : (word === 'act' ? _t('reviewContinueAct', 'Confirm and continue')
                 : (lines.length ? _t('reviewContinueChange', 'Change and continue') : _t('reviewContinue', 'Continue')));
         var stop = document.createElement('button');
         stop.type = 'button';
-        stop.className = 'admin-btn admin-btn--secondary admin-btn--small';
+        stop.className = 'admin-btn';
         stop.textContent = _t('reviewStop', 'Stop');
         go.addEventListener('click', function () { resolve(true); });
         stop.addEventListener('click', function () { resolve(false); });
@@ -2888,7 +2887,7 @@ window.PreviewAiTools = (function () {
         _recoveryEls = {
             continueBtn: _renderRecoveryButton('continue', 'admin-btn--primary', _t('continueAnswer', 'Continue the answer'),
                 _onContinueAnswerClick),
-            sendAgainBtn: _renderRecoveryButton('send-again', 'admin-btn--secondary', _t('sendAgain', 'Send again'),
+            sendAgainBtn: _renderRecoveryButton('send-again', '', _t('sendAgain', 'Send again'),
                 _onSendAgainClick)
         };
         _recoveryEls.sendAgainBtn.title = _t('sendAgainTitle', 'Sends the same prompt again, for a new answer.');
@@ -2896,7 +2895,7 @@ window.PreviewAiTools = (function () {
         actions.appendChild(_recoveryEls.sendAgainBtn);
         var stop = document.createElement('button');
         stop.type = 'button';
-        stop.className = 'admin-btn admin-btn--secondary admin-btn--small';
+        stop.className = 'admin-btn';
         stop.textContent = _t('reviewStop', 'Stop');
         stop.addEventListener('click', function () {
             if (!_answerWaiter) return;
@@ -2923,7 +2922,7 @@ window.PreviewAiTools = (function () {
         list.className = 'preview-contextual-ai-tools__effects';
         lines.forEach(function (l) {
             var item = document.createElement('li');
-            item.className = 'preview-contextual-ai-tools__effect preview-contextual-ai-tools__effect--' + l.effect;
+            item.className = 'preview-contextual-ai-tools__effect--' + l.effect;
             item.textContent = l.text;
             list.appendChild(item);
         });
@@ -2970,7 +2969,7 @@ window.PreviewAiTools = (function () {
             if (i > 0) _runLineEl.appendChild(document.createTextNode(' → '));
             var item = document.createElement('span');
             var state = _run ? (_run.states[i] || 'pending') : 'pending';
-            item.className = 'preview-contextual-ai-tools__run-phase preview-contextual-ai-tools__run-phase--' + state;
+            item.className = 'preview-contextual-ai-tools__run-phase--' + state;
             item.textContent = (marks[state] ? marks[state] + ' ' : '') + p.title + (p.ai ? ' (' + _t('kindAi', 'AI') + ')' : '');
             _runLineEl.appendChild(item);
         });
@@ -3360,7 +3359,7 @@ window.PreviewAiTools = (function () {
         actions.className = 'preview-contextual-ai-tools__kept-actions';
         var run = document.createElement('button');
         run.type = 'button';
-        run.className = 'admin-btn admin-btn--primary admin-btn--small';
+        run.className = 'admin-btn admin-btn--primary';
         run.textContent = _t('keptRun', 'Run them');
         var canRun = plan.start || (plan.reason === 'never' && plan.fitsNow > 0);
         var notYetText = canRun ? '' : _t('keptNotYet', 'Enough is back at {time}.').replace('{time}', api.clockText(plan.backAt));
@@ -3380,7 +3379,7 @@ window.PreviewAiTools = (function () {
         });
         var discard = document.createElement('button');
         discard.type = 'button';
-        discard.className = 'admin-btn admin-btn--secondary admin-btn--small';
+        discard.className = 'admin-btn';
         discard.textContent = _t('keptDiscard', 'Discard');
         discard.addEventListener('click', function () {
             _clearKept();
@@ -3951,7 +3950,7 @@ window.PreviewAiTools = (function () {
     function _renderRecoveryButton(name, kind, label, onClick) {
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'admin-btn ' + kind + ' admin-btn--small';
+        btn.className = kind ? 'admin-btn ' + kind : 'admin-btn';
         btn.dataset.recovery = name;
         btn.textContent = label;
         btn.style.display = 'none';

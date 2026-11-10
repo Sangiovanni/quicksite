@@ -16,9 +16,9 @@
         <span class="preview-element-info__label"><?= __admin('preview.nodeChildren') ?>:</span>
         <span class="preview-element-info__value" id="info-node-children">-</span>
     </div>
-    <div class="preview-element-info__row preview-element-info__row--params" id="info-node-params-row" style="display: none;">
+    <div class="preview-element-info__row" id="info-node-params-row" style="display: none;">
         <span class="preview-element-info__label"><?= __admin('preview.nodeParams') ?? 'Params' ?>:</span>
-        <span class="preview-element-info__value preview-element-info__value--params" id="info-node-params"></span>
+        <span class="preview-element-info__value" id="info-node-params"></span>
     </div>
     <div class="preview-element-info__row" id="info-node-textkey-row" style="display: none;">
         <span class="preview-element-info__label"><?= __admin('preview.textKey') ?? 'Text Key' ?>:</span>

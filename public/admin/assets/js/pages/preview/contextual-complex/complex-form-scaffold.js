@@ -96,7 +96,7 @@
         const fieldsContainer = QSDom.el('div', { id: 'ce-fs-fields-rows' });
         const submitLabelMount = QSDom.el('div', { id: 'ce-fs-submit-label-mount' });
 
-        const wrap = QSDom.el('div', { class: 'qs-complex-wizard qs-complex-wizard--form-scaffold' }, [
+        const wrap = QSDom.el('div', {}, [
             QSDom.el('div', { class: 'admin-form-group' }, [
                 QSDom.el('label', { class: 'admin-label', for: 'ce-fs-id' }, [t('formScaffold.formId'), ' ', W.requiredMark()]),
                 idEl,
@@ -207,7 +207,7 @@
                 const nameInput = QSDom.el('input', { class: 'admin-input qs-fs-field-row__name', type: 'text', placeholder: t('formScaffold.fieldNamePlaceholder'), autocomplete: 'off' });
                 const requiredInput = QSDom.el('input', { type: 'checkbox', class: 'qs-fs-field-row__required-input' });
                 const labelMount = QSDom.el('div', { class: 'qs-fs-field-row__label-mount' });
-                const row = QSDom.el('div', { class: 'qs-fs-field-row' }, [
+                const row = QSDom.el('div', {}, [
                     QSDom.el('div', { class: 'qs-fs-field-row__line' }, [
                         nameInput,
                         QSDom.el('select', { class: 'admin-input qs-fs-field-row__type' }, INPUT_TYPES.map(type =>
@@ -267,7 +267,7 @@
         const autoseedGroup = document.createElement('div');
         autoseedGroup.style.marginTop = '8px';
         autoseedGroup.style.padding = '6px 8px';
-        autoseedGroup.style.background = 'var(--admin-surface-2, rgba(0,0,0,0.03))';
+        autoseedGroup.style.background = 'var(--admin-bg-tertiary)';
         autoseedGroup.style.borderRadius = '4px';
         autoseedGroup.style.display = 'none';
 
@@ -278,7 +278,7 @@
 
         const autoseedBtn = document.createElement('button');
         autoseedBtn.type = 'button';
-        autoseedBtn.className = 'admin-btn admin-btn--sm';
+        autoseedBtn.className = 'admin-btn';
         autoseedBtn.textContent = t('formScaffold.prefill');
         autoseedGroup.appendChild(autoseedBtn);
 

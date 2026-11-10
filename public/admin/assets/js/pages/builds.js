@@ -344,7 +344,7 @@
         box.addEventListener('change', function () { includeOAuthSecrets = box.checked; });
         secretsHint = el('p', { class: 'builds-alert__body' });
         _refreshSecretsHint();
-        return el('div', { class: 'admin-alert admin-alert--warning builds-secrets' }, [
+        return el('div', { class: 'admin-alert admin-alert--warning' }, [
             el('label', { class: 'admin-checkbox', for: 'builds-opt-oauth-secrets' }, [
                 box,
                 el('strong', { class: 'builds-alert__title' }, [svgIcon(ICON_WARNING, 16), ' ' + (T.secretsLabel || '')]),

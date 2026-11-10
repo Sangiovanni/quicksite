@@ -15,7 +15,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             var star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -37,18 +36,15 @@
     function _renderItemRow(data, pickerMap) {
         var d = data || {};
         var row = document.createElement('div');
-        row.className = 'qs-dl-row';
         row.style.display = 'flex';
         row.style.gap = '8px';
         row.style.alignItems = 'flex-start';
 
         var termMount = document.createElement('div');
-        termMount.className = 'qs-dl-row__term-mount';
         termMount.style.flex = '1';
         termMount.style.minWidth = '0';
 
         var descMount = document.createElement('div');
-        descMount.className = 'qs-dl-row__desc-mount';
         descMount.style.flex = '2';
         descMount.style.minWidth = '0';
 
@@ -71,7 +67,6 @@
 
     function renderWizard(container) {
         var wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--definition-list';
 
         var itemsGroup = _renderGroup();
         itemsGroup.appendChild(_renderLabel('Items', true));

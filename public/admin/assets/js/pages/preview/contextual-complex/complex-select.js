@@ -33,7 +33,7 @@
         const optionsContainer = QSDom.el('div', { id: 'ce-sel-options-rows' });
         const idEl       = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-sel-id', placeholder: t('common.idPlaceholder'), autocomplete: 'off' });
 
-        const wrap = QSDom.el('div', { class: 'qs-complex-wizard qs-complex-wizard--select' }, [
+        const wrap = QSDom.el('div', {}, [
             QSDom.el('div', { class: 'admin-form-group' }, [
                 QSDom.el('label', { class: 'admin-label', for: 'ce-sel-name' }, [t('common.fieldName'), ' ', W.requiredMark()]),
                 nameEl,
@@ -104,7 +104,7 @@
                 const d = data || {};
                 const valEl = QSDom.el('input', { class: 'admin-input qs-sel-option-row__value', type: 'text', placeholder: t('select.valuePlaceholder'), autocomplete: 'off' });
                 const labelMountEl = QSDom.el('div', { class: 'qs-sel-option-row__label-mount' });
-                const row = QSDom.el('div', { class: 'qs-sel-option-row' }, [
+                const row = QSDom.el('div', {}, [
                     QSDom.el('div', { class: 'qs-sel-option-row__line' }, [valEl]),
                     QSDom.el('div', { class: 'qs-sel-option-row__line' }, [
                         QSDom.el('span', { class: 'qs-sel-option-row__label-label', text: t('common.rowLabelKey') }),

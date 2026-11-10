@@ -4,8 +4,6 @@
  * 
  * Handles URL routing for the admin panel.
  * Routes are parsed from URL segments: /admin/{page}/{command}/{params...}
- * 
- * @version 1.6.0
  */
 
 class AdminRouter {

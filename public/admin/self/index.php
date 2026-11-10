@@ -48,8 +48,6 @@
  * credential routes; the project-name validation, the caller-owns-this-entry rule
  * and the accept-time re-validation on the membership routes) are all in the
  * handlers and are unchanged.
- *
- * @version 1.0.0
  */
 
 require_once __DIR__ . '/../../init.php';

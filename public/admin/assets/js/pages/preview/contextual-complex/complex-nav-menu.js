@@ -16,7 +16,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             var star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -38,14 +37,12 @@
     function _renderItemRow(data, pickerMap) {
         var d = data || {};
         var row = document.createElement('div');
-        row.className = 'qs-nav-row';
         row.style.display = 'flex';
         row.style.flexDirection = 'column';
         row.style.gap = '4px';
 
         // Top sub-row: labelKey picker (full width).
         var labelMount = document.createElement('div');
-        labelMount.className = 'qs-nav-row__label-mount';
 
         // Bottom sub-row: href input + external checkbox.
         var hrefRow = document.createElement('div');
@@ -98,7 +95,6 @@
 
     function renderWizard(container) {
         var wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--nav-menu';
 
         var itemsGroup = _renderGroup();
         itemsGroup.appendChild(_renderLabel('Menu items', true));

@@ -14,8 +14,6 @@
  *
  * DOM is built with createElement + textContent through QSDom and named
  * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
- *
- * @version 1.0.0
  */
 (function() {
     'use strict';
@@ -229,7 +227,7 @@ function _isJsonType(type) {
  */
 function _renderCenteredHint(text, isError) {
     return QSDom.el('p', {
-        class: isError ? 'admin-hint admin-hint--error' : 'admin-hint',
+        class: isError ? 'admin-hint' : 'admin-hint',
         style: 'text-align: center; padding: var(--space-md);',
         text: text
     });
@@ -2390,7 +2388,6 @@ function initEditAssetExtensionHint() {
 
     // Create suffix element
     const wrapper = document.createElement('div');
-    wrapper.className = 'admin-input-group';
     wrapper.style.display = 'flex';
     wrapper.style.alignItems = 'center';
     wrapper.style.gap = '0';
@@ -2401,14 +2398,13 @@ function initEditAssetExtensionHint() {
     newFilenameInput.style.borderRight = 'none';
 
     const suffix = document.createElement('span');
-    suffix.className = 'admin-input-suffix';
-    suffix.style.cssText = 'padding:0.5rem 0.75rem;background:var(--admin-bg-tertiary,#374151);border:1px solid var(--admin-border,#4b5563);border-top-right-radius:0.375rem;border-bottom-right-radius:0.375rem;color:var(--admin-text-secondary,#9ca3af);font-family:monospace;white-space:nowrap;';
+    suffix.style.cssText = 'padding:0.5rem 0.75rem;background:var(--admin-bg-tertiary,#374151);border:1px solid var(--admin-border,#4b5563);border-top-right-radius:0.375rem;border-bottom-right-radius:0.375rem;color:var(--admin-text-muted);font-family:monospace;white-space:nowrap;';
     suffix.textContent = '';
     wrapper.appendChild(suffix);
 
     // Hint below the input
     const hint = document.createElement('small');
-    hint.style.cssText = 'display:block;margin-top:0.25rem;color:var(--admin-text-tertiary,#6b7280);font-size:0.75rem;';
+    hint.style.cssText = 'display:block;margin-top:0.25rem;color:var(--admin-text-light);font-size:0.75rem;';
     hint.textContent = t('commandForm.hint.renameNoExtension');
     wrapper.parentNode.insertBefore(hint, wrapper.nextSibling);
 
@@ -2465,13 +2461,12 @@ async function initDeleteAssetForm() {
     const selectAllCheckbox = QSDom.el('input', { type: 'checkbox', id: 'delete-select-all' });
     const fileListEl = QSDom.el('div', {
         id: 'delete-file-list',
-        class: 'admin-checkbox-list',
         style: 'max-height:320px;overflow-y:auto;border:1px solid var(--admin-border,#4b5563);'
              + 'border-radius:0.375rem;padding:0.25rem 0;'
     }, [_renderListNotice(t('commandForm.status.loadingFiles'))]);
     const countHint = QSDom.el('small', {
         id: 'delete-count-hint',
-        style: 'display:block;margin-top:0.25rem;color:var(--admin-text-tertiary,#6b7280);font-size:0.75rem;'
+        style: 'display:block;margin-top:0.25rem;color:var(--admin-text-light);font-size:0.75rem;'
     });
 
     const container = QSDom.el('div', { class: 'admin-form-group' }, [
@@ -2479,7 +2474,7 @@ async function initDeleteAssetForm() {
         QSDom.el('div', { style: 'display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;' }, [
             QSDom.el('label', {
                 style: 'display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;'
-                     + 'color:var(--admin-text-secondary,#9ca3af);white-space:nowrap;cursor:pointer;'
+                     + 'color:var(--admin-text-muted);white-space:nowrap;cursor:pointer;'
             }, [selectAllCheckbox, ' ' + t('commandForm.deleteAsset.selectAll')])
         ]),
         fileListEl,
@@ -2680,7 +2675,6 @@ async function initUploadAssetForm() {
     // Show allowed extensions hint below file input
     if (fileInput && allExtensions.length) {
         const hint = document.createElement('small');
-        hint.className = 'admin-form-hint';
         hint.textContent = t('commandForm.uploadAsset.allowedExtensions', { list: allExtensions.join(', ') });
         const group = fileInput.closest('.admin-form-group');
         if (group) group.appendChild(hint);
@@ -2919,12 +2913,12 @@ async function initEditStylesForm() {
         
         // Add helper buttons above textarea
         const loadBtn = _renderButton('load-styles-btn',
-            'admin-btn admin-btn--secondary admin-btn--small',
+            'admin-btn',
             t('commandForm.editStyles.reload'));
         const formatBtn = _renderButton('format-css-btn',
-            'admin-btn admin-btn--outline admin-btn--small',
+            'admin-btn admin-btn--outline',
             t('commandForm.editStyles.formatCss'));
-        const helperDiv = QSDom.el('div', { class: 'admin-style-helper' }, [
+        const helperDiv = QSDom.el('div', {}, [
             QSDom.el('div', {
                 style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); flex-wrap: wrap;'
             }, [loadBtn, formatBtn]),
@@ -3001,7 +2995,7 @@ async function initSetRootVariablesForm() {
         const currentValueSpan = QSDom.el('span', {
             id: 'var-current-value', style: 'font-style: italic;', text: '-'
         });
-        const addBtn = _renderButton('add-var-btn', 'admin-btn admin-btn--secondary',
+        const addBtn = _renderButton('add-var-btn', 'admin-btn',
             t('commandForm.setRootVariables.addUpdate'));
         const clearBtn = _renderButton('clear-vars-btn', 'admin-btn admin-btn--outline',
             t('common.clearAll'));
@@ -3144,7 +3138,7 @@ async function initStyleRuleForm() {
         });
         QSDom.setSelectPlaceholder(ruleSelector, t('commandForm.styleRule.loadingSelectors'),
             { disabled: true });
-        const helperDiv = QSDom.el('div', { class: 'admin-style-rule-helper' }, [
+        const helperDiv = QSDom.el('div', {}, [
             _renderLabel(t('commandForm.styleRule.title')),
             QSDom.el('div', {
                 style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
@@ -3336,7 +3330,7 @@ async function initSetKeyframesForm() {
         });
         const kfCurrentFrames = QSDom.el('div', {
             id: 'kf-current-frames', class: 'admin-hint',
-            style: 'background: var(--color-bg-secondary); padding: var(--space-sm); '
+            style: 'background: var(--admin-bg-secondary); padding: var(--space-sm); '
                  + 'border-radius: var(--radius-sm); min-height: 60px; font-family: monospace; '
                  + 'font-size: 12px; overflow: auto; max-height: 100px;',
             text: t('commandForm.setKeyframes.noAnimationSelected')
@@ -3386,39 +3380,39 @@ async function initSetKeyframesForm() {
             ...KEYFRAME_PROPERTIES.map(prop => ({ value: prop, label: prop })),
             { value: 'custom', label: t('common.custom') }
         ]);
-        const kfAddFrameBtn = _renderButton('kf-add-frame-btn', 'admin-btn admin-btn--secondary',
+        const kfAddFrameBtn = _renderButton('kf-add-frame-btn', 'admin-btn',
             t('commandForm.setKeyframes.addFrame'));
         const kfApplyNameBtn = _renderButton('kf-apply-name-btn',
-            'admin-btn admin-btn--outline admin-btn--small',
+            'admin-btn admin-btn--outline',
             t('commandForm.setKeyframes.applyName'));
         const kfClearBtn = _renderButton('kf-clear-btn',
-            'admin-btn admin-btn--outline admin-btn--small',
+            'admin-btn admin-btn--outline',
             t('commandForm.setKeyframes.clearFrames'));
         const kfLoadExistingBtn = _renderButton('kf-load-existing-btn',
-            'admin-btn admin-btn--outline admin-btn--small',
+            'admin-btn admin-btn--outline',
             t('commandForm.setKeyframes.loadExisting'));
 
-        const helperDiv = QSDom.el('div', { class: 'admin-keyframe-builder' }, [
+        const helperDiv = QSDom.el('div', {}, [
             _renderLabel(t('commandForm.setKeyframes.title')),
             QSDom.el('div', {
                 style: 'display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); '
                      + 'margin-bottom: var(--space-sm);'
             }, [
                 QSDom.el('div', null, [
-                    _renderLabel(t('commandForm.setKeyframes.animationName'), 'admin-label admin-label--small'),
+                    _renderLabel(t('commandForm.setKeyframes.animationName'), 'admin-label'),
                     kfNameSelector,
                     kfNameInput
                 ]),
                 QSDom.el('div', null, [
-                    _renderLabel(t('commandForm.setKeyframes.currentFrames'), 'admin-label admin-label--small'),
+                    _renderLabel(t('commandForm.setKeyframes.currentFrames'), 'admin-label'),
                     kfCurrentFrames
                 ])
             ]),
             QSDom.el('div', {
-                style: 'border: 1px solid var(--color-border); border-radius: var(--radius-sm); '
+                style: 'border: 1px solid var(--admin-border); border-radius: var(--radius-sm); '
                      + 'padding: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [
-                _renderLabel(t('commandForm.setKeyframes.addFrame'), 'admin-label admin-label--small'),
+                _renderLabel(t('commandForm.setKeyframes.addFrame'), 'admin-label'),
                 QSDom.el('div', {
                     style: 'display: flex; gap: var(--space-sm); align-items: flex-start;'
                 }, [
@@ -4452,12 +4446,12 @@ async function initSetTranslationKeysForm() {
                 placeholder: t('commandForm.setTranslationKeys.valuePlaceholder'),
                 style: 'resize: vertical;'
             });
-            const addBtn = _renderButton('add-translation-btn', 'admin-btn admin-btn--secondary',
+            const addBtn = _renderButton('add-translation-btn', 'admin-btn',
                 t('commandForm.setTranslationKeys.addTranslation'));
             const clearBtn = _renderButton('clear-translations-btn', 'admin-btn admin-btn--outline',
                 t('common.clearAll'), t('commandForm.setTranslationKeys.clearAllTitle'));
 
-            const helperDiv = QSDom.el('div', { class: 'admin-key-selector' }, [
+            const helperDiv = QSDom.el('div', {}, [
                 _renderLabel(t('commandForm.setTranslationKeys.title')),
                 QSDom.el('div', {
                     style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
@@ -4719,7 +4713,7 @@ async function initDeleteTranslationKeysForm() {
             });
             QSDom.setSelectPlaceholder(keySelector, t('commandForm.select.languageFirst'),
                 { disabled: true });
-            const addSelectedBtn = _renderButton('add-selected-btn', 'admin-btn admin-btn--secondary',
+            const addSelectedBtn = _renderButton('add-selected-btn', 'admin-btn',
                 t('commandForm.deleteTranslationKeys.addSelected'));
             const addAllUnusedBtn = _renderButton('add-all-unused-btn', 'admin-btn admin-btn--outline',
                 t('commandForm.deleteTranslationKeys.addAllUnused'),
@@ -4728,7 +4722,7 @@ async function initDeleteTranslationKeysForm() {
                 t('commandForm.deleteTranslationKeys.clearList'),
                 t('commandForm.deleteTranslationKeys.clearListTitle'));
 
-            const helperDiv = QSDom.el('div', { class: 'admin-key-selector' }, [
+            const helperDiv = QSDom.el('div', {}, [
                 _renderLabel(t('commandForm.deleteTranslationKeys.title')),
                 QSDom.el('div', {
                     style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
@@ -5091,7 +5085,7 @@ function renderFormField(rawName, param, required) {
 
     /** A two-digit 00..max option list, used by the hour and minute pickers. */
     function _renderTwoDigitSelect(id, dataAttr, count) {
-        const props = { id: id, class: 'admin-select admin-select--small' };
+        const props = { id: id, class: 'admin-select' };
         props[dataAttr] = inputId;
         const select = QSDom.el('select', props);
         for (let i = 0; i < count; i++) {
@@ -5135,33 +5129,32 @@ function renderFormField(rawName, param, required) {
 
         // Empty until someone picks: a date shown beforehand could not be picked, as choosing
         // the value an input already holds fires no change.
-        const dateProps = { type: 'date', id: inputId + '-date', class: 'admin-input admin-input--date' };
+        const dateProps = { type: 'date', id: inputId + '-date', class: 'admin-input' };
         dateProps['data-datetime-date'] = inputId;
 
         const selectors = [
             QSDom.el('div', { class: 'admin-form-group admin-form-group--inline' }, [
-                _renderLabel(t('commandForm.field.date'), 'admin-label admin-label--small'),
+                _renderLabel(t('commandForm.field.date'), 'admin-label'),
                 QSDom.el('input', dateProps)
             ])
         ];
         if (includeTime) {
             selectors.push(QSDom.el('div', { class: 'admin-form-group admin-form-group--inline' }, [
-                _renderLabel(t('commandForm.field.hour'), 'admin-label admin-label--small'),
+                _renderLabel(t('commandForm.field.hour'), 'admin-label'),
                 _renderTwoDigitSelect(inputId + '-hour', 'data-datetime-hour', 24)
             ]));
             selectors.push(QSDom.el('div', { class: 'admin-form-group admin-form-group--inline' }, [
-                _renderLabel(t('commandForm.field.minute'), 'admin-label admin-label--small'),
+                _renderLabel(t('commandForm.field.minute'), 'admin-label'),
                 _renderTwoDigitSelect(inputId + '-min', 'data-datetime-min', 60)
             ]));
         }
         inputArea = QSDom.el('div', { class: 'admin-datetime-picker', 'data-target': inputId }, [
             // A change in any of them bubbles here: one listener fills the field.
             QSDom.el('div', {
-                class: 'admin-datetime-picker__selectors',
                 onchange: () => _fillFromPicker(inputId, includeTime)
             }, selectors),
             QSDom.el('div', { class: 'admin-form-group', style: 'margin-top: var(--space-sm);' }, [
-                _renderLabel(t('commandForm.field.orEnterManually'), 'admin-label admin-label--small'),
+                _renderLabel(t('commandForm.field.orEnterManually'), 'admin-label'),
                 QSDom.el('input', _fieldProps({
                     type: 'text', class: 'admin-input', placeholder: String(defaultExample)
                 }))
@@ -5307,7 +5300,7 @@ function renderFormField(rawName, param, required) {
             for: inputId
         }, [
             displayName + ' ',
-            QSDom.el('span', { class: 'admin-label__type', text: '(' + type + ')' })
+            QSDom.el('span', { text: '(' + type + ')' })
         ]),
         inputArea,
         _renderHint([description])
@@ -5392,7 +5385,7 @@ function renderCommandDocs(doc) {
 
     /** One titled block of the documentation panel. */
     function _renderDocSection(title, body) {
-        return QSDom.el('div', { class: 'admin-doc-section' }, [
+        return QSDom.el('div', {}, [
             QSDom.el('h4', { text: title }),
             body
         ]);

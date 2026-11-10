@@ -8,8 +8,6 @@
  *
  * No DOM, no fetch — caller (ai-call.js) drives the HTTP. This keeps the
  * file trivially testable in the browser console.
- *
- * @version 1.0.0
  */
 (function () {
     'use strict';

@@ -4,8 +4,6 @@
  * 
  * Main admin panel landing page after login.
  * Shows site stats, site map, and recent commands.
- * 
- * @version 2.0.0 - External JS/CSS
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -387,7 +385,7 @@ if (isset($_GET['denied'])): ?>
 <!-- Restore Backup Modal -->
 <div id="modal-restore-backup" class="admin-modal" style="display: none;">
     <div class="admin-modal__backdrop"></div>
-    <div class="admin-modal__content admin-modal__content--wide">
+    <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('dashboard.projects.restoreTitle') ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal>×</button>

@@ -4,8 +4,6 @@
  * 
  * Provides multilingual support for the admin panel.
  * Translations are stored separately from main site translations.
- * 
- * @version 1.6.0
  */
 
 class AdminTranslation {

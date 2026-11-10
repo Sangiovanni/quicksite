@@ -183,7 +183,7 @@ window.QS_ACCOUNT_I18N = <?= json_encode([
      sole owner of any project (that would leave it unownable AND undeletable
      forever); the refusal names them and account.js lists them here. -->
 <section class="admin-section" id="account-delete-section">
-    <h2 class="admin-section__title admin-text-danger"><?= __admin('account.delete.title', 'Delete my account') ?></h2>
+    <h2 class="admin-section__title"><?= __admin('account.delete.title', 'Delete my account') ?></h2>
     <div class="admin-card account-danger-zone">
         <div class="admin-card__body">
             <p class="admin-warning"><?= __admin('account.delete.warn', 'Permanently deletes your account, ends every session, and removes you from every project you belong to. There is no undo and no operator lane to restore it. You cannot delete an account that is the sole owner of a project — transfer or delete those projects first.') ?></p>

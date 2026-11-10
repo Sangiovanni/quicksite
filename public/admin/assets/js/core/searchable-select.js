@@ -388,10 +388,8 @@
             if (flipUp) {
                 // Position bottom-aligned to the trigger's top edge.
                 this.dropdownEl.style.top = Math.max(margin, triggerRect.top - height - gap) + 'px';
-                this.dropdownEl.classList.add('qs-searchable-select__dropdown--flip-up');
             } else {
                 this.dropdownEl.style.top = (triggerRect.bottom + gap) + 'px';
-                this.dropdownEl.classList.remove('qs-searchable-select__dropdown--flip-up');
             }
         }
 

@@ -213,7 +213,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
             </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
-                    <label class="admin-label" for="invite-find-name"><?= __admin('members.invite.nameLabel', 'Their public name') ?> <span class="admin-text-danger">*</span></label>
+                    <label class="admin-label" for="invite-find-name"><?= __admin('members.invite.nameLabel', 'Their public name') ?> <span>*</span></label>
                     <input type="text" id="invite-find-name" class="admin-input" autocomplete="off">
                 </div>
                 <button type="button" id="btn-invite-find" class="admin-btn admin-btn--ghost"><?= __admin('members.invite.search', 'Search') ?></button>
@@ -222,7 +222,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
             <div class="members-form-row">
                 <div class="admin-form-group">
                     <label class="admin-label" for="invite-role"><?= __admin('members.invite.roleLabel', 'Role to offer') ?></label>
-                    <select id="invite-role" class="admin-input admin-input--select"></select>
+                    <select id="invite-role" class="admin-input"></select>
                 </div>
                 <div class="admin-form-group members-form-row__note">
                     <label class="admin-label" for="invite-note"><?= __admin('members.invite.noteLabel', 'Note (optional)') ?></label>
@@ -259,7 +259,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
             </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
-                    <label class="admin-label" for="propose-find-name"><?= __admin('members.invite.nameLabel', 'Their public name') ?> <span class="admin-text-danger">*</span></label>
+                    <label class="admin-label" for="propose-find-name"><?= __admin('members.invite.nameLabel', 'Their public name') ?> <span>*</span></label>
                     <input type="text" id="propose-find-name" class="admin-input" autocomplete="off">
                 </div>
                 <button type="button" id="btn-propose-find" class="admin-btn admin-btn--ghost"><?= __admin('members.invite.search', 'Search') ?></button>
@@ -268,10 +268,10 @@ window.QS_MEMBERS_I18N = <?= json_encode([
             <div class="members-form-row">
                 <div class="admin-form-group">
                     <label class="admin-label" for="propose-role"><?= __admin('members.propose.roleLabel', 'Suggested role') ?></label>
-                    <select id="propose-role" class="admin-input admin-input--select"></select>
+                    <select id="propose-role" class="admin-input"></select>
                 </div>
                 <div class="admin-form-group members-form-row__note">
-                    <label class="admin-label" for="propose-note"><?= __admin('members.propose.noteLabel', 'Why this person?') ?> <span class="admin-text-danger">*</span></label>
+                    <label class="admin-label" for="propose-note"><?= __admin('members.propose.noteLabel', 'Why this person?') ?> <span>*</span></label>
                     <input type="text" id="propose-note" class="admin-input" maxlength="500">
                 </div>
             </div>
@@ -334,18 +334,18 @@ window.QS_MEMBERS_I18N = <?= json_encode([
 <?php if ($__isOwner): ?>
 <!-- Transfer ownership — owner only -->
 <section class="admin-section" id="members-transfer-section" data-requires-command="transferOwnership">
-    <h2 class="admin-section__title admin-text-danger"><?= __admin('members.transfer.title', 'Transfer ownership') ?></h2>
+    <h2 class="admin-section__title"><?= __admin('members.transfer.title', 'Transfer ownership') ?></h2>
     <div class="admin-card members-danger-zone">
         <div class="admin-card__body">
             <p class="admin-warning"><?= __admin('members.transfer.warn', 'Hands the project to another MEMBER. You keep the role chosen below. There is no undo from your side — only the new owner could transfer it back.') ?></p>
             <div class="members-form-row">
                 <div class="admin-form-group">
                     <label class="admin-label" for="transfer-member"><?= __admin('members.transfer.memberLabel', 'New owner (must be a member)') ?></label>
-                    <select id="transfer-member" class="admin-input admin-input--select"></select>
+                    <select id="transfer-member" class="admin-input"></select>
                 </div>
                 <div class="admin-form-group">
                     <label class="admin-label" for="transfer-old-role"><?= __admin('members.transfer.oldRoleLabel', 'Your role after the transfer') ?></label>
-                    <select id="transfer-old-role" class="admin-input admin-input--select"></select>
+                    <select id="transfer-old-role" class="admin-input"></select>
                 </div>
             </div>
             <label class="admin-checkbox-group members-transfer-confirm">

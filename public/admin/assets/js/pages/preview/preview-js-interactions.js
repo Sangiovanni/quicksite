@@ -4,8 +4,6 @@
  * 
  * Dependencies:
  * - PreviewConfig global (from preview-config.php)
- * 
- * @version 1.0.0
  */
 (function() {
     'use strict';
@@ -91,7 +89,6 @@
     let jsFormClose = null;
     let jsPanelActions = null;
     let jsAddBtn = null;
-    let contextualArea = null;
     
     // Page events DOM references
     let peContainer = null;
@@ -230,7 +227,6 @@
         jsFormClose = document.getElementById('js-form-close');
         jsPanelActions = document.getElementById('js-panel-actions');
         jsAddBtn = document.getElementById('js-add-interaction');
-        contextualArea = document.getElementById('preview-contextual-area');
         
         // Page events DOM references
         peContainer = document.getElementById('js-page-events');
@@ -554,11 +550,6 @@
         if (jsContentEl) jsContentEl.style.display = '';
         if (jsPanelActionsEl) jsPanelActionsEl.style.display = 'flex';
         
-        // Expand contextual area if collapsed
-        if (contextualArea) {
-            contextualArea.classList.remove('preview-contextual-area--collapsed');
-        }
-        
         // Load selectors data if needed (for searchable picker)
         if (getSelectorsLoadedFn && loadSelectorsDataFn && !getSelectorsLoadedFn()) {
             await loadSelectorsDataFn();
@@ -657,7 +648,7 @@
     function _renderEmptyNote(text, isError) {
         const p = document.createElement('p');
         p.className = 'preview-contextual-js-empty';
-        if (isError) p.style.color = 'var(--danger)';
+        if (isError) p.style.color = 'var(--admin-error)';
         p.textContent = text;
         return p;
     }
@@ -679,7 +670,7 @@
                 QSDom.el('div', { class: 'preview-js-interaction__function', text: interaction.function + '(' + (interaction.params?.join(', ') || '') + ')' })
             ]),
             QSDom.el('div', { class: 'preview-js-interaction__actions' }, [
-                button('admin-btn--secondary js-edit-btn', PreviewConfig.i18n?.edit || 'Edit'),
+                button('js-edit-btn', PreviewConfig.i18n?.edit || 'Edit'),
                 ' ',
                 button('admin-btn--danger js-delete-btn', PreviewConfig.i18n?.delete || 'Delete')
             ])
@@ -728,7 +719,7 @@
             byEvent[event].push(interaction);
         });
         
-        listEl.replaceChildren(QSDom.el('div', { class: 'preview-js-interactions' },
+        listEl.replaceChildren(QSDom.el('div', {},
             Object.entries(byEvent).map(([event, interactions]) => _renderEventGroup(event, interactions))));
         
         // Attach event listeners to edit/delete buttons
@@ -2220,7 +2211,7 @@
         wrap.dataset.routePickerMode = 'picker';
 
         var sel = document.createElement('select');
-        sel.className = 'preview-contextual-js-form-input qs-route-picker__select';
+        sel.className = 'preview-contextual-js-form-input';
         sel.dataset.paramIndex = paramIndex;
         sel.dataset.paramName = arg.name || '';
         sel.dataset.inputType = 'route';
@@ -6207,7 +6198,6 @@
         root.appendChild(fmWrap);
 
         var warnSlot = document.createElement('div');
-        warnSlot.className = 'preview-contextual-js-response-bindings__cl-warn-slot';
         root.appendChild(warnSlot);
 
         // ── Populate the component dropdown asynchronously ──

@@ -3,8 +3,6 @@
  * 
  * Handles dashboard statistics, sitemap display, project management,
  * and storage overview functionality.
- * 
- * @version 2.0.0 - Extracted from inline PHP
  */
 
 (function() {
@@ -230,7 +228,7 @@
                     text: languages.length + ' ' + (sitemap.languages || 'languages')
                 })
                 : QSDom.el('span', {
-                    class: 'badge badge--ghost',
+                    class: 'badge',
                     text: sitemap.monolingual || 'Single language'
                 })
         ];
@@ -251,10 +249,10 @@
             dataset: { toggleLang: lang }
         }, [
             QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 16, 'sitemap__lang-toggle'),
-            QSDom.el('span', { class: 'sitemap__lang-flag', text: getFlagEmoji(lang) }),
-            QSDom.el('span', { class: 'sitemap__lang-name', text: langName }),
+            QSDom.el('span', { text: getFlagEmoji(lang) }),
+            QSDom.el('span', { text: langName }),
             isDefault
-                ? QSDom.el('span', { class: 'badge badge--primary', text: sitemap.default || 'Default' })
+                ? QSDom.el('span', { class: 'badge', text: sitemap.default || 'Default' })
                 : null,
             QSDom.el('span', {
                 class: 'sitemap__lang-count',
@@ -262,14 +260,14 @@
             }),
             coveragePercent !== null
                 ? QSDom.el('span', {
-                    class: 'sitemap__lang-coverage ' + getCoverageClass(coveragePercent),
+                    class: getCoverageClass(coveragePercent),
                     text: coveragePercent + '%'
                 })
                 : null
         ]);
 
         const routesBox = QSDom.el('div', {
-            class: 'sitemap__routes sitemap__routes--tree'
+            class: 'sitemap__routes'
         }, [renderRouteTree(routeTree, lang)]);
 
         // The default language is the one that starts open.
@@ -379,7 +377,7 @@
                 root.appendChild(langsBox);
             } else {
                 root.appendChild(QSDom.el('div', {
-                    class: 'sitemap__routes sitemap__routes--flat sitemap__routes--tree'
+                    class: 'sitemap__routes sitemap__routes--flat'
                 }, [renderRouteTree(routeTree, 'default')]));
             }
 
@@ -578,7 +576,7 @@
             star,
             QSDom.el('span', { class: 'dashboard-current__name', text: QuickSiteAdmin.projectLabel(edited.project, edited.name) }),
             _renderCopyIdButton(edited.project, proj),
-            QSDom.el('span', { class: 'badge badge--primary', text: proj.editing || 'Editing' }),
+            QSDom.el('span', { class: 'badge', text: proj.editing || 'Editing' }),
             edited.my_role ? QSDom.el('span', { class: 'members-role-chip members-role-chip--' + edited.my_role, text: edited.my_role }) : null,
         ]);
     }
@@ -1056,7 +1054,7 @@
         // the button would only ever produce an error toast.
         const dlBtn = (build.complete === false || outOfReach) ? null : QSDom.el('button', {
             type: 'button',
-            class: 'manage-space__delete-btn',
+            class: 'manage-space__download-btn',
             title: t('dashboard.storage.download', 'Download')
         }, [QSDom.svgIcon('M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 14)]);
 
@@ -1160,7 +1158,7 @@
             text: t('dashboard.storage.clearAll', 'Clear All')
         });
 
-        const item = QSDom.el('div', { class: 'manage-space__item manage-space__item--summary' }, [
+        const item = QSDom.el('div', { class: 'manage-space__item' }, [
             QSDom.el('div', { class: 'manage-space__item-info' }, [
                 QSDom.el('span', {
                     class: 'manage-space__item-name',
@@ -1791,12 +1789,12 @@
         } catch (error) {
             console.error('Failed to load backups:', error);
             QSDom.clear(container);
-            container.appendChild(QSDom.el('p', { class: 'admin-error', text: 'Failed to load backups' }));
+            container.appendChild(QSDom.el('p', { text: 'Failed to load backups' }));
             return;
         }
         if (!result.ok) {
             QSDom.clear(container);
-            container.appendChild(QSDom.el('p', { class: 'admin-error', text: result.data?.message || 'Failed to load backups' }));
+            container.appendChild(QSDom.el('p', { text: result.data?.message || 'Failed to load backups' }));
             return;
         }
 
@@ -1807,8 +1805,8 @@
         if (backups.length === 0) {
             container.appendChild(QSDom.el('div', { class: 'backup-empty' }, [
                 QSDom.svgIcon('M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 48),
-                QSDom.el('p', { class: 'backup-empty__title', text: proj.no_backups || 'No backups yet' }),
-                QSDom.el('p', { class: 'backup-empty__hint', text: proj.backup_hint || 'Click "Backup" to create your first backup' }),
+                QSDom.el('p', { text: proj.no_backups || 'No backups yet' }),
+                QSDom.el('p', { text: proj.backup_hint || 'Click "Backup" to create your first backup' }),
             ]));
             return;
         }
@@ -1827,11 +1825,11 @@
         let typeBadge = null;
         if (backup.type === 'pre-restore') typeBadge = QSDom.el('span', { class: 'badge badge--warning', text: proj.pre_restore || 'Pre-restore' });
 
-        const restoreBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--sm admin-btn--primary btn-restore-this' }, [
+        const restoreBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary' }, [
             QSDom.svgIcon('M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15', 14),
             ' ' + (proj.restore_btn || 'Restore'),
         ]);
-        const delBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--sm admin-btn--ghost admin-btn--danger btn-delete-backup' }, [
+        const delBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost admin-btn--danger' }, [
             QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14),
         ]);
 

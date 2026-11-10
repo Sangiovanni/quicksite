@@ -3,8 +3,6 @@
  * Admin Panel Helper Functions
  * 
  * Utility functions for the admin panel.
- * 
- * @version 1.6.0
  */
 
 /**

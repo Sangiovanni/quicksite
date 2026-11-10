@@ -87,12 +87,12 @@
             <div class="preview-source-canvas__restore-actions">
                 <button type="button"
                         id="preview-source-restore-accept"
-                        class="admin-btn admin-btn--sm admin-btn--primary">
+                        class="admin-btn admin-btn--primary">
                     <?= __admin('preview.styleSourceRestoreAccept', 'Restore') ?>
                 </button>
                 <button type="button"
                         id="preview-source-restore-decline"
-                        class="admin-btn admin-btn--sm admin-btn--ghost">
+                        class="admin-btn admin-btn--ghost">
                     <?= __admin('preview.styleSourceRestoreDecline', 'Discard') ?>
                 </button>
             </div>
@@ -115,13 +115,13 @@
             <div class="preview-source-canvas__restore-actions">
                 <button type="button"
                         id="preview-source-conflict-reload"
-                        class="admin-btn admin-btn--sm admin-btn--primary"
+                        class="admin-btn admin-btn--primary"
                         title="<?= __admin('preview.styleSourceConflictReloadHint') ?>">
                     <?= __admin('preview.styleSourceConflictReload') ?>
                 </button>
                 <button type="button"
                         id="preview-source-conflict-overwrite"
-                        class="admin-btn admin-btn--sm admin-btn--ghost"
+                        class="admin-btn admin-btn--ghost"
                         title="<?= __admin('preview.styleSourceConflictOverwriteHint') ?>">
                     <?= __admin('preview.styleSourceConflictOverwrite') ?>
                 </button>

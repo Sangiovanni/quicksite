@@ -5,7 +5,6 @@
  * Sets the default language for the site.
  * The language must already exist in LANGUAGES_SUPPORTED.
  * 
- * @version 1.6.0
  * @method PATCH
  */
 

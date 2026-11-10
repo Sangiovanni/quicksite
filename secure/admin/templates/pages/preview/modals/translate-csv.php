@@ -15,7 +15,7 @@
         <div class="preview-translate-csv-modal__header">
             <h3>
                 <?= __admin('preview.translateCsvTitle', 'Translate from CSV') ?>
-                <code id="translate-csv-structure-id" style="font-size: 0.9em; color: var(--admin-text-secondary);"></code>
+                <code id="translate-csv-structure-id" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
             </h3>
             <button type="button" class="preview-translate-csv-modal__close" id="translate-csv-modal-close" title="<?= __admin('common.close', 'Close') ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -33,7 +33,7 @@
             <div class="admin-form-group">
                 <label class="admin-label" for="translate-csv-lang">
                     <?= __admin('preview.translateCsvWriteToLang', 'Write values to language') ?>
-                    <span class="admin-text-danger">*</span>
+                    <span>*</span>
                 </label>
                 <select class="admin-input" id="translate-csv-lang" style="max-width: 200px;">
                     <option value="">(loading…)</option>
@@ -54,7 +54,7 @@
             <div class="admin-form-group">
                 <label class="admin-label" for="translate-csv-paste">
                     <?= __admin('preview.translateCsvPaste', 'Paste TSV / CSV') ?>
-                    <span class="admin-text-danger">*</span>
+                    <span>*</span>
                 </label>
                 <textarea class="admin-input" id="translate-csv-paste" rows="8" placeholder="<?= __admin('preview.translateCsvPlaceholder', 'Paste TSV (copy from Excel / Sheets) or CSV…') ?>"></textarea>
             </div>

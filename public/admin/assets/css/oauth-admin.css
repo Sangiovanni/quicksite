@@ -27,7 +27,7 @@
 }
 .qs-oauth-status-panel__row { color: var(--admin-text-muted); }
 .qs-oauth-status-panel__row--done { color: var(--admin-success); }
-.qs-oauth-status-panel__summary { margin-top: 6px; font-weight: 500; color: var(--admin-text); }
+.qs-oauth-status-panel__summary { margin-top: 6px; font-weight: var(--font-weight-medium); color: var(--admin-text); }
 .qs-oauth-status-panel__summary--warn { color: var(--admin-warning); }
 /* No preview keys yet: the sign-in cannot work until they are entered, so it reads as a warning. */
 .qs-oauth-status-panel__reminder {
@@ -41,7 +41,7 @@
     background: var(--admin-error-bg);
     color: var(--admin-error);
     font-size: 13px;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 .qs-oauth-status-panel__reminder svg { flex-shrink: 0; margin-top: 2px; }
 
@@ -55,7 +55,7 @@
 }
 .qs-oauth-cookie-note__summary {
     cursor: pointer;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     font-size: 13px;
     color: var(--admin-text);
     /* Override the default <summary> marker color so it's visible in dark mode. */
@@ -119,14 +119,14 @@
     flex-wrap: wrap;
 }
 .oauth-provider-card__name {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-size: 15px;
     color: var(--admin-text);
 }
 .oauth-provider-card__id {
     font-size: 12px;
     color: var(--admin-text-muted);
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
 }
 .oauth-provider-card__readonly { margin: 10px 0 0 0; }
 
@@ -159,7 +159,7 @@
 .oauth-howto__summary {
     cursor: pointer;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--admin-text);
 }
 .oauth-howto__steps {
@@ -199,7 +199,7 @@
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 12px;
-    font-family: var(--font-mono, monospace);
+    font-family: var(--font-mono);
     background: var(--admin-bg-tertiary);
     color: var(--admin-text);
 }
@@ -222,7 +222,7 @@
 .oauth-keyset__title {
     margin: 0 0 4px 0;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
 }
 .oauth-keyset .admin-input { margin-bottom: 8px; }

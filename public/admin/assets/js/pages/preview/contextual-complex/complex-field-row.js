@@ -48,7 +48,7 @@
         const requiredEl = QSDom.el('input', { type: 'checkbox', id: 'ce-fr-required' });
         const idEl = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-fr-id', placeholder: t('common.idPlaceholder'), autocomplete: 'off' });
 
-        const wrap = QSDom.el('div', { class: 'qs-complex-wizard qs-complex-wizard--field-row' }, [
+        const wrap = QSDom.el('div', {}, [
             QSDom.el('div', { class: 'admin-form-group' }, [
                 QSDom.el('label', { class: 'admin-label', for: 'ce-fr-name' }, [t('common.fieldName'), ' ', W.requiredMark()]),
                 nameEl,

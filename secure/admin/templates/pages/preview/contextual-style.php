@@ -30,7 +30,7 @@
             <?= __admin('preview.animations') ?? 'Animations' ?>
         </button>
     </div>
-    <div class="preview-contextual-style-content" id="contextual-style-content" style="display: none;">
+    <div id="contextual-style-content" style="display: none;">
         <!-- Theme Variables Panel -->
         <div class="preview-theme-panel" id="theme-panel" data-tab="theme">
             <div class="preview-theme-loading" id="theme-loading">
@@ -57,7 +57,7 @@
                     <div class="preview-theme-config-body" id="theme-config-body" style="display: none;">
                         <div class="preview-theme-config-row">
                             <span class="preview-theme-config-label"><?= __admin('preview.themeModeEnabled') ?? 'Dark mode support' ?></span>
-                            <label class="preview-toggle">
+                            <label>
                                 <input type="checkbox" id="theme-config-enabled" <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
@@ -72,12 +72,12 @@
                         </div>
                         <div class="preview-theme-config-row">
                             <span class="preview-theme-config-label"><?= __admin('preview.themeUserToggle') ?? 'Visitor can switch' ?></span>
-                            <label class="preview-toggle">
+                            <label>
                                 <input type="checkbox" id="theme-config-usertoggle" <?= ($editConfig['THEME_USER_TOGGLE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
                         </div>
-                        <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="theme-config-save-btn" style="margin-top: 8px; width: 100%;">
+                        <button type="button" class="admin-btn admin-btn--primary" id="theme-config-save-btn" style="margin-top: 8px; width: 100%;">
                             <?= __admin('preview.saveThemeConfig') ?? 'Save Settings' ?>
                         </button>
                     </div>
@@ -99,7 +99,7 @@
                         </svg>
                         <?= __admin('preview.themeColors') ?? 'Colors' ?>
                     </h4>
-                    <div class="preview-theme-grid preview-theme-grid--colors" id="theme-colors-grid">
+                    <div class="preview-theme-grid" id="theme-colors-grid">
                         <!-- Color inputs populated by JS -->
                     </div>
                     <!-- Quick-add variable -->
@@ -118,21 +118,21 @@
                             </label>
                             <div class="preview-theme-add__row">
                                 <input type="text"
-                                       class="preview-theme-add__input preview-theme-add__input--name"
+                                       class="preview-theme-add__input"
                                        data-input-name
                                        placeholder="--color-name"
                                        aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
                                 <input type="text"
-                                       class="preview-theme-add__input preview-theme-add__input--value"
+                                       class="preview-theme-add__input"
                                        data-input-value
                                        placeholder="<?= __admin('preview.themeAddVariableValueExampleColor', 'e.g. #c2703e') ?>"
                                        aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
                             </div>
                             <div class="preview-theme-add__actions">
-                                <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" data-action="cancel">
+                                <button type="button" class="admin-btn admin-btn--ghost" data-action="cancel">
                                     <?= __admin('common.cancel') ?? 'Cancel' ?>
                                 </button>
-                                <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-action="submit">
+                                <button type="button" class="admin-btn admin-btn--primary" data-action="submit">
                                     <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
                                 </button>
                             </div>
@@ -148,7 +148,7 @@
                         </svg>
                         <?= __admin('preview.themeFonts') ?? 'Fonts' ?>
                     </h4>
-                    <div class="preview-theme-grid preview-theme-grid--fonts" id="theme-fonts-grid">
+                    <div class="preview-theme-grid" id="theme-fonts-grid">
                         <!-- Font inputs populated by JS -->
                     </div>
                     <!-- Quick-add variable -->
@@ -167,21 +167,21 @@
                             </label>
                             <div class="preview-theme-add__row">
                                 <input type="text"
-                                       class="preview-theme-add__input preview-theme-add__input--name"
+                                       class="preview-theme-add__input"
                                        data-input-name
                                        placeholder="--font-name"
                                        aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
                                 <input type="text"
-                                       class="preview-theme-add__input preview-theme-add__input--value"
+                                       class="preview-theme-add__input"
                                        data-input-value
                                        placeholder="<?= __admin('preview.themeAddVariableValueExampleFont', 'e.g. Roboto, sans-serif') ?>"
                                        aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
                             </div>
                             <div class="preview-theme-add__actions">
-                                <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" data-action="cancel">
+                                <button type="button" class="admin-btn admin-btn--ghost" data-action="cancel">
                                     <?= __admin('common.cancel') ?? 'Cancel' ?>
                                 </button>
-                                <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-action="submit">
+                                <button type="button" class="admin-btn admin-btn--primary" data-action="submit">
                                     <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
                                 </button>
                             </div>
@@ -197,7 +197,7 @@
                         </svg>
                         <?= __admin('preview.themeSpacing') ?? 'Spacing' ?>
                     </h4>
-                    <div class="preview-theme-grid preview-theme-grid--spacing" id="theme-spacing-grid">
+                    <div class="preview-theme-grid" id="theme-spacing-grid">
                         <!-- Spacing inputs populated by JS -->
                     </div>
                     <!-- Quick-add variable -->
@@ -216,21 +216,21 @@
                             </label>
                             <div class="preview-theme-add__row">
                                 <input type="text"
-                                       class="preview-theme-add__input preview-theme-add__input--name"
+                                       class="preview-theme-add__input"
                                        data-input-name
                                        placeholder="--spacing-name"
                                        aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
                                 <input type="text"
-                                       class="preview-theme-add__input preview-theme-add__input--value"
+                                       class="preview-theme-add__input"
                                        data-input-value
                                        placeholder="<?= __admin('preview.themeAddVariableValueExampleSpacing', 'e.g. 1rem, 16px') ?>"
                                        aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
                             </div>
                             <div class="preview-theme-add__actions">
-                                <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" data-action="cancel">
+                                <button type="button" class="admin-btn admin-btn--ghost" data-action="cancel">
                                     <?= __admin('common.cancel') ?? 'Cancel' ?>
                                 </button>
-                                <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" data-action="submit">
+                                <button type="button" class="admin-btn admin-btn--primary" data-action="submit">
                                     <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
                                 </button>
                             </div>
@@ -246,20 +246,20 @@
                         </svg>
                         <?= __admin('preview.themeOther') ?? 'Other' ?>
                     </h4>
-                    <div class="preview-theme-grid preview-theme-grid--other" id="theme-other-grid">
+                    <div class="preview-theme-grid" id="theme-other-grid">
                         <!-- Other variables populated by JS -->
                     </div>
                 </div>
                 
                 <!-- Actions -->
                 <div class="preview-theme-actions">
-                    <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="theme-reset-btn">
+                    <button type="button" class="admin-btn admin-btn--ghost" id="theme-reset-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                         </svg>
                         <?= __admin('common.reset') ?? 'Reset' ?>
                     </button>
-                    <button type="button" class="admin-btn admin-btn--primary admin-btn--sm" id="theme-save-btn">
+                    <button type="button" class="admin-btn admin-btn--primary" id="theme-save-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                             <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
@@ -381,20 +381,20 @@
                     </span>
                 </div>
                 <div class="preview-selector-selected__actions">
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="selector-edit-btn">
+                    <button type="button" class="admin-btn admin-btn--primary" id="selector-edit-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                         </svg>
                         <?= __admin('preview.editStyles') ?? 'Edit Styles' ?>
                     </button>
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--outline" id="selector-copy-from-btn">
+                    <button type="button" class="admin-btn admin-btn--outline" id="selector-copy-from-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                         </svg>
                         <?= __admin('preview.copyStyleFrom') ?? 'Copy From…' ?>
                     </button>
-                    <button type="button" class="admin-btn admin-btn--sm admin-btn--secondary" id="selector-animate-btn">
+                    <button type="button" class="admin-btn" id="selector-animate-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
@@ -513,7 +513,7 @@
                             <?= __admin('preview.keyframesLibrary') ?? 'Keyframes library' ?>
                         </h4>
                         <span class="preview-animations-section__count" id="keyframes-count">0</span>
-                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="keyframe-add-btn" title="<?= __admin('preview.createKeyframe') ?? 'Create new @keyframes' ?>">
+                        <button type="button" class="admin-btn admin-btn--ghost" id="keyframe-add-btn" title="<?= __admin('preview.createKeyframe') ?? 'Create new @keyframes' ?>">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
@@ -549,7 +549,7 @@
                      the --dirty modifier when state changes. -->
                 <div class="preview-source-sidebar__status preview-source-sidebar__status--clean" id="source-sidebar-status">
                     <span class="preview-source-sidebar__status-dot" aria-hidden="true">●</span>
-                    <span class="preview-source-sidebar__status-text" id="source-sidebar-status-text"><?= __admin('preview.styleSourceClean', 'All saved') ?></span>
+                    <span id="source-sidebar-status-text"><?= __admin('preview.styleSourceClean', 'All saved') ?></span>
                 </div>
                 <div class="preview-source-sidebar__hint">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -560,7 +560,7 @@
                 <div class="preview-source-sidebar__actions">
                     <button type="button"
                             id="source-sidebar-save-btn"
-                            class="admin-btn admin-btn--primary admin-btn--sm"
+                            class="admin-btn admin-btn--primary"
                             disabled>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
@@ -571,7 +571,7 @@
                     </button>
                     <button type="button"
                             id="source-sidebar-cancel-btn"
-                            class="admin-btn admin-btn--ghost admin-btn--sm"
+                            class="admin-btn admin-btn--ghost"
                             disabled>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="1 4 1 10 7 10"/>
@@ -636,7 +636,7 @@
                     <polyline points="14 2 14 8 20 8"/>
                 </svg>
                 <span><?= __admin('preview.noStylesDefined') ?? 'No styles defined for this selector' ?></span>
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="style-editor-add-first">
+                <button type="button" class="admin-btn admin-btn--ghost" id="style-editor-add-first">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
@@ -661,13 +661,13 @@
             
             <!-- Actions -->
             <div class="preview-style-editor__actions" id="style-editor-actions" style="display: none;">
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="style-editor-reset">
+                <button type="button" class="admin-btn admin-btn--ghost" id="style-editor-reset">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                     </svg>
                     <?= __admin('common.reset') ?? 'Reset' ?>
                 </button>
-                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="style-editor-save">
+                <button type="button" class="admin-btn admin-btn--primary" id="style-editor-save">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                         <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>

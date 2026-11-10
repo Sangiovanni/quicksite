@@ -4,8 +4,6 @@
  * 
  * Provides data for dynamic form fields.
  * This is called via AJAX from the admin panel.
- * 
- * @version 1.6.0
  */
 
 // ============================================================================

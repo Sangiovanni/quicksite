@@ -4,8 +4,6 @@
  * 
  * Dedicated page for managing project assets: upload, browse, edit, delete.
  * Multi-file upload, visual grid with previews, inline rename, batch delete.
- * 
- * @version 1.0.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -37,7 +35,7 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
     </div>
 
     <!-- Upload Zone -->
-    <section class="asset-upload-zone admin-card">
+    <section class="admin-card">
         <div class="admin-card__header">
             <h2 class="admin-card__title">
                 <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -74,7 +72,7 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
             <div class="asset-queue" id="asset-queue" style="display:none">
                 <div class="asset-queue__header">
                     <span id="asset-queue-count"><?= __admin('media.queueReadyMany', ['count' => 0]) ?></span>
-                    <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" id="asset-queue-clear"><?= __admin('common.clearAll') ?></button>
+                    <button type="button" class="admin-btn" id="asset-queue-clear"><?= __admin('common.clearAll') ?></button>
                 </div>
                 <ul class="asset-queue__list" id="asset-queue-list"></ul>
                 <button type="button" class="admin-btn admin-btn--primary" id="asset-upload-btn" disabled>
@@ -92,7 +90,7 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
         <div class="admin-card">
             <div class="admin-card__header">
                 <h2 class="admin-card__title" id="asset-edit-title"><?= __admin('media.editAsset') ?></h2>
-                <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" id="asset-edit-close">&times; <?= __admin('common.close') ?></button>
+                <button type="button" class="admin-btn" id="asset-edit-close">&times; <?= __admin('common.close') ?></button>
             </div>
             <div class="admin-card__body asset-edit-area__content">
                 <div class="asset-edit-area__preview" id="asset-edit-preview"></div>
@@ -116,7 +114,7 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
     </section>
 
     <!-- Asset Browser -->
-    <section class="asset-browser" id="asset-browser">
+    <section id="asset-browser">
         <div class="asset-browser__toolbar">
             <div class="asset-tabs" id="asset-tabs">
                 <button class="asset-tabs__tab asset-tabs__tab--active" data-category="all"><?= __admin('media.tabAll') ?> <span class="asset-tabs__count" id="count-all">0</span></button>
@@ -155,8 +153,8 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
         <div class="asset-batch-bar" id="asset-batch-bar" style="display:none">
             <span id="asset-batch-count"><?= __admin('media.selectedCount', ['count' => 0]) ?></span>
             <div>
-                <button type="button" class="admin-btn admin-btn--small" id="asset-batch-select-all"><?= __admin('media.selectAll') ?></button>
-                <button type="button" class="admin-btn admin-btn--small admin-btn--danger" id="asset-batch-delete"><?= __admin('media.deleteSelected') ?></button>
+                <button type="button" class="admin-btn" id="asset-batch-select-all"><?= __admin('media.selectAll') ?></button>
+                <button type="button" class="admin-btn admin-btn--danger" id="asset-batch-delete"><?= __admin('media.deleteSelected') ?></button>
             </div>
         </div>
     </section>

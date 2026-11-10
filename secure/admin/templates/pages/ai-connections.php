@@ -7,8 +7,6 @@
  * direct via QSAiCall; this page is purely a UI over QSConnectionsStore.
  *
  * Old route: /admin/ai-settings -> 301 redirect (see AdminRouter).
- *
- * @version 1.0.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -49,12 +47,12 @@ window.QS_AI_CONNECTIONS_I18N = <?= json_encode($qsAiConnectionsI18n, JSON_HEX_T
     </p>
 </div>
 
-<div class="admin-grid admin-grid--cols-1">
+<div class="admin-grid">
     <div class="admin-card">
         <div class="admin-card__header" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-md);">
             <div>
                 <h2 class="admin-card__title"><?= __admin('aiConnections.connections') ?></h2>
-                <p class="admin-text-muted" style="margin:0;"><?= __admin('aiConnections.connectionsHint') ?></p>
+                <p style="margin:0;"><?= __admin('aiConnections.connectionsHint') ?></p>
             </div>
             <button type="button" class="admin-btn admin-btn--primary" id="qsac-add-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -77,14 +75,14 @@ window.QS_AI_CONNECTIONS_I18N = <?= json_encode($qsAiConnectionsI18n, JSON_HEX_T
             <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="qsac-persist">
-                    <span class="admin-checkbox__label"><?= __admin('aiConnections.persistLabel') ?></span>
+                    <span><?= __admin('aiConnections.persistLabel') ?></span>
                 </label>
                 <p class="admin-hint"><?= __admin('aiConnections.persistHint') ?></p>
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="qsac-auto-execute">
-                    <span class="admin-checkbox__label"><?= __admin('aiConnections.runWithoutStoppingLabel') ?></span>
+                    <span><?= __admin('aiConnections.runWithoutStoppingLabel') ?></span>
                 </label>
                 <p class="admin-hint"><?= str_replace(':caution', '<strong>' . __admin('aiConnections.autoExecuteCaution') . '</strong>', __admin('aiConnections.runWithoutStoppingHint')) ?></p>
             </div>
@@ -107,7 +105,7 @@ window.QS_AI_CONNECTIONS_I18N = <?= json_encode($qsAiConnectionsI18n, JSON_HEX_T
         <div class="admin-modal__body" id="qsac-modal-body">
             <!-- step content rendered by JS -->
         </div>
-        <div class="admin-modal__footer qsac-modal__footer" id="qsac-modal-footer">
+        <div class="admin-modal__footer" id="qsac-modal-footer">
             <!-- buttons rendered by JS -->
         </div>
     </div>

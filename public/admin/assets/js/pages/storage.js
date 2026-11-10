@@ -77,7 +77,7 @@
     function _renderLabel(text, required) {
         var l = QSDom.el('label', { class: 'admin-label' });
         l.appendChild(document.createTextNode(text));
-        if (required) l.appendChild(QSDom.el('span', { class: 'admin-text-danger', text: ' *' }));
+        if (required) l.appendChild(QSDom.el('span', { text: ' *' }));
         return l;
     }
     function _renderHint(text) { return QSDom.el('p', { class: 'admin-hint', text: text }); }
@@ -220,7 +220,7 @@
                 ? state.items.length
                 : state.items.filter(function (it) { return it.scope === key; }).length;
             var isActive = state.filter === key;
-            var cls = 'admin-btn admin-btn--ghost storage-filter-bar__btn' + (isActive ? ' storage-filter-bar__btn--active' : '');
+            var cls = 'admin-btn admin-btn--ghost' + (isActive ? ' storage-filter-bar__btn--active' : '');
             bar.appendChild(QSDom.el('button', {
                 class: cls, type: 'button',
                 onclick: function () { state.filter = key; renderList(); },
@@ -632,7 +632,7 @@
         if (opts && opts.declare) {
             var act = QSDom.el('div', { class: 'storage-scan-row__action' });
             var btn = QSDom.el('button', {
-                class: 'admin-btn admin-btn--primary storage-scan-row__declare',
+                class: 'admin-btn admin-btn--primary',
                 type: 'button', text: 'Declare',
             });
             btn.addEventListener('click', function () { declareIncomplete(row, btn); });
@@ -665,7 +665,7 @@
     // Dangling reads = read by a binding but never written. Not a GDPR item; a
     // likely-leftover flag. No Declare.
     function _renderDanglingSection(list) {
-        var sec = QSDom.el('section', { class: 'storage-scan-sec storage-scan-sec--dangling' });
+        var sec = QSDom.el('section', { class: 'storage-scan-sec' });
         sec.appendChild(_renderScanSecHead('Dangling reads', list.length,
             'Read by a binding but never written anywhere — likely a leftover after the writer was deleted. Review these.'));
         list.forEach(function (row) { sec.appendChild(_renderScanRow(row, null)); });
@@ -818,7 +818,7 @@
         // All body content lives in one container we can clear + rebuild as the
         // state changes (after Generate / Update / Delete), so the modal always
         // reflects the real status (e.g. locks the route once a page exists).
-        var content = QSDom.el('div', { class: 'storage-consent-content' });
+        var content = QSDom.el('div', {});
         dialog.appendChild(content);
         content.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Loading…' }));
         await _refreshConsentContent(content, '');

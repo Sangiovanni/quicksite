@@ -38,7 +38,7 @@
         <div class="sitemap-resolver-list-modal__header">
             <h3>
                 <?= __admin('sitemapPage.resolverListTitle', 'Resolvers for') ?>
-                <code id="sitemap-resolver-list-route" style="font-size: 0.9em; color: var(--admin-text-secondary);"></code>
+                <code id="sitemap-resolver-list-route" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
                 <span class="sitemap-resolver-list__count" id="sitemap-resolver-list-count"></span>
             </h3>
             <button type="button" class="sitemap-resolver-list-modal__close" id="sitemap-resolver-list-close" title="<?= __admin('common.close', 'Close') ?>">
@@ -67,7 +67,7 @@
                 <?= __admin('sitemapPage.resolverListEmpty', 'No resolvers configured for this route yet. Click "+ Add resolver" below to create the first one.') ?>
             </p>
 
-            <button type="button" class="sitemap-resolver-list__add admin-btn admin-btn--ghost admin-btn--sm" id="sitemap-resolver-list-add">
+            <button type="button" class="sitemap-resolver-list__add admin-btn admin-btn--ghost" id="sitemap-resolver-list-add">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>

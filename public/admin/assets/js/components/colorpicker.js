@@ -233,7 +233,6 @@
             wrapper.appendChild(this.input);
             
             this.swatch = document.createElement('div');
-            this.swatch.className = 'qs-cp-swatch';
             this.swatch.style.cssText = `
                 width: 20px;
                 height: 20px;
@@ -269,7 +268,6 @@
         
         _createPopup() {
             this.popup = document.createElement('div');
-            this.popup.className = 'qs-colorpicker';
             this.popup.style.cssText = `
                 position: fixed;
                 z-index: 10000;
@@ -285,7 +283,6 @@
             
             // Draggable header
             this.header = document.createElement('div');
-            this.header.className = 'qs-cp-header';
             this.header.style.cssText = `
                 display: flex;
                 align-items: center;
@@ -326,7 +323,6 @@
             
             // Saturation/Value picker area
             this.svArea = document.createElement('div');
-            this.svArea.className = 'qs-cp-sv';
             this.svArea.style.cssText = `
                 width: 100%;
                 height: 140px;
@@ -338,17 +334,14 @@
             
             // SV area overlays
             this.svArea.appendChild(QSDom.el('div', {
-                class: 'qs-cp-sv-white',
                 style: 'position:absolute;inset:0;background:linear-gradient(to right,#fff,transparent);border-radius:4px;'
             }));
             this.svArea.appendChild(QSDom.el('div', {
-                class: 'qs-cp-sv-black',
                 style: 'position:absolute;inset:0;background:linear-gradient(to top,#000,transparent);border-radius:4px;'
             }));
             
             // SV cursor
             this.svCursor = document.createElement('div');
-            this.svCursor.className = 'qs-cp-sv-cursor';
             this.svCursor.style.cssText = `
                 position: absolute;
                 width: 14px;
@@ -365,7 +358,6 @@
             
             // Hue slider
             this.hueSlider = document.createElement('div');
-            this.hueSlider.className = 'qs-cp-hue';
             this.hueSlider.style.cssText = `
                 width: 100%;
                 height: 14px;
@@ -380,7 +372,6 @@
             `;
             
             this.hueCursor = document.createElement('div');
-            this.hueCursor.className = 'qs-cp-hue-cursor';
             this.hueCursor.style.cssText = `
                 position: absolute;
                 top: 50%;
@@ -400,7 +391,6 @@
             // Alpha slider (optional)
             if (this.options.showAlpha) {
                 this.alphaSlider = document.createElement('div');
-                this.alphaSlider.className = 'qs-cp-alpha';
                 this.alphaSlider.style.cssText = `
                     width: 100%;
                     height: 14px;
@@ -420,7 +410,6 @@
                 this.alphaSlider.appendChild(this.alphaGradient);
                 
                 this.alphaCursor = document.createElement('div');
-                this.alphaCursor.className = 'qs-cp-alpha-cursor';
                 this.alphaCursor.style.cssText = `
                     position: absolute;
                     top: 50%;
@@ -444,7 +433,6 @@
             
             // Color preview (with checkerboard for alpha)
             this.preview = document.createElement('div');
-            this.preview.className = 'qs-cp-preview';
             this.preview.style.cssText = `
                 width: 36px;
                 height: 36px;
@@ -463,7 +451,6 @@
             // Hex input
             this.hexInput = document.createElement('input');
             this.hexInput.type = 'text';
-            this.hexInput.className = 'qs-cp-hex';
             this.hexInput.style.cssText = `
                 flex: 1;
                 padding: 6px 8px;
@@ -542,7 +529,6 @@
         _createVariableSelector() {
             // Container for variable selector
             const varContainer = document.createElement('div');
-            varContainer.className = 'qs-cp-variables';
             varContainer.style.cssText = `
                 margin-top: 10px;
                 padding-top: 10px;
@@ -557,7 +543,6 @@
             
             // Scrollable list of variables
             const varList = document.createElement('div');
-            varList.className = 'qs-cp-var-list';
             varList.style.cssText = `
                 max-height: 120px;
                 overflow-y: auto;

@@ -10,8 +10,6 @@
  * @auth required
  * @param string $name Optional - project name (defaults to active project)
  * @return ApiResponse List of backups with metadata
- * 
- * @version 1.0.0
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

@@ -29,7 +29,7 @@
         <div class="sitemap-resolver-modal__header">
             <h3>
                 <?= __admin('sitemapPage.resolverTitle', 'Configure resolver') ?>
-                <code id="sitemap-resolver-route" style="font-size: 0.9em; color: var(--admin-text-secondary);"></code>
+                <code id="sitemap-resolver-route" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
             </h3>
             <button type="button" class="sitemap-resolver-modal__close" id="sitemap-resolver-close" title="<?= __admin('common.close', 'Close') ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

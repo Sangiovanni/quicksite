@@ -12,8 +12,6 @@
  * The form carries a CSRF token (double-submit against an HttpOnly cookie the
  * router plants) — a login form is forgeable like any other, and being logged
  * into an account somebody else chose is a real attack, not a nuisance.
- *
- * @version 1.6.0
  */
 
 $loginError = null;

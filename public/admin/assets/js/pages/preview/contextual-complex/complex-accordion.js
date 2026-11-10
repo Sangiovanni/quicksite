@@ -16,7 +16,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             var star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -38,7 +37,6 @@
     function _renderItemRow(data, pickerMap) {
         var d = data || {};
         var row = document.createElement('div');
-        row.className = 'qs-accordion-row';
         row.style.display = 'flex';
         row.style.flexDirection = 'column';
         row.style.gap = '6px';
@@ -49,7 +47,6 @@
         summaryLabel.className = 'admin-hint';
         summaryLabel.textContent = 'Summary (title shown when collapsed)';
         var summaryMount = document.createElement('div');
-        summaryMount.className = 'qs-accordion-row__summary-mount';
         summaryWrap.appendChild(summaryLabel);
         summaryWrap.appendChild(summaryMount);
 
@@ -59,7 +56,6 @@
         contentLabel.className = 'admin-hint';
         contentLabel.textContent = 'Content (text shown when expanded — wrapped in <p>)';
         var contentMount = document.createElement('div');
-        contentMount.className = 'qs-accordion-row__content-mount';
         contentWrap.appendChild(contentLabel);
         contentWrap.appendChild(contentMount);
 
@@ -95,7 +91,6 @@
 
     function renderWizard(container) {
         var wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--accordion';
 
         var itemsGroup = _renderGroup();
         itemsGroup.appendChild(_renderLabel('Items', true));

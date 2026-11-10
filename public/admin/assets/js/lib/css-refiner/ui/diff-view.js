@@ -57,7 +57,7 @@
         }
 
         /* Separator */
-        fragment.appendChild(el('hr', { className: 'cr-diff__separator' }));
+        fragment.appendChild(el('hr', {}));
 
         /* Render added */
         for (i = 0; i < afterLines.length; i++) {
@@ -67,7 +67,7 @@
             fragment.appendChild(createDiffLine(sign2, afterLines[i], lineClass2));
         }
 
-        var diffWrap = el('div', { className: 'cr-diff' });
+        var diffWrap = el('div', {});
         diffWrap.appendChild(fragment);
 
         /* Clear and append */
@@ -79,7 +79,7 @@
 
     function createDiffLine(sign, text, className) {
         return el('div', { className: className }, [
-            el('span', { className: 'cr-diff__sign', textContent: sign }),
+            el('span', { textContent: sign }),
             el('code', { textContent: text })
         ]);
     }

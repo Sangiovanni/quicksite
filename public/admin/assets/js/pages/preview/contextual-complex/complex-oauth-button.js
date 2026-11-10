@@ -122,7 +122,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             const star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -209,7 +208,6 @@
 
     function renderWizard(container) {
         const wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--oauth-button';
 
         // ---- provider picker ------------------------------------------
         const providerGroup = _renderGroup();

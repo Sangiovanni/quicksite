@@ -43,7 +43,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             var star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -102,7 +101,6 @@
 
     function renderWizard(container) {
         var wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--table';
 
         // -- table id (required when paste mode = Translatable; used to
         //    namespace auto-generated translation keys) --
@@ -252,7 +250,7 @@
         pasteActions.style.gap = '8px';
         var pasteApply = document.createElement('button');
         pasteApply.type = 'button';
-        pasteApply.className = 'admin-btn admin-btn--sm';
+        pasteApply.className = 'admin-btn';
         pasteApply.textContent = 'Apply pasted grid';
         pasteActions.appendChild(pasteApply);
         var pasteStatus = document.createElement('span');
@@ -269,7 +267,6 @@
         var headerGroup = _renderGroup();
         headerGroup.appendChild(_renderLabel('Header row'));
         var headerRow = document.createElement('div');
-        headerRow.className = 'qs-table-header-row';
         headerRow.style.display = 'flex';
         headerRow.style.gap = '4px';
         headerGroup.appendChild(headerRow);
@@ -304,7 +301,6 @@
         function _renderRow(data, isHeader) {
             var d = data || { cells: [] };
             var row = document.createElement('div');
-            row.className = isHeader ? 'qs-table-header-row-inner' : 'qs-table-body-row';
             row.style.display = 'flex';
             row.style.gap = '4px';
             row.style.marginBottom = '4px';

@@ -89,7 +89,7 @@
         parts.forEach(function (p) {
             if (p == null || p === '') return;
             if (wrap.childNodes.length > 0) {
-                wrap.appendChild(el('span', { class: 'members-row__meta-sep', text: ' · ' }));
+                wrap.appendChild(el('span', { text: ' · ' }));
             }
             if (typeof p === 'string') wrap.appendChild(document.createTextNode(p));
             else wrap.appendChild(p);
@@ -99,7 +99,7 @@
 
     function _renderActionBtn(label, iconD, kind, onClick) {
         var b = el('button', {
-            class: 'admin-btn admin-btn--sm ' + (kind === 'danger' ? 'admin-btn--danger' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
+            class: 'admin-btn ' + (kind === 'danger' ? 'admin-btn--danger' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
             type: 'button',
             onclick: onClick,
         });
@@ -160,7 +160,7 @@
             },
         }, [confirmLabel]);
 
-        var modal = el('div', { class: 'admin-modal members-modal-open' }, [
+        var modal = el('div', { class: 'admin-modal' }, [
             el('div', { class: 'admin-modal__backdrop', onclick: close }),
             el('div', { class: 'admin-modal__content' }, [
                 el('div', { class: 'admin-modal__header' }, [
@@ -200,7 +200,7 @@
 
     /** A row's star toggle: the panel's (QuickSiteAdmin.syncStarToggle / bindStarToggle). */
     function _renderStarToggle(projectId) {
-        var star = el('button', { class: 'admin-btn admin-btn--sm admin-btn--ghost admin-project-star', type: 'button' });
+        var star = el('button', { class: 'admin-btn admin-btn--ghost admin-project-star', type: 'button' });
         window.QuickSiteAdmin.syncStarToggle(star, projectId);
         window.QuickSiteAdmin.bindStarToggle(star);
         return star;

@@ -10,8 +10,6 @@
  *
  * DOM is built with createElement + textContent through QSDom and named
  * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
- *
- * @version 1.0.0
  */
 
 (function() {
@@ -99,7 +97,6 @@
         });
         return QSDom.el('details', { style: 'margin-top: var(--space-md);' }, [
             QSDom.el('summary', {
-                class: 'admin-text-muted',
                 style: 'cursor: pointer;',
                 text: t('settings.permissions.viewAccessible')
             }),
@@ -119,12 +116,11 @@
 
     function showError(container, error) {
         _replace(container, QSDom.el('p', {
-            class: 'admin-text-error',
             text: t('settings.errors.generic', { message: error.message })
         }));
     }
     function showMuted(container, text) {
-        _replace(container, QSDom.el('p', { class: 'admin-text-muted', text: text }));
+        _replace(container, QSDom.el('p', { text: text }));
     }
 
     /**
@@ -178,7 +174,6 @@
         } else {
             QSDom.clear(container);
             container.appendChild(QSDom.el('p', {
-                class: 'admin-text-muted',
                 text: t('settings.ai.noneConfigured')
             }));
             container.appendChild(QSDom.el('a', {

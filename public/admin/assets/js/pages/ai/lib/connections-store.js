@@ -9,8 +9,6 @@
  *
  * No DOM, no fetch — pure CRUD over a JSON blob. Caller decides which
  * storage (local vs session) to read/write based on the persist toggle.
- *
- * @version 1.0.0
  */
 (function () {
     'use strict';

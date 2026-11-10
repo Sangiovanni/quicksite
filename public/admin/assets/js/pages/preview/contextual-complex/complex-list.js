@@ -43,7 +43,7 @@
         ]);
         const itemsHost = QSDom.el('div', { id: 'ce-list-items-rows' });
 
-        const wrap = QSDom.el('div', { class: 'qs-complex-wizard qs-complex-wizard--list' }, [
+        const wrap = QSDom.el('div', {}, [
             QSDom.el('div', { class: 'admin-form-group' }, [
                 QSDom.el('label', { class: 'admin-label' }, [t('list.type'), ' ', W.requiredMark()]),
                 QSDom.el('div', null, [
@@ -87,8 +87,8 @@
             ],
             renderRow: function (data) {
                 const d = data || {};
-                const mount = QSDom.el('div', { class: 'qs-list-item-row__label-mount' });
-                const row = QSDom.el('div', { class: 'qs-list-item-row' }, [mount]);
+                const mount = QSDom.el('div', {});
+                const row = QSDom.el('div', {}, [mount]);
 
                 const picker = W.createTextKeyPicker({
                     container: mount,

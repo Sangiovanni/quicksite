@@ -7,8 +7,6 @@
  *
  * Usage:
  *   localStorage.getItem(QuickSiteStorageKeys.aiKeysV2)
- *
- * @version 1.0.0
  */
 window.QuickSiteStorageKeys = Object.freeze({
     // Auth / session — nothing auth-related touches browser storage. The

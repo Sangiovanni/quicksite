@@ -8,8 +8,6 @@
  * Two-step wizard:
  *   1. Pick a kind (cloud provider, Ollama, LM Studio, LiteLLM, vLLM, custom).
  *   2. Fill in name + key/base URL — auto-probe on change to surface models.
- *
- * @version 1.0.0
  */
 (function () {
     'use strict';
@@ -101,10 +99,9 @@
                 onclick: function () { openWizard(); }
             });
             root.appendChild(QSDom.el('div', {
-                class: 'admin-empty-state',
                 style: 'padding: var(--space-lg) 0; text-align:center;'
             }, [
-                QSDom.el('p', { class: 'admin-text-muted', text: t('aiConnections.empty') }),
+                QSDom.el('p', { text: t('aiConnections.empty') }),
                 addBtn
             ]));
             return;
@@ -188,7 +185,7 @@
     function _renderCardAction(action, label, extraClass) {
         return QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--secondary admin-btn--small'
+            class: 'admin-btn'
                 + (extraClass ? ' ' + extraClass : ''),
             'data-qsac-action': action,
             text: label
@@ -385,7 +382,7 @@
         QSDom.clear(footer);
         footer.appendChild(QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--secondary',
+            class: 'admin-btn',
             'data-qsac-close': '',
             text: t('common.cancel'),
             onclick: closeWizard
@@ -494,7 +491,7 @@
                 }),
                 QSDom.el('input', {
                     type: 'text', id: 'qsac-baseurl',
-                    class: 'admin-input admin-input--monospace',
+                    class: 'admin-input',
                     value: current.baseUrl || '',
                     placeholder: 'http://localhost:11434/v1'
                 }),
@@ -507,10 +504,10 @@
                 class: 'admin-label', for: 'qsac-key',
                 text: t(isLocal ? 'aiConnections.apiKeyLabelOptional' : 'aiConnections.apiKeyLabel')
             }),
-            QSDom.el('div', { class: 'admin-input-group' }, [
+            QSDom.el('div', {}, [
                 QSDom.el('input', {
                     type: 'password', id: 'qsac-key',
-                    class: 'admin-input admin-input--monospace',
+                    class: 'admin-input',
                     autocomplete: 'off', spellcheck: 'false',
                     value: current.key || '',
                     placeholder: t(isLocal
@@ -518,7 +515,7 @@
                         : 'aiConnections.keyPlaceholderCloud')
                 }),
                 QSDom.el('button', {
-                    type: 'button', class: 'admin-btn admin-btn--icon',
+                    type: 'button', class: 'admin-btn',
                     id: 'qsac-key-toggle', title: t('aiConnections.keyToggleTitle')
                 }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eye, 18)])
             ])
@@ -539,7 +536,7 @@
             QSDom.el('label', { class: 'admin-checkbox' }, [
                 streamingCb,
                 QSDom.el('span', {
-                    class: 'admin-checkbox__label', text: t('aiConnections.streamingLabel')
+                    text: t('aiConnections.streamingLabel')
                 })
             ])
         ]));
@@ -563,7 +560,7 @@
 
         QSDom.clear(footer);
         footer.appendChild(QSDom.el('button', {
-            type: 'button', class: 'admin-btn admin-btn--secondary', id: 'qsac-back',
+            type: 'button', class: 'admin-btn', id: 'qsac-back',
             text: current._editing ? t('common.cancel') : t('aiConnections.back')
         }));
         const saveBtn = QSDom.el('button', {

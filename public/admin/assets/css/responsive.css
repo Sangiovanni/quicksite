@@ -92,25 +92,22 @@
     .preview-tools__buttons {
         display: contents;
     }
-    .preview-tool,
-    .preview-tools__show-names,
-    .preview-device-btn {
-        min-height: 2.75rem;
-    }
     .preview-tools--icons-only .preview-tool {
         width: 2.75rem;
         height: 2.75rem;
     }
-    .preview-element-info__toggle {
+    /* The Phone frame's bar and handles have room for a finger */
+    .preview-tool,
+    .preview-tools__show-names,
+    .preview-device-btn,
+    .preview-element-info__toggle,
+    .preview-frame-bar__sizes,
+    .preview-frame-bar__number,
+    .preview-frame-bar__rotate {
         min-height: 2.75rem;
     }
     .preview-sidebar__resize {
         width: 0.75rem;
-    }
-    /* A tablet shows the page at its own width: no tablet device, whichever one a computer chose
-       (setDevice() writes the frame's size inline) */
-    .preview-device-btn[data-device="tablet"] {
-        display: none;
     }
     .preview-container--device[data-device="tablet"] {
         padding: 0;
@@ -125,15 +122,15 @@
         border-radius: 0;
         box-shadow: none;
     }
+    /* A tablet shows the page at its own width: no tablet device, whichever one a computer chose
+       (setDevice() writes the frame's size inline) */
+    /* The dashboard: the project's buttons wrap from here down, and a divider means nothing once a
+       row breaks */
+    .preview-device-btn[data-device="tablet"],
     .preview-container--device[data-device="tablet"] .preview-frame-bar,
-    .preview-container--device[data-device="tablet"] .preview-frame-handle {
+    .preview-container--device[data-device="tablet"] .preview-frame-handle,
+    .dashboard-current__divider {
         display: none;
-    }
-    /* The Phone frame's bar and handles have room for a finger */
-    .preview-frame-bar__sizes,
-    .preview-frame-bar__number,
-    .preview-frame-bar__rotate {
-        min-height: 2.75rem;
     }
     .preview-frame-bar__rotate {
         min-width: 2.75rem;
@@ -155,16 +152,6 @@
     .preview-sidebar__options,
     .preview-contextual-area--sidebar .preview-contextual-content {
         padding: var(--space-xs);
-    }
-    /* What the page's room leaves Source's toolbar, and the panel's Translations: they wrap */
-    .preview-source-canvas__toolbar,
-    .preview-source-canvas__search,
-    .preview-source-canvas__restore-banner,
-    .preview-source-canvas__restore-actions,
-    .preview-iframe-warning,
-    .preview-contextual-translation__chips,
-    .preview-selector-selected__actions {
-        flex-wrap: wrap;
     }
     .preview-source-canvas__restore-actions {
         flex: 0 1 auto;
@@ -193,6 +180,14 @@
     .preview-sidebar__options {
         overflow-wrap: break-word;
     }
+    /* What the page's room leaves Source's toolbar, and the panel's Translations: they wrap */
+    .preview-source-canvas__toolbar,
+    .preview-source-canvas__search,
+    .preview-source-canvas__restore-banner,
+    .preview-source-canvas__restore-actions,
+    .preview-iframe-warning,
+    .preview-contextual-translation__chips,
+    .preview-selector-selected__actions,
     .qs-fs-field-row__line,
     .preview-contextual-js-state-stores__card,
     .preview-contextual-ai-tools__runner-section-header,
@@ -233,12 +228,6 @@
     }
     .optimize-sidebar {
         position: static;
-    }
-
-    /* The dashboard: the project's buttons wrap from here down, and a divider means nothing once a
-       row breaks */
-    .dashboard-current__divider {
-        display: none;
     }
 
     /* A finger has no hover: what a pointer reveals on a computer is in view from here down */
@@ -286,9 +275,6 @@
         box-sizing: border-box;
         min-height: 3.5rem;
     }
-    .admin-header__wordmark {
-        display: none;
-    }
     .admin-header__brand {
         margin-right: auto;
     }
@@ -303,10 +289,9 @@
         gap: var(--space-xs);
         padding-inline: var(--space-xs);
     }
+    .admin-header__wordmark,
     .admin-project-badge > .admin-btn__icon,
-    .admin-user-badge > .admin-nav__group-arrow {
-        display: none;
-    }
+    .admin-user-badge > .admin-nav__group-arrow,
     .admin-write-rate__figure {
         display: none;
     }
@@ -444,9 +429,6 @@
         width: auto;
         min-width: 0;
     }
-    .preview-toolbar__devices {
-        display: none;
-    }
     .preview-container--device {
         padding: 0;
         align-items: stretch;
@@ -460,6 +442,7 @@
         border-radius: 0;
         box-shadow: none;
     }
+    .preview-toolbar__devices,
     .preview-container--device .preview-frame-bar,
     .preview-container--device .preview-frame-handle {
         display: none;
@@ -554,11 +537,9 @@
     .preview-workspace--panel-fills .preview-sidebar__options {
         display: block;
     }
-    .preview-workspace[data-mode="add"] .preview-sidebar__toggle,
-    .preview-workspace--panel-fills .preview-sidebar__toggle {
-        display: none;
-    }
     /* AI tools: three tags and the count of the rest */
+    .preview-workspace[data-mode="add"] .preview-sidebar__toggle,
+    .preview-workspace--panel-fills .preview-sidebar__toggle,
     .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag--past-phone,
     .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle-count {
         display: none;
@@ -569,10 +550,9 @@
     }
 
     /* Media */
-    .asset-edit-area__content {
-        flex-direction: column;
-    }
-    .asset-browser__toolbar {
+    .asset-edit-area__content,
+    .asset-browser__toolbar,
+    .sitemap-generator__row {
         flex-direction: column;
     }
 
@@ -581,12 +561,7 @@
         flex-wrap: wrap;
         gap: var(--space-xs);
     }
-    .sitemap__route-path {
-        display: none;
-    }
-    .sitemap-generator__row {
-        flex-direction: column;
-    }
+    .sitemap__route-path,
     .sitemap-layout-toggles {
         display: none;
     }
@@ -598,11 +573,6 @@
     .sitemap__route-name {
         min-width: 0;
         overflow-wrap: anywhere;
-    }
-    .sitemap-edit-title-modal__footer,
-    .sitemap-resolver-modal__footer,
-    .sitemap-resolver-list-modal__footer {
-        flex-wrap: wrap;
     }
     /* A link of the generator: its address wraps, and its count of languages stays in view */
     .sitemap-url__text {
@@ -622,6 +592,9 @@
     .dashboard-current__actions .admin-btn--primary {
         grid-column: 1 / -1;
     }
+    .sitemap-edit-title-modal__footer,
+    .sitemap-resolver-modal__footer,
+    .sitemap-resolver-list-modal__footer,
     .dashboard-memberships__links,
     .dashboard-current__line {
         flex-wrap: wrap;
@@ -660,11 +633,6 @@
         flex-wrap: wrap;
         row-gap: var(--space-sm);
     }
-    .admin-card__header,
-    .admin-pagination,
-    .admin-form-actions {
-        flex-wrap: wrap;
-    }
 
     /* A long value with no space in it breaks where it must: a command's name, a code in a hint,
        a list of errors or a list of facts */
@@ -682,6 +650,9 @@
     }
 
     /* A command's form: setRootVariables' value column goes under its list */
+    .admin-card__header,
+    .admin-pagination,
+    .admin-form-actions,
     .admin-variable-selector > div {
         flex-wrap: wrap;
     }
@@ -701,17 +672,11 @@
     .api-card__text {
         min-width: 0;
     }
-    .api-card__name {
-        flex-wrap: wrap;
-    }
     .api-card__meta {
         overflow-wrap: anywhere;
     }
     .api-card__actions {
         margin-left: auto;
-    }
-    .api-auth-token {
-        flex-wrap: wrap;
     }
     .api-auth-token__field {
         flex: 1 1 100%;
@@ -723,9 +688,17 @@
 
     /* My memberships and Project members: a row's buttons go under its text, every one in reach;
        a contact's id has a line of its own */
+    /* Project members: a project's line in the notice wraps, its button under its name */
+    .api-card__name,
+    .api-auth-token,
     .members-banner,
     .members-policy-row,
-    .members-row {
+    .members-row,
+    .members-match-row,
+    .privacy-section__head,
+    .privacy-section__actions,
+    .privacy-host,
+    .members-elsewhere__row {
         flex-wrap: wrap;
     }
     .members-row__main {
@@ -735,19 +708,11 @@
         flex: 1 1 100%;
         justify-content: flex-start;
     }
-    .members-match-row {
-        flex-wrap: wrap;
-    }
     .members-match-row .members-row__id {
         flex: 1 1 100%;
     }
 
     /* Privacy: Add data collected and a host's address stay inside their box */
-    .privacy-section__head,
-    .privacy-section__actions,
-    .privacy-host {
-        flex-wrap: wrap;
-    }
     .privacy-host__url {
         min-width: 0;
         overflow-wrap: anywhere;
@@ -764,11 +729,6 @@
         justify-content: space-between;
         align-items: baseline;
         gap: var(--space-sm);
-    }
-
-    /* Project members: a project's line in the notice wraps, its button under its name */
-    .members-elsewhere__row {
-        flex-wrap: wrap;
     }
 
     /* My account: a label above its value */

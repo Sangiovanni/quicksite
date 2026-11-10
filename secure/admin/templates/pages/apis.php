@@ -4,8 +4,6 @@
  * 
  * Manage external API definitions (REST endpoints) for use in the visual editor.
  * APIs are stored per-project in data/api-endpoints.json.
- * 
- * @version 1.0.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -50,8 +48,8 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
 </div>
 
 <!-- Actions Bar -->
-<div class="admin-toolbar apis-toolbar">
-    <div class="admin-toolbar__left">
+<div class="apis-toolbar">
+    <div>
         <button type="button" class="admin-btn admin-btn--primary" id="btn-add-api" data-requires-command="addApi">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/>
@@ -67,7 +65,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
             <?= __admin('common.refresh') ?>
         </button>
     </div>
-    <div class="admin-toolbar__right">
+    <div>
         <button type="button" class="admin-btn admin-btn--ghost" id="btn-import" title="<?= __admin('apis.importJson') ?>" data-requires-command="addApi,editApi">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -112,7 +110,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
 <div id="apis-loading" class="admin-card">
     <div class="admin-card__body apis-loading">
         <div class="admin-spinner"></div>
-        <p class="admin-text-muted"><?= __admin('common.loading') ?></p>
+        <p><?= __admin('common.loading') ?></p>
     </div>
 </div>
 
@@ -124,7 +122,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
             <polyline points="22 6 12 13 2 6"/>
         </svg>
         <h3 class="apis-empty__title"><?= __admin('apis.empty.title') ?></h3>
-        <p class="admin-text-muted apis-empty__desc"><?= __admin('apis.empty.description') ?></p>
+        <p class="apis-empty__desc"><?= __admin('apis.empty.description') ?></p>
         <button type="button" class="admin-btn admin-btn--primary" id="btn-add-api-empty" data-requires-command="addApi">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/>
@@ -177,7 +175,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                               placeholder="<?= __admin('apis.form.descriptionPlaceholder') ?>"></textarea>
                 </div>
                 
-                <fieldset class="admin-fieldset">
+                <fieldset>
                     <legend><?= __admin('apis.form.authentication') ?></legend>
                     
                     <div class="admin-form-group">
@@ -209,8 +207,8 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     <!-- Refresh (optional) — bearer-only. The collapsible
                          <details>/<summary> is dependency-free and keeps the
                          section out of the way until needed. -->
-                    <details class="admin-collapsible" id="auth-refresh-group" style="display: none;">
-                        <summary class="admin-collapsible__summary"><?= __admin('apis.form.refreshSection') ?></summary>
+                    <details id="auth-refresh-group" style="display: none;">
+                        <summary><?= __admin('apis.form.refreshSection') ?></summary>
                         <div class="admin-form-group">
                             <label class="admin-label" for="api-refresh-endpoint"><?= __admin('apis.form.refreshEndpoint') ?></label>
                             <select class="admin-select" id="api-refresh-endpoint">
@@ -341,12 +339,12 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     <p class="admin-hint"><?= __admin('apis.form.endpointAuthHint') ?></p>
                 </div>
 
-                <fieldset class="admin-fieldset">
+                <fieldset>
                     <legend><?= __admin('apis.form.parameters', 'Parameters') ?></legend>
                     <p class="admin-hint">
                         <?= __admin('apis.form.parametersHint', 'Use <code>:name</code> in the path for path-segment params (e.g. <code>/users/:id</code>). Other params go to the query string at fetch time.') ?>
                     </p>
-                    <div class="apis-params-editor">
+                    <div>
                         <div id="endpoint-params-rows" class="apis-params-editor__rows">
                             <!-- Rows populated by JS -->
                         </div>
@@ -358,7 +356,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     </div>
                 </fieldset>
 
-                <fieldset class="admin-fieldset">
+                <fieldset>
                     <legend><?= __admin('apis.form.requestSchema') ?></legend>
                     <p class="admin-hint apis-schema-hint"><?= __admin('apis.form.schemaHint') ?></p>
                     <div class="admin-schema-editor">
@@ -383,7 +381,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     </div>
                 </fieldset>
                 
-                <fieldset class="admin-fieldset">
+                <fieldset>
                     <legend><?= __admin('apis.form.responseSchema') ?></legend>
                     <div class="admin-schema-editor">
                         <div class="admin-schema-editor__toolbar">
@@ -430,7 +428,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                 <!-- Request Panel -->
                 <div>
                     <h4 class="apis-test-section-title"><?= __admin('apis.test.request') ?></h4>
-                    <div id="test-request-info" class="admin-code-block apis-test-info"></div>
+                    <div id="test-request-info" class="apis-test-info"></div>
                     
                     <!-- Dynamic form fields from schema -->
                     <div id="test-params-form" class="apis-test-params-form">
@@ -467,9 +465,9 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                 <div>
                     <h4 class="apis-test-section-title"><?= __admin('apis.test.response') ?></h4>
                     <div id="test-response-status" class="apis-test-response-status"></div>
-                    <div id="test-response-time" class="admin-text-muted apis-test-response-time"></div>
-                    <div id="test-response-body" class="admin-code-block apis-test-response-body">
-                        <span class="admin-text-muted"><?= __admin('apis.test.noResponse') ?></span>
+                    <div id="test-response-time" class="apis-test-response-time"></div>
+                    <div id="test-response-body" class="apis-test-response-body">
+                        <span><?= __admin('apis.test.noResponse') ?></span>
                     </div>
                     <!-- A draft response schema, offered after a 2xx JSON answer (apis.js). -->
                     <div id="test-draft-offer" class="apis-test-draft-offer" style="display: none;"></div>
@@ -513,7 +511,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     <textarea class="admin-input admin-input--code" id="import-json" rows="12"
                               placeholder='{"apis": {...}}'></textarea>
                 </div>
-                <div id="import-parse-error" class="admin-alert admin-alert--danger" style="display:none;"></div>
+                <div id="import-parse-error" class="admin-alert" style="display:none;"></div>
             </div>
 
             <!-- Screen 2: preview-and-confirm -->
@@ -533,8 +531,8 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     <label class="admin-label"><?= __admin('apis.importModal.treeLabel', 'Endpoints to import (uncheck to exclude)') ?></label>
                     <div id="import-tree"></div>
                 </div>
-                <details class="admin-collapsible">
-                    <summary class="admin-collapsible__summary"><?= __admin('apis.importModal.advancedJson', 'Advanced: raw JSON') ?></summary>
+                <details>
+                    <summary><?= __admin('apis.importModal.advancedJson', 'Advanced: raw JSON') ?></summary>
                     <div class="admin-form-group">
                         <textarea class="admin-input admin-input--code" id="import-preview-json" rows="14"></textarea>
                         <p class="admin-hint"><?= __admin('apis.importModal.previewJsonHint', 'Edits here take effect on Import. Use this to fine-tune schemas or descriptions before saving.') ?></p>

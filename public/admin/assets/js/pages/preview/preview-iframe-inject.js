@@ -10,8 +10,6 @@
  * - Navigation (parent/sibling/child)
  * 
  * Communication with parent window via postMessage.
- * 
- * @version 1.0.0
  */
 (function() {
     'use strict';

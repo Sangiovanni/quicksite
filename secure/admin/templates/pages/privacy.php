@@ -33,7 +33,7 @@ window.QS_PRIVACY_I18N = <?= qs_inline_script_json(['privacy' => AdminTranslatio
 <p id="privacy-desclang-hint" class="admin-hint privacy-desclang-hint" hidden></p>
 
 <div id="privacy-root" class="privacy-root" role="region" aria-label="Privacy helper">
-    <div class="privacy-root__loading" style="padding: 24px; color: var(--admin-text-muted, #555);">Loading privacy status…</div>
+    <div style="padding: 24px; color: var(--admin-text-muted, #555);">Loading privacy status…</div>
 </div>
 
 <div id="privacy-modal-root" data-privacy-modal-root></div>

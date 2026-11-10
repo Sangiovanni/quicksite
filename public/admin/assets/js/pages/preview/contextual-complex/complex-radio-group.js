@@ -33,7 +33,6 @@
         l.appendChild(document.createTextNode(text));
         if (required) {
             var star = document.createElement('span');
-            star.className = 'admin-text-danger';
             star.textContent = ' *';
             l.appendChild(star);
         }
@@ -108,7 +107,6 @@
         // One row of the options editor: value <input> + labelKey picker.
         var d = data || {};
         var row = document.createElement('div');
-        row.className = 'qs-radio-option-row';
         row.style.display = 'flex';
         row.style.gap = '8px';
         row.style.alignItems = 'flex-start';
@@ -122,7 +120,6 @@
         if (d.value !== undefined) valueInput.value = d.value;
 
         var labelMount = document.createElement('div');
-        labelMount.className = 'qs-radio-option-row__label-mount';
         labelMount.style.flex = '1';
         labelMount.style.minWidth = '0';
 
@@ -144,7 +141,6 @@
 
     function renderWizard(container) {
         var wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--radio-group';
 
         // -- name --
         var nameInput = _renderTextInput('ce-rg-name', 'e.g. consent (letters/digits/_/- only)');

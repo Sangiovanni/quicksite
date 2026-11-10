@@ -3,8 +3,6 @@
  * Admin 404 Page
  * 
  * Page not found template.
- * 
- * @version 1.6.0
  */
 ?>
 

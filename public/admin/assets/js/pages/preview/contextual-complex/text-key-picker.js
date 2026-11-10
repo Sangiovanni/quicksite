@@ -171,7 +171,7 @@
 
         const createBtn = document.createElement('button');
         createBtn.type = 'button';
-        createBtn.className = 'admin-btn admin-btn--success admin-btn--sm';
+        createBtn.className = 'admin-btn admin-btn--success';
         createBtn.textContent = QSComplexWizard.t('textKeyPicker.create');
         createRow.appendChild(createBtn);
 

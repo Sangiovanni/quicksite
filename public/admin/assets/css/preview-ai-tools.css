@@ -11,26 +11,6 @@
     padding: 12px;
 }
 
-/* Import + New workflow actions row (below backup banner) */
-.preview-contextual-ai-tools__workflow-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: stretch;
-}
-.preview-contextual-ai-tools__workflow-actions .preview-contextual-ai-tools__small-btn {
-    flex: 1 1 auto;
-    text-align: center;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-}
-.preview-contextual-ai-tools__small-btn--label {
-    /* file-input label must be tab-focusable */
-    cursor: pointer;
-}
 
 /* Backup-first warning banner (top of AI tools panel) */
 .preview-contextual-ai-tools__backup-banner {
@@ -38,8 +18,8 @@
     flex-direction: column;
     gap: 8px;
     padding: 10px;
-    background: rgba(245, 158, 11, 0.08);
-    border: 1px solid rgba(245, 158, 11, 0.4);
+    background: #f59e0b14;
+    border: 1px solid #f59e0b66;
     border-radius: 6px;
 }
 
@@ -54,7 +34,7 @@
 
 .preview-contextual-ai-tools__backup-banner-text strong {
     color: #f59e0b;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 .preview-contextual-ai-tools__backup-banner-text strong::before {
@@ -64,19 +44,19 @@
 .preview-contextual-ai-tools__backup-btn {
     align-self: flex-start;
     padding: 5px 12px;
-    background: rgba(245, 158, 11, 0.15);
+    background: #f59e0b26;
     color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.5);
+    border: 1px solid #f59e0b80;
     border-radius: 4px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-family: inherit;
     cursor: pointer;
     transition: background 0.12s ease;
 }
 
 .preview-contextual-ai-tools__backup-btn:hover {
-    background: rgba(245, 158, 11, 0.25);
+    background: #f59e0b40;
 }
 
 .preview-contextual-ai-tools__backup-btn:disabled {
@@ -155,7 +135,7 @@
 
 .preview-contextual-ai-tools__tag-mode {
     padding: 3px 9px;
-    background: var(--admin-bg-elevated, var(--admin-bg));
+    background: var(--admin-card-bg);
     color: var(--admin-text-muted);
     border: 1px solid var(--admin-border);
     border-radius: 4px;
@@ -217,7 +197,7 @@
     margin: 0;
     padding: 0;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
     opacity: 0.9;
 }
@@ -226,7 +206,7 @@
     display: inline-flex;
     align-items: center;
     padding: 3px 9px;
-    background: var(--admin-bg-elevated, var(--admin-bg));
+    background: var(--admin-card-bg);
     color: var(--admin-text-muted);
     border: 1px solid var(--admin-border);
     border-radius: 999px;
@@ -251,16 +231,6 @@
     gap: 8px;
 }
 
-.preview-contextual-ai-tools__section-header {
-    margin: 0;
-    padding: 0;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--admin-text-muted);
-}
-
 .preview-contextual-ai-tools__tool-list {
     display: flex;
     flex-direction: column;
@@ -272,7 +242,7 @@
     flex-direction: column;
     gap: 6px;
     padding: 10px;
-    background: var(--admin-bg-elevated, var(--admin-bg));
+    background: var(--admin-card-bg);
     color: var(--admin-text);
     border: 1px solid var(--admin-border);
     border-radius: 6px;
@@ -305,7 +275,7 @@
 .preview-contextual-ai-tools__tool-card-title {
     flex: 1;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -320,29 +290,6 @@
     cursor: help;
 }
 
-/* Delete icon on custom workflow cards (top-right) */
-.preview-contextual-ai-tools__tool-card-delete {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    color: var(--admin-text-muted);
-    border: 1px solid transparent;
-    border-radius: 3px;
-    font-size: 12px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 0;
-    transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
-}
-.preview-contextual-ai-tools__tool-card-delete:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.08);
-    border-color: rgba(239, 68, 68, 0.3);
-}
 
 .preview-contextual-ai-tools__tool-card-desc {
     margin: 0;
@@ -375,19 +322,15 @@
 }
 .preview-contextual-ai-tools__tool-card-meta-chip--difficulty-beginner {
     color: #22c55e;
-    border-color: rgba(34, 197, 94, 0.3);
+    border-color: #22c55e4d;
 }
 .preview-contextual-ai-tools__tool-card-meta-chip--difficulty-intermediate {
     color: #f59e0b;
-    border-color: rgba(245, 158, 11, 0.3);
+    border-color: #f59e0b4d;
 }
 .preview-contextual-ai-tools__tool-card-meta-chip--difficulty-advanced {
     color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.3);
-}
-.preview-contextual-ai-tools__tool-card-meta-chip--custom {
-    color: #8b5cf6;
-    border-color: rgba(139, 92, 246, 0.3);
+    border-color: #ef44444d;
 }
 
 .preview-contextual-ai-tools__show-more {
@@ -474,7 +417,7 @@
     margin: 0;
     padding: 0;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -497,9 +440,9 @@
 .preview-contextual-ai-tools__runner-error {
     padding: 10px;
     color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    border: 1px solid #ef44444d;
     border-radius: 4px;
-    background: rgba(239, 68, 68, 0.08);
+    background: #ef444414;
     font-size: 12px;
     line-height: 1.4;
 }
@@ -511,7 +454,7 @@
     flex-direction: column;
     border: 1px solid var(--admin-border);
     border-radius: 4px;
-    background: var(--admin-bg-elevated, var(--admin-bg));
+    background: var(--admin-card-bg);
     overflow: hidden;
 }
 
@@ -527,7 +470,7 @@
     text-align: left;
     font: inherit;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: background 0.12s ease;
 }
@@ -567,22 +510,6 @@
 
 /* Section: Your prompt — template preview */
 
-.preview-contextual-ai-tools__template-preview {
-    margin: 0;
-    padding: 8px;
-    background: var(--admin-bg);
-    border: 1px solid var(--admin-border);
-    border-radius: 4px;
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-    font-size: 11px;
-    line-height: 1.4;
-    color: var(--admin-text);
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 240px;
-    overflow: auto;
-}
-
 /* Parameters */
 
 .preview-contextual-ai-tools__param {
@@ -593,7 +520,7 @@
 
 .preview-contextual-ai-tools__param-label {
     font-size: 12px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
     display: flex;
     align-items: center;
@@ -680,43 +607,7 @@
     line-height: 1.4;
 }
 
-/* Model section */
-.preview-contextual-ai-tools__model-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-.preview-contextual-ai-tools__model-name {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--admin-text);
-}
-.preview-contextual-ai-tools__model-id {
-    font-size: 11px;
-    color: var(--admin-text-muted);
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-}
-.preview-contextual-ai-tools__model-empty {
-    font-size: 12px;
-    color: var(--admin-text-muted);
-}
 
-/* Related commands chips */
-.preview-contextual-ai-tools__related-commands {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-.preview-contextual-ai-tools__related-command {
-    display: inline-block;
-    padding: 2px 7px;
-    background: var(--admin-bg);
-    color: var(--admin-text);
-    border: 1px solid var(--admin-border);
-    border-radius: 3px;
-    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-    font-size: 11px;
-}
 
 /* Input action row: model picker + primary/secondary buttons */
 .preview-contextual-ai-tools__input-action-row {
@@ -759,7 +650,7 @@
     border: 1px solid var(--admin-accent);
     border-radius: 4px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     font-family: inherit;
     cursor: pointer;
     transition: opacity 0.12s ease;
@@ -811,9 +702,6 @@
     color: var(--admin-text);
     cursor: pointer;
     user-select: none;
-}
-.preview-contextual-ai-tools__toggle input {
-    margin: 0;
 }
 
 /* Your prompt + General prompt textareas */
@@ -872,11 +760,6 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
-.preview-contextual-ai-tools__small-btn--primary {
-    background: var(--admin-accent);
-    color: var(--admin-on-accent);
-    border-color: var(--admin-accent);
-}
 
 /* tag-select: scrollable checkbox list */
 
@@ -900,6 +783,7 @@
     cursor: pointer;
     user-select: none;
 }
+.preview-contextual-ai-tools__toggle input,
 .preview-contextual-ai-tools__tag-select-option input {
     margin: 0;
 }
@@ -957,14 +841,14 @@
     padding: 10px;
     border: 1px solid var(--admin-border);
     border-radius: 6px;
-    background: var(--admin-bg-elevated, var(--admin-bg));
+    background: var(--admin-card-bg);
 }
 
 .preview-contextual-ai-tools__zone-header {
     margin: 0;
     padding: 0;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     text-transform: uppercase;
     letter-spacing: 0.6px;
     color: var(--admin-text-muted);
@@ -977,35 +861,11 @@
     color: var(--admin-accent);
 }
 
-.preview-contextual-ai-tools__zone--exchange {
-    border-style: dashed;
-}
-
+.preview-contextual-ai-tools__zone--exchange,
 .preview-contextual-ai-tools__zone--execution {
     border-style: dashed;
 }
 
-/* Generate button inside the inputs zone */
-.preview-contextual-ai-tools__generate-btn {
-    width: 100%;
-    padding: 8px 12px;
-    background: var(--admin-accent);
-    color: var(--admin-on-accent);
-    border: 1px solid var(--admin-accent);
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    transition: opacity 0.12s ease;
-}
-.preview-contextual-ai-tools__generate-btn:hover {
-    opacity: 0.9;
-}
-.preview-contextual-ai-tools__generate-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
 
 /* Inline checkbox layout (param.type === 'checkbox') */
 .preview-contextual-ai-tools__param--inline {
@@ -1028,7 +888,7 @@
 }
 .preview-contextual-ai-tools__param--inline .preview-contextual-ai-tools__param-label {
     cursor: pointer;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 /* AI response textarea + parse status */
@@ -1086,7 +946,7 @@
 
 .preview-contextual-ai-tools__footer-label {
     color: var(--admin-text-muted);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     text-transform: uppercase;
     font-size: 9px;
     letter-spacing: 0.5px;
@@ -1122,6 +982,7 @@
     padding: 4px 0;
     font-size: 12px;
     color: var(--admin-text);
+    cursor: pointer;
 }
 .preview-contextual-ai-tools__step + .preview-contextual-ai-tools__step {
     border-top: 1px dashed var(--admin-border);
@@ -1168,9 +1029,6 @@
     color: var(--admin-accent);
 }
 
-.preview-contextual-ai-tools__step {
-    cursor: pointer;
-}
 .preview-contextual-ai-tools__step:hover {
     background: var(--admin-bg);
 }
@@ -1214,13 +1072,13 @@
 .preview-contextual-ai-tools__kept {
     margin: 0 0 var(--space-md, 12px);
     padding: var(--space-sm, 8px) var(--space-md, 12px);
-    border: 1px solid var(--admin-warning, #d4a84b);
+    border: 1px solid var(--admin-warning, var(--admin-warning));
     border-radius: var(--radius-md, 6px);
-    background: var(--admin-warning-bg, rgba(212, 168, 75, 0.15));
+    background: var(--admin-warning-bg, var(--admin-warning-bg));
 }
 .preview-contextual-ai-tools__kept-title {
     margin: 0 0 4px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 .preview-contextual-ai-tools__kept-warning,
 .preview-contextual-ai-tools__kept-wait {
@@ -1247,7 +1105,7 @@
 }
 .preview-contextual-ai-tools__run-phase--current {
     color: var(--admin-accent);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 .preview-contextual-ai-tools__run-phase--done {
     color: var(--admin-text);
@@ -1271,7 +1129,7 @@
     display: none;
 }
 .preview-contextual-ai-tools__review--change {
-    border-color: var(--admin-warning, #d4a84b);
+    border-color: var(--admin-warning, var(--admin-warning));
 }
 .preview-contextual-ai-tools__review--delete {
     border-color: #ef4444;
@@ -1279,7 +1137,7 @@
 .preview-contextual-ai-tools__review-title {
     margin: 0;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
 }
 .preview-contextual-ai-tools__review-what,
@@ -1304,7 +1162,7 @@
     color: #ef4444;
 }
 .preview-contextual-ai-tools__effect--change {
-    color: var(--admin-warning, #d4a84b);
+    color: var(--admin-warning, var(--admin-warning));
 }
 
 /* A step's mark in the Batch: it deletes or changes content. */
@@ -1316,12 +1174,12 @@
     line-height: 1.5;
 }
 .preview-contextual-ai-tools__step-effect--delete {
-    background: rgba(239, 68, 68, 0.15);
+    background: #ef444426;
     color: #ef4444;
 }
 .preview-contextual-ai-tools__step-effect--change {
-    background: rgba(212, 168, 75, 0.15);
-    color: var(--admin-warning, #d4a84b);
+    background: var(--admin-warning-bg);
+    color: var(--admin-warning, var(--admin-warning));
 }
 
 /* The Batch by phase: a group per phase, its header opening its rows. */
@@ -1344,7 +1202,7 @@
     cursor: pointer;
 }
 .preview-contextual-ai-tools__phase-name {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 .preview-contextual-ai-tools__phase-meta {
     color: var(--admin-text-muted);
@@ -1407,7 +1265,7 @@
 .preview-contextual-ai-tools__cost-title,
 .preview-contextual-ai-tools__cost-phase-name {
     color: var(--admin-text);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 .preview-contextual-ai-tools__cost-note {
     font-style: italic;

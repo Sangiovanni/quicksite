@@ -7,7 +7,6 @@
  * Example: "onclick": "{{call:hide:#modal}}"
  * Renders: onclick="QS.hide('#modal')"
  * 
- * @version 2.0.0
  * @license MIT
  */
 
