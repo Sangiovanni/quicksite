@@ -105,8 +105,9 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge, and each share on its entry (My memberships, Project members); the queue's count also per project (`adjudicationByProject`), which the Project members page names; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
+| `js/core/panel-mode.js` | The mode (*The mode: simple or advanced* above): the account menu's **Mode** row, the chooser for an account with no mode, and what follows the first pick (the account menu open, the row's glow, the bubble). Loaded on every page of a signed-in account, after `admin.js`. |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
-| `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, delegation. |
+| `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, the menu's groups after both filters (`applyMenuGroups()`), `canRun(command)` (the one answer to whether a page shows a control: the role holds the command, and a project-scoped command has a project), delegation. |
 
 **Tooltips: the panel's bubble.** A tooltip in the panel is a plain `title` attribute, in a
 template or written by a script; `bubble.js` shows it instead of the browser. It shows on mouse
@@ -160,7 +161,7 @@ hover opened leaves it open, and the next click closes it. While a menu is pinne
 other. In the phone's panel a group expands in place and has no hover; it closes when another group
 opens, with the panel, by its arrow or on Escape, never on the way to a press elsewhere in the
 panel, which would move the next entry from under the finger. The **account menu**, which
-your name and role open, holds My account, the panel's language, Log out and Log out everywhere,
+your name and role open, holds My account, the panel's language, the mode, Log out and Log out everywhere,
 and on a phone says your name and role as its first line. One helper opens and closes all three kinds of menu
 (`QuickSiteAdmin.initHeaderMenus()`), so they close by the same rules: one at a time, but for a
 group inside the open panel; on Escape, which puts the focus back on what opened it; on a click or
@@ -168,6 +169,45 @@ tap outside; when the focus leaves; and when the page changes. A menu's box stay
 window at any width. The **Members** group's count is everything that waits; its two entries each
 show their share: **My memberships** what waits for you (invitations and notices), **Project
 members** the join requests waiting for your validation, across the projects you run.
+
+**The mode: simple or advanced.** Each account chooses the menu it sees. **Simple** shows Dashboard,
+Build (Visual Editor, Builds), Media, Sitemap, Members (My memberships, Project members) and Settings
+(Settings, AI connections). **Advanced** shows every page: Commands, History and API Endpoints in
+Build, Authentication, Compliance (Storage, Privacy), Optimize and Embed Security besides. The mode
+decides the menu and nothing else: every page opens at its address for anyone whose role allows it,
+in either mode, and no permission, control or command reads the mode. A page the advanced menu reaches
+and the simple one does not (Commands, History, API Endpoints, Authentication, Storage, Privacy, Optimize,
+Embed Security), opened in simple from its address or a link, says so in one line at its top, *This page is
+in the Advanced menu: you reached it from its address or a link.*, with **Switch to Advanced**, the *Mode*
+row's own switch (`qs_admin_menu_page_is_advanced()`; drawn in either mode, shown by the simple class). What simple shows is one definition
+in code, `secure/admin/functions/panelMenu.php` (`qs_admin_menu()`): every entry with its words, its
+icon, the commands its role filter needs, the setup switch that can take it off the installation, and
+whether simple shows it; an entry it does not mark simple is advanced. `layout.php` draws the menu from
+it, every entry the installation offers, and marks each advanced one `data-menu-advanced`; the page's
+`admin-body--simple` class, set by the server from the account's mode, hides those, so the first frame
+is right and a switch needs no reload. Once permissions load the role filter hides what the role cannot
+use (`data-requires-command`), and `QuickSiteAdmin.applyMenuGroups()` then draws a group with no entry
+left as nothing and a group with one entry left as that entry, a plain link with its own words, icon
+and count; it runs again after a switch. The Visual Editor needs only what reading a page needs, so a
+viewer has it in the menu; Build's other entries need `editStructure` too.
+
+The mode is kept on the account, in `users.php` (`panel_mode`), beside the starred projects, and
+written through `/admin/state/panel-mode` (`{"mode": "simple"|"advanced"}`, any other value refused),
+so it follows the account to another browser. An account with no mode has not chosen: the first panel
+page it loads while signed in, whichever page that is, opens the **chooser**, and the menu behind it is
+simple. Sign-in, register and first run never show it. The chooser is the panel's one modal
+(`QuickSiteUtils.openModal()`, see *Dialogs* below), opened once permissions have loaded; it closes
+only by a pick (Escape and the backdrop do nothing). Its two cards, Simple on the left and Advanced on
+the right, each hold a drawing of the menu (inline SVG in the panel's colours, no words) and the list of
+pages that mode's menu reaches for this role, from the same definition and through the same role filter;
+the Advanced list starts *Everything in Simple, plus:*, or says the pages are the same for now when the
+role gives nothing more. A card is its button. In bold, it says the mode can be changed at any time from
+the account menu. A pick that cannot be saved keeps the chooser open and says so. After the pick the
+account menu opens, its **Mode** row glows three times where it is (with the system's *reduce motion*,
+it does not), and a bubble under the row, with a ×, says the mode can be switched there at any time;
+the bubble goes with its × or with the menu, and does not come back. The **Mode** row (*Mode: Simple |
+Advanced*, under the language, the current mode marked) switches at once and saves; a save that fails
+puts the menu back and says so in a toast. `js/core/panel-mode.js` answers the row and the chooser.
 
 `--admin-header-height` follows the header's real height at every width, in any language and at
 any text size: `admin.js` writes it on `:root` from a `ResizeObserver`, and `admin.css` and
@@ -200,6 +240,7 @@ whose click it holds is followed afterwards, a mode or tab switch happens afterw
 | Focus | It takes the focus: the confirm button, **Cancel** for a `type: 'danger'` one (a question before a delete or an overwrite: its button is red), the text field of a prompt (Enter there is OK). Tab stays inside. Closing gives the focus back where it was. |
 | Keys | While it is open no key reaches the page: not the editor's shortcuts (Delete, Escape), not the panel's (`g d`, `?`), not a modal underneath. Escape and a click on the backdrop answer no. |
 | Words | Its message keeps its line breaks and is shown as text. Default title *Confirm Action* and buttons *Confirm* / *Cancel* (`common`), or the `title`, `confirmText`, `cancelText` given; a prompt has no title unless given, its question is the field's label, and `defaultValue` / `placeholder` fill the field. |
+| The one modal | Both are drawn in `QuickSiteUtils.openModal(box, options)`, which does the layer, the focus, Tab and the keys for any content; the mode chooser uses it with no dismissal, so Escape and the backdrop do nothing there and only its own buttons close it. |
 | The one exception | Leaving the page with unsaved CSS Source edits (closing the tab, reloading) is the browser's own `beforeunload` question: a page cannot replace it (§8.10). |
 
 ### 5.2 Shared components
@@ -346,7 +387,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `starredProjects` (the account's starred project ids, §8.0), `writeRate`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `starredProjects` (the account's starred project ids, §8.0), `panelMode` (the account's mode, `null` until its first pick: a display preference, never an authorization input), `writeRate`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` + `window.QS_SETTINGS_I18N` | `baseUrl`, `commandUrl`, `aiSettingsUrl`, `quicksiteVersion`; the `settings` and `common` sub-trees, verbatim |
 | `templates/pages/apis.php` | `window.QS_APIS_I18N` | the `apis` and `common` sub-trees, verbatim |
 | `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `window.QS_EMBED_SECURITY_I18N` | `baseUrl`; the `embedSecurity` sub-tree, verbatim |
@@ -1093,7 +1134,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
-| **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. |
+| **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. An installation can hide the page (setup item 11, `embed-security.php`, `qs_embed_security_shown()`; absent, it is shown): it leaves the menu and says it was turned off, while the policy stays in force and `getIframeSandbox` keeps answering every role that holds it. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
 
 ### 9.1 API Registry (/admin/apis)
@@ -3809,10 +3850,13 @@ Each field is built from the parameter's `help` entry:
 | `description` | Under the field. |
 | `default` | Under the field as **Default:** — what the command uses when the field is left empty. |
 | `validation` | Under the field as **Validation:**. |
+| `enum` | The values the command takes, and no other: the field is a list of exactly those, starting blank (an optional one left blank is not sent). `addStorageItem`'s and `editStorageItem`'s scope and category are such lists. |
 
 A parameter `help` types as `object`, `array` or a choice of the two (`object|array`) is a JSON box: what it holds is sent as JSON. A field starts empty, JSON boxes included, and a field left empty is not sent: an optional parameter the form was not given is absent from the request, so the command applies its own default.
 
 The fields come in up to three groups, by what `help` says of each parameter: **Required Parameters**, which the form will not send without; **Required in Some Cases** — `help` marks the parameter `conditional`, and its description says when it is needed (`addNode`'s `tag` for an element, `textKey` or `textValue` for a text) — which the form never requires, since a request of the other kind must leave it out; and **Optional Parameters**.
+
+`deleteStorageItem`'s and `editStorageItem`'s `id` is a searchable list of the project's storage items (`listStorageItems`); `deleteCollectedDatum`'s `id` one of its collected data (`getPrivacyStatus`); `setCollectedDatum`, which creates or edits, offers the existing ids with a way to type a new one. Each list comes from a read every role that may run the command holds, so it shows nothing its reader cannot read, and it is read again after the command succeeds. `setRouteResolver`'s form has one line under the route field linking to the Sitemap, where each route's resolver has an editor of its own (§9.7).
 
 `addNode`'s and `editNode`'s `tag` is a searchable list of every tag the commands accept, grouped and described as the visual editor's **HTML Tag** picker shows them; the tags that picker leaves out sit in its **Other** group. `editNode`'s starts blank, which keeps the node's tag.
 

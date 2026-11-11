@@ -22,27 +22,9 @@
     // Helper Functions
     // ========================================================================
 
-    /**
-     * Can this page actually run `command` right now?
-     *
-     * Permission is only half the question. A PROJECT-SCOPED command with no
-     * project bound never reaches the server at all — api.js's buildCommandPath
-     * returns null and the call is refused client-side — so the block that
-     * consumes the result can only ever render an error. At zero membership that
-     * is every project-scoped call on the page.
-     *
-     * Without the second half, the dashboard fires getSizeInfo and logs
-     * "getSizeInfo failed: Unknown error" for an account that is a member of
-     * nothing. Gate on BOTH, in one place, so a future call inherits it.
-     */
+    /** Can this page run `command` now: the panel's one rule, QuickSiteAdmin.canRun() (permission and a project). */
     function canRun(command) {
-        const admin = window.QuickSiteAdmin;
-        const api = window.QuickSiteAPI;
-        if (!(admin?.hasPermission(command) ?? true)) return false;
-        // Unknown scope => treat as project-scoped, mirroring api.js and the
-        // server's own 'scope' ?? 'project' default (fail closed).
-        if (api && !api.isProjectScoped(command)) return true;
-        return !!(api ? api.getCurrentProject() : (window.QUICKSITE_CONFIG?.currentProject));
+        return window.QuickSiteAdmin.canRun(command);
     }
 
     /**

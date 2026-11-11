@@ -767,7 +767,13 @@
             "eventsLessCommon": "Less common",
             "eventCustom": "Type an event that is not listed…",
             "eventCustomHint": "Use an event name the element does not normally carry",
-            "eventCustomPlaceholder": "Event name, for example onclick"
+            "eventCustomPlaceholder": "Event name, for example onclick",
+            "storageItem": "Select a storage item",
+            "collectedDatum": "Select a collected datum",
+            "collectedDatumCustom": "Another id…",
+            "collectedDatumCustomHint": "Type an id the list does not have: the datum is created.",
+            "collectedDatumPlaceholder": "The datum's id",
+            "collectedDatumExisting": "Collected data"
         },
         "empty": {
             "noKeys": "No keys found",
@@ -925,6 +931,10 @@
             "login": "Signing in from this console would mint a second session on top of the one this panel is already using. The parameters and documentation below are complete \u2014 call it against the Management API instead.",
             "logoutSession": "Running this from the console would end the session this panel is using and sign you out mid-page. Use Logout in the account menu instead. The parameters and documentation below are complete.",
             "registerDisabled": "This installation does not accept self-registration (registration.allow_self_registration is off), so this command answers 403 to every caller \u2014 the console included. The parameters and documentation below are complete, and describe what it does where the setting is on."
+        },
+        "setRouteResolver": {
+            "sitemapNote": "The Sitemap has an editor for a route's resolver:",
+            "sitemapLink": "open the Sitemap"
         }
     },
     "history": {
@@ -1184,6 +1194,26 @@
         "noteAmazon": "Login with Amazon asks for a privacy notice address, and expects its return addresses to use https.",
         "noteMeta": "Add the email permission, and keep the app in Development mode while you test: only accounts with a role on the app can sign in."
     },
+    "panelMode": {
+        "bubble": "You can switch between Simple and Advanced here at any time.",
+        "bubbleClose": "Close",
+        "saveFailed": "Your choice could not be saved. Try again.",
+        "chooser": {
+            "title": "How should your menu look?",
+            "intro": "Both menus open the same panel. Pick the one that suits you.",
+            "simpleLead": "The pages you need to build and publish a site.",
+            "advancedLead": "Every page of the panel, the technical ones too.",
+            "everythingInSimple": "Everything in Simple, plus:",
+            "pickSimple": "Choose Simple",
+            "pickAdvanced": "Choose Advanced",
+            "note": "You can change this at any time from the account menu, top right.",
+            "advancedNone": "The same pages for now: the others come with a role in a project."
+        },
+        "notice": {
+            "text": "This page is in the Advanced menu: you reached it from its address or a link.",
+            "switch": "Switch to Advanced"
+        }
+    },
     "nav": {
         "oauth-providers": "OAuth providers",
         "members": "Members",
@@ -1229,7 +1259,10 @@
         "authentication": "Authentication",
         "compliance": "Compliance",
         "storage": "Storage",
-        "privacy": "Privacy"
+        "privacy": "Privacy",
+        "mode": "Mode",
+        "modeSimple": "Simple",
+        "modeAdvanced": "Advanced"
     },
     "optimize": {
         "title": "Optimization Tools",
@@ -1465,6 +1498,10 @@
         "blockEverything": "Block everything",
         "errors": {
             "loadFailed": "Failed to load the embed policy"
+        },
+        "disabled": {
+            "title": "The Embed Security page is turned off",
+            "text": "The operator of this installation chose not to show it. This removes a page, not a rule: the embed policy stays in force, and every command still answers on the Management API to any caller whose role allows it."
         }
     },
     "settings": {

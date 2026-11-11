@@ -7,9 +7,10 @@
  * a fact about the panel, not about any project, so it is served here and
  * reached at `/admin/state/…` rather than through `/management`.
  *
- * Today that is two values in the account's users.php entry: `selected_project`
- * (the project the panel edits) and `starred_projects` (the projects the account
- * starred, which come first in each of its project lists).
+ * Today that is three values in the account's users.php entry: `selected_project`
+ * (the project the panel edits), `starred_projects` (the projects the account
+ * starred, which come first in each of its project lists) and `panel_mode` (the
+ * menu the account chose, simple or advanced).
  *
  * Answers are ApiResponse envelopes — the same shape `/management` returns — so
  * the panel's existing error handling reads them unchanged.
@@ -210,5 +211,75 @@ if (!function_exists('qs_admin_set_project_star')) {
                 'starred'          => $starred,
                 'starred_projects' => $starredNow,
             ]);
+    }
+}
+
+/**
+ * The menus an account can choose: `simple` shows the pages a beginner needs, `advanced` every page (the
+ * definition is panelMenu.php's). An entry without `panel_mode` has chosen nothing yet.
+ *
+ * ⚠ THE MODE IS NOT A PERMISSION. It decides which entries the menu draws, and a line at the top of a page of the
+ * advanced menu opened in simple; nothing else: no page, no
+ * command and no control is refused because of it, here or anywhere. A page left out of the simple menu
+ * opens at its address for anyone whose role allows it, as it always did.
+ */
+const QS_PANEL_MODES = ['simple', 'advanced'];
+
+if (!function_exists('qs_admin_panel_mode')) {
+    /**
+     * THIS caller's mode (users.php `panel_mode`), or null when it has chosen none. A value that is not one
+     * of the modes reads as none, so the panel asks again rather than guess.
+     *
+     * @param array $user the caller's users.php entry
+     */
+    function qs_admin_panel_mode(array $user): ?string {
+        $mode = $user['panel_mode'] ?? null;
+        return in_array($mode, QS_PANEL_MODES, true) ? $mode : null;
+    }
+}
+
+if (!function_exists('qs_admin_set_panel_mode')) {
+    /**
+     * Set THIS caller's mode — the one writer of users.php `panel_mode`. The chooser and the account menu's
+     * Mode row both write it. A display preference, like a star: it decides which entries the menu draws,
+     * and grants or refuses nothing.
+     *
+     * @param array $user the authenticated caller (needs 'id')
+     * @param mixed $mode 'simple' or 'advanced' (anything else is refused)
+     */
+    function qs_admin_set_panel_mode(array $user, $mode): ApiResponse {
+        if (!in_array($mode, QS_PANEL_MODES, true)) {
+            return ApiResponse::create(400, 'validation.invalid_value')
+                ->withMessage('mode must be simple or advanced')
+                ->withErrors(['mode' => 'Must be simple or advanced']);
+        }
+
+        $userId = (string)($user['id'] ?? '');
+        if ($userId === '') {
+            return ApiResponse::create(401, 'auth.required')
+                ->withMessage('Authentication required');
+        }
+
+        $userMissing = false;
+        $written = qs_users_mutate(function (array &$cfg) use ($userId, $mode, &$userMissing) {
+            if (!isset($cfg['users'][$userId])) {
+                $userMissing = true;
+                return false;
+            }
+            $cfg['users'][$userId]['panel_mode'] = $mode;
+            return true;
+        });
+        if ($userMissing) {
+            return ApiResponse::create(404, 'resource.not_found')
+                ->withMessage('User record not found');
+        }
+        if ($written !== true) {
+            return ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage('Failed to persist the mode');
+        }
+
+        return ApiResponse::create(200, 'operation.success')
+            ->withMessage("Panel mode set to '$mode'")
+            ->withData(['panel_mode' => $mode]);
     }
 }

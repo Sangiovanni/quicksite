@@ -57,6 +57,10 @@ $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the p
 // cookie's path is '/'. Nothing extra is emitted here.
 $myProjectIds = [];
 $starredProjects = [];
+// The account's mode (panel state, users.php `panel_mode`): null until it picks one. A display preference and
+// nothing else: it decides which menu entries are drawn (and shows a line on a page of the advanced menu opened in
+// simple); no permission and no command reads it.
+$panelMode = null;
 require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php'; // qs_project_label (the picker)
 // Does THIS account see operator notices? (secure/management/config/operator.php,
 // written at first run.) A DISPLAY PREFERENCE AND NOTHING ELSE: it gates
@@ -95,6 +99,7 @@ if (!$isLoginPage) {
         // orders its lists (QuickSiteAdmin.orderProjectSelect) from this list.
         require_once SECURE_FOLDER_PATH . '/admin/functions/panelState.php';
         $starredProjects = qs_admin_starred_projects($__pkAuth['user']);
+        $panelMode = qs_admin_panel_mode($__pkAuth['user']);
         $__pkUserId = (string)($__pkAuth['user']['id'] ?? ($__pkAuth['userId'] ?? ''));
         $isOperator = $__pkUserId !== '' && in_array($__pkUserId, qs_operator_ids(), true);
     }
@@ -187,7 +192,12 @@ $langNames = [
     <!-- The panel's hover bubble: every title shows through it. Listens on the document; builds its element on first use. -->
     <script src="<?= $versionedAsset('/js/core/bubble.js') ?>"></script>
 </head>
-<body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
+<?php
+// The simple menu until the account picks advanced: an account that has not chosen sees the simple menu
+// behind the chooser. The class only hides menu entries (panelMenu.php); it is no permission.
+$panelSimple = !$isLoginPage && $panelMode !== 'advanced';
+?>
+<body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?><?= $panelSimple ? ' admin-body--simple' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
     
     <?php if (!$isLoginPage): ?>
     <!-- Admin Header -->
@@ -200,19 +210,29 @@ $langNames = [
         </div>
         
         <?php
-            // Determine which nav group should be highlighted
-            // API Endpoints sit under Build, not Settings: it's an authoring
-            // surface used constantly during build (fetch picker, interactions,
-            // component-list bindings), not a config setting.
-            $buildPages = ['workflows', 'command', 'history', 'preview', 'apis', 'builds'];
-            $settingsPages = ['settings', 'ai-settings', 'ai-connections', 'embed-security'];
-            $compliancePages = ['storage', 'privacy'];
-            $membersPages = ['memberships', 'members'];
-            $isBuildActive = in_array($currentPage, $buildPages);
-            $isSettingsActive = in_array($currentPage, $settingsPages);
-            $isAssetsActive = ($currentPage === 'media');
-            $isComplianceActive = in_array($currentPage, $compliancePages);
-            $isMembersActive = in_array($currentPage, $membersPages);
+            // The menu: one definition (panelMenu.php), which the chooser's lists read too. Every entry its
+            // deployer offers is drawn in both modes; simple hides the advanced ones by the page's class, so the
+            // first frame is right and a switch needs no reload. The role filter runs once permissions load
+            // (data-requires-command), and admin.js then draws a group with one entry left as that entry.
+            require_once SECURE_FOLDER_PATH . '/admin/functions/panelMenu.php';
+            $navMenu = qs_admin_menu_drawn();
+            $navWords = static function (array $label): string {
+                return $label[1] === null ? __admin($label[0]) : __admin($label[0], $label[1]);
+            };
+            $navIcon = static function (string $inner): string {
+                return '<svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' . $inner . '</svg>';
+            };
+            $navBadge = static function (?string $id): string {
+                return $id === null ? '' : '<span class="admin-nav__count-badge" id="' . adminAttr($id) . '" hidden>0</span>';
+            };
+            // One link of the menu, at the top level or inside a group's dropdown.
+            $navLink = static function (array $entry) use ($router, $currentPage, $navWords, $navIcon, $navBadge): string {
+                $active = in_array($currentPage, $entry['active'] ?? [$entry['page']], true);
+                return '<a href="' . adminAttr($router->url($entry['page'])) . '" class="admin-nav__link' . ($active ? ' admin-nav__link--active' : '') . '"'
+                    . (($entry['requires'] ?? '') !== '' ? ' data-requires-command="' . adminAttr($entry['requires']) . '"' : '')
+                    . ($entry['simple'] ? '' : ' data-menu-advanced')
+                    . '>' . $navIcon($entry['icon']) . '<span>' . $navWords($entry['label']) . '</span>' . $navBadge($entry['badge'] ?? null) . '</a>';
+            };
 
             // A group's arrow, a button of its own beside the word, which stays a link to its page: a touch
             // and a key have no hover to open a group with. Its dropdown is admin-nav-menu-<group>.
@@ -332,6 +352,17 @@ $langNames = [
                     <?php endforeach; ?>
                 </div>
 
+                <!-- The menu the account chose, the current one marked (none before the first pick): simple shows the
+                     pages a beginner needs, advanced every page. It hides menu entries and grants or refuses
+                     nothing. js/core/panel-mode.js answers a click, at once and saved. -->
+                <div class="admin-account__mode" id="admin-account-mode" role="group" aria-labelledby="admin-account-mode-label">
+                    <span class="admin-account__mode-label" id="admin-account-mode-label"><?= __admin('nav.mode', 'Mode') ?>:</span>
+                    <?php foreach (QS_PANEL_MODES as $modeOption): ?>
+                    <button type="button" class="admin-account__mode-btn<?= $modeOption === $panelMode ? ' admin-account__mode-btn--active' : '' ?>"
+                            data-panel-mode="<?= adminAttr($modeOption) ?>" aria-pressed="<?= $modeOption === $panelMode ? 'true' : 'false' ?>"><?= __admin('nav.mode' . ucfirst($modeOption)) ?></button>
+                    <?php endforeach; ?>
+                </div>
+
                 <!-- Both logouts POST and carry the per-session token: signing
                      somebody out is a state change, and as GET links any foreign
                      page could spend one <img> tag doing it. The router refuses
@@ -386,243 +417,21 @@ $langNames = [
              Nothing moves it, and no script reads a width. -->
         <div class="admin-header__panel" id="admin-header-panel">
             <nav class="admin-nav">
-                <a href="<?= $router->url('dashboard') ?>" 
-                   class="admin-nav__link<?= $currentPage === 'dashboard' ? ' admin-nav__link--active' : '' ?>">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"/>
-                        <rect x="14" y="3" width="7" height="7"/>
-                        <rect x="14" y="14" width="7" height="7"/>
-                        <rect x="3" y="14" width="7" height="7"/>
-                    </svg>
-                    <span><?= __admin('nav.dashboard') ?></span>
-                </a>
-            
-                <!-- Build Tools Group - Click goes to Visual Editor -->
-                <div class="admin-nav__group<?= $isBuildActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="build" data-requires-command="editStructure">
-                    <a href="<?= $router->url('preview') ?>" class="admin-nav__group-toggle" data-requires-command="editStructure">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                        </svg>
-                        <span><?= __admin('nav.build') ?></span>
-                    </a>
-                    <?= $navGroupArrow('build', __admin('nav.build')) ?>
-                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-build">
-                        <a href="<?= $router->url('preview') ?>" 
-                           class="admin-nav__link<?= $currentPage === 'preview' ? ' admin-nav__link--active' : '' ?>">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                                <line x1="8" y1="21" x2="16" y2="21"/>
-                                <line x1="12" y1="17" x2="12" y2="21"/>
-                            </svg>
-                            <span><?= __admin('nav.visualEditor') ?></span>
-                        </a>
-                        <?php /* An installation can decline to offer the command console
-                                 (console.php; absent means it is offered). Gated here on the
-                                 SERVER so the entry is never emitted: the panel's own
-                                 data-requires-command filter only ever hides elements it finds,
-                                 so a client-side rule could not have removed this one on an
-                                 install where the operator said no. The page itself refuses
-                                 independently — this only stops us advertising it. */ ?>
-                        <?php if ($router->isConsoleEnabled()): ?>
-                        <a href="<?= $router->url('command') ?>"
-                           class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="16 18 22 12 16 6"/>
-                                <polyline points="8 6 2 12 8 18"/>
-                            </svg>
-                            <span><?= __admin('nav.commands') ?></span>
-                        </a>
-                        <?php endif; ?>
-                        <?php /* Command history — its own page, not a
-                                 tab on the console. Not gated on the console: the trail is
-                                 independent of the runner, and stays reachable when the
-                                 operator turns the console off. data-requires-command hides
-                                 it for ranks below admin, which is chrome-hiding only — the
-                                 page itself is gated server-side in PAGE_PERMISSIONS. */ ?>
-                        <a href="<?= $router->url('history') ?>"
-                           class="admin-nav__link<?= $currentPage === 'history' ? ' admin-nav__link--active' : '' ?>"
-                           data-requires-command="getCommandHistory">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                            <span><?= __admin('nav.history', 'History') ?></span>
-                        </a>
-                        <a href="<?= $router->url('apis') ?>"
-                           class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
-                           data-requires-command="listApiEndpoints">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                                <polyline points="22 6 12 13 2 6"/>
-                            </svg>
-                            <span><?= __admin('nav.apiEndpoints') ?></span>
-                        </a>
-                        <a href="<?= $router->url('builds') ?>"
-                           class="admin-nav__link<?= $currentPage === 'builds' ? ' admin-nav__link--active' : '' ?>"
-                           data-requires-command="getBuild">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                                <line x1="12" y1="22.08" x2="12" y2="12"/>
-                            </svg>
-                            <span><?= __admin('nav.builds', 'Builds') ?></span>
-                        </a>
+                <?php foreach ($navMenu as $navItem): ?>
+                <?php if (!isset($navItem['entries'])): ?>
+                <?= $navLink($navItem) ?>
+                <?php else: ?>
+                <div class="admin-nav__group<?= in_array($currentPage, $navItem['active'], true) ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="<?= adminAttr($navItem['group']) ?>"<?= $navItem['simple'] ? '' : ' data-menu-advanced' ?>>
+                    <a href="<?= adminAttr($router->url($navItem['page'])) ?>" class="admin-nav__group-toggle"><?= $navIcon($navItem['icon']) ?><span><?= $navWords($navItem['label']) ?></span><?= $navBadge($navItem['badge'] ?? null) ?></a>
+                    <?= $navGroupArrow($navItem['group'], $navWords($navItem['label'])) ?>
+                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-<?= adminAttr($navItem['group']) ?>">
+                        <?php foreach ($navItem['entries'] as $navEntry): ?>
+                        <?= $navLink($navEntry) ?>
+                        <?php endforeach; ?>
                     </div>
                 </div>
-
-                <!-- Media - Top-level tab -->
-                <a href="<?= $router->url('media') ?>" 
-                   class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>"
-                   data-requires-command="listAssets">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                    </svg>
-                    <span><?= __admin('nav.assets', 'Media') ?></span>
-                </a>
-            
-                <!-- Sitemap - Top-level tab -->
-                <a href="<?= $router->url('sitemap') ?>"
-                   class="admin-nav__link<?= $currentPage === 'sitemap' ? ' admin-nav__link--active' : '' ?>"
-                   data-requires-command="getSiteMap">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                    </svg>
-                    <span><?= __admin('nav.sitemap') ?></span>
-                </a>
-
-                <!-- Authentication - Top-level tab. Links to the OAuth providers page, the panel's only authentication surface. -->
-                <a href="<?= $router->url('oauth-providers') ?>"
-                   class="admin-nav__link<?= $currentPage === 'oauth-providers' ? ' admin-nav__link--active' : '' ?>"
-                   data-requires-command="listOAuthProviders">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                    <span><?= __admin('nav.authentication') ?></span>
-                </a>
-
-                <!-- Members Group — My Memberships (any authenticated user) + Project Members
-                     (any member rank of the EDITED project; link hidden without proposeMember).
-                     The group toggle deliberately targets the ALWAYS-accessible memberships page.
-                     No data-requires-command on the group: a 0-membership user still has an inbox. -->
-                <div class="admin-nav__group<?= $isMembersActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="members">
-                    <a href="<?= $router->url('memberships') ?>" class="admin-nav__group-toggle">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                        <span><?= __admin('nav.members', 'Members') ?></span>
-                        <span class="admin-nav__count-badge" id="members-nav-badge" hidden>0</span>
-                    </a>
-                    <?= $navGroupArrow('members', __admin('nav.members', 'Members')) ?>
-                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-members">
-                        <a href="<?= $router->url('memberships') ?>"
-                           class="admin-nav__link<?= $currentPage === 'memberships' ? ' admin-nav__link--active' : '' ?>">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                <circle cx="12" cy="7" r="4"/>
-                            </svg>
-                            <span><?= __admin('nav.myMemberships', 'My memberships') ?></span>
-                            <span class="admin-nav__count-badge" id="members-nav-badge-mine" hidden>0</span>
-                        </a>
-                        <a href="<?= $router->url('members') ?>"
-                           class="admin-nav__link<?= $currentPage === 'members' ? ' admin-nav__link--active' : '' ?>"
-                           data-requires-command="proposeMember">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                                <circle cx="9" cy="7" r="4"/>
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                            </svg>
-                            <span><?= __admin('nav.projectMembers', 'Project members') ?></span>
-                            <span class="admin-nav__count-badge" id="members-nav-badge-queue" hidden>0</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Compliance Group - Storage + Privacy (data layer + data sharing) -->
-                <div class="admin-nav__group<?= $isComplianceActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="compliance" data-requires-command="listStorageItems">
-                    <a href="<?= $router->url('storage') ?>" class="admin-nav__group-toggle" data-requires-command="listStorageItems">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
-                        </svg>
-                        <span><?= __admin('nav.compliance', 'Compliance') ?></span>
-                    </a>
-                    <?= $navGroupArrow('compliance', __admin('nav.compliance', 'Compliance')) ?>
-                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-compliance">
-                        <a href="<?= $router->url('storage') ?>"
-                           class="admin-nav__link<?= $currentPage === 'storage' ? ' admin-nav__link--active' : '' ?>"
-                           data-requires-command="listStorageItems">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
-                            </svg>
-                            <span><?= __admin('nav.storage', 'Storage') ?></span>
-                        </a>
-                        <a href="<?= $router->url('privacy') ?>"
-                           class="admin-nav__link<?= $currentPage === 'privacy' ? ' admin-nav__link--active' : '' ?>"
-                           data-requires-command="getPrivacyStatus">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
-                            </svg>
-                            <span><?= __admin('nav.privacy', 'Privacy') ?></span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Optimize - Top-level tab -->
-                <a href="<?= $router->url('optimize') ?>" 
-                   class="admin-nav__link<?= $currentPage === 'optimize' ? ' admin-nav__link--active' : '' ?>"
-                   data-requires-command="getStyles">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                    </svg>
-                    <span><?= __admin('nav.optimize') ?></span>
-                </a>
-            
-                <!-- Settings Group - Click goes to Project Settings -->
-                <!-- No data-requires-command on this group. It used to name getMyPermissions,
-                     which was a global any-auth command every signed-in account held, so the
-                     gate never hid anything; that command left the surface
-                     (reading your own role is an ACCOUNT fact, served by /admin/self), and
-                     keeping the attribute would have hidden Settings from everyone. The
-                     entries inside carry their own gates where they need one. -->
-                <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">
-                    <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                        </svg>
-                        <span><?= __admin('nav.settings') ?></span>
-                    </a>
-                    <?= $navGroupArrow('settings', __admin('nav.settings')) ?>
-                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-settings">
-                        <a href="<?= $router->url('settings') ?>" 
-                           class="admin-nav__link<?= $currentPage === 'settings' ? ' admin-nav__link--active' : '' ?>">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="3"/>
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4"/>
-                            </svg>
-                            <span><?= __admin('nav.projectSettings') ?></span>
-                        </a>
-                        <a href="<?= $router->url('ai-connections') ?>"
-                           class="admin-nav__link<?= ($currentPage === 'ai-connections' || $currentPage === 'ai-settings') ? ' admin-nav__link--active' : '' ?>">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                                <circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/>
-                            </svg>
-                            <span><?= __admin('nav.ai') ?></span>
-                        </a>
-                        <a href="<?= $router->url('embed-security') ?>" 
-                           class="admin-nav__link<?= $currentPage === 'embed-security' ? ' admin-nav__link--active' : '' ?>"
-                           data-requires-command="getIframeSandbox">
-                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                            </svg>
-                            <span><?= __admin('nav.embedSecurity') ?></span>
-                        </a>
-                    </div>
-                </div>
+                <?php endif; ?>
+                <?php endforeach; ?>
             </nav>
         </div>
     </header>
@@ -639,6 +448,15 @@ $langNames = [
 
     <!-- Main Content -->
     <main class="admin-main<?= $isLoginPage ? ' admin-main--centered' : '' ?>">
+        <?php if (!$isLoginPage && function_exists('qs_admin_menu_page_is_advanced') && qs_admin_menu_page_is_advanced($currentPage)): ?>
+        <!-- A page the simple menu does not show, opened from its address or a link: in simple (the page's class) it says where
+             it lives, with the Mode row's own switch. Drawn in either mode, shown in simple alone, so a switch needs no reload. It
+             opens the page as ever: the mode is no lock. -->
+        <div class="admin-alert admin-alert--info admin-mode-notice" id="admin-mode-notice">
+            <span class="admin-mode-notice__text"><?= __admin('panelMode.notice.text', 'This page is in the Advanced menu: you reached it from its address or a link.') ?></span>
+            <button type="button" class="admin-btn admin-btn--outline" data-panel-mode="advanced"><?= __admin('panelMode.notice.switch', 'Switch to Advanced') ?></button>
+        </div>
+        <?php endif; ?>
         <?php require $templatePath; ?>
     </main>
     
@@ -693,6 +511,9 @@ $langNames = [
             // update-check arm's own response, and putting the engine version into
             // every account's page would let any account fingerprint the install.
             isOperator: <?= $isOperator ? 'true' : 'false' ?>,
+            // The account's mode (panel state): 'simple', 'advanced', or null until its first pick, when
+            // js/core/panel-mode.js opens the chooser. A display preference, never an authorization input.
+            panelMode: <?= json_encode($panelMode) ?>,
             // The edited project's own value is project DATA, so it is written
             // the way every data value in an inline script is.
             defaultLang: <?= qs_inline_script_json(qs_project_default_language()) ?>,
@@ -848,6 +669,13 @@ $langNames = [
                     showHelp: '<?= __adminJs('shortcuts.showHelp') ?>',
                     closeModal: '<?= __adminJs('shortcuts.closeModal') ?>'
                 },
+                // The mode's words built in JS (js/core/panel-mode.js): the bubble after the first pick, and a
+                // save that failed.
+                panelMode: {
+                    bubble: '<?= __adminJs('panelMode.bubble') ?>',
+                    bubbleClose: '<?= __adminJs('panelMode.bubbleClose') ?>',
+                    saveFailed: '<?= __adminJs('panelMode.saveFailed') ?>'
+                },
                 nav: {
                     dashboard: '<?= __adminJs('nav.dashboard') ?>',
                     commands: '<?= __adminJs('nav.commands') ?>',
@@ -918,6 +746,15 @@ $langNames = [
 
     <!-- Admin JavaScript -->
     <script src="<?= $versionedAsset('/admin.js') ?>"></script>
+
+    <?php if (!$isLoginPage): ?>
+    <?php if ($panelMode === null) {
+        // Asked once, of a signed-in account that has not chosen: never on sign-in, register or first run.
+        require SECURE_FOLDER_PATH . '/admin/templates/partials/mode-chooser.php';
+    } ?>
+    <!-- The mode: the account menu's Mode row and, for an account that has not chosen, the chooser. After admin.js. -->
+    <script src="<?= $versionedAsset('/js/core/panel-mode.js') ?>"></script>
+    <?php endif; ?>
 
     <?php if ($isOperator): ?>
     <!-- Operator update notice — emitted ONLY for an account named in

@@ -69,11 +69,11 @@
     }
 
     /**
-     * Does this account hold `command`? It decides what the page shows and nothing else: the command's
-     * own refusal stays the authority. A page script runs with the panel's admin.js already there.
+     * Can this page run `command` now: the panel's one rule, QuickSiteAdmin.canRun() (permission and a project).
+     * It decides what the page shows and nothing else: the command's own refusal stays the authority.
      */
     function canRun(command) {
-        return QuickSiteAdmin.hasPermission(command);
+        return QuickSiteAdmin.canRun(command);
     }
 
     // =========================================================================

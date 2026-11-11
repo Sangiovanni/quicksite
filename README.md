@@ -152,6 +152,7 @@ re-run, so changing one setting later never means answering the others again:
 | **8** | Command console on / off | should the panel offer the raw command runner at `/admin/command`? **Default on.** Turning it off removes reach and discoverability, not access — every command stays reachable at `/management/` to any caller whose role allows it, and the command history stays either way |
 | **9** | Default language for new projects | the language a new project starts in when nobody chooses one: the New Project dialog preselects it, and an imported archive that names none gets it. A code from the installation's language list; default `en` |
 | **10** | Idle sign-out | how long the admin panel may go unused before it signs you out: a number and `m`, `h` or `d` (`90m`, `2h`, `1d`), at least 5 minutes; default 1 day. *Keep me signed in* keeps a session across browser restarts, never past this limit, and the login page states it under that box |
+| **11** | Embed Security page shown / hidden | should the panel show `/admin/embed-security`, the read-only view of the embed policy? **Default shown.** Hiding it removes a page, not a rule: the policy in `embed-policy.json` stays in force, and every command stays reachable at `/management/` to any caller whose role allows it |
 
 The menu header always shows the values currently on disk, so nothing is
 guessed. Every item is optional — skip anything you do not need.
@@ -172,7 +173,7 @@ see *Create your first account* below for the order.
 Items 1–3 update `init.php` constants and the `.htaccess` routing, and drop the
 generated nginx routing config so the engine rebuilds it for the new layout on
 the next page load. Item 4 writes `environment.php`, and items 5 and 10 edit
-`auth.php`. Items 7 to 9 write a config file only when you ask for something
+`auth.php`. Items 7 to 9 and 11 write a config file only when you ask for something
 other than the default — accept the default and the file stays absent, which is
 already what it means, so an install that never opted out never looks as though
 somebody opted in; item 10 does the same while `auth.php` does not exist yet.
@@ -498,7 +499,7 @@ own.
 has nothing to overwrite them with: everything under
 `secure/management/config/` that is yours rather than shipped — `users.php`,
 `auth.php`, `roles.php`, `environment.php`, `operator.php`, `quota.php`,
-`console.php`, `import-policy.php` — the
+`console.php`, `embed-security.php`, `import-policy.php` — the
 server-side secrets in `secure/admin/config/`, your logs, and every project
 under `secure/projects/`. Git only knows tracked files, so it cannot reach any
 of them. What it *does* replace is the `.example` template beside each of those,

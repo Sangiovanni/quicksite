@@ -86,9 +86,11 @@ const QuickSiteAdmin = {
         
         // Update user badge in header
         this.updateUserBadge();
-        
+
         // Trigger permission-based filtering
         this.filterByPermissions();
+        // The menu's groups, now that the role has hidden what it hides.
+        this.applyMenuGroups();
     },
 
     /**
@@ -162,18 +164,41 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * Does this account hold `command`, with a project to run it on? It decides what a page shows and nothing
+     * else: the command's own refusal stays the authority.
+     *
+     * Permission AND a bound project: a project-scoped command with no project never reaches the server, so a
+     * control gated on the permission alone would show for an account that is a member of nothing and only
+     * ever produce an error. A command of unknown scope counts as project-scoped, as api.js and the server's
+     * own `'scope' ?? 'project'` default have it (fail closed). Before permissions load it answers false, as
+     * hasPermission() does: a page draws its controls once QuickSiteAdmin.permissionsReady resolves.
+     *
+     * @param {string} command
+     * @returns {boolean}
+     */
+    canRun(command) {
+        if (!this.hasPermission(command)) return false;
+        const api = window.QuickSiteAPI;
+        if (api && !api.isProjectScoped(command)) return true;
+        return !!(api ? api.getCurrentProject() : window.QUICKSITE_CONFIG?.currentProject);
+    },
+
+    /**
      * Filter UI elements based on permissions
      * Hides elements with data-requires-command that user doesn't have access to
+     *
+     * @param {ParentNode} [root=document] where to look: the page, or what a script adds later (the mode chooser's
+     *        lists), which the same rule filters
      */
-    filterByPermissions() {
+    filterByPermissions(root = document) {
         // Skip if permissions not loaded yet
         if (!this.permissions.loaded) return;
-        
+
         // Superadmin sees everything
         if (this.permissions.isSuperAdmin) return;
-        
+
         // Filter command links
-        document.querySelectorAll('[data-command]').forEach(el => {
+        root.querySelectorAll('[data-command]').forEach(el => {
             const command = el.dataset.command;
             if (!this.hasPermission(command)) {
                 el.classList.add('admin-hidden-permission');
@@ -182,7 +207,7 @@ const QuickSiteAdmin = {
         });
         
         // Filter elements requiring specific commands
-        document.querySelectorAll('[data-requires-command]').forEach(el => {
+        root.querySelectorAll('[data-requires-command]').forEach(el => {
             const required = el.dataset.requiresCommand.split(',').map(c => c.trim());
             if (!this.hasAllPermissions(required)) {
                 el.classList.add('admin-hidden-permission');
@@ -191,7 +216,7 @@ const QuickSiteAdmin = {
         });
         
         // Update category counts after filtering
-        document.querySelectorAll('.admin-category').forEach(category => {
+        root.querySelectorAll('.admin-category').forEach(category => {
             const visible = category.querySelectorAll('.admin-command-link:not(.admin-hidden-permission)');
             const countEl = category.querySelector('.admin-category__count');
             if (countEl) {
@@ -205,10 +230,49 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * The menu's groups after both filters, the role (filterByPermissions) and the mode (the page's
+     * admin-body--simple class hides every entry marked data-menu-advanced): a group with no entry left is not
+     * drawn, and a group with one entry left is drawn as that entry, a plain link with its own words, icon,
+     * address and count, moved out of the group to the group's place. Run again after a switch of mode: each
+     * moved entry goes back into its group first.
+     *
+     * The mode is not a permission: this only decides what the menu draws.
+     */
+    applyMenuGroups() {
+        const simple = document.body.classList.contains('admin-body--simple');
+        const shown = (el) => !el.classList.contains('admin-hidden-permission') && !(simple && el.hasAttribute('data-menu-advanced'));
+        document.querySelectorAll('.admin-nav__group').forEach((group) => {
+            const dropdown = group.querySelector('.admin-nav__group-dropdown');
+            if (!dropdown) return;
+            if (group._qsLone) {
+                dropdown.insertBefore(group._qsLone.link, group._qsLone.next);
+                group._qsLone = null;
+            }
+            const left = Array.from(dropdown.children).filter((el) => el.classList.contains('admin-nav__link') && shown(el));
+            group.classList.toggle('admin-nav__group--empty', left.length === 0);
+            group.classList.toggle('admin-nav__group--lone', left.length === 1);
+            if (left.length === 1) {
+                const link = left[0];
+                group._qsLone = { link: link, next: link.nextSibling };
+                group.parentNode.insertBefore(link, group);
+            }
+        });
+    },
+
+    /**
+     * Open the account menu, pinned, as a click on your name does (the mode chooser opens it after a pick).
+     * @returns {HTMLElement|null} the menu, or null on a page without one
+     */
+    openAccountMenu() {
+        return this._openAccountMenu ? this._openAccountMenu() : null;
+    },
+
+    /**
      * Initialize the admin panel
      */
     init() {
         this.initHeaderMenus();
+        this.applyMenuGroups();
         this.initCategoryToggles();
         this.initForms();
         this.initCopyButtons();
@@ -371,6 +435,12 @@ const QuickSiteAdmin = {
                 else open(m, true);
             });
         });
+
+        // openAccountMenu(): the account menu opened as a click on your name opens it.
+        this._openAccountMenu = () => {
+            open(account, true);
+            return account.box;
+        };
 
         groups.forEach((m) => {
             m.owner.addEventListener('pointerenter', (e) => {

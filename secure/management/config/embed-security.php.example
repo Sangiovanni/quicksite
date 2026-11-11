@@ -1,0 +1,37 @@
+<?php
+/**
+ * Embed Security page switch
+ *
+ * Copy this file to embed-security.php and set show_embed_security to false (the
+ * line at the bottom) to take the admin panel's Embed Security page out of this
+ * installation's panel. `setup.sh` / `setup.bat` offer it as menu item 11.
+ *
+ * ⚠ IF THIS FILE IS ABSENT, THE PAGE IS SHOWN. You only need this file to hide it.
+ *
+ * WHAT IT GOVERNS
+ *   The /admin/embed-security page, a read-only view of the embed policy
+ *   (embed-policy.json, the sandbox the installation puts around iframes embedded
+ *   in a page), and its entry in the panel's menu. Hidden, the entry is gone and
+ *   the page says it was turned off. Nothing else changes.
+ *
+ * ⚠⚠ THIS IS NOT A SECURITY CONTROL.
+ *   The embed policy stays in force exactly as before: it is set in
+ *   embed-policy.json, and nobody can change it from the panel whether the page is
+ *   shown or not. getIframeSandbox keeps answering on /management/ to every role
+ *   that holds it. Hiding the page removes a page, not a rule.
+ *
+ * WHEN TO HIDE IT
+ *   When your authors have no use for it: the policy is yours, set at deployment,
+ *   and a page that shows it to them only invites questions they cannot act on.
+ *
+ * WHAT A BROKEN FILE MEANS
+ *   HIDDEN. An unreadable file, a syntax error, a file that is not PHP, a wrong
+ *   return type, a missing key, and any value that is not boolean `true` all hide
+ *   the page, and the reason is written to the PHP error log. An ABSENT file means
+ *   nobody ever configured this; a present but broken one means somebody did, and
+ *   the only reason to create it is to hide the page.
+ */
+
+return [
+    'show_embed_security' => true,
+];

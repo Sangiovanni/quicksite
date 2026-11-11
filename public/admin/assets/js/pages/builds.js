@@ -75,20 +75,9 @@
         return window.QuickSiteUtils.formatSize(Number(bytes) || 0);
     }
 
-    /**
-     * Can this page actually run `command` right now?
-     *
-     * Permission AND a bound project, for the reason dashboard.js documents: a
-     * project-scoped command with no project never reaches the server, so a
-     * control gated on permission alone would render for a zero-membership
-     * account and only ever produce an error.
-     */
+    /** Can this page run `command` now: the panel's one rule, QuickSiteAdmin.canRun() (permission and a project). */
     function canRun(command) {
-        var admin = window.QuickSiteAdmin;
-        var apiMod = window.QuickSiteAPI;
-        if (admin && admin.permissions && !admin.hasPermission(command)) return false;
-        if (apiMod && !apiMod.isProjectScoped(command)) return true;
-        return !!(apiMod ? apiMod.getCurrentProject() : CFG.project);
+        return window.QuickSiteAdmin.canRun(command);
     }
 
     // ============================================================

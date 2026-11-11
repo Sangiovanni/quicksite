@@ -437,8 +437,9 @@ code,
 .admin-account__who {
     display: none;
 }
-/* The panel's language, one of the menu's lines. */
-.admin-account__lang {
+/* The panel's language and the mode, two of the menu's lines, drawn alike. */
+.admin-account__lang,
+.admin-account__mode {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -448,12 +449,14 @@ code,
     font-size: var(--font-size-sm);
 }
 
-.admin-account__lang-label {
+.admin-account__lang-label,
+.admin-account__mode-label {
     opacity: 0.7;
     margin-right: var(--space-xs);
 }
 
-.admin-account__lang-btn {
+.admin-account__lang-btn,
+.admin-account__mode-btn {
     padding: 0.25rem 0.5rem;
     font-size: var(--font-size-xs);
     background: transparent;
@@ -464,18 +467,96 @@ code,
     transition: all var(--transition-fast);
 }
 
-.admin-account__lang-btn:hover {
+.admin-account__lang-btn:hover,
+.admin-account__mode-btn:hover {
     background: var(--admin-bg);
     border-color: var(--admin-primary);
     color: var(--admin-primary);
 }
 
 .admin-account__lang-btn--active,
-.admin-account__lang-btn--active:hover {
+.admin-account__lang-btn--active:hover,
+.admin-account__mode-btn--active,
+.admin-account__mode-btn--active:hover {
     background: var(--admin-primary);
     border-color: var(--admin-primary);
     color: var(--admin-on-accent);
     cursor: default;
+}
+
+/* The simple menu: the page's class, from the account's mode, hides every entry the menu's definition
+   (panelMenu.php) does not call simple. Menu entries only: their pages open at their address as ever.
+   A group with no entry left is not drawn either, and a group with one entry left is drawn as that
+   entry, which admin.js (applyMenuGroups) moves to the group's place. */
+.admin-body--simple [data-menu-advanced],
+.admin-nav__group--empty,
+.admin-nav__group--lone {
+    display: none !important;
+}
+
+/* A page the simple menu does not show, opened in simple: one line at its top saying where it lives, and the switch. Drawn
+   in either mode, shown in simple alone, so a switch shows or hides it with no reload. */
+.admin-mode-notice {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+}
+.admin-body--simple .admin-mode-notice {
+    display: flex;
+}
+.admin-mode-notice__text {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+/* After the first pick: the Mode row glows, three times, where it is (nothing moves across the
+   screen; with reduce motion it does not play, responsive.css), and a bubble under it says the
+   mode can be switched there at any time. */
+@keyframes admin-mode-glow {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 var(--admin-accent-muted);
+    }
+    50% {
+        box-shadow: 0 0 0 4px var(--admin-accent-muted);
+    }
+}
+.admin-account__mode--glow {
+    border-radius: var(--radius-md);
+    animation: admin-mode-glow 0.9s ease-in-out 3;
+}
+.admin-mode-bubble {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    max-width: 16rem;
+    margin: 0 var(--space-md) var(--space-sm);
+    padding: var(--space-sm) var(--space-xs) var(--space-sm) var(--space-md);
+    background: var(--admin-accent-subtle);
+    border: 1px solid var(--admin-border-focus);
+    border-radius: var(--radius-md);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+}
+.admin-mode-bubble__text {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+.admin-mode-bubble__close {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: var(--space-xs);
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+.admin-mode-bubble__close:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface);
 }
 
 /* The menu button: a phone's way to the panel. */
@@ -666,7 +747,7 @@ code,
 .admin-form-group,
 .manage-space__section,
 .apis-toolbar,
-.apis-stats,
+.admin-figures,
 .apis-empty__desc,
 .admin-category,
 .admin-empty__text {
@@ -916,14 +997,6 @@ input.admin-checkbox {
 
 .admin-grid--cols-2 {
     grid-template-columns: repeat(2, 1fr);
-}
-
-.admin-grid--cols-3 {
-    grid-template-columns: repeat(3, 1fr);
-}
-
-.admin-grid--cols-4 {
-    grid-template-columns: repeat(4, 1fr);
 }
 
 /* =============================================================================
@@ -2999,34 +3072,6 @@ kbd {
 
 /* APIs Page specific styles */
 
-/* The figures: a label, then its number, on one line, each as narrow as its words */
-.apis-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm) var(--space-md);
-}
-
-.apis-stat {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-sm);
-    padding: var(--space-xs) var(--space-md);
-    background: var(--admin-bg-secondary);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-md);
-}
-
-.apis-stat__label {
-    font-size: var(--font-size-sm);
-    color: var(--admin-text-muted);
-}
-
-.apis-stat__value {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-bold);
-    color: var(--admin-accent);
-}
-
 .apis-loading,
 .apis-empty,
 .admin-modal-dialog__content {
@@ -3554,26 +3599,35 @@ kbd {
 }
 
 /* =============================================================================
-   STAT CARDS
+   FIGURES
    ============================================================================= */
-.admin-stat {
-    padding: var(--space-lg);
+/* A row of figures (the dashboard's, the APIs page's): each its label, then its number, on one
+   line, each as narrow as its words; they wrap as the width runs out. */
+.admin-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-md);
+}
+
+.admin-figure {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
     background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-md);
-    text-align: center;
 }
 
-.admin-stat__value {
-    font-size: var(--font-size-3xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--admin-accent);
-}
-
-.admin-stat__label {
-    margin-top: var(--space-xs);
+.admin-figure__label {
     font-size: var(--font-size-sm);
     color: var(--admin-text-muted);
+}
+
+.admin-figure__value {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--admin-accent);
 }
 
 /* =============================================================================
@@ -3772,6 +3826,119 @@ kbd {
     flex-shrink: 0;
     gap: var(--space-md);
     justify-content: center;
+}
+
+/* The mode chooser (partials/mode-chooser.php), in the one modal: two cards side by side, stacked where two
+   do not fit, and the whole of it scrolling inside the screen's height. Each card is its button. */
+.admin-modal-dialog--chooser {
+    max-width: 56rem;
+    width: calc(100% - 2 * var(--space-md));
+}
+.admin-mode-chooser {
+    gap: var(--space-md);
+    padding: clamp(var(--space-md), 4vw, var(--space-xl));
+    overflow-y: auto;
+    text-align: left;
+}
+.admin-mode-chooser .admin-modal-dialog__title,
+.admin-mode-chooser__intro,
+.admin-mode-chooser__note,
+.admin-mode-chooser__error {
+    margin: 0;
+    text-align: center;
+}
+.admin-mode-chooser__intro,
+.admin-mode-chooser__lead {
+    color: var(--admin-text-muted);
+}
+.admin-mode-chooser__error {
+    color: var(--admin-error);
+}
+.admin-mode-chooser__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
+    gap: var(--space-md);
+}
+.admin-mode-chooser__card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 0;
+    padding: var(--space-md);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.admin-mode-chooser__card:hover,
+.admin-mode-chooser__card:focus-within {
+    background: var(--admin-bg-tertiary);
+    border-color: var(--admin-accent);
+}
+.admin-mode-chooser__name {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--admin-text);
+}
+.admin-mode-chooser__lead {
+    margin: 0;
+    font-size: var(--font-size-sm);
+}
+.admin-mode-chooser__list {
+    flex: 1 1 auto;
+    margin: 0;
+    padding-left: var(--space-lg);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+}
+.admin-mode-chooser__item {
+    margin: var(--space-2xs) 0;
+}
+.admin-mode-chooser__item--all,
+.admin-mode-chooser__item--none {
+    margin-left: calc(-1 * var(--space-lg));
+    list-style: none;
+    color: var(--admin-text-muted);
+}
+.admin-mode-chooser__pick {
+    justify-content: center;
+}
+
+/* The chooser's drawings: a menu, slim or full, in the panel's own colours and with no words. */
+.admin-mode-drawing {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.admin-mode-drawing__frame,
+.admin-mode-drawing__drop {
+    fill: var(--admin-bg-secondary);
+    stroke: var(--admin-border);
+    stroke-width: 2;
+}
+.admin-mode-drawing__band {
+    fill: var(--admin-bg-tertiary);
+}
+.admin-mode-drawing__accent {
+    fill: var(--admin-accent);
+}
+.admin-mode-drawing__line {
+    fill: var(--admin-text-light);
+}
+.admin-mode-drawing__pill,
+.admin-mode-drawing__block {
+    fill: var(--admin-surface);
+}
+.admin-mode-drawing__pill--active {
+    fill: var(--admin-accent-muted);
+}
+.admin-mode-drawing__arrow {
+    fill: none;
+    stroke: var(--admin-text-muted);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* =============================================================================

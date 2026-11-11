@@ -574,6 +574,18 @@ const FIELD_PICKERS = {
     // The category is one of a fixed set the server keeps; "default other".
     createSnippet:    { kind: 'enum', param: 'category', values: 'snippetCategory', defaultValue: 'other' },
 
+    // --- The storage and privacy registries ---------------------------------
+    // Each list comes from a read every role that may run these commands holds:
+    // listStorageItems and getPrivacyStatus are config.read, the four commands
+    // privacy.manage, and every role granted privacy.manage (editor and up) also
+    // holds config.read. So a picker never shows its user what they cannot read.
+    // An id that must exist is a dropdown; setCollectedDatum CREATES or edits, so
+    // its id is the existing ones as suggestions, with free entry.
+    deleteStorageItem:    { kind: 'registry', param: 'id', source: 'storageItems' },
+    editStorageItem:      { kind: 'registry', param: 'id', source: 'storageItems' },
+    deleteCollectedDatum: { kind: 'registry', param: 'id', source: 'collectedData' },
+    setCollectedDatum:    { kind: 'registry', param: 'id', source: 'collectedData', freeEntry: true },
+
     // --- Language: the languages the project ALREADY HAS -------------------
     setStorageDescLang: { kind: 'select', param: 'lang', source: 'languages' },
     setPrivacyDescLang: { kind: 'select', param: 'lang', source: 'languages' },
@@ -1177,6 +1189,97 @@ async function _initSnippetSelect(form, cfg) {
 }
 
 /**
+ * A field naming an entry of the project's storage registry (listStorageItems) or of
+ * its collected data (getPrivacyStatus): a searchable dropdown of the ids, or, with
+ * cfg.freeEntry, the ids as suggestions with a way to type a new one (the route
+ * picker's pick-or-type). An empty registry leaves the placeholder alone, as every
+ * picker does; a read that fails too, and the field stays submittable. The list is
+ * read again after the command succeeds: a delete or a rename changed it.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row (cfg.source 'storageItems' | 'collectedData')
+ * @returns {Promise<void>}
+ */
+async function _initRegistryPicker(form, cfg) {
+    const storage = cfg.source === 'storageItems';
+    const placeholder = t(storage ? 'commandForm.select.storageItem' : 'commandForm.select.collectedDatum');
+
+    let select;
+    let group = null;
+    if (cfg.freeEntry) {
+        const built = _initPickOrType(form, cfg.param, {
+            placeholder: placeholder,
+            sentinelText: t('commandForm.select.collectedDatumCustom'),
+            sentinelHint: t('commandForm.select.collectedDatumCustomHint'),
+            inputPlaceholder: t('commandForm.select.collectedDatumPlaceholder')
+        });
+        if (!built) return;
+        select = built.select;
+    } else {
+        select = _swapForSelect(form, cfg.param);
+        if (!select) return;
+        _makeSearchable(select, placeholder);
+        _placeholder(select, placeholder);
+    }
+
+    const rows = async () => {
+        try {
+            const res = await QuickSiteAdmin.apiRequest(storage ? 'listStorageItems' : 'getPrivacyStatus', 'GET');
+            const data = (res && res.ok && res.data && res.data.data) || {};
+            const list = (storage ? data.items : data.collectedData) || [];
+            return list.filter(row => row && row.id !== undefined && row.id !== '').map(row => ({
+                value: String(row.id),
+                label: String(row.id),
+                // Found by what it is as well as by its id.
+                description: storage
+                    ? [row.scope, row.category].filter(Boolean).join(' · ')
+                    : String(row.label || '')
+            }));
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const load = async () => {
+        const found = await rows();
+        if (!cfg.freeEntry) {
+            _fillSelect(select, found, placeholder);
+            return;
+        }
+        if (group) group.remove();
+        group = null;
+        if (found.length) {
+            group = QSDom.el('optgroup', { label: t('commandForm.select.collectedDatumExisting') }, found.map(r =>
+                QSDom.el('option', { value: r.value, text: r.label, 'data-description': r.description })));
+            select.appendChild(group);
+        }
+        _syncPicker(select);
+    };
+    await load();
+
+    form.addEventListener('command-success', async (e) => {
+        if (e.detail.command === COMMAND_NAME) {
+            await load();
+        }
+    });
+}
+
+/**
+ * setRouteResolver's form: one line to the Sitemap, where each route's resolver has
+ * an editor of its own, under the route field.
+ */
+function initRouteResolverNote() {
+    const field = document.querySelector('#command-form [name="route"]');
+    const group = field && field.closest('.admin-form-group');
+    if (!group) return;
+    const href = QuickSiteAdmin.config.adminBase + '/sitemap';
+    group.appendChild(_renderHint([
+        t('commandForm.setRouteResolver.sitemapNote') + ' ',
+        QSDom.el('a', { href: href, text: t('commandForm.setRouteResolver.sitemapLink') })
+    ]));
+}
+
+/**
  * A language field: a searchable dropdown, each language labelled with its name.
  *
  *   cfg.source 'list'    the installation's language list (getLanguageList), for
@@ -1766,6 +1869,8 @@ async function applyPagePickers() {
             await _initLanguagePicker(form, cfg);
         } else if (cfg.kind === 'command') {
             _initCommandPicker(form, cfg);
+        } else if (cfg.kind === 'registry') {
+            await _initRegistryPicker(form, cfg);
         }
     }
 
@@ -1881,6 +1986,9 @@ async function initEnhancedFeatures() {
             break;
         case 'editComponentToNode':
             await initEditComponentToNodeForm();
+            break;
+        case 'setRouteResolver':
+            initRouteResolverNote();
             break;
     }
 
@@ -5254,6 +5362,17 @@ function renderFormField(rawName, param, required) {
             }
 
             default: {
+                // The values help lists for the parameter (`enum`) are the only ones the command takes: a dropdown of
+                // exactly those, so a value cannot be mistyped. Blank first: an optional one left blank is not sent,
+                // and a required one asks for a choice.
+                if (Array.isArray(param.enum) && param.enum.length) {
+                    const select = QSDom.el('select', _fieldProps({ class: 'admin-select' }));
+                    QSDom.setSelectPlaceholder(select, t('commandForm.field.selectPlaceholder'));
+                    QuickSiteAdmin.appendOptionsToSelect(select, param.enum.map(v => ({ value: String(v), label: String(v) })));
+                    inputArea = select;
+                    break;
+                }
+
                 // Check for select options in validation
                 if (validation && validation.includes('|')) {
                     const options = validation.split(',')[0]?.split('|').map(o => o.trim()) || [];

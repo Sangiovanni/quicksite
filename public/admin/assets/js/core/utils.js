@@ -313,16 +313,93 @@ window.QuickSiteUtils = (function() {
     let dialogSeq = 0;
 
     /**
-     * The one modal dialog behind confirm() and prompt().
+     * The panel's one modal: confirm(), prompt() and the mode chooser show their content in it.
      *
-     * It stands in for the browser's own, so it behaves like one: it opens above
-     * every layer of the panel (a modal included), takes the focus (the confirm
-     * button; Cancel for a 'danger' one; the text field of a prompt), keeps Tab
-     * inside, and lets no key reach the page while it is open: the editor's
-     * shortcuts (Delete, Escape), the panel's (g d, ?) and a modal underneath
-     * would otherwise act behind it. Escape and the backdrop cancel. Closing
-     * gives the focus back where it was and drops every listener it added. The
-     * message keeps its line breaks.
+     * It stands in for the browser's own dialog, so it behaves like one: it opens above
+     * every layer of the panel (a modal included), takes the focus, keeps Tab inside,
+     * and lets no key reach the page while it is open: the editor's shortcuts (Delete,
+     * Escape), the panel's (g d, ?) and a modal underneath would otherwise act behind
+     * it. Closing gives the focus back where it was and drops every listener it added.
+     * Only the newest open modal answers the keyboard.
+     *
+     * Escape and a click on the backdrop do what `dismiss` says: confirm() and prompt()
+     * cancel. A caller that passes none (the chooser, which closes only by a pick) makes
+     * both do nothing.
+     *
+     * @param {HTMLElement} modal  the box: role="dialog", aria-modal and its labels are the caller's
+     * @param {Object} opts
+     * @param {function(): HTMLElement[]} opts.focusable  what Tab cycles through, in order
+     * @param {HTMLElement} opts.first  what takes the focus when it opens
+     * @param {?function()} [opts.dismiss]  what Escape and the backdrop do; none: nothing
+     * @param {function(KeyboardEvent): boolean} [opts.onKey]  a key the caller answers (true: answered)
+     * @returns {{close: function(), overlay: HTMLElement}} close() removes it
+     */
+    function openModal(modal, opts) {
+        const previous = document.activeElement;
+        const overlay = QSDom.el('div', { class: 'admin-modal-overlay admin-modal-overlay--dialog' }, [modal]);
+        document.body.appendChild(overlay);
+
+        const entry = { overlay };
+        let closed = false;
+
+        const close = () => {
+            if (closed) return;
+            closed = true;
+            window.removeEventListener('keydown', onKey, true);
+            openDialogs.splice(openDialogs.indexOf(entry), 1);
+            overlay.classList.remove('admin-modal-overlay--visible');
+            setTimeout(() => overlay.remove(), 300);
+            if (previous && previous !== document.body && previous.isConnected && typeof previous.focus === 'function') {
+                previous.focus();
+            }
+        };
+
+        // Window, capture phase: before any listener of the page sees the key.
+        function onKey(e) {
+            if (openDialogs[openDialogs.length - 1] !== entry) return;
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (opts.dismiss) opts.dismiss();
+                return;
+            }
+            if (!modal.contains(e.target)) {
+                // The focus got out (a script moved it): the key is not the page's either.
+                e.preventDefault();
+                opts.first.focus();
+                return;
+            }
+            if (opts.onKey && opts.onKey(e)) return;
+            if (e.key === 'Tab') {
+                const list = opts.focusable();
+                const at = list.indexOf(e.target);
+                const next = e.shiftKey
+                    ? (at <= 0 ? list[list.length - 1] : null)
+                    : (at === list.length - 1 || at < 0 ? list[0] : null);
+                if (next) {
+                    e.preventDefault();
+                    next.focus();
+                }
+            }
+        }
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay && opts.dismiss) opts.dismiss();
+        });
+        openDialogs.push(entry);
+        window.addEventListener('keydown', onKey, true);
+        opts.first.focus();
+
+        // Animate in
+        requestAnimationFrame(() => overlay.classList.add('admin-modal-overlay--visible'));
+        return { close: close, overlay: overlay };
+    }
+
+    /**
+     * The content behind confirm() and prompt(), in the one modal (openModal): a
+     * message (its line breaks kept) or a text field, and Cancel / OK. The focus goes
+     * to OK, to Cancel for a 'danger' one, or to the text field; Escape and the
+     * backdrop cancel.
      *
      * @param {string} message
      * @param {Object} options   see confirm() and prompt()
@@ -333,9 +410,7 @@ window.QuickSiteUtils = (function() {
         return new Promise((resolve) => {
             const id = 'qs-dialog-' + (++dialogSeq);
             const type = options.type || 'warning';
-            const previous = document.activeElement;
 
-            const overlay = QSDom.el('div', { class: 'admin-modal-overlay admin-modal-overlay--dialog' });
             const modal = QSDom.el('div', {
                 class: 'admin-modal-dialog' + (withInput ? ' admin-modal-dialog--prompt' : ''),
                 role: 'dialog',
@@ -381,74 +456,34 @@ window.QuickSiteUtils = (function() {
             });
             content.appendChild(QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [cancelBtn, confirmBtn]));
             modal.appendChild(content);
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
 
-            const focusable = () => (input ? [input, cancelBtn, confirmBtn] : [cancelBtn, confirmBtn]);
-            const first = input || (type === 'danger' ? cancelBtn : confirmBtn);
-            const entry = { overlay };
-            let closed = false;
-
+            let shown = null;
             const close = (result) => {
-                if (closed) return;
-                closed = true;
-                window.removeEventListener('keydown', onKey, true);
-                openDialogs.splice(openDialogs.indexOf(entry), 1);
-                overlay.classList.remove('admin-modal-overlay--visible');
-                setTimeout(() => overlay.remove(), 300);
-                if (previous && previous !== document.body && previous.isConnected && typeof previous.focus === 'function') {
-                    previous.focus();
-                }
+                if (!shown) return;
+                const s = shown;
+                shown = null;
+                s.close();
                 resolve(result);
             };
             const ok = () => close(input ? input.value : '');
             const cancel = () => close(null);
 
-            // Window, capture phase: before any listener of the page sees the key.
-            function onKey(e) {
-                if (openDialogs[openDialogs.length - 1] !== entry) return;
-                e.stopPropagation();
-                if (e.key === 'Escape') {
-                    e.preventDefault();
-                    cancel();
-                    return;
-                }
-                if (!modal.contains(e.target)) {
-                    // The focus got out (a script moved it): the key is not the page's either.
-                    e.preventDefault();
-                    first.focus();
-                    return;
-                }
-                if (e.key === 'Enter' && e.target === input) {
-                    e.preventDefault();
-                    ok();
-                    return;
-                }
-                if (e.key === 'Tab') {
-                    const list = focusable();
-                    const at = list.indexOf(e.target);
-                    const next = e.shiftKey
-                        ? (at <= 0 ? list[list.length - 1] : null)
-                        : (at === list.length - 1 || at < 0 ? list[0] : null);
-                    if (next) {
-                        e.preventDefault();
-                        next.focus();
-                    }
-                }
-            }
-
             cancelBtn.addEventListener('click', cancel);
             confirmBtn.addEventListener('click', ok);
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) cancel();
+            shown = openModal(modal, {
+                focusable: () => (input ? [input, cancelBtn, confirmBtn] : [cancelBtn, confirmBtn]),
+                first: input || (type === 'danger' ? cancelBtn : confirmBtn),
+                dismiss: cancel,
+                onKey: (e) => {
+                    if (e.key === 'Enter' && e.target === input) {
+                        e.preventDefault();
+                        ok();
+                        return true;
+                    }
+                    return false;
+                }
             });
-            openDialogs.push(entry);
-            window.addEventListener('keydown', onKey, true);
-            first.focus();
             if (input) input.select();
-
-            // Animate in
-            requestAnimationFrame(() => overlay.classList.add('admin-modal-overlay--visible'));
         });
     }
 
@@ -689,6 +724,7 @@ window.QuickSiteUtils = (function() {
         // Dialogs
         confirm,
         prompt,
+        openModal,
 
         // Clipboard
         copyToClipboard,

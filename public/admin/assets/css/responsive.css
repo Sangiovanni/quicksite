@@ -16,10 +16,6 @@
 
 @media (max-width: 64rem) {
     /* Card grids */
-    .admin-grid--cols-4,
-    .admin-grid--cols-3 {
-        grid-template-columns: repeat(2, 1fr);
-    }
     .admin-grid--cols-2 {
         grid-template-columns: 1fr;
     }
@@ -40,9 +36,15 @@
     .admin-nav__link,
     .admin-nav__group-toggle,
     .admin-user-badge,
-    .admin-account__lang-btn {
+    .admin-account__lang-btn,
+    .admin-account__mode-btn {
         box-sizing: border-box;
         min-height: 2.75rem;
+    }
+    /* The current language is a span, not a button: made a finger's height, it centres its word as a button does */
+    .admin-account__lang-btn--active {
+        display: inline-flex;
+        align-items: center;
     }
     .admin-nav > .admin-nav__link {
         padding-inline: var(--space-sm);
@@ -255,12 +257,6 @@
     /* A word with no break in it, a path or a variable's name, breaks rather than leave its box */
     .admin-main {
         overflow-wrap: break-word;
-    }
-
-    /* Card grids */
-    .admin-grid--cols-3,
-    .admin-grid--cols-4 {
-        grid-template-columns: 1fr;
     }
 
     /* The header: one row, the mark, the actions, the account menu and the menu button. The
@@ -740,5 +736,13 @@
     }
     .account-identity__value code {
         overflow-wrap: anywhere;
+    }
+}
+
+/* Reduce motion (the system's setting): the mode's glow does not play. The one query here that is not a
+   view, after the phone block, and once. */
+@media (prefers-reduced-motion: reduce) {
+    .admin-account__mode--glow {
+        animation: none;
     }
 }

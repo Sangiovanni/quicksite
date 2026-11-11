@@ -16,6 +16,10 @@
  * ROUTES
  *   POST /admin/state/selected-project   {"project": "<id>"}
  *   POST /admin/state/project-star       {"project": "<id>", "starred": true|false}
+ *   POST /admin/state/panel-mode         {"mode": "simple"|"advanced"}
+ *
+ * The mode is a display preference like the star: it decides which entries the
+ * menu draws, never what the caller may open or run.
  *
  * AUTH is the shared admin gate (qs_admin_json_boot): the session cookie AND
  * the per-session token as `Authorization: Bearer`. The header is what proves
@@ -71,6 +75,10 @@ switch ($key) {
 
     case 'project-star':
         qs_admin_set_project_star($tokenInfo, is_string($body['project'] ?? null) ? $body['project'] : '', $body['starred'] ?? null)->send();
+        break;
+
+    case 'panel-mode':
+        qs_admin_set_panel_mode($tokenInfo, $body['mode'] ?? null)->send();
         break;
 
     default:

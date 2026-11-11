@@ -555,6 +555,18 @@
         "errors": {
             "docNotFound": "Documentation de la commande introuvable",
             "docLoadFailed": "Échec du chargement de la documentation :"
+        },
+        "select": {
+            "storageItem": "Choisir un élément de stockage",
+            "collectedDatum": "Choisir une donnée collectée",
+            "collectedDatumCustom": "Un autre identifiant…",
+            "collectedDatumCustomHint": "Saisissez un identifiant absent de la liste : la donnée est créée.",
+            "collectedDatumPlaceholder": "L'identifiant de la donnée",
+            "collectedDatumExisting": "Données collectées"
+        },
+        "setRouteResolver": {
+            "sitemapNote": "Le plan du site a un éditeur pour le résolveur d'une route :",
+            "sitemapLink": "ouvrir le plan du site"
         }
     },
     "history": {
@@ -801,6 +813,26 @@
         "noteAmazon": "Login with Amazon demande l'adresse d'une politique de confidentialité et attend des adresses de retour en https.",
         "noteMeta": "Ajoutez l'autorisation email et laissez l'application en mode Développement pendant vos tests : seuls les comptes ayant un rôle sur l'application peuvent se connecter."
     },
+    "panelMode": {
+        "bubble": "Vous pouvez passer de Simple à Avancé ici, à tout moment.",
+        "bubbleClose": "Fermer",
+        "saveFailed": "Votre choix n'a pas pu être enregistré. Réessayez.",
+        "chooser": {
+            "title": "Quel menu voulez-vous ?",
+            "intro": "Les deux menus ouvrent le même panneau. Choisissez celui qui vous convient.",
+            "simpleLead": "Les pages qu'il faut pour construire et publier un site.",
+            "advancedLead": "Toutes les pages du panneau, les techniques aussi.",
+            "everythingInSimple": "Tout ce que contient Simple, et en plus :",
+            "pickSimple": "Choisir Simple",
+            "pickAdvanced": "Choisir Avancé",
+            "note": "Vous pouvez changer cela à tout moment depuis le menu du compte, en haut à droite.",
+            "advancedNone": "Les mêmes pages pour l'instant : les autres viennent avec un rôle dans un projet."
+        },
+        "notice": {
+            "text": "Cette page est dans le menu Avancé : vous l'avez ouverte par son adresse ou un lien.",
+            "switch": "Passer en Avancé"
+        }
+    },
     "nav": {
         "authentication": "Authentification",
         "oauth-providers": "Fournisseurs OAuth",
@@ -832,7 +864,10 @@
         "inspect": "Inspecter",
         "interactions": "Interactions",
         "sitemap": "Plan du site",
-        "optimize": "Optimiser"
+        "optimize": "Optimiser",
+        "mode": "Mode",
+        "modeSimple": "Simple",
+        "modeAdvanced": "Avancé"
     },
     "optimize": {
         "title": "Outils d'optimisation",
@@ -996,7 +1031,11 @@
     },
     "embedSecurity": {
         "title": "S\u00e9curit\u00e9 d'int\u00e9gration",
-        "subtitle": "G\u00e9rer les r\u00e8gles de sandbox iframe et les permissions d'int\u00e9gration"
+        "subtitle": "G\u00e9rer les r\u00e8gles de sandbox iframe et les permissions d'int\u00e9gration",
+        "disabled": {
+            "title": "La page Sécurité d'intégration est désactivée",
+            "text": "L'opérateur de cette installation a choisi de ne pas l'afficher. Cela retire une page, pas une règle : la politique d'intégration reste en vigueur, et chaque commande répond toujours sur l'API de gestion à tout appelant dont le rôle le permet."
+        }
     },
     "settings": {
         "title": "Paramètres",

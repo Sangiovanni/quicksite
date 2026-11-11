@@ -351,30 +351,30 @@ if (isset($_GET['denied'])): ?>
             <a href="<?= $router->url('members') ?>" class="admin-btn admin-btn--ghost" data-requires-command="proposeMember"><?= __admin('nav.projectMembers', 'Project members') ?></a>
         </div>
     </div>
-    <div class="admin-grid admin-grid--cols-3">
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="dash-mem-projects">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.projects', 'My projects') ?></div>
+    <div class="admin-figures">
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.projects', 'My projects') ?></span>
+            <span class="admin-figure__value" id="dash-mem-projects">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="dash-mem-owned">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.owned', 'Owned') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.owned', 'Owned') ?></span>
+            <span class="admin-figure__value" id="dash-mem-owned">-</span>
         </div>
-        <div class="admin-stat" id="dash-mem-invitations-stat">
-            <div class="admin-stat__value" id="dash-mem-invitations">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.invitations', 'Invitations awaiting you') ?></div>
+        <div class="admin-figure" id="dash-mem-invitations-stat">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.invitations', 'Invitations awaiting you') ?></span>
+            <span class="admin-figure__value" id="dash-mem-invitations">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="dash-mem-requests">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.requests', 'Join requests you sent') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.requests', 'Join requests you sent') ?></span>
+            <span class="admin-figure__value" id="dash-mem-requests">-</span>
         </div>
-        <div class="admin-stat" id="dash-mem-notices-stat">
-            <div class="admin-stat__value" id="dash-mem-notices">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.notices', 'Notices to dismiss') ?></div>
+        <div class="admin-figure" id="dash-mem-notices-stat">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.notices', 'Notices to dismiss') ?></span>
+            <span class="admin-figure__value" id="dash-mem-notices">-</span>
         </div>
-        <div class="admin-stat" id="dash-mem-queue-stat">
-            <div class="admin-stat__value" id="dash-mem-queue">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.queue', 'Awaiting your validation') ?></div>
+        <div class="admin-figure" id="dash-mem-queue-stat">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.queue', 'Awaiting your validation') ?></span>
+            <span class="admin-figure__value" id="dash-mem-queue">-</span>
         </div>
     </div>
 </section>
@@ -623,22 +623,22 @@ if (isset($_GET['denied'])): ?>
 <!-- Quick Stats (loaded via AJAX) -->
 <section class="admin-section">
     <h2 class="admin-section__title"><?= __admin('dashboard.stats.title') ?></h2>
-    <div class="admin-grid admin-grid--cols-4" id="admin-stats">
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-routes">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.routes') ?></div>
+    <div class="admin-figures" id="admin-stats">
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.routes') ?></span>
+            <span class="admin-figure__value" id="stat-routes">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-pages">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.pages') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.pages') ?></span>
+            <span class="admin-figure__value" id="stat-pages">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-components">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.components') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.components') ?></span>
+            <span class="admin-figure__value" id="stat-components">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-languages">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.languages') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.languages') ?></span>
+            <span class="admin-figure__value" id="stat-languages">-</span>
         </div>
     </div>
 </section>

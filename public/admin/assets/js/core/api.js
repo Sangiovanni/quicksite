@@ -766,6 +766,17 @@ window.QuickSiteAPI = (function() {
         return postPanelState('project-star', { project: projectId, starred: starred === true });
     }
 
+    /**
+     * Save THIS user's panel mode (their `panel_mode`): 'simple' or 'advanced', the menu the panel draws for
+     * them. Panel state, like the star, and like it no permission: it hides menu entries and refuses nothing.
+     *
+     * @param {string} mode 'simple' or 'advanced'
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
+     */
+    async function setPanelMode(mode) {
+        return postPanelState('panel-mode', { mode: mode });
+    }
+
     /** One POST to /admin/state/<key>, answered in request()'s {ok, status, data} shape. */
     async function postPanelState(key, body) {
         const token = getToken();
@@ -1053,6 +1064,7 @@ window.QuickSiteAPI = (function() {
         // Panel state (/admin/state) — not commands. See setSelectedProject.
         setSelectedProject,
         setProjectStar,
+        setPanelMode,
 
         // Account + membership self-service and directory lookups
         // (/admin/self) — not commands either. See accountRequest.

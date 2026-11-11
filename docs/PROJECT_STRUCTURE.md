@@ -38,6 +38,7 @@ quicksite/
 │   │   │   ├── security-trail-key.txt # Key of the security trail's username digest (gitignored; written on the first refused sign-in, never regenerated)
 │   │   │   ├── quota.php         # Per-account limits: storage ceiling, upload and write rates, file caps (gitignored; optional — absent: no storage ceiling or upload rate, the shipped file caps and write rate)
 │   │   │   ├── console.php       # Is the /admin/command console offered here (optional; ABSENT MEANS OFFERED)
+│   │   │   ├── embed-security.php # Is the Embed Security page shown in the panel (optional; ABSENT MEANS SHOWN; hides a page, never the policy)
 │   │   │   ├── import-policy.php # Archive import + publish allowlists and archive size limits (gitignored; optional, built-in defaults apply without it)
 │   │   │   ├── languages.json    # The installation's language list, {"code": "name"} — the languages a project may start in or add, and their names (gitignored; optional, ABSENT MEANS the shipped languages.json.example is the list)
 │   │   │   ├── languages.NOTICE.txt # The Unicode License v3 notice the shipped list's language names are used under (tracked, beside languages.json.example)
