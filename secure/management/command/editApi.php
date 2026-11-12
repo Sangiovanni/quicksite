@@ -39,9 +39,9 @@
  * }
  *
  * A response binding that writes an attribute names one an author could write
- * on a page: an event handler, srcdoc or a malformed name is refused (400), by
- * the rule qs.js holds every binding to in the browser
- * (qs_binding_attribute_refusal(), through ApiEndpointManager).
+ * on a page: an event handler, srcdoc, a name starting data-consent- or a
+ * malformed name is refused (400), by the rule qs.js holds every binding to in
+ * the browser (qs_binding_attribute_refusal(), through ApiEndpointManager).
  *
  * Response data carries `countKeyWarnings`: every count-sentence binding whose
  * translation key resolves in no (or not every) project language, with the

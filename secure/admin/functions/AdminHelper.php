@@ -154,11 +154,6 @@ function getCommandCategories(): array {
         // served by /admin/self and reached from the My Memberships page. An
         // emptied section renders as a category with nothing in it, which is why
         // this one was removed with its last command.
-        'storage_monitoring' => [
-            'label' => 'Storage',
-            'icon' => 'database',
-            'commands' => ['getSizeInfo']
-        ],
         'command_history' => [
             'label' => 'Command History',
             'icon' => 'history',

@@ -228,6 +228,13 @@ class PageManagement {
                 'params' => $trimParameters->routeParams(),
                 'found'  => $trimParameters->routeFound(),
             ],
+            // What this page composed its site addresses with (processUrl()), so
+            // qs.js composes a bound one the same way: this render's language (on
+            // a multilingual site the page body's renderer is given the same one,
+            // and on a site in one language no address takes one) and the
+            // project's languages.
+            'lang'               => $renderer->addressLanguage(),
+            'languages'          => qs_project_languages(),
             'themeEnabled'       => $themeEnabled,
             'themeToggleEnabled' => $toggleEnabled,
             'consentPayload'     => $__handoffConsentPayload,

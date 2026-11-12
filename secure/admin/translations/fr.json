@@ -396,13 +396,9 @@
             "title": "Commandes par catégorie"
         },
         "storage": {
-            "title": "Aperçu du stockage",
-            "projects": "Projets",
             "backups": "Sauvegardes",
             "builds": "Builds",
             "exports": "Exports",
-            "admin": "Admin",
-            "system": "Système",
             "manageSpace": "Gérer l'espace",
             "buildsPage": "Ouvrir la page des compilations",
             "noItems": "Aucun élément",

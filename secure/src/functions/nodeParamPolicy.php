@@ -48,7 +48,14 @@ if (!function_exists('qs_binding_attribute_refusal')) {
      *     data is never compiled;
      *   - `srcdoc` on any element, and `src` or `sandbox` on an iframe: the
      *     render paths decide a frame's sandbox from the src and srcdoc they
-     *     render (IframeSandbox), and nothing decides it again in the browser.
+     *     render (IframeSandbox), and nothing decides it again in the browser;
+     *   - any name starting `data-consent-`, in any letter case: qs.js reads
+     *     those on the consent banner and popup to decide what a click records
+     *     (`data-consent-action`, `data-consent-toggle`), and data from an API is
+     *     not the author;
+     *   - `content` and `http-equiv` on a meta: together they make a refresh,
+     *     whose address the render paths check only as the page holds it when
+     *     it is served (UrlPolicy::safeRefreshContent()).
      * A URL attribute stays nameable: its VALUE comes from data, so only the
      * runtime can hold it to UrlPolicy's allowlist.
      *
@@ -77,6 +84,12 @@ if (!function_exists('qs_binding_attribute_refusal')) {
         }
         if (($folded === 'src' || $folded === 'sandbox') && $tag !== null && strtolower($tag) === 'iframe') {
             return "an iframe's '{$name}' is fixed when the page is served, as its sandbox follows the address the page holds then.";
+        }
+        if (strpos($folded, 'data-consent-') === 0) {
+            return "'{$name}' belongs to the consent banner and popup, where it decides what a click records: only the page sets it, never data.";
+        }
+        if (($folded === 'content' || $folded === 'http-equiv') && $tag !== null && strtolower($tag) === 'meta') {
+            return "a meta's '{$name}' is fixed when the page is served, as data could turn it into a refresh to another address.";
         }
         return null;
     }
@@ -187,6 +200,8 @@ if (!function_exists('qs_first_unsafe_structure_param')) {
      *      collision is DETECTED on folded names and nothing is stored folded:
      *      SVG's `viewBox` means something only in that case, and every API
      *      client reads the structure back as it was written.
+     * Then, on a meta whose attributes all passed, a refresh to a refused address
+     * (qs_unsafe_refresh_param()): its `http-equiv` and its `content` together.
      *
      * Params are checked on every node whatever its kind, a text node's
      * included: no render path emits those, but no legitimate writer puts
@@ -256,6 +271,12 @@ if (!function_exists('qs_first_unsafe_node_param')) {
                 }
                 $seen[$folded] = $name;
             }
+            if ($tag !== null && strtolower($tag) === 'meta') {
+                $refresh = qs_unsafe_refresh_param($node['params']);
+                if ($refresh !== null) {
+                    return ['node' => $path] + $refresh;
+                }
+            }
         }
 
         $childBase = $path === 'root' ? '' : $path . '.';
@@ -293,6 +314,54 @@ if (!function_exists('qs_first_unsafe_node_param')) {
         }
 
         return null;
+    }
+}
+
+if (!function_exists('qs_unsafe_refresh_param')) {
+    /**
+     * A meta's refresh to a refused address, which only the whole node can show:
+     * its `http-equiv` makes its `content` a refresh, and the address sits inside
+     * that text (UrlPolicy::refreshAddress()). Judged on the first attribute of
+     * each name in any letter case, as a browser keeps the first, and on each
+     * value as a page draws it, with a `__LIT__` or `__RAW__` prefix dropped (a
+     * build drops either). A value a placeholder fills when the page is served
+     * is judged as written here, as an href is, and drawn safe by both render
+     * paths once it is filled.
+     *
+     * @param array $params one meta node's params
+     * @return array{attribute:string, message:string}|null
+     */
+    function qs_unsafe_refresh_param(array $params): ?array {
+        $first = [];
+        foreach ($params as $name => $value) {
+            $folded = strtolower((string) $name);
+            if (($folded === 'http-equiv' || $folded === 'content') && !isset($first[$folded])) {
+                $first[$folded] = [(string) $name, $value];
+            }
+        }
+        if (!isset($first['http-equiv'], $first['content'])) {
+            return null;
+        }
+        $drawn = static function ($value): ?string {
+            if (!is_string($value)) {
+                return null;
+            }
+            return (strpos($value, '__LIT__') === 0 || strpos($value, '__RAW__') === 0) ? substr($value, 7) : $value;
+        };
+        $httpEquiv = $drawn($first['http-equiv'][1]);
+        $content = $drawn($first['content'][1]);
+        if ($httpEquiv === null || $content === null || !UrlPolicy::isRefresh($httpEquiv)) {
+            return null;
+        }
+        $at = UrlPolicy::refreshAddress($content);
+        if ($at === null || !UrlPolicy::isRefused(substr($content, $at[0], $at[1]))) {
+            return null;
+        }
+        return [
+            'attribute' => $first['content'][0],
+            'message'   => "Attribute '{$first['content'][0]}' makes this meta refresh the page to an address with a "
+                         . 'disallowed URL scheme (only http, https, mailto, tel are allowed).',
+        ];
     }
 }
 

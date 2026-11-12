@@ -743,6 +743,10 @@ class JsonToHtmlRenderer {
             $html .= $this->renderEditorAttributes($isComponentRoot);
         }
 
+        // A meta's refresh: the content whose address this page draws safe, when
+        // the meta's http-equiv makes it a refresh (refreshContentKey()).
+        $refreshContentKey = (strtolower($tag) === 'meta' && is_array($params)) ? $this->refreshContentKey($params) : null;
+
         // Render attributes
         if (is_array($params) && !empty($params)) {
             foreach ($params as $attrName => $attrValue) {
@@ -750,7 +754,8 @@ class JsonToHtmlRenderer {
                 if (strtolower($tag) === 'iframe' && strtolower($attrName) === 'sandbox') {
                     continue;
                 }
-                $html .= $this->renderAttribute($attrName, $attrValue);
+                $html .= $this->renderAttribute($attrName, $attrValue,
+                    $refreshContentKey !== null && (string) $attrName === $refreshContentKey);
             }
         }
 
@@ -815,7 +820,55 @@ class JsonToHtmlRenderer {
 
         return $html;
     }
-    
+
+    /**
+     * Which param of a meta holds the content of a refresh, or null when the
+     * meta is no refresh. A browser keeps the first attribute of a name in any
+     * letter case, so the first `http-equiv` decides and the first `content` is
+     * the one drawn safe (UrlPolicy::safeRefreshContent()). The `http-equiv` is
+     * read as this page draws it, its placeholders filled, so a refresh made by
+     * a value only the request supplies is drawn safe too.
+     *
+     * ⚠ THIS SELECTION RULE AND JsonToPhpCompiler'S MUST STAY IDENTICAL, as the
+     * iframe's are: one meta must not refresh in one surface and not the other.
+     */
+    private function refreshContentKey(array $params): ?string {
+        $httpEquiv = null;
+        $httpEquivFound = false;
+        $contentKey = null;
+        foreach ($params as $attrName => $attrValue) {
+            $lowerName = strtolower((string) $attrName);
+            if ($lowerName === 'http-equiv' && !$httpEquivFound) {
+                $httpEquiv = $attrValue;
+                $httpEquivFound = true;
+            } elseif ($lowerName === 'content' && $contentKey === null) {
+                $contentKey = (string) $attrName;
+            }
+        }
+        if ($contentKey === null || !is_string($httpEquiv)) {
+            return null;
+        }
+        $drawn = $this->substitutedAttributeValue($httpEquiv);
+        if (strpos($drawn, '__LIT__') === 0) {
+            $drawn = substr($drawn, 7);
+        }
+        return UrlPolicy::isRefresh($drawn) ? $contentKey : null;
+    }
+
+    /**
+     * The placeholders in an attribute's value filled, as renderAttribute() fills
+     * them and in its order: the system ones, then what the resolver fetched,
+     * then the route's params, the one input a visitor controls, last, so
+     * nothing it brings in is read again.
+     */
+    private function substitutedAttributeValue(string $value): string {
+        if (strpos($value, '{{__') !== false) {
+            $value = $this->processDataPlaceholders($value);
+        }
+        $value = $this->applyResolved($value);
+        return $this->applyRouteParams($value);
+    }
+
     /**
      * Render editor mode data attributes
      * 
@@ -849,12 +902,14 @@ class JsonToHtmlRenderer {
 
     /**
      * Render an HTML attribute
-     * 
+     *
      * @param string $name Attribute name
      * @param mixed $value Attribute value
+     * @param bool $refreshContent the content of a meta refresh (refreshContentKey()):
+     *                             its address is drawn safe
      * @return string Rendered attribute (e.g., ' class="value"')
      */
-    private function renderAttribute(string $name, $value): string {
+    private function renderAttribute(string $name, $value, bool $refreshContent = false): string {
         // Sanitize attribute name. The charset rule is shared with the compiler
         // and the write-side param check so all three make the same decision
         // about the same name (TagRegistry::isRenderableAttributeName).
@@ -951,10 +1006,8 @@ class JsonToHtmlRenderer {
             // base a second time.
             if (strpos($value, '{{__') !== false) {
                 $isLanguageSwitch = $this->hasLanguageSwitchPlaceholder($value);
-                $value = $this->processDataPlaceholders($value);
             }
-            $value = $this->applyResolved($value);
-            $value = $this->applyRouteParams($value);
+            $value = $this->substitutedAttributeValue($value);
         }
 
         // Special handling for URL attributes. Scheme safety is value-based +
@@ -972,6 +1025,12 @@ class JsonToHtmlRenderer {
         // Strip __LIT__ prefix from any attribute value (literal values used as-is everywhere)
         if (is_string($value) && strpos($value, '__LIT__') === 0) {
             $value = substr($value, 7);
+        }
+
+        // A refresh's address is a URL sink inside text: held to the same
+        // allowlist as an href, on the value the page now holds.
+        if ($refreshContent && is_string($value)) {
+            $value = UrlPolicy::safeRefreshContent($value);
         }
 
         // Convert value to string and escape
@@ -1342,6 +1401,15 @@ class JsonToHtmlRenderer {
         }
 
         return $fullUrl . $url;
+    }
+
+    /**
+     * The language this render composes a site address with (processUrl()): the
+     * page's, or the project's default when the render was given none. The
+     * runtime handoff hands it to qs.js, which composes a bound address with it.
+     */
+    public function addressLanguage(): string {
+        return (string) ($this->context['lang'] ?? '');
     }
 
     /**

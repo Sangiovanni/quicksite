@@ -228,8 +228,8 @@ if (isset($_GET['denied'])): ?>
             </button>
         </div>
         <!-- Manage Space: the edited project's build, exports and backups, with your own
-             space. It stays when you own nothing and can read one of the three: then the
-             card holds it alone (dashboard.js, owner-space--manage-only). -->
+             space. It stays when you own nothing and can read its build or its backups:
+             then the card holds it alone (dashboard.js, owner-space--manage-only). -->
         <div class="manage-space" id="manage-space">
             <button type="button" class="manage-space__toggle" id="manage-space-toggle">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -257,7 +257,8 @@ if (isset($_GET['denied'])): ?>
                     </div>
                     <div class="manage-space__list" id="manage-builds-list"></div>
                 </div>
-                <!-- Shown by dashboard.js only when the project holds a saved export: the panel's Export keeps none on the server, the API's can. -->
+                <!-- Shown by dashboard.js only when the project holds a saved export: the panel's Export keeps none on the server, the API's can.
+                     Its figures are My total space's for that project, so it shows when you own the project you edit. -->
                 <div class="manage-space__section" id="manage-space-exports" style="display: none;">
                     <div class="manage-space__section-header">
                         <span class="manage-space__section-title">
@@ -280,61 +281,6 @@ if (isset($_GET['denied'])): ?>
                     <div class="manage-space__tip" id="manage-backups-tip"></div>
                     <div class="manage-space__list" id="manage-backups-list"></div>
                 </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Storage Overview -->
-<section class="admin-section">
-    <div class="storage-overview" id="storage-overview">
-        <div class="storage-overview__header">
-            <h3 class="storage-overview__title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                    <path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
-                </svg>
-                <?= __admin('dashboard.storage.title') ?>
-            </h3>
-            <span class="storage-overview__total" id="storage-total">--</span>
-        </div>
-        <div class="storage-overview__bar" id="storage-bar">
-            <div class="storage-overview__segment storage-overview__segment--projects" id="storage-seg-projects" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--backups" id="storage-seg-backups" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--builds" id="storage-seg-builds" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--exports" id="storage-seg-exports" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--admin" id="storage-seg-admin" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--system" id="storage-seg-system" style="width: 0%"></div>
-        </div>
-        <div class="storage-overview__legend">
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--projects"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.projects') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-projects">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.backups') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-backups">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.builds') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-builds">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-exports">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--admin"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.admin') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-admin">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--system"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.system') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-system">--</span>
             </div>
         </div>
     </div>

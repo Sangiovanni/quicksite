@@ -2,7 +2,7 @@
  * Dashboard Page JavaScript
  * 
  * Handles dashboard statistics, sitemap display, project management,
- * and storage overview functionality.
+ * and My total space with its Manage Space.
  */
 
 (function() {
@@ -813,6 +813,8 @@
             // Owning nothing is a normal state, not an error: the card shows only
             // Manage Space, or nothing.
             if (!data || !data.project_count) {
+                ownerSpaceRows = [];
+                syncManageSpaceExports();
                 showOwnerSpace(section, false);
                 return;
             }
@@ -873,6 +875,7 @@
             ownerSpaceRows = data.projects || [];
             ownerSpaceGrandTotal = total;
             renderOwnerSpaceRows();
+            syncManageSpaceExports();
 
             const hint = document.getElementById('owner-space-hint');
             if (hint) {
@@ -889,22 +892,22 @@
     /**
      * My total space, with Manage Space at its foot. Your own space shows when you own
      * a project. Manage Space is about the EDITED project, so it stays for an account
-     * that owns nothing but can read one of its three lists: the card then holds it
-     * alone. With neither, the card stays hidden.
+     * that owns nothing but can read its build or its backups: the card then holds it
+     * alone. With neither, the card stays hidden. (Its exports are a project you own.)
      */
     function showOwnerSpace(section, ownsProjects) {
-        const manageReach = canRun('getBuild') || canRun('getSizeInfo') || canRun('listBackups');
+        const manageReach = canRun('getBuild') || canRun('listBackups');
         const card = section.querySelector('.owner-space');
         if (card) card.classList.toggle('owner-space--manage-only', !ownsProjects);
         section.style.display = (ownsProjects || manageReach) ? '' : 'none';
     }
 
     /**
-     * After something on this page changed what a project takes: the edited project's
-     * figures and your own, re-measured, or a deletion reads high until the cache lapses.
+     * After something on this page changed what a project takes: your own figures
+     * re-measured, Manage Space's exports with them, or a deletion reads high until
+     * the cache lapses.
      */
     function refreshSpaceFigures() {
-        loadStorageOverview();
         loadOwnerSpaceUsage(true);
     }
 
@@ -912,51 +915,6 @@
     function afterBackupsChanged() {
         refreshSpaceFigures();
         if (manageSpaceLoaded && canRun('listBackups')) loadManageSpaceBackups();
-    }
-
-    async function loadStorageOverview() {
-        try {
-            const result = await QuickSiteAdmin.apiRequest('getSizeInfo');
-            
-            if (result.ok && result.data?.data?.summary) {
-                const summary = result.data.data.summary;
-                const byCategory = summary.by_category || {};
-                
-                document.getElementById('storage-total').textContent = summary.total?.size_formatted || '--';
-                
-                const totalBytes = summary.total?.size || 1;
-                const categories = ['projects', 'backups', 'builds', 'exports', 'admin', 'system'];
-                
-                const systemBytes = (byCategory.management?.size || 0) + (byCategory.core?.size || 0);
-                const sizes = {
-                    projects: byCategory.projects?.size || 0,
-                    backups: byCategory.backups?.size || 0,
-                    builds: byCategory.builds?.size || 0,
-                    exports: byCategory.exports?.size || 0,
-                    admin: byCategory.admin?.size || 0,
-                    system: systemBytes
-                };
-                
-                categories.forEach(cat => {
-                    const bytes = sizes[cat] || 0;
-                    const pct = (bytes / totalBytes) * 100;
-                    
-                    const segment = document.getElementById(`storage-seg-${cat}`);
-                    const value = document.getElementById(`storage-val-${cat}`);
-                    
-                    if (segment) {
-                        segment.style.width = pct > 0 ? Math.max(pct, 1) + '%' : '0%';
-                    }
-                    if (value) {
-                        value.textContent = formatSize(bytes);
-                    }
-                });
-            } else {
-                console.error('getSizeInfo failed:', result.data?.message || 'Unknown error');
-            }
-        } catch (error) {
-            console.error('Failed to load storage info:', error);
-        }
     }
 
     // ========================================================================
@@ -980,7 +938,7 @@
                 // data" three times over. Gated at the CALL SITE rather than inside
                 // each loader so the loaders stay untouched.
                 if (canRun('getBuild'))     loadManageSpaceBuilds();
-                if (canRun('getSizeInfo'))  loadManageSpaceExports();
+                syncManageSpaceExports();
                 if (canRun('listBackups'))  loadManageSpaceBackups();
             }
         });
@@ -1099,37 +1057,31 @@
         return item;
     }
 
-    async function loadManageSpaceExports() {
+    /**
+     * Manage Space's exports: the edited project's saved export files, from My total
+     * space's own answer, which measures each project you own (its row's `exports`).
+     * So the section shows only when you own the project you edit, can clear its
+     * exports, and it holds one: the panel's Export keeps none on the server, and an
+     * API caller's save=true is what leaves one. Called when Manage Space opens and
+     * each time My total space loads, so a clear (which re-measures) hides it.
+     */
+    function syncManageSpaceExports() {
         const section = document.getElementById('manage-space-exports');
         const list = document.getElementById('manage-exports-list');
         const count = document.getElementById('manage-exports-count');
-        if (!list) return;
+        if (!section || !list || !count || !manageSpaceLoaded) return;
+
+        const edited = editedProjectId();
+        const row = canRun('clearExports') ? ownerSpaceRows.find(p => p.project === edited) : null;
+        const fileCount = row?.exports?.count || 0;
+        const totalBytes = row?.exports?.size || 0;
+        count.textContent = fileCount;
 
         QSDom.clear(list);
-        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: t('common.loading', 'Loading...') }));
+        if (fileCount === 0) { section.style.display = 'none'; return; }
 
-        try {
-            const result = await QuickSiteAdmin.apiRequest('getSizeInfo');
-            // getSizeInfo returns { summary, public, secure } — the folder map is
-            // secure.folders. The old `secure_folders` path never existed, so this
-            // panel always reported 0 files.
-            const exports = result.data?.data?.secure?.folders?.exports || {};
-            const totalBytes = exports.size || 0;
-            const fileCount = exports.files || 0;
-            count.textContent = fileCount;
-
-            QSDom.clear(list);
-            // The section shows only when the project holds a saved export: the panel's Export
-            // keeps none on the server, and an API caller's save=true is what leaves one.
-            if (fileCount === 0) { section.style.display = 'none'; return; }
-
-            section.style.display = '';
-            list.appendChild(_renderManageSpaceExports(fileCount, totalBytes, section));
-        } catch (error) {
-            QSDom.clear(list);
-            section.style.display = '';
-            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: t('common.error', 'Error loading data') }));
-        }
+        section.style.display = '';
+        list.appendChild(_renderManageSpaceExports(fileCount, totalBytes, section));
     }
 
     function _renderManageSpaceExports(fileCount, totalBytes, section) {
@@ -1941,7 +1893,6 @@
             hp('getSiteMap')         ? loadSiteMap()         : Promise.resolve(),
             hp('getCommandHistory')  ? loadRecentCommands()  : Promise.resolve(),
             hp('listProjects')       ? loadProjectManager()  : Promise.resolve(),
-            hp('getSizeInfo')        ? loadStorageOverview() : Promise.resolve(),
             // Owner-wide usage walks every owned project, so it loads alongside
             // rather than gating anything; when you own nothing it keeps only Manage
             // Space, or hides itself.

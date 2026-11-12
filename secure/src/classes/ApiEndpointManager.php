@@ -941,7 +941,8 @@ class ApiEndpointManager {
      * the name is held to what an author could write in a page, by the binding
      * rule (qs_binding_attribute_refusal(), the runtime's verdict). Its selector
      * can reach any element of the page, so no tag is known here: an iframe's
-     * `src` stays the runtime's to refuse. Like `headers`, the field is otherwise
+     * `src`, and a meta's `content` and `http-equiv`, stay the runtime's to
+     * refuse. Like `headers`, the field is otherwise
      * kept as it is sent.
      *
      * @param mixed $bindings the endpoint's `responseBindings`

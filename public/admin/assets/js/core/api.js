@@ -200,15 +200,13 @@ window.QuickSiteAPI = (function() {
             'No project selected for project-scoped command: ' + command, 0);
     }
 
-    // Every failure this module answers WITHOUT reaching the server used to carry
-    // only `error`, while the server's own envelope (ApiResponse) carries `message`.
-    // Callers overwhelmingly read `result.data.message` — 89 sites across the admin
-    // panel against 18 that read `.error` — so a client-side refusal printed each
-    // caller's generic fallback and the real reason never surfaced. That is how
-    // "getSizeInfo failed: Unknown error" reached the dashboard console at zero
-    // membership with no hint that the cause was a missing project. Both keys are
-    // emitted: `message` so the common path works, `error` so the 18 existing
-    // readers keep working.
+    // Every failure this module answers WITHOUT reaching the server carries the
+    // reason under both keys a caller may read: `message`, as the server's own
+    // envelope (ApiResponse) has it and as most callers read it
+    // (`result.data.message`), and `error`, which the rest read. With one key
+    // alone, a client-side refusal would print the other callers' generic
+    // fallback ("… failed: Unknown error"), with no hint that the cause was, say,
+    // a missing project.
     function clientError(code, text, status) {
         return {
             ok: false,

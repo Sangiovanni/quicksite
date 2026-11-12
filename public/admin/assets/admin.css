@@ -149,12 +149,14 @@ code,
 /* =============================================================================
    SECURITY WARNING BANNER
    ============================================================================= */
+/* The panel's own colours. The tint lies over the page's background, as the
+   banner sticks under the header and what scrolls beneath must not show through. */
 .admin-security-warning {
-    background: #fff3e0;
-    border-bottom: 1px solid #ffcc02;
+    background: linear-gradient(var(--admin-warning-bg), var(--admin-warning-bg)), var(--admin-bg);
+    border-bottom: 1px solid var(--admin-warning-border);
     padding: 8px var(--space-xl);
     font-size: var(--font-size-sm);
-    color: #5d4037;
+    color: var(--admin-text);
     position: sticky;
     top: var(--admin-header-height);
     z-index: 99;
@@ -169,13 +171,13 @@ code,
 }
 
 .admin-security-warning__link {
-    color: #1565c0;
+    color: var(--admin-accent);
     text-decoration: underline;
     font-weight: var(--font-weight-medium);
 }
 
 .admin-security-warning__link:hover {
-    color: #0d47a1;
+    color: var(--admin-accent-hover);
 }
 
 .admin-security-warning__dismiss {
@@ -184,31 +186,22 @@ code,
     border: none;
     cursor: pointer;
     font-size: var(--font-size-xl);
-    color: #8d6e63;
+    color: var(--admin-text-muted);
     padding: 0 4px;
     line-height: 1;
 }
 
 .admin-security-warning__dismiss:hover {
-    color: #4e342e;
+    color: var(--admin-text);
 }
 
 /* Informational variant — same banner mechanics, no alarm. Used for the
    operator update notice, which reports news rather than a misconfiguration.
-   Only the palette is overridden; layout, stickiness and the dismiss control
-   are the block's own. */
+   Only the tint and its border differ; text, link, layout, stickiness and the
+   dismiss control are the block's own. */
 .admin-security-warning--info {
-    background: #e8f1fb;
-    border-bottom-color: #90caf9;
-    color: #14395e;
-}
-
-.admin-security-warning--info .admin-security-warning__dismiss {
-    color: #5b7fa6;
-}
-
-.admin-security-warning--info .admin-security-warning__dismiss:hover {
-    color: #14395e;
+    background: linear-gradient(var(--admin-info-bg), var(--admin-info-bg)), var(--admin-bg);
+    border-bottom-color: var(--admin-info-border);
 }
 
 /* =============================================================================
@@ -2274,7 +2267,7 @@ kbd {
     justify-content: flex-end;
 }
 
-/* Storage Overview Styles */
+/* The space card's shell: My total space, with Manage Space at its foot. */
 .storage-overview {
     background: var(--admin-surface);
     border: 1px solid var(--admin-border);
@@ -2339,19 +2332,9 @@ kbd {
     background: var(--admin-success);
 }
 
-.storage-overview__segment--admin,
-.storage-overview__legend-color--admin {
-    background: var(--admin-warning);
-}
-
 .storage-overview__segment--exports,
 .storage-overview__legend-color--exports {
     background: var(--admin-info);
-}
-
-.storage-overview__segment--system,
-.storage-overview__legend-color--system {
-    background: var(--admin-text-muted);
 }
 
 .storage-overview__segment--builds,
@@ -2394,8 +2377,8 @@ kbd {
     color: var(--admin-text);
 }
 
-/* Owner Space Usage — aggregate across every project the caller owns.
-   Reuses the .storage-overview shell; only the per-project list is new. */
+/* Owner Space Usage — aggregate across every project the caller owns, in the
+   .storage-overview shell above, with its per-project list. */
 .owner-space__count {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-normal);

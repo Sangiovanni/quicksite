@@ -543,13 +543,9 @@
             "error": "Failed to load project info"
         },
         "storage": {
-            "title": "Storage Overview",
-            "projects": "Projects",
             "backups": "Backups",
             "builds": "Builds",
             "exports": "Exports",
-            "admin": "Admin",
-            "system": "System",
             "manageSpace": "Manage Space",
             "buildsPage": "Open builds page",
             "noItems": "No items",
