@@ -6,9 +6,10 @@
         "icon": "📜",
         "titleKey": "workflows.specs.fitConsentPages.title",
         "descriptionKey": "workflows.specs.fitConsentPages.description",
-        "category": "style",
-        "tags": ["cookie", "privacy", "policy", "consent", "style"],
-        "difficulty": "beginner"
+        "category": "privacy",
+        "answerLength": "short",
+        "needsKey": "workflows.needs.consentPages",
+        "tags": ["cookie", "privacy", "policy", "consent", "style"]
     },
     "parameters": [
         {

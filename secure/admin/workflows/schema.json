@@ -46,18 +46,22 @@
         },
         "category": {
           "type": "string",
-          "enum": ["creation", "modification", "content", "style", "advanced", "wip", "template"],
-          "description": "Category for organizing workflows"
+          "enum": ["start", "add", "look", "texts", "privacy", "tools"],
+          "description": "The group the Workflows panel lists the workflow in, by what a person wants to do. The panel shows the groups in this order: start (Start a new site), add (Add to my site), look (Change the look), texts (Texts and languages), privacy (Cookies and privacy), tools (Tools); a group's words are ai.categories.<value>.title and .desc in the panel's translations. Another name still runs (the engine checks only that the field names a group), and the panel lists it last, under its own name."
         },
         "tags": {
           "type": "array",
           "items": { "type": "string" },
           "description": "Tags for filtering and search"
         },
-        "difficulty": {
+        "answerLength": {
           "type": "string",
-          "enum": ["beginner", "intermediate", "advanced"],
-          "description": "Complexity level for user guidance"
+          "enum": ["short", "long"],
+          "description": "How long the AI's answer runs, for the row's words ('one request, short answer'): short is up to about 5,000 characters, long is the whole of a site. Set it only from a measure or an estimate that stands far from the line; left out, the row says how many requests and no more."
+        },
+        "needsKey": {
+          "type": "string",
+          "description": "Translation key of a short text naming what the project must hold before a run makes sense ('Needs a cookie banner'), shown on the workflow's row. Left out, the row names no need."
         },
         "suppressPinsHeader": {
           "type": "boolean",
@@ -275,6 +279,10 @@
     "promptTemplate": {
       "type": "string",
       "description": "Filename of the .md prompt template (same folder as spec)"
+    },
+    "pasteOnly": {
+      "type": "boolean",
+      "description": "The commands are pasted by hand and no model is asked: the workflow's row says No AI, and how many requests a run sends counts none for it. Its promptTemplate is what the paste box asks for."
     },
     "answerRules": {
       "type": "object",

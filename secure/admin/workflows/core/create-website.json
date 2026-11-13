@@ -6,9 +6,9 @@
         "icon": "🌐",
         "titleKey": "ai.specs.createWebsite.title",
         "descriptionKey": "ai.specs.createWebsite.description",
-        "category": "creation",
-        "tags": ["create", "website", "multi-page", "single-page", "landing", "from-scratch"],
-        "difficulty": "advanced"
+        "category": "start",
+        "answerLength": "long",
+        "tags": ["create", "website", "multi-page", "single-page", "landing", "from-scratch"]
     },
     "parameters": [
         {

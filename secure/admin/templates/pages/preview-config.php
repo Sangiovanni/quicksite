@@ -28,12 +28,15 @@ if (!isset($editConfig)) {
     $editConfig = defined('CONFIG') ? CONFIG : [];
 }
 
-// AI tools mode workflow metadata, loaded server-side. A workflow is listed only when the
-// role may send every command a run of it may send, its sub-workflows' included
-// (WorkflowManager::runCommands()).
+// The Workflows panel's list (mode ai-tools), loaded server-side. A workflow is listed only when
+// the role may send every command a run of it may send, its sub-workflows' included
+// (WorkflowManager::runCommands()). Each row carries what a run does, derived from the workflow's
+// file and every workflow it may reach (WorkflowManager::rowFacts()), and the groups come in the
+// schema's order (WorkflowManager::categories()).
 require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $__previewAiToolsWorkflows = [];
+$__previewWorkflowGroups = [];
 try {
     $__aiToolsManager = new WorkflowManager();
     $__aiToolsSpecs = $__aiToolsManager->listWorkflows();
@@ -44,7 +47,16 @@ try {
         $__aiToolsPerms = getTokenPermissions($__aiToolsResolved['user']);
         $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
     }
-    $__aiToolsCategoryOrder = ['creation', 'template', 'modification', 'content', 'style', 'advanced', 'wip'];
+    // Each group's words, its title and the line under it, with their English as the fallback.
+    $__aiToolsGroupWords = [
+        'start'   => ['Start a new site', 'Replaces what is there'],
+        'add'     => ['Add to my site', 'Keeps what is there'],
+        'look'    => ['Change the look', 'Colours, styles, animations'],
+        'texts'   => ['Texts and languages', 'Words, translations, the switch'],
+        'privacy' => ['Cookies and privacy', 'Your consent banner and pages'],
+        'tools'   => ['Tools', 'For when you know what you want'],
+    ];
+    $__aiToolsCategoryOrder = $__aiToolsManager->categories();
     $__aiToolsCategoryIndex = array_flip($__aiToolsCategoryOrder);
     foreach ($__aiToolsSpecs as $__aiToolsSpec) {
         if ($__aiToolsAllowed !== null) {
@@ -58,10 +70,11 @@ try {
             if ($__aiToolsSkip) continue;
         }
         $__aiToolsMeta = $__aiToolsSpec['meta'] ?? [];
-        $__aiToolsHasSteps = !empty($__aiToolsSpec['steps']);
-        $__aiToolsHasPrompt = !empty($__aiToolsSpec['promptTemplate']);
-        $__aiToolsCategory = $__aiToolsMeta['category'] ?? 'other';
-        $__aiToolsDifficulty = $__aiToolsMeta['difficulty'] ?? 'intermediate';
+        $__aiToolsCategory = is_string($__aiToolsMeta['category'] ?? null) ? $__aiToolsMeta['category'] : 'other';
+        $__aiToolsFacts = $__aiToolsManager->rowFacts($__aiToolsSpec);
+        // A need is shown in the panel's language only where that language holds its key: there is no word to fall back on.
+        $__aiToolsFacts['needs'] = $__aiToolsFacts['needsKey'] !== null ? __admin($__aiToolsFacts['needsKey'], '') : '';
+        unset($__aiToolsFacts['needsKey']);
         $__previewAiToolsWorkflows[] = [
             'id'              => $__aiToolsSpec['id'],
             'icon'            => $__aiToolsMeta['icon'] ?? '📋',
@@ -70,13 +83,9 @@ try {
             'description'     => $__aiToolsMeta['description']
                                   ?? __workflow($__aiToolsSpec, $__aiToolsMeta['descriptionKey'] ?? '', ''),
             'category'        => $__aiToolsCategory,
-            'categoryLabel'   => __admin('ai.categories.' . $__aiToolsCategory . '.title', ucfirst($__aiToolsCategory)),
-            'tags'            => array_values($__aiToolsMeta['tags'] ?? []),
-            'difficulty'      => $__aiToolsDifficulty,
-            'difficultyLabel' => __admin('ai.difficulty.' . $__aiToolsDifficulty, ucfirst($__aiToolsDifficulty)),
-            'source'          => $__aiToolsSpec['_source'] ?? 'core',
-            'isAI'            => $__aiToolsHasPrompt,
-            'isManual'        => $__aiToolsHasSteps && !$__aiToolsHasPrompt,
+            // Hidden search words: a search reads them, nothing shows them.
+            'tags'            => array_values(array_filter($__aiToolsMeta['tags'] ?? [], 'is_string')),
+            'facts'           => $__aiToolsFacts,
         ];
     }
     usort($__previewAiToolsWorkflows, function ($a, $b) use ($__aiToolsCategoryIndex) {
@@ -85,6 +94,19 @@ try {
         if ($aIdx !== $bIdx) return $aIdx - $bIdx;
         return strcasecmp($a['title'], $b['title']);
     });
+    // The groups in the schema's order, then any group a file names that the schema does not know, last, by its own name.
+    $__aiToolsGroupIds = $__aiToolsCategoryOrder;
+    foreach ($__previewAiToolsWorkflows as $__aiToolsRow) {
+        if (!in_array($__aiToolsRow['category'], $__aiToolsGroupIds, true)) $__aiToolsGroupIds[] = $__aiToolsRow['category'];
+    }
+    foreach ($__aiToolsGroupIds as $__aiToolsGroupId) {
+        $__aiToolsWords = $__aiToolsGroupWords[$__aiToolsGroupId] ?? [ucfirst($__aiToolsGroupId), ''];
+        $__previewWorkflowGroups[] = [
+            'id'    => $__aiToolsGroupId,
+            'title' => __admin('ai.categories.' . $__aiToolsGroupId . '.title', $__aiToolsWords[0]),
+            'line'  => __admin('ai.categories.' . $__aiToolsGroupId . '.desc', $__aiToolsWords[1]),
+        ];
+    }
 } catch (\Throwable $__aiToolsErr) {
     error_log('[PreviewAiTools] Failed to load workflow list: ' . $__aiToolsErr->getMessage());
 }
@@ -144,9 +166,11 @@ window.PreviewConfig = {
     // schema declared in /admin/apis.
     routeResolverDefaults: <?= json_encode($__previewResolverDefaults ?: new stdClass()) ?>,
 
-    // AI tools panel — pre-resolved workflow metadata. Role-filtered
-    // (matches /admin/workflows). One entry per visible workflow.
+    // Workflows panel — pre-resolved workflow metadata, each with what a run does
+    // (its facts). Role-filtered. One entry per visible workflow.
     aiToolsWorkflows: <?= json_encode($__previewAiToolsWorkflows) ?>,
+    // The panel's groups, in order: id, title and the line under it.
+    workflowGroups: <?= json_encode($__previewWorkflowGroups) ?>,
     // The edited project's own stylesheet, where /p/<id>/ serves it (the snippet
     // preview's "with the project's style"). The install root has no stylesheet.
     projectStyleUrl: <?= json_encode($router->projectSiteBase($__previewProject) . '/style/style.css') ?>,
@@ -646,14 +670,21 @@ window.PreviewConfig = {
             styleSourceUnknownError: <?= json_encode(__admin('common.unknownError')) ?>
         },
 
-        // ── AI tools panel (preview-ai-tools.js) ──
+        // ── Workflows panel (preview-ai-tools.js) ──
         aiTools: {
-            aiBadgeTooltip: <?= json_encode(__admin('preview.aiToolsAiBadgeTooltip', 'AI workflow — generates a prompt')) ?>,
-            manualBadgeTooltip: <?= json_encode(__admin('preview.aiToolsManualBadgeTooltip', 'Steps-only workflow — runs commands without AI')) ?>,
-            showMoreLabel: <?= json_encode(__admin('preview.aiToolsShowMore', 'Show more')) ?>,
-            showMoreCount: <?= json_encode(__admin('preview.aiToolsShowMoreCount', 'Show {n} more')) ?>,
-            tagShowMore: <?= json_encode(__admin('preview.aiToolsTagShowMore', '+{n} more')) ?>,
-            tagShowLess: <?= json_encode(__admin('preview.aiToolsTagShowLess', 'Show less')) ?>,
+            // A row's second line: what a run does, in words
+            factNoAi: <?= json_encode(__admin('preview.workflowsFactNoAi', 'No AI')) ?>,
+            factPaste: <?= json_encode(__admin('preview.workflowsFactPaste', 'No AI: you paste the commands')) ?>,
+            factAiOne: <?= json_encode(__admin('preview.workflowsFactAiOne', 'Uses AI: one request')) ?>,
+            factAiOneShort: <?= json_encode(__admin('preview.workflowsFactAiOneShort', 'Uses AI: one request, short answer')) ?>,
+            factAiOneLong: <?= json_encode(__admin('preview.workflowsFactAiOneLong', 'Uses AI: one request, long answer')) ?>,
+            factAiSeveral: <?= json_encode(__admin('preview.workflowsFactAiSeveral', 'Uses AI: several requests')) ?>,
+            factAiSeveralShort: <?= json_encode(__admin('preview.workflowsFactAiSeveralShort', 'Uses AI: several requests, short answers')) ?>,
+            factAiSeveralLong: <?= json_encode(__admin('preview.workflowsFactAiSeveralLong', 'Uses AI: several requests, long answers')) ?>,
+            factCanDelete: <?= json_encode(__admin('preview.workflowsFactCanDelete', 'Can delete: {what}')) ?>,
+            factChanges: <?= json_encode(__admin('preview.workflowsFactChanges', 'Changes: {what}')) ?>,
+            factAnyCommand: <?= json_encode(__admin('preview.workflowsFactAnyCommand', 'Can run any command, one that deletes included')) ?>,
+            recentTitle: <?= json_encode(__admin('preview.workflowsRecent', 'Recently used')) ?>,
             backToList: <?= json_encode(__admin('preview.aiToolsBackToList', '← Back')) ?>,
             sectionYourPrompt: <?= json_encode(__admin('preview.aiToolsSectionYourPrompt', 'Your prompt')) ?>,
             sectionParameters: <?= json_encode(__admin('preview.aiToolsSectionParameters', 'Parameters')) ?>,
@@ -733,13 +764,13 @@ window.PreviewConfig = {
             confirmTitleDelete: <?= qs_inline_script_json(__admin('preview.aiToolsConfirmTitleDelete')) ?>,
             effectChanges: <?= qs_inline_script_json(__admin('preview.aiToolsEffectChanges')) ?>,
             effectRestores: <?= qs_inline_script_json(__admin('preview.aiToolsEffectRestores')) ?>,
-            effectRestoresLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectRestoresLine')) ?>,
+            effectRestoresLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectRestoresLine', 'Puts a backup back, over the project\'s current state')) ?>,
             effectTransfers: <?= qs_inline_script_json(__admin('preview.aiToolsEffectTransfers')) ?>,
-            effectTransfersLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectTransfersLine')) ?>,
+            effectTransfersLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectTransfersLine', 'Hands the project to another member, who becomes its owner')) ?>,
             effectSetsKeys: <?= qs_inline_script_json(__admin('preview.aiToolsEffectSetsKeys')) ?>,
-            effectSetsKeysLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectSetsKeysLine')) ?>,
+            effectSetsKeysLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectSetsKeysLine', 'Sets or clears the project\'s keys for a sign-in provider')) ?>,
             effectRegenerates: <?= qs_inline_script_json(__admin('preview.aiToolsEffectRegenerates')) ?>,
-            effectRegeneratesLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectRegeneratesLine')) ?>,
+            effectRegeneratesLine: <?= qs_inline_script_json(__admin('preview.aiToolsEffectRegeneratesLine', 'Writes the cookie banner and popup again, over what is there')) ?>,
             effectDeletes: <?= qs_inline_script_json(__admin('preview.aiToolsEffectDeletes')) ?>,
             effectMore: <?= qs_inline_script_json(__admin('preview.aiToolsEffectMore')) ?>,
             exchangeFor: <?= qs_inline_script_json(__admin('preview.aiToolsExchangeFor')) ?>,
@@ -779,21 +810,21 @@ window.PreviewConfig = {
             stepRetry: <?= qs_inline_script_json(__admin('preview.aiToolsStepRetry')) ?>,
             stoppedByStep: <?= qs_inline_script_json(__admin('preview.aiToolsStoppedByStep')) ?>,
             stoppedByUser: <?= qs_inline_script_json(__admin('preview.aiToolsStoppedByUser')) ?>,
-            whatComponents: <?= qs_inline_script_json(__admin('preview.aiToolsWhatComponents')) ?>,
-            whatDefaultLanguage: <?= qs_inline_script_json(__admin('preview.aiToolsWhatDefaultLanguage')) ?>,
-            whatFooter: <?= qs_inline_script_json(__admin('preview.aiToolsWhatFooter')) ?>,
-            whatInteractions: <?= qs_inline_script_json(__admin('preview.aiToolsWhatInteractions')) ?>,
-            whatLanguages: <?= qs_inline_script_json(__admin('preview.aiToolsWhatLanguages')) ?>,
-            whatMedia: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMedia')) ?>,
-            whatMenu: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMenu')) ?>,
-            whatMultilingual: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMultilingual')) ?>,
-            whatOther: <?= qs_inline_script_json(__admin('preview.aiToolsWhatOther')) ?>,
-            whatPages: <?= qs_inline_script_json(__admin('preview.aiToolsWhatPages')) ?>,
-            whatPrivacy: <?= qs_inline_script_json(__admin('preview.aiToolsWhatPrivacy')) ?>,
-            whatSnippets: <?= qs_inline_script_json(__admin('preview.aiToolsWhatSnippets')) ?>,
-            whatStylesheet: <?= qs_inline_script_json(__admin('preview.aiToolsWhatStylesheet')) ?>,
-            whatTexts: <?= qs_inline_script_json(__admin('preview.aiToolsWhatTexts')) ?>,
-            whatTranslationFiles: <?= qs_inline_script_json(__admin('preview.aiToolsWhatTranslationFiles')) ?>,
+            whatComponents: <?= qs_inline_script_json(__admin('preview.aiToolsWhatComponents', 'Components')) ?>,
+            whatDefaultLanguage: <?= qs_inline_script_json(__admin('preview.aiToolsWhatDefaultLanguage', 'The default language')) ?>,
+            whatFooter: <?= qs_inline_script_json(__admin('preview.aiToolsWhatFooter', 'The footer')) ?>,
+            whatInteractions: <?= qs_inline_script_json(__admin('preview.aiToolsWhatInteractions', 'Interactions')) ?>,
+            whatLanguages: <?= qs_inline_script_json(__admin('preview.aiToolsWhatLanguages', 'Languages')) ?>,
+            whatMedia: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMedia', 'Media files')) ?>,
+            whatMenu: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMenu', 'The menu')) ?>,
+            whatMultilingual: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMultilingual', 'Multilingual mode')) ?>,
+            whatOther: <?= qs_inline_script_json(__admin('preview.aiToolsWhatOther', 'Other commands')) ?>,
+            whatPages: <?= qs_inline_script_json(__admin('preview.aiToolsWhatPages', 'Pages')) ?>,
+            whatPrivacy: <?= qs_inline_script_json(__admin('preview.aiToolsWhatPrivacy', 'Privacy pages and settings')) ?>,
+            whatSnippets: <?= qs_inline_script_json(__admin('preview.aiToolsWhatSnippets', 'Snippets')) ?>,
+            whatStylesheet: <?= qs_inline_script_json(__admin('preview.aiToolsWhatStylesheet', 'The stylesheet')) ?>,
+            whatTexts: <?= qs_inline_script_json(__admin('preview.aiToolsWhatTexts', 'Texts')) ?>,
+            whatTranslationFiles: <?= qs_inline_script_json(__admin('preview.aiToolsWhatTranslationFiles', 'Translation files of languages the project no longer has')) ?>,
             answerCut: <?= qs_inline_script_json(__admin('preview.aiToolsAnswerCut')) ?>,
             answerNothingRuns: <?= qs_inline_script_json(__admin('preview.aiToolsAnswerNothingRuns', 'Nothing in this answer can run.')) ?>,
             answerLeftOutCommand: <?= qs_inline_script_json(__admin('preview.aiToolsAnswerLeftOutCommand', 'Left out, as this workflow does not send them: {list}')) ?>,

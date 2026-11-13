@@ -6,9 +6,8 @@
         "icon": "🌙",
         "titleKey": "workflows.specs.setupThemeSwitch.title",
         "descriptionKey": "workflows.specs.setupThemeSwitch.description",
-        "category": "modification",
-        "tags": ["theme", "dark", "light", "switch", "toggle"],
-        "difficulty": "beginner"
+        "category": "look",
+        "tags": ["theme", "dark", "light", "switch", "toggle"]
     },
     "parameters": [],
     "steps": [

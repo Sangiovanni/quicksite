@@ -1,12 +1,12 @@
-<!-- AI TOOLS MODE Content -->
+<!-- WORKFLOWS MODE Content (mode ai-tools: the ids and file names keep the panel's first name, AI tools) -->
 <div class="preview-contextual-section" id="contextual-ai-tools" data-mode="ai-tools" style="display: none;">
 
-    <!-- List view (default; switches to runner view when a tool is picked) -->
+    <!-- List view (default; switches to runner view when a workflow is picked) -->
     <div class="preview-contextual-ai-tools__list-view" id="ai-tools-list-view">
 
         <div class="preview-contextual-ai-tools__backup-banner" id="ai-tools-backup-banner" role="alert">
             <div class="preview-contextual-ai-tools__backup-banner-text">
-                <strong><?= __admin('preview.aiToolsBackupWarning', 'AI tools modify your site directly. Changes cannot be easily reverted.') ?></strong>
+                <strong><?= __admin('preview.aiToolsBackupWarning', 'Workflows modify your site directly. Changes cannot be easily reverted.') ?></strong>
                 <span><?= __admin('preview.aiToolsBackupRecommendation', "We recommend creating a backup before running any workflow you're not sure about.") ?></span>
             </div>
             <div class="preview-contextual-ai-tools__backup-actions">
@@ -21,26 +21,20 @@
 
         <div class="preview-contextual-ai-tools__search-row">
             <input type="search" class="preview-contextual-ai-tools__search" id="ai-tools-search"
-                   placeholder="<?= __admin('preview.aiToolsSearchPlaceholder', 'Search AI tools…') ?>"
+                   placeholder="<?= __admin('preview.aiToolsSearchPlaceholder', 'Search workflows…') ?>"
                    autocomplete="off">
         </div>
 
-        <div class="preview-contextual-ai-tools__tag-mode-row" id="ai-tools-tag-mode-row" style="display: none;">
-            <span class="preview-contextual-ai-tools__tag-mode-label">
-                <?= __admin('preview.aiToolsMatchLabel', 'Match:') ?>
-            </span>
-            <button type="button" class="preview-contextual-ai-tools__tag-mode preview-contextual-ai-tools__tag-mode--active"
-                    id="ai-tools-tag-mode-any" data-mode="any">
-                <?= __admin('preview.aiToolsMatchAny', 'Any') ?>
-            </button>
-            <button type="button" class="preview-contextual-ai-tools__tag-mode"
-                    id="ai-tools-tag-mode-all" data-mode="all">
-                <?= __admin('preview.aiToolsMatchAll', 'All') ?>
-            </button>
-        </div>
-
-        <div class="preview-contextual-ai-tools__tags" id="ai-tools-tags">
-            <!-- Tag chips inserted by JS -->
+        <!-- Each switch keeps only the rows it names; neither is remembered -->
+        <div class="preview-contextual-ai-tools__switches">
+            <label class="preview-contextual-ai-tools__switch">
+                <input type="checkbox" id="ai-tools-switch-no-ai" autocomplete="off">
+                <span><?= __admin('preview.workflowsSwitchNoAi', 'No AI') ?></span>
+            </label>
+            <label class="preview-contextual-ai-tools__switch">
+                <input type="checkbox" id="ai-tools-switch-nothing-deleted" autocomplete="off">
+                <span><?= __admin('preview.workflowsSwitchNothingDeleted', 'Nothing deleted') ?></span>
+            </label>
         </div>
 
         <div class="preview-contextual-ai-tools__section" id="ai-tools-all-section">
@@ -49,16 +43,13 @@
                     <?= __admin('preview.aiToolsLoading', 'Loading…') ?>
                 </div>
             </div>
-            <button type="button" class="preview-contextual-ai-tools__show-more" id="ai-tools-show-more" style="display: none;">
-                <?= __admin('preview.aiToolsShowMore', 'Show more') ?>
-            </button>
             <div class="preview-contextual-ai-tools__empty" id="ai-tools-empty" style="display: none;">
-                <?= __admin('preview.aiToolsEmpty', 'No tools match the current filters.') ?>
+                <?= __admin('preview.aiToolsEmpty', 'No workflow matches your search and switches.') ?>
             </div>
         </div>
     </div>
 
-    <!-- Runner view (populated when a tool is picked) -->
+    <!-- Runner view (populated when a workflow is picked) -->
     <div class="preview-contextual-ai-tools__runner-view" id="ai-tools-runner-view" style="display: none;">
     </div>
 </div>

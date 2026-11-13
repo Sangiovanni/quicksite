@@ -6,9 +6,8 @@
         "icon": "🌍",
         "titleKey": "workflows.specs.landingPageMultilingual.title",
         "descriptionKey": "workflows.specs.landingPageMultilingual.description",
-        "category": "template",
-        "tags": ["landing", "single-page", "starter", "template", "multilingual"],
-        "difficulty": "beginner"
+        "category": "start",
+        "tags": ["landing", "single-page", "starter", "template", "multilingual"]
     },
     "preWorkflows": [
         { "id": "fresh-start", "params": { "keepLanguages": true } }

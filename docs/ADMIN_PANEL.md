@@ -125,7 +125,7 @@ does a scroll. A touch shows nothing, as a title never did.
 | Stays the browser's | An `<iframe>`'s title (its accessible name), an `<option>`'s (a native list is drawn outside the page), and any title inside an element marked `data-qs-native-title` — the tag preview, which shows a visitor's markup as a browser shows it. |
 
 **A disabled button.** An admin button (`.admin-btn`) that is disabled, or marked unavailable
-with `aria-disabled="true"` while it still answers a click (AI tools' **Run them** before the
+with `aria-disabled="true"` while it still answers a click (Workflows' **Run them** before the
 allowance is back), is dimmed with a not-allowed cursor: one rule in `admin.css` for the whole
 panel. Hovering it keeps its colour, and its title still shows. The danger and success variants
 dim their own way; a button that is not an admin button keeps its own rule.
@@ -234,7 +234,7 @@ whose click it holds is followed afterwards, a mode or tab switch happens afterw
 
 ### 5.4 AI sub-pages (`pages/ai/`)
 
-There is no workflow browser or spec-runner page: both are subsumed by the visual editor's AI tools mode (§8.12), so this folder holds only the BYOK connection UI and the shared AI-call library.
+There is no workflow browser or spec-runner page: both are subsumed by the visual editor's Workflows mode (§8.12), so this folder holds only the BYOK connection UI and the shared AI-call library.
 
 | File | Purpose |
 |---|---|
@@ -262,7 +262,7 @@ There is no workflow browser or spec-runner page: both are subsumed by the visua
 | `preview-transition-editor.js` | Transition-property editor. |
 | `preview-js-interactions.js` | Element-level interaction (event) editor + verb picker (§9.9). |
 | `preview-translation.js` | Translation Manager mode (§8.9). |
-| `preview-ai-tools.js` | AI tools mode — workflow list, runner, batch execution (§8.12). |
+| `preview-ai-tools.js` | Workflows mode (`ai-tools`, the file named after the panel's first name, AI tools) — workflow list, runner, batch execution (§8.12). |
 | `preview-drag.js` | Drag-mode UX. |
 | `contextual-complex/` | Per-kind complex-element wizards (§8.7). |
 
@@ -336,6 +336,8 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
 | `sidebarWidth` | localStorage | `preview-sidebar-resize.js` — the visual editor's options panel's width in pixels, as its handle left it; stored as `quicksite_sidebar_width` |
 | `previewFrame` | localStorage | `preview.js` — the visual editor's device and each device frame's last size, as JSON (`{"device": "mobile", "sizes": {"mobile": [375, 667], "tablet": [768, 1024]}}`); one per browser, for every project. A missing, malformed or out-of-range part gives that part's default (§8.3) |
+| `workflowsList` | localStorage | `preview-ai-tools.js` — the Workflows panel's workflows last opened, newest first (three kept), and the groups left open once the list folds, as JSON (`{"recent": ["restyle"], "open": ["look"]}`); one per browser, for every project. A missing or malformed part reads as empty, and a failure to read or write is silent (§8.12) |
+| `workflowsBackupNoteHidden` | localStorage | `preview-ai-tools.js` — the Workflows panel's backup message put away for good (`'1'`); stored as `quicksite-ai-tools-backup-note-hidden`, its name from before the registry (§8.12) |
 | `updateCheckAt` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
 | `updateNoticeHidden` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
 | `updateLastSeen` | localStorage | `update-notice.js` — the newest version the last check reported, so the banner can re-render inside the throttle window without another call |
@@ -402,9 +404,9 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. An element's event list offers the events the interaction commands accept, in two groups: **Common for** the element's tag, and **Less common**. |
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
-| **AI tools** | `ai-tools` | In-editor workflow runner. Searchable + tag-filtered list of workflow specs grouped by category; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
+| **Workflows** | `ai-tools` | In-editor workflow runner. A searchable list of the workflows, grouped by what you want to do, each row saying in words what a run does; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
-**Picking a target.** Picking the Menu or the Footer in the Edit list selects nothing, as picking a page does, and scrolls it into view in the frame. The frame shows a page with its menu and footer around it, so in Select a click on an element outside the target, whichever of the three it is, asks whether to switch: a yes moves the Edit list there with nothing selected, and a no leaves the outline and the panel on what was selected before. AI tools asks nothing, as a selection there acts on nothing, and Select does not take over a selection another tool made outside the target.
+**Picking a target.** Picking the Menu or the Footer in the Edit list selects nothing, as picking a page does, and scrolls it into view in the frame. The frame shows a page with its menu and footer around it, so in Select a click on an element outside the target, whichever of the three it is, asks whether to switch: a yes moves the Edit list there with nothing selected, and a no leaves the outline and the panel on what was selected before. Workflows asks nothing, as a selection there acts on nothing, and Select does not take over a selection another tool made outside the target.
 
 **Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. An element added *inside* one that holds text takes that text (`addNode` moves the target's text into the new element when the new element can hold children), and the canvas shows it there at once, the text once, without a reload. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
 
@@ -428,7 +430,7 @@ While a page is the edit target, the toolbar's **Title** field holds that page's
 
 **The Edit list follows what changes under it.** A wizard that makes routes (the OAuth button) and a workflow run change the project without leaving the page, so the list is read again: after the wizard's setup, whether it finished or stopped half way, before its element is added; and after each phase of a run that changed something, before the preview reloads. `getRoutes` answers the Pages group, `listComponents` the Components group, and both are rebuilt whole. A new route or component is on the list at once, a deleted one is gone, and the target stays selected. A read that fails changes nothing and says nothing: its group stays as it was.
 
-**A target that no longer exists is left.** The list, the editor and the preview move together to the first page, or to the menu on a project with no page left, and a toast names both. A title being typed for it is dropped. Open forms close as on any other move through the list, except that the AI tools stay open, so a run's review and answer stay on screen. An element a wizard was about to add is not added. A phase names the page it writes to, so the move changes nothing of where the next phase writes. A route changed in another browser tab reaches the list at the next reload of the panel.
+**A target that no longer exists is left.** The list, the editor and the preview move together to the first page, or to the menu on a project with no page left, and a toast names both. A title being typed for it is dropped. Open forms close as on any other move through the list, except that Workflows stays open, so a run's review and answer stay on screen. An element a wizard was about to add is not added. A phase names the page it writes to, so the move changes nothing of where the next phase writes. A route changed in another browser tab reaches the list at the next reload of the panel.
 
 ### 8.3 Device preview
 
@@ -960,21 +962,28 @@ If the picked selector already has a transition, the form pre-fills from `animat
 | Server: read | `listKeyframes`, `getAnimatedSelectors` |
 | Server: write | `setStyleRule` (apply-keyframe, remove-from-selector, add-transition all go through it; the remove path uses `removeProperties: ['animation']`); `setKeyframes`, `deleteKeyframes` |
 
-### 8.12 AI tools (mode `ai-tools`)
+### 8.12 Workflows (mode `ai-tools`)
 
-The AI tools mode lets the operator pick a workflow spec, fill its parameters, and run it without leaving the visual editor. Workflows expose themselves as a searchable + tag-filtered list; picking one swaps the panel into a runner organised in three zones — INPUTS, AI EXCHANGE, EXECUTION.
+The Workflows mode lets the operator pick a workflow, fill its parameters, and run it without leaving the visual editor. The workflows are listed by what you want to do, each row saying in words what a run does; picking one swaps the panel into a runner organised in three zones — INPUTS, AI EXCHANGE, EXECUTION.
 
 #### Backup-first banner
 
-An amber-bordered banner sits at the top of the panel: `⚠ AI tools modify your site directly. Changes cannot be easily reverted. We recommend creating a backup before running any workflow you're not sure about.` *Don't show this message again* puts the message away for this browser and leaves the button. The button calls the existing `backupProject` command (timestamped folder copy into `secure/projects/<active>/backups/<timestamp>/`) and confirms via toast on success or failure.
+An amber-bordered banner sits at the top of the panel: `⚠ Workflows modify your site directly. Changes cannot be easily reverted. We recommend creating a backup before running any workflow you're not sure about.` *Don't show this message again* puts the message away for this browser (`workflowsBackupNoteHidden`, §6) and leaves the button. The button calls the existing `backupProject` command (timestamped folder copy into `secure/projects/<active>/backups/<timestamp>/`) and confirms via toast on success or failure.
 
 #### Workflow list
 
-- **Search** — case-insensitive substring across title, description, tags
-- **Tag chip filter** with a `Match: Any | All` toggle (toggle row appears only when ≥2 chips are active). Chips show the top 6 tags by frequency plus a `+N more` expander; any active chip outside the top 6 stays visible so it can always be deselected
-- **Category grouping** — canonical order `Creation → Template → Modification → Content → Style → Advanced → WIP`. Sub-headers between groups; alphabetical within
-- **`Show 10 more` pagination** at the end of the list — global across categories
-- **Cards** carry the workflow's emoji icon, title, AI 🤖 / Steps 📦 badge, 2-line description, and a colour-coded difficulty chip (`beginner` green, `intermediate` amber, `advanced` red)
+- **Search** — over each row's title, description and second line, its group's name and its file's tags (which nothing shows); case and accents ignored, and a search of several words keeps the rows holding every one. `delete` finds every workflow that can delete
+- **Two switches** under it: **No AI** keeps the workflows that ask no model, **Nothing deleted** those that can delete nothing (a workflow whose AI answer may send any command can). Neither is remembered
+- **Groups, by what you want to do,** in the order of the schema's `meta.category`: *Start a new site* (Replaces what is there), *Add to my site* (Keeps what is there), *Change the look* (Colours, styles, animations), *Texts and languages* (Words, translations, the switch), *Cookies and privacy* (Your consent banner and pages), *Tools* (For when you know what you want); alphabetical within. A group's title stays at the top of the panel while its rows scroll under it, until the next group's title takes its place. A group with no workflow shows nothing, and a group name the schema does not hold is listed last, under its own name
+- **A row** carries the workflow's icon and title, then what a run does, one line per fact, then its description cut at two lines:
+  - AI or not, and how many requests a run sends (*one request*, or *several* when two AI workflows are in its reach or a `forEach` repeats one), with how long the answer runs when the file says (`meta.answerLength`); *No AI: you paste the commands* for a `pasteOnly` workflow
+  - **Can delete:** the groups any step of its reach can delete, in the run review's own words (*Pages*, *Media files*…), in the warning colour
+  - **Changes:** the groups it changes and does not delete; for an AI workflow, those of the commands its answer may send (`relatedCommands`)
+  - *Can run any command, one that deletes included* when its answer may send any command (`answerRules.anyCommand`)
+  - what the project needs first (`meta.needsKey`): *Needs a cookie banner*
+
+  These facts are read from the workflow's file and every workflow it may reach, through `WorkflowManager::rowFacts()`, when the editor loads: nothing is fetched, so each says what a run *can* do. A file without `answerLength` or `needsKey` says less. Opening the row shows the run's own review, which names what a phase deletes or changes on this project
+- **From 30 workflows** each group folds to its name and count, *Change the look (6)*: the first is open until the reader opens or closes one, a search opens every group holding a match, and the browser keeps which are open (`workflowsList`, §6). **Recently used** then comes first, with the last three workflows opened in this browser. Both numbers are conventions, named at the top of `preview-ai-tools.js`
 - **What is listed** — a workflow is offered when the account's role may send every command a run of it may send: its related commands and its steps', and those of every sub-workflow it may reach, whatever their conditions (`WorkflowManager::runCommands()`)
 
 #### Setup Languages, the two Create Websites and Translate Site
@@ -1048,7 +1057,7 @@ A run goes through the workflow's **phases**: each pre-workflow, the workflow it
 - **A step's options** — a failing step is counted and the run carries on, unless it sets `abortOnFail: true`: the run then stops at that step (`Stopped: {command} failed, and its step stops the run when it fails.`), its later phases not run. `retryOn` sends a step again on the statuses it lists, up to `maxRetries` times (default 3) `retryDelayMs` apart (default 1000), the row saying so (`Retrying (1 of 3) in 2 s — {error}`, then `Failed: {error} (after 3 retries)`).
 - **Stop, and what is kept** — Stop at a review or while an answer is awaited, a step's `abortOnFail` and the write rate (below) end the run and keep the rest for later: the steps of the phase it stopped in that did not run (from the failed or refused step), and its later phases, kept by name and resolved when the kept run reaches them. The banner at the top of the panel says which run stopped and before what (`{label}: stopped before {name}`, or `{n} steps kept from a stopped run`), lists the later phases (`Then: …`), warns that the page may have changed, and offers **Run them** — which reopens that workflow with the run's parameters and requests and resumes there — and **Discard**. A new run waits until the kept rest is run or discarded.
 - **The run's plan changed** — the runner asks for each phase by its place and by its key, the entries that lead to it ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*). A sub-workflow's condition or `forEach` that reads the project's data can plan another phase in that place once an earlier phase has changed the project; the server then refuses the phase, and the run stops there with `The run's plan changed: start the run again.` (the batch header and a warning). What ran stays done and nothing is kept. A kept rest resumes only where its phase still is, else it is refused with the same words and nothing runs.
-- **During a run** — its parameters and ← Back are locked; leaving AI tools and coming back returns to the run, its review or its wait still on screen.
+- **During a run** — its parameters and ← Back are locked; leaving Workflows and coming back returns to the run, its review or its wait still on screen.
 
 #### The write rate
 
@@ -1064,7 +1073,7 @@ Single line: `Touches: cmd1, cmd2, cmd3` — the workflow's `relatedCommands` li
 
 #### Element selection
 
-AI tools mode forwards as `select` to the iframe overlay, so hover-highlight + click-to-select work just like in Select mode. The footer/menu structure-mismatch confirm prompts are suppressed — selection in AI tools is informational, not edit-context-switching. The current selection is available through `window.PreviewManager.getSelectedNode()` as `{ struct, node, component, tag, classes }`. Workflows declaring a `selector` parameter receive this object as the param value and refresh live as the user picks different elements; see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the parameter-type contract.
+Workflows mode forwards as `select` to the iframe overlay, so hover-highlight + click-to-select work just like in Select mode. The footer/menu structure-mismatch confirm prompts are suppressed — selection in Workflows is informational, not edit-context-switching. The current selection is available through `window.PreviewManager.getSelectedNode()` as `{ struct, node, component, tag, classes }`. Workflows declaring a `selector` parameter receive this object as the param value and refresh live as the user picks different elements; see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the parameter-type contract.
 
 #### BYOK calls
 

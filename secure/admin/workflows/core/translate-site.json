@@ -6,9 +6,9 @@
         "icon": "🌍",
         "titleKey": "ai.specs.translateSite.title",
         "descriptionKey": "ai.specs.translateSite.description",
-        "category": "content",
-        "tags": ["translate", "translation", "language", "multilingual", "i18n"],
-        "difficulty": "beginner"
+        "category": "texts",
+        "needsKey": "workflows.needs.secondLanguage",
+        "tags": ["translate", "translation", "language", "multilingual", "i18n"]
     },
     "parameters": [
         {

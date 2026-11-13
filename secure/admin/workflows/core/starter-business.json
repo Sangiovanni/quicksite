@@ -6,9 +6,8 @@
         "icon": "🏢",
         "titleKey": "workflows.specs.starterBusiness.title",
         "descriptionKey": "workflows.specs.starterBusiness.description",
-        "category": "template",
-        "tags": ["business", "website", "starter", "template"],
-        "difficulty": "beginner"
+        "category": "start",
+        "tags": ["business", "website", "starter", "template"]
     },
     "preWorkflows": ["fresh-start"],
     "parameters": [],

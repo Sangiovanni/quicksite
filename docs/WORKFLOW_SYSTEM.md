@@ -32,7 +32,7 @@ A workflow can have steps (manual), a promptTemplate (AI), or both.
 ## Architecture
 
 ```
-User fills parameters in the AI tools panel
+User fills parameters in the Workflows panel
         │
         ▼
 ┌─────────────────────────────────────┐
@@ -93,8 +93,8 @@ see *Adding a workflow* below. The panel runs workflows; it does not create them
 
 ### Admin UI
 
-Workflows are run from the visual editor's **AI tools** mode
-(`/admin/preview` → AI tools). Any `/admin/workflows*` URL redirects there.
+Workflows are run from the visual editor's **Workflows** mode (`ai-tools`)
+(`/admin/preview` → Workflows). Any `/admin/workflows*` URL redirects there.
 
 | File | Purpose |
 |------|---------|
@@ -200,9 +200,9 @@ workflow with no parameters — the least a real spec can carry:
         "icon": "🎨",
         "titleKey": "ai.specs.globalDesign.title",
         "descriptionKey": "ai.specs.globalDesign.description",
-        "category": "style",
-        "tags": ["design", "colors", "variables", "theme"],
-        "difficulty": "beginner"
+        "category": "look",
+        "answerLength": "short",
+        "tags": ["design", "colors", "variables", "theme"]
     },
     "parameters": [],
     "dataRequirements": [
@@ -238,7 +238,7 @@ so your own workflow will display as `my-workflow` until you add translations.
 Direct strings need none:
 
 ```json
-"meta": { "icon": "🎨", "name": "My Workflow", "description": "What it does", "category": "style" }
+"meta": { "icon": "🎨", "name": "My Workflow", "description": "What it does", "category": "look" }
 ```
 
 ### How the template consumes what the spec declares
@@ -281,9 +281,9 @@ placeholders resolve against `dataRequirements` ids, not against arbitrary names
    This is what decides whether the workflow is offered to a given role — leave a
    command out and the workflow is shown to people who cannot run it.
 
-5. **Reload the panel and run it.** Open the visual editor, switch to **AI
-   tools**, and your workflow appears in the list under its category. Running it
-   is the check — see below.
+5. **Reload the panel and run it.** Open the visual editor, switch to
+   **Workflows**, and your workflow appears in the list under its group, its row
+   saying what a run does. Running it is the check — see below.
 
 ### How you know it worked
 
@@ -325,27 +325,64 @@ that replaces a language's texts does the same.
     "meta": {
         "icon": "🎯",             // emoji for display
         "name": "My Workflow",     // display name (alternative to titleKey)
-        "category": "advanced"     // see categories below
+        "category": "tools"        // see groups below
     }
 }
 ```
 
 > Core workflows use `titleKey`/`descriptionKey` (i18n translation keys) instead of `name`/`description`.
 
-### Categories
+### Groups (`meta.category`)
 
-`creation` | `modification` | `content` | `style` | `advanced` | `wip` | `template`
+The Workflows panel lists the workflows by what a person wants to do, in this order:
+
+| Value | Group, on screen | Under it |
+|---|---|---|
+| `start` | Start a new site | Replaces what is there |
+| `add` | Add to my site | Keeps what is there |
+| `look` | Change the look | Colours, styles, animations |
+| `texts` | Texts and languages | Words, translations, the switch |
+| `privacy` | Cookies and privacy | Your consent banner and pages |
+| `tools` | Tools | For when you know what you want |
+
+The list is `schema.json`'s enum, and its order is the panel's; a group's words are `ai.categories.<value>.title` and `.desc` in the
+panel's translations. A group with no workflow shows nothing. Another name still runs, as the engine checks only that `category`
+names a group, and the panel lists it last, under its own name.
+
+### What a workflow's row says
+
+Under its title, a row says what a run does, read from the workflow's file and every workflow it may reach
+(`WorkflowManager::rowFacts()`), so a new file says it with nothing to declare:
+
+- **AI or not, and how many requests:** a `promptTemplate` in its reach asks a model, unless that workflow is `pasteOnly`; one
+  request, or several when its reach holds two AI workflows or a `forEach` repeats one. `meta.answerLength` adds how long the
+  answer runs.
+- **Can delete** and **Changes:** each step of its reach as its file writes it, and each command an AI answer may send
+  (`relatedCommands`), read as a run's review reads them (*What a run warns about*, below). As nothing is fetched, each says what a
+  run *can* do: a step repeated over a project's pages deletes nothing where there is none.
+- **Can run any command, one that deletes included:** `answerRules.anyCommand`.
+- **What it needs:** `meta.needsKey`.
 
 ### Optional Fields
 
 #### `meta.description` / `meta.descriptionKey`
-Short description shown in the workflow browser.
+Short description shown on the workflow's row, cut at two lines.
 
 #### `meta.tags` (array of strings)
-For filtering/search in the browser. Example: `["create", "website", "multi-page"]`
+Words the list's search reads and nothing shows. Example: `["create", "website", "multi-page"]`
 
-#### `meta.difficulty`
-`beginner` | `intermediate` | `advanced` — shown as a visual indicator.
+#### `meta.answerLength`
+`short` | `long` — how long the AI's answer runs, added to the row's words (*Uses AI: one request, short answer*): short is up to
+about 5,000 characters, long is the whole of a site. Set it only from a measure or an estimate that stands far from the line; left
+out, the row says how many requests and no more.
+
+#### `meta.needsKey`
+A translation key of a short text naming what the project must hold before a run makes sense, shown on the row: *Needs a cookie
+banner*. It is shown in the panel's language only where that language holds the key.
+
+#### `pasteOnly` (boolean)
+The commands are pasted by hand and no model is asked: the row says *No AI: you paste the commands*, and the requests a run sends
+count none for it. Its `promptTemplate` is what the paste box asks for. `run-batch` is the one.
 
 #### `parameters` (array)
 User input form fields. Each parameter:
@@ -385,7 +422,7 @@ Hidden parameters (those failing their own `condition`) skip validation entirely
 - `checkbox` — boolean toggle
 - `number` — numeric input (renders `<input type="number">`)
 - `nodeSelector` — visual node picker from page structures
-- `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the AI tools panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc.
+- `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the Workflows panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc.
 - `hidden` — not shown in UI, value set programmatically
 
 **Default values from data**: `default` accepts either a literal value or a template string referencing fetched `dataRequirements`. For example:

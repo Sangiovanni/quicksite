@@ -6,9 +6,8 @@
         "icon": "🌐",
         "titleKey": "workflows.specs.starterBusinessMultilingual.title",
         "descriptionKey": "workflows.specs.starterBusinessMultilingual.description",
-        "category": "template",
-        "tags": ["business", "website", "starter", "template", "multilingual"],
-        "difficulty": "beginner"
+        "category": "start",
+        "tags": ["business", "website", "starter", "template", "multilingual"]
     },
     "preWorkflows": [
         { "id": "fresh-start", "params": { "keepLanguages": true } }

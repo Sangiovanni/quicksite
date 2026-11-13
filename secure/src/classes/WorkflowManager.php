@@ -34,6 +34,9 @@ class WorkflowManager {
     
     /** @var array Per-render help cache: [commandName => helpData]. Lifetime = one renderPrompt() call. */
     private array $helpCache = [];
+
+    /** @var array Each command's category, as stepEffect() reads it: getCommandCategory() reads the categories file at every call. */
+    private array $categoryCache = [];
     
     /** Max recursion depth for {{> partial}} resolution (cycle/runaway guard). */
     private const PARTIALS_MAX_DEPTH = 5;
@@ -125,25 +128,21 @@ class WorkflowManager {
     }
     
     /**
-     * Get workflows organized by category
-     * 
-     * @return array Workflows grouped by category
+     * The groups a workflow may be listed in (meta.category), in the order the Workflows panel shows them: the schema's
+     * own list, so a new group is one edit there. Read once per request.
+     *
+     * @return string[]
      */
-    public function getWorkflowsByCategory(): array {
-        $workflows = $this->listWorkflows();
-        $byCategory = [];
-        
-        foreach ($workflows as $workflow) {
-            $category = $workflow['meta']['category'] ?? 'other';
-            if (!isset($byCategory[$category])) {
-                $byCategory[$category] = [];
-            }
-            $byCategory[$category][] = $workflow;
+    public function categories(): array {
+        static $categories = null;
+        if ($categories === null) {
+            $schema = json_decode((string) @file_get_contents($this->workflowsBasePath . '/schema.json'), true);
+            $enum = $schema['properties']['meta']['properties']['category']['enum'] ?? null;
+            $categories = is_array($enum) ? array_values(array_filter($enum, 'is_string')) : [];
         }
-        
-        return $byCategory;
+        return $categories;
     }
-    
+
     /**
      * Load a workflow by ID
      * 
@@ -476,6 +475,75 @@ class WorkflowManager {
             }
         }
         return array_values(array_unique($commands));
+    }
+
+    /**
+     * What a run of this workflow does, read from its file and every workflow it may reach (reachableWorkflows()), for the
+     * words of its row in the Workflows panel. Nothing is fetched and the project is not read, so each fact says what a run
+     * CAN do: a step repeated over a project's pages deletes nothing on a project with none.
+     *   'ai'         a model is asked: a workflow of its reach has a promptTemplate and is not pasteOnly
+     *   'paste'      the commands of an AI phase are pasted by hand (pasteOnly): no model is asked for them
+     *   'requests'   the AI requests a run sends: 0, 1, or 2 for several (two AI workflows in reach, or one a forEach repeats)
+     *   'effects'    each [effect, what, command] a step can have, as the run's review words it (stepEffect()): every step
+     *                as its file writes it, and every command an AI answer may send (relatedCommands), once each
+     *   'anyCommand' an AI answer may send any command (answerRules.anyCommand): what it changes is not known before
+     *   'answerLength', 'needsKey'  the file's own meta, when set
+     *
+     * @return array{ai: bool, paste: bool, requests: int, effects: array, anyCommand: bool, answerLength: ?string, needsKey: ?string}
+     */
+    public function rowFacts(array $workflow): array {
+        $paste = false;
+        $any = false;
+        $effects = [];
+        foreach ($this->reachableWorkflows($workflow) as $reached) {
+            if ($this->isAiWorkflow($reached)) {
+                if (!empty($reached['pasteOnly'])) $paste = true;
+                if (!empty($reached['answerRules']['anyCommand'])) $any = true;
+                $steps = array_map(static fn($command) => ['command' => $command], array_filter($reached['relatedCommands'] ?? [], 'is_string'));
+            } else {
+                $steps = array_filter($reached['steps'] ?? [], 'is_array');
+            }
+            foreach ($steps as $step) {
+                $effect = $this->stepEffect($step);
+                if ($effect === null) continue;
+                $key = $effect['effect'] . '|' . $effect['what'] . '|' . $effect['command'];
+                $effects[$key] = ['effect' => $effect['effect'], 'what' => $effect['what'], 'command' => $effect['command']];
+            }
+        }
+        $requests = min($this->aiRequests($workflow, []), 2);
+        $meta = is_array($workflow['meta'] ?? null) ? $workflow['meta'] : [];
+        return [
+            'ai' => $requests > 0,
+            'paste' => $paste,
+            'requests' => $requests,
+            'effects' => array_values($effects),
+            'anyCommand' => $any,
+            'answerLength' => in_array($meta['answerLength'] ?? null, ['short', 'long'], true) ? $meta['answerLength'] : null,
+            'needsKey' => is_string($meta['needsKey'] ?? null) && $meta['needsKey'] !== '' ? $meta['needsKey'] : null,
+        ];
+    }
+
+    /**
+     * How many AI requests a run of this workflow sends at most, counting its pre- and post-workflows at any depth as
+     * collectPhases() follows them: one per AI workflow that is not pasteOnly, two for one that a forEach repeats (it runs once
+     * per item). A conditional entry counts, as it may run; a cycle or a nesting past PHASES_MAX_DEPTH stops the count.
+     */
+    private function aiRequests(array $workflow, array $trail): int {
+        $id = (string) ($workflow['id'] ?? '');
+        if (in_array($id, $trail, true) || count($trail) >= self::PHASES_MAX_DEPTH) return 0;
+        $trail[] = $id;
+        $count = $this->isAiWorkflow($workflow) && empty($workflow['pasteOnly']) ? 1 : 0;
+        foreach (['preWorkflows', 'postWorkflows'] as $list) {
+            foreach (($workflow[$list] ?? []) as $entry) {
+                $subId = is_string($entry) ? $entry : (is_array($entry) ? (string) ($entry['id'] ?? '') : '');
+                $sub = $subId !== '' ? $this->loadWorkflow($subId) : null;
+                if (!$sub) continue;
+                $n = $this->aiRequests($sub, $trail);
+                if ($n > 0 && is_array($entry) && is_string($entry['forEach'] ?? null)) $n = max($n, 2);
+                $count += $n;
+            }
+        }
+        return $count;
     }
 
     /**
@@ -885,7 +953,7 @@ class WorkflowManager {
             require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
         }
         if (!qs_write_rate_counts($command)) return null;
-        $category = (string) getCommandCategory($command);
+        $category = $this->categoryCache[$command] ??= (string) getCommandCategory($command);
         $deletes = preg_match(self::DELETE_NAME, $command) === 1
             || ($command === 'editStructure' && ($params['action'] ?? null) === 'delete')
             || ($command === 'editStructure' && ($params['type'] ?? null) === 'component' && ($params['structure'] ?? null) === [])
@@ -1891,12 +1959,10 @@ class WorkflowManager {
             }
             if (!isset($meta['category'])) {
                 $errors[] = "Missing required meta field: category";
-            } else {
-                // Validate category value
-                $validCategories = ['creation', 'modification', 'advanced', 'style', 'template', 'content', 'wip'];
-                if (!in_array($meta['category'], $validCategories)) {
-                    $errors[] = "Invalid category: {$meta['category']}. Must be one of: " . implode(', ', $validCategories);
-                }
+            } elseif (!is_string($meta['category']) || trim($meta['category']) === '') {
+                // Any group name runs: the panel lists one the schema does not know (categories()) last, under its own name,
+                // so an older file keeps running.
+                $errors[] = "Invalid category: it must name a group. The panel's groups are: " . implode(', ', $this->categories());
             }
         }
         

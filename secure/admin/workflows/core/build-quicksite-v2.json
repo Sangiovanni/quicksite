@@ -6,14 +6,13 @@
         "icon": "🚀",
         "name": "Build QuickSite v2",
         "description": "Rebuilds the full quicksite-v2 website from scratch: languages, routes, page structures, translations, styles, and favicon. Uses fresh-start as pre-workflow and update-lang-switch as post-workflow.",
-        "category": "template",
+        "category": "start",
         "tags": [
             "quicksite",
             "rebuild",
             "template",
             "demo"
-        ],
-        "difficulty": "beginner"
+        ]
     },
     "parameters": [],
     "staticData": {

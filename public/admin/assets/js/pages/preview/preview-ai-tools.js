@@ -1,12 +1,14 @@
 /**
- * preview-ai-tools.js — AI tools panel.
+ * preview-ai-tools.js — the Workflows panel (mode ai-tools: the file keeps the panel's first name, AI tools).
  *
- * In-editor AI tools panel:
- *   list view  → workflow picker (search + tag filter + show-more)
+ * In-editor Workflows panel:
+ *   list view  → workflow picker: search, two switches (No AI, Nothing deleted), the groups by what you want
+ *                to do, each row saying in words what a run does; from FOLD_AT workflows the groups fold and
+ *                Recently used appears
  *   runner view → spec runner (3 zones: INPUTS / AI EXCHANGE / EXECUTION)
  *                  + footer line (Model + Touches)
  *
- * Activation: sidebar "AI tools" → setMode('ai-tools') in preview.js
+ * Activation: the tool "Workflows" → setMode('ai-tools') in preview.js
  * shows #contextual-ai-tools and calls PreviewAiTools.enter().
  *
  * Workflow runner flow:
@@ -22,11 +24,11 @@
 window.PreviewAiTools = (function () {
     'use strict';
 
-    var PAGE_SIZE = 10;
     var SEARCH_DEBOUNCE_MS = 180;
-    var TAG_SHOW_LIMIT = 6;
-    var TAG_SHOW_LIMIT_PHONE = 3;
-    var BACKUP_NOTE_HIDDEN_KEY = 'quicksite-ai-tools-backup-note-hidden';
+    // From this many workflows the groups fold, each showing its name and count, and Recently used appears. A convention.
+    var FOLD_AT = 30;
+    // How many workflows Recently used keeps. A convention.
+    var RECENT_KEPT = 3;
 
     // ──────────────────────────── State ─────────────────────────────────
 
@@ -34,13 +36,14 @@ window.PreviewAiTools = (function () {
 
     // List view state
     var _allWorkflows = [];
-    var _filteredWorkflows = [];
-    var _visibleCount = PAGE_SIZE;
-    var _activeTags = new Set();
-    var _tagMatchMode = 'any';
-    var _tagsExpanded = false;
-    var _searchTerm = '';
+    var _groups = [];                        // the panel's groups in order, { id, title, line } (PreviewConfig.workflowGroups)
+    var _factsById = {};                     // each row's second line, its parts in words (_factParts())
+    var _hayById = {};                       // what a search reads of each row, folded (_fold())
+    var _searchWords = [];                   // the search, folded and cut into words: a row holds every one
     var _searchDebounceId = null;
+    var _noAi = false;                       // the No AI switch: only the rows that ask no model
+    var _nothingDeleted = false;             // the Nothing deleted switch: only the rows that can delete nothing
+    var _listState = { recent: [], open: null }; // what the browser keeps of the list (_readListState())
 
     // Runner view state
     var _activeWorkflowSummary = null;
@@ -86,13 +89,10 @@ window.PreviewAiTools = (function () {
     var _listView = null;
     var _runnerView = null;
     var _searchInput = null;
-    var _tagModeRow = null;
-    var _tagModeAnyBtn = null;
-    var _tagModeAllBtn = null;
-    var _tagsContainer = null;
+    var _noAiSwitch = null;
+    var _nothingDeletedSwitch = null;
     var _allList = null;
     var _loadingEl = null;
-    var _showMoreBtn = null;
     var _emptyEl = null;
     var _backupBtnEl = null;
     var _backupBannerEl = null;
@@ -148,13 +148,10 @@ window.PreviewAiTools = (function () {
         _listView = document.getElementById('ai-tools-list-view');
         _runnerView = document.getElementById('ai-tools-runner-view');
         _searchInput = document.getElementById('ai-tools-search');
-        _tagModeRow = document.getElementById('ai-tools-tag-mode-row');
-        _tagModeAnyBtn = document.getElementById('ai-tools-tag-mode-any');
-        _tagModeAllBtn = document.getElementById('ai-tools-tag-mode-all');
-        _tagsContainer = document.getElementById('ai-tools-tags');
+        _noAiSwitch = document.getElementById('ai-tools-switch-no-ai');
+        _nothingDeletedSwitch = document.getElementById('ai-tools-switch-nothing-deleted');
         _allList = document.getElementById('ai-tools-all-list');
         _loadingEl = document.getElementById('ai-tools-loading');
-        _showMoreBtn = document.getElementById('ai-tools-show-more');
         _emptyEl = document.getElementById('ai-tools-empty');
         _backupBtnEl = document.getElementById('ai-tools-backup-btn');
         _backupBannerEl = document.getElementById('ai-tools-backup-banner');
@@ -187,14 +184,11 @@ window.PreviewAiTools = (function () {
         if (_searchInput) {
             _searchInput.addEventListener('input', _onSearchInput);
         }
-        if (_showMoreBtn) {
-            _showMoreBtn.addEventListener('click', _onShowMore);
+        if (_noAiSwitch) {
+            _noAiSwitch.addEventListener('change', _onSwitchChange);
         }
-        if (_tagModeAnyBtn) {
-            _tagModeAnyBtn.addEventListener('click', function () { _setTagMatchMode('any'); });
-        }
-        if (_tagModeAllBtn) {
-            _tagModeAllBtn.addEventListener('click', function () { _setTagMatchMode('all'); });
+        if (_nothingDeletedSwitch) {
+            _nothingDeletedSwitch.addEventListener('change', _onSwitchChange);
         }
         if (_backupBtnEl) {
             _backupBtnEl.addEventListener('click', _onBackupClick);
@@ -204,9 +198,16 @@ window.PreviewAiTools = (function () {
         }
     }
 
+    /** A name of the panel's storage registry (QuickSiteStorageKeys), or null when the registry does not hold it. */
+    function _storageKey(name) {
+        var keys = window.QuickSiteStorageKeys;
+        return keys && typeof keys[name] === 'string' ? keys[name] : null;
+    }
+
     function _isBackupNoteHidden() {
         try {
-            return localStorage.getItem(BACKUP_NOTE_HIDDEN_KEY) === '1';
+            var key = _storageKey('workflowsBackupNoteHidden');
+            return key !== null && localStorage.getItem(key) === '1';
         } catch (e) {
             return false;
         }
@@ -220,7 +221,8 @@ window.PreviewAiTools = (function () {
 
     function _onBackupNoteHide() {
         try {
-            localStorage.setItem(BACKUP_NOTE_HIDDEN_KEY, '1');
+            var key = _storageKey('workflowsBackupNoteHidden');
+            if (key !== null) localStorage.setItem(key, '1');
         } catch (e) { /* the message goes for this visit, and comes back on the next */ }
         _showBackupNote(false);
     }
@@ -267,8 +269,7 @@ window.PreviewAiTools = (function () {
         if (_entered && !opts.refresh) return;
         _entered = true;
         _initData();
-        _renderTags();
-        _applyFilters();
+        _onSwitchChange();
     }
 
     function leave() {
@@ -288,239 +289,281 @@ window.PreviewAiTools = (function () {
     // ──────────────────────────── Data (list) ───────────────────────────
 
     function _initData() {
-        var raw = (window.PreviewConfig && window.PreviewConfig.aiToolsWorkflows) || [];
-        _allWorkflows = Array.isArray(raw) ? raw.slice() : [];
+        var config = window.PreviewConfig || {};
+        _allWorkflows = Array.isArray(config.aiToolsWorkflows) ? config.aiToolsWorkflows.slice() : [];
+        _groups = Array.isArray(config.workflowGroups) ? config.workflowGroups.slice() : [];
+        _listState = _readListState();
+        var groupTitle = {};
+        _groups.forEach(function (g) { groupTitle[g.id] = g.title || ''; });
+        _factsById = {};
+        _hayById = {};
+        _allWorkflows.forEach(function (w) {
+            _factsById[w.id] = _factParts(w);
+            var facts = _factsById[w.id].map(function (part) { return part.text; }).join(' ');
+            // A search reads the title, the description, the second line, the group's name and the tags, which nothing shows.
+            _hayById[w.id] = _fold([w.title, w.description, facts, groupTitle[w.category]].concat(w.tags || []).join(' '));
+        });
     }
 
-    function _uniqueTags() {
-        var counts = Object.create(null);
-        for (var i = 0; i < _allWorkflows.length; i++) {
-            var tags = _allWorkflows[i].tags || [];
-            for (var j = 0; j < tags.length; j++) {
-                var t = String(tags[j]);
-                counts[t] = (counts[t] || 0) + 1;
+    /** Text as a search compares it: lower case, its accents dropped ("Créer" finds "creer" and the other way round). */
+    function _fold(text) {
+        return String(text || '').normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase();
+    }
+
+    /**
+     * What the browser keeps of the list (QuickSiteStorageKeys.workflowsList): the workflows last opened, newest first, and
+     * the groups left open once the list folds (null until the reader opens or closes one). A failure is silent: the list
+     * then starts as new.
+     */
+    function _readListState() {
+        var state = { recent: [], open: null };
+        try {
+            var key = _storageKey('workflowsList');
+            var raw = key !== null ? JSON.parse(localStorage.getItem(key) || 'null') : null;
+            var strings = function (list) { return list.filter(function (id) { return typeof id === 'string'; }); };
+            if (raw && Array.isArray(raw.recent)) state.recent = strings(raw.recent).slice(0, RECENT_KEPT);
+            if (raw && Array.isArray(raw.open)) state.open = strings(raw.open);
+        } catch (e) { /* the list starts as new */ }
+        return state;
+    }
+
+    function _writeListState() {
+        try {
+            var key = _storageKey('workflowsList');
+            if (key !== null) localStorage.setItem(key, JSON.stringify({ recent: _listState.recent, open: _listState.open || [] }));
+        } catch (e) { /* kept for this visit only */ }
+    }
+
+    function _rememberRecent(id) {
+        var recent = _listState.recent.filter(function (r) { return r !== id; });
+        recent.unshift(id);
+        _listState.recent = recent.slice(0, RECENT_KEPT);
+        _writeListState();
+    }
+
+    // ──────────────────────────── A row's second line ───────────────────
+
+    /**
+     * A row's second line, part by part: what a run does, in words, from the facts the server derived from the workflow's
+     * file (WorkflowManager::rowFacts()): AI or not and how many requests, what it can delete, what it changes, whether it
+     * runs any command, what it needs. The groups are the run review's own words (EFFECT_WHAT, EFFECT_DOES), so a row and its
+     * review name the same things. Each part is { kind: 'ai'|'delete'|'change'|'need', text }.
+     */
+    function _factParts(workflow) {
+        // A row the server sent no facts for says nothing of what a run does, rather than guess.
+        if (!workflow.facts) return [];
+        var f = workflow.facts;
+        var effects = Array.isArray(f.effects) ? f.effects : [];
+        var parts = [{ kind: 'ai', text: _aiWords(f) }];
+        var deleted = {};
+        var deletes = [];
+        var does = [];
+        effects.forEach(function (e) {
+            if (e.effect !== 'delete') return;
+            var own = _effectDoes(e);
+            if (own) {
+                var line = _t(own.line[0], own.line[1]);
+                if (does.indexOf(line) === -1) does.push(line);
+                return;
             }
+            if (deleted[e.what]) return;
+            deleted[e.what] = true;
+            deletes.push(_whatWord(e.what));
+        });
+        // What it deletes, it is not said to change as well.
+        var changed = {};
+        var changes = [];
+        effects.forEach(function (e) {
+            if (e.effect !== 'change' || deleted[e.what] || changed[e.what]) return;
+            changed[e.what] = true;
+            changes.push(_whatWord(e.what));
+        });
+        if (deletes.length > 0) {
+            parts.push({ kind: 'delete', text: _t('factCanDelete', 'Can delete: {what}').replace('{what}', function () { return deletes.join(', '); }) });
         }
-        return Object.keys(counts).sort(function (a, b) {
-            if (counts[b] !== counts[a]) return counts[b] - counts[a];
-            return a.localeCompare(b);
-        });
+        does.forEach(function (line) { parts.push({ kind: 'delete', text: line }); });
+        if (changes.length > 0) {
+            parts.push({ kind: 'change', text: _t('factChanges', 'Changes: {what}').replace('{what}', function () { return changes.join(', '); }) });
+        }
+        if (f.anyCommand) parts.push({ kind: 'delete', text: _t('factAnyCommand', 'Can run any command, one that deletes included') });
+        if (f.needs) parts.push({ kind: 'need', text: String(f.needs) });
+        return parts;
     }
 
-    // ──────────────────────────── Filters ───────────────────────────────
+    /** AI or not, and how many requests a run sends (and how long the answer runs, when the workflow's file says). */
+    function _aiWords(f) {
+        if (f.paste) return _t('factPaste', 'No AI: you paste the commands');
+        if (!f.ai) return _t('factNoAi', 'No AI');
+        var several = f.requests > 1;
+        if (f.answerLength === 'long') {
+            return several ? _t('factAiSeveralLong', 'Uses AI: several requests, long answers') : _t('factAiOneLong', 'Uses AI: one request, long answer');
+        }
+        if (f.answerLength === 'short') {
+            return several ? _t('factAiSeveralShort', 'Uses AI: several requests, short answers') : _t('factAiOneShort', 'Uses AI: one request, short answer');
+        }
+        return several ? _t('factAiSeveral', 'Uses AI: several requests') : _t('factAiOne', 'Uses AI: one request');
+    }
 
-    function _applyFilters() {
-        var term = _searchTerm;
-        var mode = _tagMatchMode;
-        var tagFilter = _activeTags;
-        _filteredWorkflows = _allWorkflows.filter(function (w) {
-            if (term) {
-                var hay = (w.title + ' ' + w.description + ' ' + (w.tags || []).join(' ')).toLowerCase();
-                if (hay.indexOf(term) === -1) return false;
-            }
-            if (tagFilter.size > 0) {
-                var wTags = w.tags || [];
-                if (mode === 'all') {
-                    var iter = tagFilter.values();
-                    var step = iter.next();
-                    while (!step.done) {
-                        if (wTags.indexOf(step.value) === -1) return false;
-                        step = iter.next();
-                    }
-                    return true;
-                }
-                for (var i = 0; i < wTags.length; i++) {
-                    if (tagFilter.has(wTags[i])) return true;
-                }
-                return false;
-            }
-            return true;
-        });
-        _visibleCount = PAGE_SIZE;
-        _renderCards();
+    function _whatWord(what) {
+        var words = EFFECT_WHAT[what] || EFFECT_WHAT.other;
+        return _t(words[0], words[1]);
+    }
+
+    /** Whether a run can delete: a step that deletes, or an answer that may send any command. */
+    function _canDelete(workflow) {
+        var f = workflow.facts || {};
+        return !!f.anyCommand || (Array.isArray(f.effects) && f.effects.some(function (e) { return e.effect === 'delete'; }));
+    }
+
+    // ──────────────────────────── Search and switches ───────────────────
+
+    function _filtering() {
+        return _searchWords.length > 0 || _noAi || _nothingDeleted;
+    }
+
+    function _matches(workflow) {
+        if (_noAi && workflow.facts && workflow.facts.ai) return false;
+        if (_nothingDeleted && _canDelete(workflow)) return false;
+        var hay = _hayById[workflow.id] || '';
+        return _searchWords.every(function (word) { return hay.indexOf(word) !== -1; });
     }
 
     function _onSearchInput(e) {
-        var raw = String(e.target.value || '').trim().toLowerCase();
+        var raw = String(e.target.value || '');
         if (_searchDebounceId) clearTimeout(_searchDebounceId);
         _searchDebounceId = setTimeout(function () {
             _searchDebounceId = null;
-            _searchTerm = raw;
-            _applyFilters();
+            _searchWords = _fold(raw).split(/\s+/).filter(Boolean);
+            _renderList();
         }, SEARCH_DEBOUNCE_MS);
     }
 
-    function _onTagClick(tag) {
-        if (_activeTags.has(tag)) {
-            _activeTags.delete(tag);
-        } else {
-            _activeTags.add(tag);
-        }
-        _renderTagModeRow();
-        _renderTags();
-        _applyFilters();
+    /** A switch changed, or the list is drawn again: each switch is read as it stands, as neither is remembered. */
+    function _onSwitchChange() {
+        _noAi = !!(_noAiSwitch && _noAiSwitch.checked);
+        _nothingDeleted = !!(_nothingDeletedSwitch && _nothingDeletedSwitch.checked);
+        _renderList();
     }
 
-    function _onShowMore() {
-        _visibleCount += PAGE_SIZE;
-        _renderCards();
+    /** A group opened or closed by the reader, once the list folds: the browser keeps which are open. */
+    function _onGroupToggle() {
+        // A search opens every group holding a match: that is not the reader's choice, so it is not kept.
+        if (_filtering() || !_allList) return;
+        _listState.open = Array.prototype.slice.call(_allList.querySelectorAll('details.preview-contextual-ai-tools__category-group'))
+            .filter(function (g) { return g.open; })
+            .map(function (g) { return g.dataset.category; });
+        _writeListState();
     }
 
-    function _setTagMatchMode(mode) {
-        if (mode !== 'any' && mode !== 'all') return;
-        if (_tagMatchMode === mode) return;
-        _tagMatchMode = mode;
-        _renderTagModeRow();
-        _applyFilters();
-    }
+    // ──────────────────────────── Render: the list ──────────────────────
 
-    function _toggleTagsExpanded() {
-        _tagsExpanded = !_tagsExpanded;
-        _renderTags();
-    }
-
-    // ──────────────────────────── Render: tag-mode row ──────────────────
-
-    function _renderTagModeRow() {
-        if (!_tagModeRow) return;
-        _tagModeRow.style.display = _activeTags.size >= 2 ? '' : 'none';
-        if (_tagModeAnyBtn) {
-            _tagModeAnyBtn.classList.toggle('preview-contextual-ai-tools__tag-mode--active', _tagMatchMode === 'any');
-        }
-        if (_tagModeAllBtn) {
-            _tagModeAllBtn.classList.toggle('preview-contextual-ai-tools__tag-mode--active', _tagMatchMode === 'all');
-        }
-    }
-
-    // ──────────────────────────── Render: tags ──────────────────────────
-
-    function _renderTags() {
-        if (!_tagsContainer) return;
-        _tagsContainer.replaceChildren();
-        var tags = _uniqueTags();
-        if (tags.length === 0) return;
-
-        var visible;
-        if (_tagsExpanded || tags.length <= TAG_SHOW_LIMIT) {
-            visible = tags;
-        } else {
-            var top = tags.slice(0, TAG_SHOW_LIMIT);
-            var topSet = new Set(top);
-            visible = top.slice();
-            _activeTags.forEach(function (t) {
-                if (!topSet.has(t)) visible.push(t);
-            });
-        }
-        // A phone shows fewer: every chip is drawn, and past its count the phone block hides one
-        // that is not in use.
-        var shownOnPhone = 0;
-        for (var i = 0; i < visible.length; i++) {
-            var chip = _renderTagChip(visible[i]);
-            if (!_tagsExpanded && i >= TAG_SHOW_LIMIT_PHONE && !_activeTags.has(visible[i])) {
-                chip.classList.add('preview-contextual-ai-tools__tag--past-phone');
-            } else {
-                shownOnPhone++;
-            }
-            _tagsContainer.appendChild(chip);
-        }
-        if (tags.length > TAG_SHOW_LIMIT_PHONE) {
-            _tagsContainer.appendChild(_renderTagOverflowToggle(tags.length, visible.length, shownOnPhone));
-        }
-    }
-
-    function _renderTagChip(tag) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'preview-contextual-ai-tools__tag';
-        if (_activeTags.has(tag)) {
-            btn.classList.add('preview-contextual-ai-tools__tag--active');
-        }
-        btn.textContent = tag;
-        btn.addEventListener('click', function () { _onTagClick(tag); });
-        return btn;
-    }
-
-    function _renderTagOverflowToggle(total, currentlyVisible, shownOnPhone) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'preview-contextual-ai-tools__tag-toggle';
-        // Up to the limit only a phone hides a tag, so only a phone has this button.
-        if (total <= TAG_SHOW_LIMIT) {
-            btn.classList.add('preview-contextual-ai-tools__tag-toggle--phone-only');
-        }
-        if (_tagsExpanded) {
-            btn.textContent = _t('tagShowLess', 'Show less');
-        } else {
-            btn.appendChild(_renderTagToggleCount('preview-contextual-ai-tools__tag-toggle-count', total - currentlyVisible));
-            btn.appendChild(_renderTagToggleCount('preview-contextual-ai-tools__tag-toggle-count--phone', total - shownOnPhone));
-        }
-        btn.addEventListener('click', _toggleTagsExpanded);
-        return btn;
-    }
-
-    function _renderTagToggleCount(className, hidden) {
-        var span = document.createElement('span');
-        span.className = className;
-        span.textContent = _t('tagShowMore', '+{n} more').replace('{n}', String(hidden));
-        return span;
-    }
-
-    // ──────────────────────────── Render: cards ─────────────────────────
-
-    function _renderCards() {
+    /**
+     * The list: the rows the search and the switches keep, by group in the panel's order, a group with none left out. From
+     * FOLD_AT workflows each group folds to its name and count (the first open until the reader chooses, every group holding
+     * a match open during a search), and Recently used comes first.
+     */
+    function _renderList() {
         if (!_allList) return;
         _allList.replaceChildren();
         if (_loadingEl) _loadingEl.style.display = 'none';
+        var rows = _allWorkflows.filter(_matches);
+        if (_emptyEl) _emptyEl.style.display = rows.length === 0 ? '' : 'none';
+        if (rows.length === 0) return;
 
-        if (_filteredWorkflows.length === 0) {
-            if (_emptyEl) _emptyEl.style.display = '';
-            if (_showMoreBtn) _showMoreBtn.style.display = 'none';
-            return;
+        var folds = _allWorkflows.length >= FOLD_AT;
+        if (folds && !_filtering()) {
+            var recent = _recentRows();
+            if (recent.length > 0) _allList.appendChild(_renderRecent(recent));
         }
-        if (_emptyEl) _emptyEl.style.display = 'none';
-
-        var slice = _filteredWorkflows.slice(0, _visibleCount);
-        var lastCategory = null;
-        var currentList = null;
-        for (var i = 0; i < slice.length; i++) {
-            var w = slice[i];
-            if (w.category !== lastCategory) {
-                var group = document.createElement('div');
-                group.className = 'preview-contextual-ai-tools__category-group';
-                group.dataset.category = w.category;
-
-                var header = document.createElement('h4');
-                header.className = 'preview-contextual-ai-tools__category-header';
-                header.textContent = w.categoryLabel || w.category;
-                group.appendChild(header);
-
-                currentList = document.createElement('div');
-                currentList.className = 'preview-contextual-ai-tools__tool-list';
-                group.appendChild(currentList);
-
-                _allList.appendChild(group);
-                lastCategory = w.category;
-            }
-            currentList.appendChild(_renderCard(w));
-        }
-
-        var remaining = _filteredWorkflows.length - slice.length;
-        if (remaining > 0 && _showMoreBtn) {
-            var step = Math.min(PAGE_SIZE, remaining);
-            var template = _t('showMoreCount', 'Show {n} more');
-            _showMoreBtn.textContent = template.replace('{n}', String(step));
-            _showMoreBtn.style.display = '';
-        } else if (_showMoreBtn) {
-            _showMoreBtn.style.display = 'none';
-        }
+        // The server lists every group a row names; one it did not is shown last, by its own name.
+        var order = _groups.slice();
+        var known = {};
+        order.forEach(function (g) { known[g.id] = true; });
+        rows.forEach(function (w) {
+            if (known[w.category]) return;
+            known[w.category] = true;
+            order.push({ id: w.category, title: w.category, line: '' });
+        });
+        var first = true;
+        order.forEach(function (group) {
+            var inGroup = rows.filter(function (w) { return w.category === group.id; });
+            if (inGroup.length === 0) return;
+            var open = !folds || _filtering()
+                || (_listState.open === null ? first : _listState.open.indexOf(group.id) !== -1);
+            _allList.appendChild(_renderGroup(group, inGroup, folds, open));
+            first = false;
+        });
     }
 
+    function _recentRows() {
+        var byId = {};
+        _allWorkflows.forEach(function (w) { byId[w.id] = w; });
+        return _listState.recent.map(function (id) { return byId[id]; }).filter(Boolean);
+    }
+
+    /** One group: its title and the line under it, then its rows; folded, a <details> whose summary also gives its count. */
+    function _renderGroup(group, rows, folds, open) {
+        var el = document.createElement(folds ? 'details' : 'section');
+        el.className = 'preview-contextual-ai-tools__category-group';
+        el.dataset.category = group.id;
+        el.appendChild(_renderGroupHeader(group, folds ? rows.length : null));
+        el.appendChild(_renderRows(rows));
+        if (folds) {
+            el.open = open;
+            el.addEventListener('toggle', _onGroupToggle);
+        }
+        return el;
+    }
+
+    function _renderGroupHeader(group, count) {
+        var header = document.createElement(count === null ? 'h4' : 'summary');
+        header.className = 'preview-contextual-ai-tools__category-header'
+            + (count === null ? '' : ' preview-contextual-ai-tools__category-header--fold');
+        header.appendChild(document.createTextNode(group.title || group.id));
+        if (count !== null) {
+            header.appendChild(document.createTextNode(' '));
+            var countEl = document.createElement('span');
+            countEl.className = 'preview-contextual-ai-tools__category-count';
+            countEl.textContent = '(' + count + ')';
+            header.appendChild(countEl);
+        }
+        if (group.line) {
+            var line = document.createElement('span');
+            line.className = 'preview-contextual-ai-tools__category-line';
+            line.textContent = group.line;
+            header.appendChild(line);
+        }
+        return header;
+    }
+
+    /** Recently used: the workflows last opened in this browser, newest first. */
+    function _renderRecent(rows) {
+        var el = document.createElement('section');
+        el.className = 'preview-contextual-ai-tools__recent';
+        el.appendChild(_renderGroupHeader({ id: 'recent', title: _t('recentTitle', 'Recently used'), line: '' }, null));
+        el.appendChild(_renderRows(rows));
+        return el;
+    }
+
+    function _renderRows(rows) {
+        var list = document.createElement('div');
+        list.className = 'preview-contextual-ai-tools__tool-list';
+        rows.forEach(function (w) { list.appendChild(_renderCard(w)); });
+        return list;
+    }
+
+    // ──────────────────────────── Render: a row ─────────────────────────
+
+    /** A row: its icon and title, the second line (what a run does, in words), then its description. */
     function _renderCard(workflow) {
         var card = document.createElement('button');
         card.type = 'button';
         card.className = 'preview-contextual-ai-tools__tool-card';
         card.dataset.id = workflow.id;
-        card.addEventListener('click', function () { _onCardClick(workflow); });
+        card.addEventListener('click', function () {
+            _rememberRecent(workflow.id);
+            _onCardClick(workflow);
+        });
 
         var header = document.createElement('div');
         header.className = 'preview-contextual-ai-tools__tool-card-header';
@@ -530,21 +573,10 @@ window.PreviewAiTools = (function () {
         var titleEl = document.createElement('span');
         titleEl.className = 'preview-contextual-ai-tools__tool-card-title';
         titleEl.textContent = workflow.title || workflow.id;
-        var badgeEl = document.createElement('span');
-        badgeEl.className = 'preview-contextual-ai-tools__tool-card-badge';
-        if (workflow.isAI) {
-            badgeEl.textContent = '🤖';
-            badgeEl.title = _t('aiBadgeTooltip', 'AI workflow');
-        } else if (workflow.isManual) {
-            badgeEl.textContent = '📦';
-            badgeEl.title = _t('manualBadgeTooltip', 'Steps-only workflow');
-        } else {
-            badgeEl.textContent = '';
-        }
         header.appendChild(iconEl);
         header.appendChild(titleEl);
-        if (badgeEl.textContent) header.appendChild(badgeEl);
         card.appendChild(header);
+        card.appendChild(_renderRunFacts(workflow));
 
         if (workflow.description) {
             var desc = document.createElement('p');
@@ -552,24 +584,21 @@ window.PreviewAiTools = (function () {
             desc.textContent = workflow.description;
             card.appendChild(desc);
         }
-
-        var meta = document.createElement('div');
-        meta.className = 'preview-contextual-ai-tools__tool-card-meta';
-        if (workflow.difficultyLabel) {
-            var diff = _renderMetaChip(workflow.difficultyLabel);
-            diff.classList.add('preview-contextual-ai-tools__tool-card-meta-chip--difficulty-' + workflow.difficulty);
-            meta.appendChild(diff);
-        }
-        if (meta.childNodes.length > 0) card.appendChild(meta);
-
         return card;
     }
 
-    function _renderMetaChip(text) {
-        var chip = document.createElement('span');
-        chip.className = 'preview-contextual-ai-tools__tool-card-meta-chip';
-        chip.textContent = text;
-        return chip;
+    /** The second line: one line per part, what can be deleted in the warning colour (the words say it as well). */
+    function _renderRunFacts(workflow) {
+        var facts = document.createElement('span');
+        facts.className = 'preview-contextual-ai-tools__tool-card-facts';
+        (_factsById[workflow.id] || _factParts(workflow)).forEach(function (part) {
+            var line = document.createElement('span');
+            line.className = 'preview-contextual-ai-tools__tool-card-fact'
+                + (part.kind === 'delete' ? ' preview-contextual-ai-tools__tool-card-fact--delete' : '');
+            line.textContent = part.text;
+            facts.appendChild(line);
+        });
+        return facts;
     }
 
 

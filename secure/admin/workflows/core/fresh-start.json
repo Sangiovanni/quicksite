@@ -6,9 +6,8 @@
         "icon": "🧹",
         "titleKey": "workflows.specs.freshStart.title",
         "descriptionKey": "workflows.specs.freshStart.description",
-        "category": "advanced",
-        "tags": ["reset", "cleanup", "fresh"],
-        "difficulty": "beginner"
+        "category": "tools",
+        "tags": ["reset", "cleanup", "fresh"]
     },
     "parameters": [
         {

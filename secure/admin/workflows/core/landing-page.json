@@ -6,9 +6,8 @@
         "icon": "🚀",
         "titleKey": "workflows.specs.landingPage.title",
         "descriptionKey": "workflows.specs.landingPage.description",
-        "category": "template",
-        "tags": ["landing", "single-page", "starter", "template"],
-        "difficulty": "beginner"
+        "category": "start",
+        "tags": ["landing", "single-page", "starter", "template"]
     },
     "preWorkflows": ["fresh-start"],
     "parameters": [],

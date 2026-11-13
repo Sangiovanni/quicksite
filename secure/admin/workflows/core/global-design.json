@@ -6,9 +6,9 @@
         "icon": "🎨",
         "titleKey": "ai.specs.globalDesign.title",
         "descriptionKey": "ai.specs.globalDesign.description",
-        "category": "style",
-        "tags": ["design", "colors", "variables", "theme"],
-        "difficulty": "beginner"
+        "category": "look",
+        "answerLength": "short",
+        "tags": ["design", "colors", "variables", "theme"]
     },
     "parameters": [],
     "dataRequirements": [

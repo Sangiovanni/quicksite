@@ -537,16 +537,9 @@
     .preview-workspace--panel-fills .preview-sidebar__options {
         display: block;
     }
-    /* AI tools: three tags and the count of the rest */
     .preview-workspace[data-mode="add"] .preview-sidebar__toggle,
-    .preview-workspace--panel-fills .preview-sidebar__toggle,
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag--past-phone,
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle-count {
+    .preview-workspace--panel-fills .preview-sidebar__toggle {
         display: none;
-    }
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle--phone-only,
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle-count--phone {
-        display: inline;
     }
 
     /* Media */

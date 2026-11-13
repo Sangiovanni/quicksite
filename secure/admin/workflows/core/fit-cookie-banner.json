@@ -6,9 +6,10 @@
         "icon": "🍪",
         "titleKey": "workflows.specs.fitCookieBanner.title",
         "descriptionKey": "workflows.specs.fitCookieBanner.description",
-        "category": "style",
-        "tags": ["cookie", "consent", "banner", "style"],
-        "difficulty": "beginner"
+        "category": "privacy",
+        "answerLength": "short",
+        "needsKey": "workflows.needs.cookieBanner",
+        "tags": ["cookie", "consent", "banner", "style"]
     },
     "parameters": [
         {

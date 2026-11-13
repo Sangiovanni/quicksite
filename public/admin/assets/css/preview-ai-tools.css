@@ -1,5 +1,5 @@
 /*
- * AI tools panel (preview-ai-tools.js).
+ * Workflows panel (preview-ai-tools.js, mode ai-tools: the file names keep the panel's first name, AI tools).
  *
  * Theme: --admin-* variables (admin is dark-themed).
  */
@@ -12,7 +12,7 @@
 }
 
 
-/* Backup-first warning banner (top of AI tools panel) */
+/* Backup-first warning banner (top of the Workflows panel) */
 .preview-contextual-ai-tools__backup-banner {
     display: flex;
     flex-direction: column;
@@ -121,70 +121,33 @@
     box-shadow: 0 0 0 2px var(--admin-accent-muted);
 }
 
-.preview-contextual-ai-tools__tag-mode-row {
+/* The two switches under the search: each keeps only the rows it names */
+.preview-contextual-ai-tools__switches {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--admin-text-muted);
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
 }
 
-.preview-contextual-ai-tools__tag-mode-label {
+.preview-contextual-ai-tools__switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--admin-text);
+    cursor: pointer;
     user-select: none;
 }
 
-.preview-contextual-ai-tools__tag-mode {
-    padding: 3px 9px;
-    background: var(--admin-card-bg);
-    color: var(--admin-text-muted);
-    border: 1px solid var(--admin-border);
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: inherit;
+.preview-contextual-ai-tools__switch input {
+    margin: 0;
+    accent-color: var(--admin-accent);
     cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.preview-contextual-ai-tools__tag-mode:hover {
-    color: var(--admin-text);
-    border-color: var(--admin-border-focus);
-}
-.preview-contextual-ai-tools__tag-mode--active {
-    background: var(--admin-accent);
-    color: var(--admin-on-accent);
-    border-color: var(--admin-accent);
-}
-
-.preview-contextual-ai-tools__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-}
-
-.preview-contextual-ai-tools__tag-toggle {
-    background: transparent;
-    color: var(--admin-text-muted);
-    border: none;
-    padding: 3px 4px;
-    font-size: 11px;
-    font-family: inherit;
-    cursor: pointer;
-    text-decoration: underline;
-    transition: color 0.12s ease;
-}
-.preview-contextual-ai-tools__tag-toggle:hover {
-    color: var(--admin-text);
-}
-/* The phone block shows these two, and hides the other count */
-.preview-contextual-ai-tools__tag-toggle--phone-only,
-.preview-contextual-ai-tools__tag-toggle-count--phone {
-    display: none;
 }
 
 .preview-contextual-ai-tools__categories {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-lg);
 }
 
 .preview-contextual-ai-tools__category-group {
@@ -193,36 +156,43 @@
     gap: 4px;
 }
 
+/* A group's title stays at the top of the panel while its rows scroll under it: opaque, on the panel's own colour,
+   its shadow covering the panel's top padding above it */
 .preview-contextual-ai-tools__category-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
     margin: 0;
-    padding: 0;
-    font-size: 12px;
+    padding: var(--space-xs) 0;
+    font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
-    opacity: 0.9;
+    background: var(--admin-surface);
+    box-shadow: 0 calc(-1 * var(--space-xs)) 0 0 var(--admin-surface);
 }
 
-.preview-contextual-ai-tools__tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 9px;
-    background: var(--admin-card-bg);
-    color: var(--admin-text-muted);
-    border: 1px solid var(--admin-border);
-    border-radius: 999px;
-    font-size: 11px;
-    line-height: 1.4;
+/* Folded, a group's header is the summary a click opens: the browser's own marker says which way */
+.preview-contextual-ai-tools__category-header--fold {
+    display: list-item;
     cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
-.preview-contextual-ai-tools__tag:hover {
-    color: var(--admin-text);
-    border-color: var(--admin-border-focus);
+
+.preview-contextual-ai-tools__category-header--fold .preview-contextual-ai-tools__category-line {
+    display: block;
 }
-.preview-contextual-ai-tools__tag--active {
-    background: var(--admin-accent);
-    color: var(--admin-on-accent);
-    border-color: var(--admin-accent);
+
+.preview-contextual-ai-tools__category-count {
+    font-weight: var(--font-weight-normal);
+    color: var(--admin-text-muted);
+}
+
+.preview-contextual-ai-tools__category-line {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+    color: var(--admin-text-muted);
 }
 
 .preview-contextual-ai-tools__section {
@@ -277,19 +247,8 @@
     font-size: 13px;
     font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
-
-.preview-contextual-ai-tools__tool-card-badge {
-    flex-shrink: 0;
-    font-size: 12px;
-    line-height: 1;
-    opacity: 0.7;
-    cursor: help;
-}
-
 
 .preview-contextual-ai-tools__tool-card-desc {
     margin: 0;
@@ -302,57 +261,28 @@
     overflow: hidden;
 }
 
-.preview-contextual-ai-tools__tool-card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: var(--admin-text-muted);
-}
-
-.preview-contextual-ai-tools__tool-card-meta-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 1px 6px;
-    background: var(--admin-bg);
-    border: 1px solid var(--admin-border);
-    border-radius: 3px;
+/* A row's second line: what a run does, in words, one line per fact, never cut */
+.preview-contextual-ai-tools__tool-card-facts {
+    display: block;
+    font-size: var(--font-size-xs);
     line-height: 1.4;
-}
-.preview-contextual-ai-tools__tool-card-meta-chip--difficulty-beginner {
-    color: #22c55e;
-    border-color: #22c55e4d;
-}
-.preview-contextual-ai-tools__tool-card-meta-chip--difficulty-intermediate {
-    color: #f59e0b;
-    border-color: #f59e0b4d;
-}
-.preview-contextual-ai-tools__tool-card-meta-chip--difficulty-advanced {
-    color: #ef4444;
-    border-color: #ef44444d;
+    color: var(--admin-text);
 }
 
-.preview-contextual-ai-tools__show-more {
-    width: 100%;
-    padding: 8px;
-    background: transparent;
-    color: var(--admin-text-muted);
-    border: 1px dashed var(--admin-border);
-    border-radius: 4px;
-    font-size: 12px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: color 0.12s ease, border-color 0.12s ease;
+.preview-contextual-ai-tools__tool-card-fact {
+    display: block;
 }
-.preview-contextual-ai-tools__show-more:hover {
-    color: var(--admin-text);
-    border-color: var(--admin-border-focus);
+
+/* What a run can delete: the words say it, the colour points at it */
+.preview-contextual-ai-tools__tool-card-fact--delete {
+    color: var(--admin-warning);
 }
-.preview-contextual-ai-tools__show-more:focus-visible {
-    outline: none;
-    border-color: var(--admin-accent);
-    color: var(--admin-text);
+
+/* Recently used, above the groups once they fold */
+.preview-contextual-ai-tools__recent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
 }
 
 .preview-contextual-ai-tools__empty {

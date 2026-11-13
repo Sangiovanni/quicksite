@@ -1219,7 +1219,7 @@
             "invalidImport": "Fichier d'import invalide : doit contenir spec et template"
         },
         "spec": {
-            "editorHint": "Vous pouvez aussi exécuter ce workflow sans quitter l'éditeur visuel — ouvrez <strong>Aperçu → Outils IA</strong>.",
+            "editorHint": "Vous pouvez aussi exécuter ce workflow sans quitter l'éditeur visuel — ouvrez <strong>Aperçu → Workflows</strong>.",
             "openEditor": "Ouvrir l'éditeur →",
             "manual": "Manuel",
             "ai": "IA",
@@ -1258,41 +1258,6 @@
         },
         "tagSelect": {
             "searchPlaceholder": "Tapez pour rechercher..."
-        },
-        "categories": {
-            "creation": {
-                "title": "Création",
-                "desc": "Créer de nouveaux sites et pages à partir de zéro"
-            },
-            "template": {
-                "title": "Templates",
-                "desc": "Modèles de sites prêts à l'emploi - sans IA"
-            },
-            "modification": {
-                "title": "Modification",
-                "desc": "Modifier les structures et le contenu existants"
-            },
-            "content": {
-                "title": "Contenu",
-                "desc": "Ajouter ou mettre à jour le contenu des pages"
-            },
-            "style": {
-                "title": "Style",
-                "desc": "Changer l'apparence et le design"
-            },
-            "advanced": {
-                "title": "Avancé",
-                "desc": "Opérations et configurations complexes"
-            },
-            "wip": {
-                "title": "En développement",
-                "desc": "Specs expérimentales en cours de développement"
-            }
-        },
-        "difficulty": {
-            "beginner": "Débutant",
-            "intermediate": "Intermédiaire",
-            "advanced": "Avancé"
         },
         "specs": {
             "shared": {
@@ -1545,22 +1510,10 @@
         "toolStyle": "CSS",
         "toolJs": "Interactions",
         "toolTranslation": "Traductions",
-        "toolAiTools": "Outils IA",
-        "aiToolsSearchPlaceholder": "Rechercher des outils IA…",
-        "aiToolsSuggestedHeader": "Suggérés",
-        "aiToolsAllHeader": "Tous les workflows",
-        "aiToolsMatchLabel": "Correspondance :",
-        "aiToolsMatchAny": "L'un",
-        "aiToolsMatchAll": "Tous",
-        "aiToolsTagShowMore": "+{n} de plus",
-        "aiToolsTagShowLess": "Voir moins",
+        "toolAiTools": "Workflows",
+        "aiToolsSearchPlaceholder": "Rechercher un workflow…",
         "aiToolsLoading": "Chargement…",
-        "aiToolsShowMore": "Voir plus",
-        "aiToolsEmpty": "Aucun outil ne correspond aux filtres.",
-        "aiToolsShowMoreCount": "Voir {n} de plus",
-        "aiToolsAiBadgeTooltip": "Workflow IA — génère une invite",
-        "aiToolsManualBadgeTooltip": "Workflow d'étapes — exécute des commandes sans IA",
-        "aiToolsSourceCustom": "personnalisé",
+        "aiToolsEmpty": "Aucun workflow ne correspond à votre recherche et à vos filtres.",
         "aiToolsBackToList": "← Retour",
         "aiToolsSectionYourPrompt": "Votre invite",
         "aiToolsSectionParameters": "Paramètres",
@@ -1644,7 +1597,7 @@
         "aiToolsStreaming": "Réception depuis {model}… ({chars} car.)",
         "aiToolsSendingWithElapsed": "Envoi à {model}… ({sec}s)",
         "aiToolsStreamingWithElapsed": "Réception depuis {model}… ({chars} car., {sec}s)",
-        "aiToolsBackupWarning": "Les outils IA modifient votre site directement. Les changements ne peuvent pas être facilement annulés.",
+        "aiToolsBackupWarning": "Les workflows modifient votre site directement. Les changements ne peuvent pas être facilement annulés.",
         "aiToolsBackupRecommendation": "Nous recommandons de créer une sauvegarde avant d'exécuter un workflow dont vous n'êtes pas sûr.",
         "aiToolsBackupBtn": "Créer une sauvegarde maintenant",
         "aiToolsBackupCreating": "Création de la sauvegarde…",

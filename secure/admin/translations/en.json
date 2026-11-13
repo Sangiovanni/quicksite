@@ -1758,7 +1758,7 @@
             "invalidImport": "Invalid import file: must contain spec and template"
         },
         "spec": {
-            "editorHint": "You can also run this workflow without leaving the visual editor — open <strong>Preview → AI tools</strong>.",
+            "editorHint": "You can also run this workflow without leaving the visual editor — open <strong>Preview → Workflows</strong>.",
             "openEditor": "Open editor →",
             "manual": "Manual",
             "ai": "AI",
@@ -1799,39 +1799,35 @@
             "searchPlaceholder": "Type to search..."
         },
         "categories": {
-            "creation": {
-                "title": "Creation",
-                "desc": "Create new websites and pages from scratch"
+            "start": {
+                "title": "Start a new site",
+                "desc": "Replaces what is there"
             },
-            "template": {
-                "title": "Templates",
-                "desc": "Ready-to-use site templates - no AI required"
+            "add": {
+                "title": "Add to my site",
+                "desc": "Keeps what is there"
             },
-            "modification": {
-                "title": "Modification",
-                "desc": "Modify existing structures and content"
+            "look": {
+                "title": "Change the look",
+                "desc": "Colours, styles, animations"
             },
-            "content": {
-                "title": "Content",
-                "desc": "Add or update page content and text"
+            "texts": {
+                "title": "Texts and languages",
+                "desc": "Words, translations, the switch"
             },
-            "style": {
-                "title": "Style",
-                "desc": "Change appearance and design"
+            "privacy": {
+                "title": "Cookies and privacy",
+                "desc": "Your consent banner and pages"
             },
-            "advanced": {
-                "title": "Advanced",
-                "desc": "Complex operations and configurations"
-            },
-            "wip": {
-                "title": "Work in Progress",
-                "desc": "Experimental specs in development"
+            "tools": {
+                "title": "Tools",
+                "desc": "For when you know what you want"
             }
         },
-        "difficulty": {
-            "beginner": "Beginner",
-            "intermediate": "Intermediate",
-            "advanced": "Advanced"
+        "needs": {
+            "cookieBanner": "Needs a cookie banner",
+            "consentPages": "Needs your cookie policy or privacy page",
+            "secondLanguage": "Needs a second language"
         },
         "specs": {
             "shared": {
@@ -2059,6 +2055,10 @@
             "updateLangSwitch": {
                 "title": "Update Language Switch",
                 "description": "Rebuild the language switch component based on the current project languages."
+            },
+            "setupThemeSwitch": {
+                "title": "Theme Switch Button",
+                "description": "Writes a light/dark button as the component theme-switch. Visitors see it only once you place it on a page or in the menu."
             }
         }
     },
@@ -2130,22 +2130,24 @@
         "toolStyle": "CSS",
         "toolJs": "Interactions",
         "toolTranslation": "Translations",
-        "toolAiTools": "AI tools",
-        "aiToolsSearchPlaceholder": "Search AI tools…",
-        "aiToolsSuggestedHeader": "Suggested",
-        "aiToolsAllHeader": "All workflows",
-        "aiToolsMatchLabel": "Match:",
-        "aiToolsMatchAny": "Any",
-        "aiToolsMatchAll": "All",
-        "aiToolsTagShowMore": "+{n} more",
-        "aiToolsTagShowLess": "Show less",
+        "toolAiTools": "Workflows",
+        "aiToolsSearchPlaceholder": "Search workflows…",
+        "workflowsSwitchNoAi": "No AI",
+        "workflowsSwitchNothingDeleted": "Nothing deleted",
+        "workflowsFactNoAi": "No AI",
+        "workflowsFactPaste": "No AI: you paste the commands",
+        "workflowsFactAiOne": "Uses AI: one request",
+        "workflowsFactAiOneShort": "Uses AI: one request, short answer",
+        "workflowsFactAiOneLong": "Uses AI: one request, long answer",
+        "workflowsFactAiSeveral": "Uses AI: several requests",
+        "workflowsFactAiSeveralShort": "Uses AI: several requests, short answers",
+        "workflowsFactAiSeveralLong": "Uses AI: several requests, long answers",
+        "workflowsFactCanDelete": "Can delete: {what}",
+        "workflowsFactChanges": "Changes: {what}",
+        "workflowsFactAnyCommand": "Can run any command, one that deletes included",
+        "workflowsRecent": "Recently used",
         "aiToolsLoading": "Loading…",
-        "aiToolsShowMore": "Show more",
-        "aiToolsEmpty": "No tools match the current filters.",
-        "aiToolsShowMoreCount": "Show {n} more",
-        "aiToolsAiBadgeTooltip": "AI workflow — generates a prompt",
-        "aiToolsManualBadgeTooltip": "Steps-only workflow — runs commands without AI",
-        "aiToolsSourceCustom": "custom",
+        "aiToolsEmpty": "No workflow matches your search and switches.",
         "aiToolsBackToList": "← Back",
         "aiToolsSectionYourPrompt": "Your prompt",
         "aiToolsSectionParameters": "Parameters",
@@ -2319,7 +2321,7 @@
         "aiToolsStreaming": "Receiving from {model}… ({chars} chars)",
         "aiToolsSendingWithElapsed": "Sending to {model}… ({sec}s)",
         "aiToolsStreamingWithElapsed": "Receiving from {model}… ({chars} chars, {sec}s)",
-        "aiToolsBackupWarning": "AI tools modify your site directly. Changes cannot be easily reverted.",
+        "aiToolsBackupWarning": "Workflows modify your site directly. Changes cannot be easily reverted.",
         "aiToolsBackupRecommendation": "We recommend creating a backup before running any workflow you're not sure about.",
         "aiToolsBackupBtn": "Create backup now",
         "aiToolsBackupCreating": "Creating backup…",
@@ -3736,7 +3738,7 @@
         "persistHint": "Off = cleared on tab close (sessionStorage). Local connections always persist (URLs aren't sensitive).",
         "runWithoutStoppingLabel": "Run without stopping",
         "autoExecuteCaution": "Use with caution.",
-        "runWithoutStoppingHint": ":caution An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the AI tools panel (Preview → AI tools). What a part deletes or changes is still confirmed first.",
+        "runWithoutStoppingHint": ":caution An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the Workflows panel (Preview → Workflows). What a part deletes or changes is still confirmed first.",
         "modalTitle": "Add a connection",
         "empty": "No AI connection yet.",
         "emptyAdd": "+ Add your first connection",

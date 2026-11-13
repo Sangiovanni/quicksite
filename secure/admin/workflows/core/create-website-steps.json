@@ -6,9 +6,8 @@
         "icon": "🌐",
         "titleKey": "ai.specs.createWebsiteSteps.title",
         "descriptionKey": "ai.specs.createWebsiteSteps.description",
-        "category": "creation",
-        "tags": ["create", "website", "multi-page", "single-page", "landing", "from-scratch", "phased"],
-        "difficulty": "advanced"
+        "category": "start",
+        "tags": ["create", "website", "multi-page", "single-page", "landing", "from-scratch", "phased"]
     },
     "parameters": [
         {
