@@ -9,8 +9,8 @@
  * 
  * Creates a deep copy of a node and all its children, generating new
  * translation keys for all textKey and translatable attributes (alt, title, etc).
- * Optionally copies translation values from the source to the new keys. A raw or
- * literal value (`__RAW__` / `__LIT__`) is copied as it is: it is no key.
+ * Optionally copies translation values from the source to the new keys. A raw
+ * value (`__RAW__`) is copied as it is: it is no key.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

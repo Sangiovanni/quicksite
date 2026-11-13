@@ -129,16 +129,14 @@ if (!function_exists('firstUnsafeParam')) {
             // `data-bind-attr` names the attribute qs.js writes with a value
             // from data, so its VALUE is a name, judged by the binding rule
             // above. A number renders as its digits and is judged as that
-            // text; `true` renders the bare name, which names nothing. The
-            // renderer drops a `__LIT__` prefix from any value, so the name
-            // judged is the one the page will hold. A value holding a
-            // placeholder is filled when the page is served, so only the
-            // runtime can judge it: it passes here, and qs.js refuses it there.
+            // text; `true` renders the bare name, which names nothing. Both
+            // render paths draw this value as written (no marker is removed
+            // outside a translatable attribute), so the name judged is the one
+            // the page will hold. A value holding a placeholder is filled when
+            // the page is served, so only the runtime can judge it: it passes
+            // here, and qs.js refuses it there.
             if (strtolower($name) === 'data-bind-attr' && (is_string($value) || is_int($value) || is_float($value))) {
                 $target = (string) $value;
-                if (strpos($target, '__LIT__') === 0) {
-                    $target = substr($target, 7);
-                }
                 if ($target !== '' && strpos($target, '{{') === false) {
                     $refusal = qs_binding_attribute_refusal($target, $tag);
                     if ($refusal !== null) {
@@ -157,10 +155,15 @@ if (!function_exists('firstUnsafeParam')) {
             // Dangerous URL scheme on a URL-sink attribute (mirrors UrlPolicy).
             // sanitize() returns '#' for a disallowed scheme / control chars;
             // guard the legitimate literal '#' anchor so it isn't rejected.
-            if (UrlPolicy::isUrlAttribute($name)
-                && UrlPolicy::sanitize($value) === '#'
-                && ltrim($value, " \t\n\r\0\x0B\f") !== '#'
-            ) {
+            // A `srcset` is a list of files, each one's address judged as the
+            // render paths judge it (UrlPolicy::refusedSrcsetAddress()); the
+            // whitespace between files is no control character there.
+            if (UrlPolicy::isSrcsetAttribute($name)) {
+                if (UrlPolicy::refusedSrcsetAddress($value) !== null) {
+                    return "Attribute '{$name}' lists a file whose address uses a disallowed URL scheme "
+                         . '(only http, https, mailto, tel are allowed).';
+                }
+            } elseif (UrlPolicy::isUrlAttribute($name) && UrlPolicy::isRefused($value)) {
                 return "Attribute '{$name}' uses a disallowed URL scheme (only http, https, mailto, tel are allowed).";
             }
         }
@@ -323,10 +326,10 @@ if (!function_exists('qs_unsafe_refresh_param')) {
      * its `http-equiv` makes its `content` a refresh, and the address sits inside
      * that text (UrlPolicy::refreshAddress()). Judged on the first attribute of
      * each name in any letter case, as a browser keeps the first, and on each
-     * value as a page draws it, with a `__LIT__` or `__RAW__` prefix dropped (a
-     * build drops either). A value a placeholder fills when the page is served
-     * is judged as written here, as an href is, and drawn safe by both render
-     * paths once it is filled.
+     * value as a page draws it: as written, since neither attribute is
+     * translatable and no marker is removed from either. A value a placeholder
+     * fills when the page is served is judged as written here, as an href is,
+     * and drawn safe by both render paths once it is filled.
      *
      * @param array $params one meta node's params
      * @return array{attribute:string, message:string}|null
@@ -342,15 +345,9 @@ if (!function_exists('qs_unsafe_refresh_param')) {
         if (!isset($first['http-equiv'], $first['content'])) {
             return null;
         }
-        $drawn = static function ($value): ?string {
-            if (!is_string($value)) {
-                return null;
-            }
-            return (strpos($value, '__LIT__') === 0 || strpos($value, '__RAW__') === 0) ? substr($value, 7) : $value;
-        };
-        $httpEquiv = $drawn($first['http-equiv'][1]);
-        $content = $drawn($first['content'][1]);
-        if ($httpEquiv === null || $content === null || !UrlPolicy::isRefresh($httpEquiv)) {
+        $httpEquiv = $first['http-equiv'][1];
+        $content = $first['content'][1];
+        if (!is_string($httpEquiv) || !is_string($content) || !UrlPolicy::isRefresh($httpEquiv)) {
             return null;
         }
         $at = UrlPolicy::refreshAddress($content);

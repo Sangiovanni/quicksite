@@ -389,6 +389,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `emulateComponent`, `emulatePage` | localStorage | `preview.js` — the sample values an Emulation fills the preview with, as JSON: per component (`qs_emulate_<component>`) and per page (`qs_emulate_page_<route>`); kept in this browser, nothing written to the project |
 | `addLastTab` | localStorage | `preview.js` — the tab the advanced Add form last opened on |
 | `addPreviewExpanded`, `addPositionExpanded`, `addAdvancedExpanded` | localStorage | `preview.js` — whether each folding section of the Add form is open (`'1'`) or folded (`'0'`); `contextual-add.php` names each on its header (`data-storage-key`) |
+| `tagShowHtmlCode`, `addFavoriteTags` | localStorage | `preview.js` — the Add form's HTML Tag tab: whether a tag's example is shown as its HTML (`'true'`) or drawn, and the tags starred as favourites, newest first, as a JSON list of ten at most; stored as `tagSelector_showHtmlCode` and `qs-add-favorite-tags` |
 | `updateCheckAt` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
 | `updateNoticeHidden` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
 | `updateLastSeen` | localStorage | `update-notice.js` — the newest version the last check reported, so the banner can re-render inside the throttle window without another call |
@@ -484,7 +485,7 @@ There is no class, no ID and no key-or-literal choice: each text gets a translat
 
 **Saving a selection as a snippet.** Select mode's *save as snippet* flow asks for a name and offers one checkbox: **"Save to my personal snippets (reusable in all my projects)"**. Leave it unchecked and the snippet belongs to the project you are editing, where every member of that project can use it. Tick it and the snippet goes to your own library instead — it follows you into every project you work on, and nobody else can see it, insert it, or delete it. The Add panel's **Snippet** tab lists all three tiers in one picker — the snippets shipped with the engine, your personal ones, and the current project's — with each entry labelled by the tier it came from. See [COMMAND_API.md](COMMAND_API.md) for how a name that exists in more than one tier resolves.
 
-**The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), a raw or literal text (`__RAW__` / `__LIT__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
+**The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), a raw text (`__RAW__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
 
 **The tag preview.** Picking a tag in the **HTML Tag** tab shows a small example of it under the picker, and its **`</>`** button switches to the example's HTML as the page holds it once parsed: a boolean attribute reads `open=""`, a table row sits in the `<tbody>` the browser adds, an `<option>` is closed. A tag that renders nothing visible (`script`, `meta`, `template`…) reads "No visual preview". The examples come with the page, one `<template>` per tag written by `_tag-selector.php` from `_tag-examples.php`, so picking a tag copies its example and parses nothing.
 
@@ -787,12 +788,12 @@ The Add button (bottom Cancel / Add) posts `addNode` with `nodeKind:"text"` plus
 text node in the preview and makes it `contenteditable`. On commit:
 - For a translation-key node, the new value is saved via `setTranslationKeys`
   to the current-language translation file.
-- For a `__RAW__`/`__LIT__` literal, the new value is saved via `editStructure`
+- For a `__RAW__` literal, the new value is saved via `editStructure`
   by updating the node's `textKey` to `"__RAW__"+value` — *not* a translation
   entry (literals don't have one).
 
 In the renderer (`JsonToHtmlRenderer::renderText`), editor mode wraps both
-key-based AND `__RAW__`/`__LIT__` text in the `data-qs-textkey` selection span
+key-based AND `__RAW__` text in the `data-qs-textkey` selection span
 (with a `data-qs-raw="true"` marker on literals), so RAW text gets a selection
 handle just like translation-key text.
 
@@ -2088,7 +2089,7 @@ Phase 3 — Page loads, exchange runs:
 
 | Verb | Purpose | Typical chain |
 |---|---|---|
-| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (the route the server resolved for the page — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
+| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (the route the server resolved for the page — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. On success it goes to `returnTo`, else to a `?return=` path on this site, composed as every site address is: the base the page is served under and, on a multilingual site, the page's language. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
 | `QS.requestMagicLink(endpoint, email, returnTo?)` | Forward path. POSTs `{email}` to the issue endpoint. `email` accepts a literal address OR a `#selector` / `.selector` to read from an `<input>` (same convention as `setState`'s value arg). | `validate` → `requestMagicLink` → optional `redirect` to "check your email" page |
 | `QS.logoutServer(endpoint)` | Server-side logout — POST so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
 
@@ -2463,7 +2464,8 @@ init / `setState` / `fetchState`:
 - `data-state-value="store.field"` — scalar; sets `textContent` to the field
   value.
 - `data-state-list="store.field"` — array container. The container's first child
-  is the **item template** that gets cloned per array item.
+  is the **item template** that gets cloned per array item. Several containers may
+  name the same field: each is filled, from its own first child.
   - Template descendants with `data-bind="fieldName"` get `textContent` set to
     the matching field on each item; `data-bind-attr="attr"` sets an attribute
     instead. *This is the same `data-bind` mechanism used by componentList

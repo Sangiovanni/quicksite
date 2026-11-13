@@ -2675,7 +2675,7 @@
         "enumValueType": "Type de valeur",
         "enumType": "Type",
         "enumTypeDefault": "(défaut)",
-        "enumTypeLiteral": "Littéral",
+        "enumTypeAttributeValue": "Valeur d'attribut",
         "enumTypeOverrideTip": "Cliquer pour changer le type de cette ligne",
         "enumSourceRequired": "La clé source est requise",
         "enumNeedsOptions": "Au moins une option est requise",

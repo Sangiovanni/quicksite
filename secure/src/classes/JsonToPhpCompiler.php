@@ -465,11 +465,9 @@ class JsonToPhpCompiler {
         $textKey = $node['textKey'];
         $prefix = $echo ? 'echo ' : '$content .= ';
 
-        // __LIT__ is the renderer's second literal prefix, so the compiler
-        // honours it too: a __LIT__ node routed to the translation branch
-        // would build a page reading `{translation missing: __LIT__…}` where
-        // preview shows the text.
-        if (strpos($textKey, '__RAW__') === 0 || strpos($textKey, '__LIT__') === 0) {
+        // __RAW__ marks raw text, as in the renderer (renderTextNode()): shown as
+        // written, never looked up.
+        if (strpos($textKey, '__RAW__') === 0) {
             // Raw text. A literal is fully known here, so the substitution call
             // is emitted ONLY when the text actually carries a placeholder —
             // most raw text does not, and a built page should not pay for a
@@ -727,6 +725,18 @@ class JsonToPhpCompiler {
         // rewritable set (UrlPolicy::REWRITABLE_URL_ATTRIBUTES).
         $isUrlAttr    = UrlPolicy::isUrlAttribute($attrName);
         $needsRewrite = UrlPolicy::isRewritableUrlAttribute($attrName);
+        $isSrcset     = UrlPolicy::isSrcsetAttribute($attrName);
+
+        // A raw text (`__RAW__`) is read in a translatable attribute and nowhere
+        // else, before any placeholder is filled: the marker is removed and
+        // nothing is translated, as JsonToHtmlRenderer::renderAttribute() reads it.
+        // In any other attribute nothing is translated and nothing is removed: a
+        // `__RAW__` there is part of the value, drawn and checked as written.
+        $translatable = is_string($attrValue) && in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true);
+        $raw = $translatable && strpos($attrValue, '__RAW__') === 0;
+        if ($raw) {
+            $attrValue = substr($attrValue, 7);
+        }
 
         // Check if value contains system placeholders
         if (is_string($attrValue) && strpos($attrValue, '{{__') !== false) {
@@ -736,28 +746,30 @@ class JsonToPhpCompiler {
             // Check if this is a buildLanguageSwitchUrl() call - these return complete URLs
             $isLanguageSwitch = strpos($phpValue, 'buildLanguageSwitchUrl(') !== false;
 
+            if ($isSrcset) {
+                // Each file made safe and composed once the page fills it, as the preview does.
+                return 'UrlPolicy::mapSrcset(' . $phpValue . ', ' . $this->srcsetAddressFn($isLanguageSwitch) . ')';
+            }
             if ($needsRewrite && !$isLanguageSwitch) {
                 // Wrap with processUrl (BASE_URL/lang). Placeholders are
                 // system-generated URLs, not attacker-controlled schemes.
                 return 'processUrl(' . $phpValue . ', $__lang)';
             }
+            if ($isUrlAttr && !$needsRewrite) {
+                // A URL attribute that is not composed (xlink:href, ping, …) has
+                // no processUrl() in front of its value, so the value is held to
+                // the allowlist once filled, as the preview holds it: the write
+                // gate reads the value as written, where a placeholder can sit
+                // inside the scheme it would refuse.
+                return 'UrlPolicy::sanitize(' . $phpValue . ')';
+            }
             return $phpValue;
         }
-        if (is_string($attrValue) && in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true)
-            && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
-            && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
+        if ($translatable && !$raw && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
             // A translation KEY in a translatable attribute. Emitted as a
             // runtime lookup for the same reason a text node is: which
             // translation file answers depends on the request's language.
             return '$translator->translate(' . var_export($attrValue, true) . ')';
-        }
-
-        // A literal prefix marks "use this verbatim, do not translate".
-        // The renderer strips both prefixes, so the compiler does too —
-        // left in, the marker would ship to the visitor in a built page.
-        if (is_string($attrValue)
-            && (strpos($attrValue, '__RAW__') === 0 || strpos($attrValue, '__LIT__') === 0)) {
-            $attrValue = substr($attrValue, 7);
         }
 
         // Static value — the attacker-controlled case. Make it
@@ -777,6 +789,9 @@ class JsonToPhpCompiler {
             // substitution at RUNTIME rather than folding at compile
             // time, and processUrl composes on top of the safe value.
             $expr = 'qs_apply_runtime_placeholders(' . var_export($attrValue, true) . ', $__routeParams)';
+            if ($isSrcset) {
+                return 'UrlPolicy::mapSrcset(' . $expr . ', ' . $this->srcsetAddressFn(false) . ')';
+            }
             if ($isUrlAttr) {
                 $expr = 'UrlPolicy::sanitize(' . $expr . ')';
                 if ($needsRewrite) {
@@ -784,6 +799,9 @@ class JsonToPhpCompiler {
                 }
             }
             return $expr;
+        }
+        if ($isSrcset && is_string($attrValue)) {
+            return $this->staticSrcsetExpr($attrValue);
         }
         if ($isUrlAttr && is_string($attrValue)) {
             // No runtime placeholder: the value is fully known, so the
@@ -798,23 +816,62 @@ class JsonToPhpCompiler {
     }
 
     /**
+     * The function a built page makes one file of a `srcset` with
+     * (UrlPolicy::mapSrcset()): its address made safe, then composed by the
+     * compiled processUrl() (which leaves an absolute address as it is), unless
+     * the value is a language switch, which is complete already.
+     */
+    private function srcsetAddressFn(bool $languageSwitch): string {
+        return $languageSwitch
+            ? 'static fn($u) => UrlPolicy::sanitize($u)'
+            : 'static fn($u) => processUrl(UrlPolicy::sanitize($u), $__lang)';
+    }
+
+    /**
+     * A `srcset` this compile knows whole: each file's address made safe now and
+     * composed by processUrl() when the page is served, the text around the
+     * addresses as written, the value's leading whitespace dropped as
+     * UrlPolicy::mapSrcset() drops it. A one-file value compiles exactly as an
+     * src does.
+     */
+    private function staticSrcsetExpr(string $srcset): string {
+        $srcset = ltrim($srcset, " \t\n\r\0\x0B\f");
+        $parts = [];
+        $pos = 0;
+        foreach (UrlPolicy::srcsetAddresses($srcset) as [$at, $length]) {
+            if ($at > $pos) {
+                $parts[] = var_export(substr($srcset, $pos, $at - $pos), true);
+            }
+            $parts[] = 'processUrl(' . var_export(UrlPolicy::sanitize(substr($srcset, $at, $length)), true) . ', $__lang)';
+            $pos = $at + $length;
+        }
+        if ($pos < strlen($srcset) || $parts === []) {
+            $parts[] = var_export(substr($srcset, $pos), true);
+        }
+        return implode(' . ', $parts);
+    }
+
+    /**
      * An attribute's value as a built page draws it, when this compile already
-     * knows it: a string with no placeholder, its literal prefix dropped. Null
-     * when only the request can tell (a placeholder, a translation key), and for
-     * anything but a string. For an attribute that is no URL: a URL's value is
-     * also made safe and composed (attributeValueExpr()).
+     * knows it: a string with no placeholder, a raw text's marker dropped in a
+     * translatable attribute (attributeValueExpr()'s rule). Null when only the
+     * request can tell (a placeholder, a translation key), and for anything but
+     * a string. For an attribute that is no URL: a URL's value is also made safe
+     * and composed (attributeValueExpr()).
      */
     private function staticAttributeValue(string $attrName, $attrValue): ?string {
-        if (!is_string($attrValue) || strpos($attrValue, '{{__') !== false) {
+        if (!is_string($attrValue)) {
             return null;
         }
-        if (in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true)
-            && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
-            && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
-            return null;
+        if (in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true)) {
+            if (strpos($attrValue, '__RAW__') === 0) {
+                $attrValue = substr($attrValue, 7);
+            } elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
+                return null;
+            }
         }
-        if (strpos($attrValue, '__RAW__') === 0 || strpos($attrValue, '__LIT__') === 0) {
-            $attrValue = substr($attrValue, 7);
+        if (strpos($attrValue, '{{__') !== false) {
+            return null;
         }
         return $this->hasRuntimePlaceholder($attrValue) ? null : $attrValue;
     }

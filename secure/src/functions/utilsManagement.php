@@ -898,13 +898,13 @@ function qs_component_name_refusal($name, string $field = 'name'): ?ApiResponse
 }
 
 /**
- * Whether a text value is written as is: a `__RAW__` or `__LIT__` value, which the renderer and the
- * compiler show verbatim, never a translation key. A command that copies nodes keeps such a value as
- * it is, with no key and no translation: a key made for it would show the key's name, not the text.
+ * Whether a text value is written as is: a `__RAW__` value, which the renderer and the compiler show
+ * verbatim, never a translation key. A command that copies nodes keeps such a value as it is, with
+ * no key and no translation: a key made for it would show the key's name, not the text.
  */
 function qs_is_literal_text($value): bool
 {
-    return is_string($value) && (strncmp($value, '__RAW__', 7) === 0 || strncmp($value, '__LIT__', 7) === 0);
+    return is_string($value) && strncmp($value, '__RAW__', 7) === 0;
 }
 /**
  * Validate that params array does not contain reserved data-qs-* attributes

@@ -300,7 +300,8 @@
      * composes a written relative address against the site's root, and that is
      * not followed here, as a relative address means the page's neighbourhood.
      * Without the handoff's language fields (a page from before they existed, or
-     * with no handoff) nothing is composed.
+     * with no handoff) nothing is composed. The magic-link return
+     * (QS.exchangeMagicLink()'s ?return=) is a site address too, composed here.
      */
     function _qsComposeSiteAddress(value) {
         if (!_qsSiteAddress) return value;
@@ -322,6 +323,54 @@
         var folded = _qsAsciiLower(rest);
         if (langs.some(function (l) { return _qsAsciiLower(l) === folded; })) rest += '/';
         return full + rest;
+    }
+
+    /**
+     * Where each file's address sits in a srcset, as [offset, length] pairs in
+     * order: the HTML standard's "parse a srcset attribute" steps, which a browser
+     * follows. Skip whitespace and commas; the address runs to the next
+     * whitespace, so it may hold a comma, but a comma ending it ends the file;
+     * otherwise the descriptors follow, up to a comma outside parentheses.
+     * Mirrors UrlPolicy::srcsetAddresses(): the two change together.
+     */
+    function _qsSrcsetAddresses(srcset) {
+        var ws = ' \t\n\f\r';
+        var n = srcset.length, i = 0, out = [];
+        for (;;) {
+            while (i < n && (ws.indexOf(srcset.charAt(i)) !== -1 || srcset.charAt(i) === ',')) i++;
+            if (i >= n) return out;
+            var start = i;
+            while (i < n && ws.indexOf(srcset.charAt(i)) === -1) i++;
+            var end = i;
+            if (srcset.charAt(end - 1) === ',') {
+                while (srcset.charAt(end - 1) === ',') end--;
+                out.push([start, end - start]);
+                continue;
+            }
+            out.push([start, end - start]);
+            var inParens = false;
+            for (; i < n; i++) {
+                var c = srcset.charAt(i);
+                if (inParens) inParens = c !== ')';
+                else if (c === '(') inParens = true;
+                else if (c === ',') { i++; break; }
+            }
+        }
+    }
+
+    /**
+     * A srcset with each file's address replaced by what address() answers for it,
+     * everything else as written, the value's leading whitespace dropped first.
+     * Mirrors UrlPolicy::mapSrcset().
+     */
+    function _qsMapSrcset(srcset, address) {
+        var s = String(srcset).replace(/^[ \t\n\r\0\x0B\f]+/, '');
+        var spans = _qsSrcsetAddresses(s);
+        for (var k = spans.length - 1; k >= 0; k--) {
+            var at = spans[k][0], len = spans[k][1];
+            s = s.slice(0, at) + address(s.slice(at, at + len)) + s.slice(at + len);
+        }
+        return s;
     }
 
     /**
@@ -376,9 +425,11 @@
      * to the allowlist, and a refused one writes `#`, as UrlPolicy::sanitize() does:
      * an element bound twice keeps no stale link. An accepted one, in an attribute
      * the server composes a written address in, is composed as the server composes
-     * it (_qsComposeSiteAddress()). Anything else is written as it comes. A
-     * refusal writes nothing, says so on the console and throws nothing, so the
-     * rest of a list renders. Answers whether the attribute was written.
+     * it (_qsComposeSiteAddress()). A srcset is a list of files: each file's
+     * address is held and composed so, the rest of the value kept as it comes
+     * (_qsMapSrcset()). Anything else is written as it comes. A refusal writes
+     * nothing, says so on the console and throws nothing, so the rest of a list
+     * renders. Answers whether the attribute was written.
      */
     function _qsSetBoundAttribute(el, name, value) {
         name = String(name);
@@ -389,12 +440,15 @@
         }
         var v = String(value);
         if (_qsIsUrlAttribute(name)) {
-            if (!_qsSafeNavigationUrl(v)) {
-                _qsBindingWarn('refused a URL with a disallowed scheme and wrote # in', name);
-                v = '#';
-            } else if (QS_REWRITABLE_URL_ATTRIBUTES.indexOf(name.toLowerCase()) !== -1) {
-                v = _qsComposeSiteAddress(v);
-            }
+            var rewrite = QS_REWRITABLE_URL_ATTRIBUTES.indexOf(name.toLowerCase()) !== -1;
+            var address = function (u) {
+                if (!_qsSafeNavigationUrl(u)) {
+                    _qsBindingWarn('refused a URL with a disallowed scheme and wrote # in', name);
+                    return '#';
+                }
+                return rewrite ? _qsComposeSiteAddress(u) : u;
+            };
+            v = name.toLowerCase() === 'srcset' ? _qsMapSrcset(v, address) : address(v);
         }
         try {
             el.setAttribute(name, v);
@@ -2085,25 +2139,16 @@
         return path.split('.').reduce((o, k) => (o || {})[k], obj);
     }
 
-    /**
-     * A value written as a CSS string, quotes included, for an attribute selector
-     * such as [data-state-list="…"]. Written raw, a quote in the value ends the
-     * string early and a backslash escapes what follows it, so the selector throws
-     * and nothing after it runs. A line break, which a CSS string cannot hold, is
-     * written as its code point.
-     */
-    function _qsCssString(value) {
-        return '"' + String(value).replace(/["\\]/g, '\\$&').replace(/[\n\r\f]/g, function (c) {
-            return '\\' + c.charCodeAt(0).toString(16) + ' ';
-        }) + '"';
-    }
-
     // =========================================================================
     // LIST RENDERING
     // =========================================================================
 
     // Template cache: containerSelector → cloned template element
     const _listTemplates = {};
+    // The same cache for a container passed as an element (each [data-state-list]
+    // block of a store): keyed by the element, so two blocks naming one list each
+    // keep their own template.
+    const _listTemplatesByElement = new WeakMap();
 
     /**
      * Render an array of data into a container using its first child as template.
@@ -2111,12 +2156,14 @@
      * Inside the template, elements with [data-bind] get their content populated.
      * Elements with [data-bind-attr] set the specified attribute instead of textContent.
      *
-     * @param {string} containerSelector - CSS selector for the container
+     * @param {string|Element} containerSelector - CSS selector for the container (its first
+     *        match), or the container element itself
      * @param {Array} items - Array of objects (or primitives) to render
      * @param {string} [emptyText] - Message to show when array is empty
      */
     function renderList(containerSelector, items, emptyText) {
-        const container = document.querySelector(containerSelector);
+        const byElement = containerSelector instanceof Element;
+        const container = byElement ? containerSelector : document.querySelector(containerSelector);
         if (!container) {
             console.warn('[QS] renderList: container not found:', containerSelector);
             return;
@@ -2128,18 +2175,22 @@
         }
 
         // Cache the template on first call (before clearing)
-        if (!_listTemplates[containerSelector]) {
+        let template = byElement ? _listTemplatesByElement.get(container) : _listTemplates[containerSelector];
+        if (!template) {
             const tplEl = container.querySelector('[data-list-template]') || container.firstElementChild;
             if (!tplEl) {
                 console.warn('[QS] renderList: no template element found in', containerSelector);
                 return;
             }
-            _listTemplates[containerSelector] = tplEl.cloneNode(true);
+            template = tplEl.cloneNode(true);
             // Remove the data-list-template attr from clone so rendered items don't have it
-            _listTemplates[containerSelector].removeAttribute('data-list-template');
+            template.removeAttribute('data-list-template');
+            if (byElement) {
+                _listTemplatesByElement.set(container, template);
+            } else {
+                _listTemplates[containerSelector] = template;
+            }
         }
-
-        const template = _listTemplates[containerSelector];
 
         // Clear container
         container.replaceChildren();
@@ -2762,13 +2813,14 @@
                 // ?return= is whoever wrote the link's: it is followed only when
                 // it is a path on this site (one '/', then neither a second '/'
                 // nor a backslash, which a browser reads as another host), and it
-                // is composed against the base here, because the server never
-                // sees it.
+                // is composed here as every site address is composed
+                // (_qsComposeSiteAddress(): the base and, on a multilingual site,
+                // the page's language), because the server never sees it.
                 var target = (returnTo !== undefined && returnTo !== null && returnTo !== '') ? returnTo : null;
                 if (!target) {
                     var queryReturn = new URLSearchParams(location.search).get('return');
                     if (queryReturn && /^\/(?![/\\])/.test(queryReturn)) {
-                        target = QS.basePath + queryReturn.slice(1);
+                        target = _qsComposeSiteAddress(queryReturn);
                     } else if (queryReturn) {
                         console.warn('[QS] exchangeMagicLink: ?return= is not a path on this site, not followed:', queryReturn);
                     }
@@ -3301,13 +3353,14 @@
         // field's array via renderList (template = its first child /
         // [data-list-template]). store.state holds the FULL (appended) array, so
         // re-rendering the whole array covers both replace (offset) and append
-        // (infinite) modes. Optional data-state-empty = empty-state text.
+        // (infinite) modes. Optional data-state-empty = empty-state text. Every
+        // container naming the field is rendered, each from its own template.
         document.querySelectorAll('[data-state-list]').forEach(function (el) {
             var ref = el.getAttribute('data-state-list') || '';
             var dot = ref.indexOf('.');
             if (dot === -1 || ref.slice(0, dot) !== storeId) return;
             var arr = store.state[ref.slice(dot + 1)];
-            renderList('[data-state-list=' + _qsCssString(ref) + ']',
+            renderList(el,
                 Array.isArray(arr) ? arr : (arr === undefined || arr === null ? [] : [arr]),
                 el.getAttribute('data-state-empty') || undefined);
         });

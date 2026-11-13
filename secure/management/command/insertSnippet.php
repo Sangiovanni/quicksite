@@ -16,8 +16,8 @@
  * Inserts the full snippet structure with:
  * - Recursive node insertion (full tree); every root of a snippet that has
  *   several, in order, at the position asked
- * - Auto-generated unique textKeys for all translatable content; a raw or
- *   literal value (`__RAW__` / `__LIT__`) is kept as written, with no key
+ * - Auto-generated unique textKeys for all translatable content; a raw
+ *   value (`__RAW__`) is kept as written, with no key
  * - Translations copied to project's translation files
  */
 

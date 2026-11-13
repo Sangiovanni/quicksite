@@ -36,9 +36,9 @@ require_once __DIR__ . '/../functions/opcacheHygiene.php';
  *     save; the runtime falls back to the raw value via QS.enum's
  *     `fallback ?? value` semantics. Warning is surfaced to the
  *     caller for editor display.
- *   - `__RAW__` / `__LIT__` prefixes (renderer-side markers for "skip
- *     i18n" / "literal") are stripped before writing — the runtime
- *     reads plain values.
+ *   - a `__RAW__` prefix (the renderer's raw-text marker, "skip
+ *     i18n") is stripped before writing — the runtime reads plain
+ *     values.
  *
  * Hooked from:
  *   - editApi (after a successful writeCompiledJs).
@@ -139,8 +139,8 @@ class EnumSyncHelper {
 
     /**
      * Scan all components for `__enums__` blocks and return a map of
-     * fully-qualified names to runtime-shape maps (with `__RAW__` /
-     * `__LIT__` prefixes stripped).
+     * fully-qualified names to runtime-shape maps (with the `__RAW__`
+     * prefix stripped).
      *
      * @return array<string, array<string,mixed>>
      */
@@ -219,9 +219,8 @@ class EnumSyncHelper {
     }
 
     /**
-     * Strip `__RAW__` / `__LIT__` prefixes from a value. The renderer
-     * uses these to skip i18n / mark as literal; the runtime QS.enum
-     * just substitutes plain strings.
+     * Strip the `__RAW__` prefix from a value. The renderer uses it to
+     * skip i18n; the runtime QS.enum just substitutes plain strings.
      *
      * @param mixed $value
      * @return mixed
@@ -229,7 +228,6 @@ class EnumSyncHelper {
     private static function stripRenderMarkers($value) {
         if (!is_string($value)) return $value;
         if (strncmp($value, '__RAW__', 7) === 0) return substr($value, 7);
-        if (strncmp($value, '__LIT__', 7) === 0) return substr($value, 7);
         return $value;
     }
 

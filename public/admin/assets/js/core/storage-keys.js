@@ -67,6 +67,13 @@ window.QuickSiteStorageKeys = Object.freeze({
     addPositionExpanded: 'qs-add-position-expanded',
     addAdvancedExpanded: 'qs-add-advanced-expanded',
 
+    // Visual editor — the Add form's HTML Tag tab: whether a tag's example is
+    // shown as its HTML ('true') or drawn (anything else, or nothing), and the
+    // tags starred as favourites, newest first, as a JSON list of ten at most.
+    // The names predate the registry and stay, so nothing kept is lost.
+    tagShowHtmlCode:     'tagSelector_showHtmlCode',
+    addFavoriteTags:     'qs-add-favorite-tags',
+
     // Operator update notice. Written only in a browser signed in as an account
     // named in operator.php — nobody else runs update-notice.js at all.
     //   updateCheckAt      epoch ms of the last update check, so a panel

@@ -58,6 +58,12 @@ class UrlPolicy
         return in_array(strtolower($name), self::REWRITABLE_URL_ATTRIBUTES, true);
     }
 
+    /** Is this attribute a `srcset`, a list of files rather than one address? */
+    public static function isSrcsetAttribute(string $name): bool
+    {
+        return strtolower($name) === 'srcset';
+    }
+
     /**
      * Return a scheme-SAFE version of $value, or '#' if it carries a disallowed
      * scheme or any ASCII control character. Does NOT do BASE_URL rewriting.
@@ -95,6 +101,99 @@ class UrlPolicy
     public static function isRefused(string $value): bool
     {
         return self::sanitize($value) === '#' && ltrim($value, " \t\n\r\0\x0B\f") !== '#';
+    }
+
+    // ── A SRCSET'S FILES ──────────────────────────────────────────────────
+    //
+    // A `srcset` lists several files of one image, each with an optional
+    // descriptor (`2x`, `480w`), and the browser loads one of them. Each file's
+    // address is an address as an href's is: held to the allowlist and, as the
+    // attribute is rewritable, composed with the site's address by each render
+    // path's processUrl(), every file alike. Only the addresses change: the
+    // descriptors, the commas and the spaces between files are kept as written.
+    // `sizes` and `media` hold no address.
+
+    /**
+     * Where each file's address sits in a `srcset`, as [offset, length] pairs in
+     * order. The steps are the HTML standard's "parse a srcset attribute", which
+     * browsers follow:
+     *   - skip whitespace and commas; at the end of the value, stop;
+     *   - the address is the run of characters up to the next whitespace, so it
+     *     may hold a comma (`/img?w=1,2`); a comma ENDING it ends the file and is
+     *     not part of the address;
+     *   - otherwise the descriptors follow, up to a comma outside parentheses.
+     *
+     * @return array<int, array{0:int, 1:int}>
+     */
+    public static function srcsetAddresses(string $srcset): array
+    {
+        $ws = " \t\n\f\r";   // the standard's ASCII whitespace
+        $n = strlen($srcset);
+        $i = 0;
+        $out = [];
+        while (true) {
+            $i += strspn($srcset, $ws . ',', $i);
+            if ($i >= $n) {
+                return $out;
+            }
+            $start = $i;
+            $i += strcspn($srcset, $ws, $i);
+            $end = $i;
+            if ($srcset[$end - 1] === ',') {
+                while ($srcset[$end - 1] === ',') {
+                    $end--;
+                }
+                $out[] = [$start, $end - $start];
+                continue;
+            }
+            $out[] = [$start, $end - $start];
+            $inParens = false;
+            for (; $i < $n; $i++) {
+                $c = $srcset[$i];
+                if ($inParens) {
+                    $inParens = $c !== ')';
+                } elseif ($c === '(') {
+                    $inParens = true;
+                } elseif ($c === ',') {
+                    $i++;
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * A `srcset` with each file's address replaced by what $address answers for
+     * it, and everything else as written. The value's leading whitespace is
+     * dropped first, as sanitize() drops it before an address.
+     *
+     * @param callable(string): string $address
+     */
+    public static function mapSrcset(string $srcset, callable $address): string
+    {
+        $srcset = ltrim($srcset, " \t\n\r\0\x0B\f");
+        foreach (array_reverse(self::srcsetAddresses($srcset)) as [$at, $length]) {
+            $srcset = substr($srcset, 0, $at) . $address(substr($srcset, $at, $length)) . substr($srcset, $at + $length);
+        }
+        return $srcset;
+    }
+
+    /** A `srcset` with each file's address made scheme-safe (sanitize()), every file alike. */
+    public static function sanitizeSrcset(string $srcset): string
+    {
+        return self::mapSrcset($srcset, [self::class, 'sanitize']);
+    }
+
+    /** The first file of a `srcset` whose address sanitize() refuses, or null when none is. */
+    public static function refusedSrcsetAddress(string $srcset): ?string
+    {
+        foreach (self::srcsetAddresses($srcset) as [$at, $length]) {
+            $address = substr($srcset, $at, $length);
+            if (self::isRefused($address)) {
+                return $address;
+            }
+        }
+        return null;
     }
 
     // ── A REFRESH'S ADDRESS ───────────────────────────────────────────────

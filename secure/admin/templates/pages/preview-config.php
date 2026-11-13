@@ -450,7 +450,7 @@ window.PreviewConfig = {
         enumValueType: <?= json_encode(__admin('preview.enumValueType', 'Value type')) ?>,
         enumType: <?= json_encode(__admin('preview.enumType', 'Type')) ?>,
         enumTypeDefault: <?= json_encode(__admin('preview.enumTypeDefault', '(default)')) ?>,
-        enumTypeLiteral: <?= json_encode(__admin('preview.enumTypeLiteral', 'Literal')) ?>,
+        enumTypeAttributeValue: <?= json_encode(__admin('preview.enumTypeAttributeValue', 'Attribute value')) ?>,
         enumTypeOverrideTip: <?= json_encode(__admin('preview.enumTypeOverrideTip', 'Click to override type for this row')) ?>,
 
         // ── Tag dropdown (add element) ──

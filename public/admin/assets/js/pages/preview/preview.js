@@ -3949,9 +3949,9 @@
             return;
         }
 
-        // RAW / LIT literals are NOT translation keys — update the node's textKey
+        // A RAW text is NOT a translation key — update the node's textKey
         // in the structure directly instead of writing a (bogus) translation.
-        if (textKey.startsWith('__RAW__') || textKey.startsWith('__LIT__')) {
+        if (textKey.startsWith('__RAW__')) {
             return saveRawTextEdit(data);
         }
 
@@ -6903,9 +6903,9 @@
     // (TAG_INFO, declared further down: read when a preview is built, not at load).
     const SNIPPET_TRANSLATION_KEY = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/i;
 
-    /** The text of a raw (`__RAW__`) or literal (`__LIT__`) value, or null for any other value. */
+    /** The text of a raw (`__RAW__`) value, or null for any other value. */
     function snippetLiteral(value) {
-        return value.startsWith('__RAW__') || value.startsWith('__LIT__') ? value.slice(7) : null;
+        return value.startsWith('__RAW__') ? value.slice(7) : null;
     }
 
     /** A key's text in the project's default language, then in English; the key itself when neither has it. */
@@ -6923,7 +6923,11 @@
         return literal !== null ? literal : snippetTranslation(snippetData, textKey);
     }
 
-    /** An attribute's value as the page renders it; null when the page renders no such attribute. */
+    /**
+     * An attribute's value as the page renders it; null when the page renders no such attribute.
+     * A raw text (`__RAW__`) is read in a translatable attribute only, as the renderer reads it:
+     * anywhere else the value is shown as written.
+     */
     function snippetAttributeValue(snippetData, name, value) {
         // A handler never runs in the preview (no scripts), so it is not written at all
         if (/^on/i.test(name)) return null;
@@ -6937,7 +6941,7 @@
             if (literal !== null) return literal;
             if (SNIPPET_TRANSLATION_KEY.test(value)) return snippetTranslation(snippetData, value);
         }
-        return value.startsWith('__LIT__') ? value.slice(7) : value;
+        return value;
     }
 
     /** The snippet's structure (a node or a list of nodes) as nodes of the frame's document. */
@@ -7065,9 +7069,10 @@
             }
         }
         
-        // Code view toggle (persisted in localStorage)
-        const CODE_VIEW_KEY = 'tagSelector_showHtmlCode';
-        let showHtmlCode = localStorage.getItem(CODE_VIEW_KEY) === 'true';
+        // Code view toggle (persisted in localStorage, when the browser keeps it)
+        const CODE_VIEW_KEY = QuickSiteStorageKeys.tagShowHtmlCode;
+        let showHtmlCode = false;
+        try { showHtmlCode = localStorage.getItem(CODE_VIEW_KEY) === 'true'; } catch (e) { /* drawn */ }
         if (codeToggle && codeView) {
             if (showHtmlCode) {
                 codeToggle.classList.add('active');
@@ -7075,14 +7080,14 @@
             }
             codeToggle.addEventListener('click', function() {
                 showHtmlCode = !showHtmlCode;
-                localStorage.setItem(CODE_VIEW_KEY, showHtmlCode);
+                try { localStorage.setItem(CODE_VIEW_KEY, showHtmlCode); } catch (e) { /* not kept */ }
                 this.classList.toggle('active', showHtmlCode);
                 codeView.style.display = showHtmlCode ? '' : 'none';
             });
         }
         
         // Favorites from localStorage
-        const FAVORITES_KEY = 'qs-add-favorite-tags';
+        const FAVORITES_KEY = QuickSiteStorageKeys.addFavoriteTags;
         const MAX_FAVORITES = 10;
         
         function getFavorites() {
@@ -7091,7 +7096,7 @@
         }
         
         function saveFavorites(favs) {
-            localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs.slice(0, MAX_FAVORITES)));
+            try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs.slice(0, MAX_FAVORITES))); } catch (e) { /* not kept */ }
         }
         
         function isFavorite(tag) {
@@ -9618,6 +9623,44 @@
      * │ [+ Add Option]            [Save] [🗑]  │
      * └────────────────────────────────────────┘
      */
+    /**
+     * An enum map value's type: 'raw' for a raw text (`__RAW__…`), 'translation' for a key the project
+     * has, else 'value': an attribute's value, written as it is (a class, an address). The render paths
+     * read `__RAW__` in a text and a translatable attribute only, so a value for any other attribute
+     * carries no prefix.
+     */
+    function enumValueType(value) {
+        const v = String(value);
+        if (v.startsWith('__RAW__')) return 'raw';
+        return enumsPanelTranslationKeys.includes(v) ? 'translation' : 'value';
+    }
+
+    /**
+     * The type a value of an enum's variable needs, from where the component first uses `{{name}}`:
+     * 'value' in an attribute that is not translatable (a class, an address), 'raw' in a text or a
+     * translatable attribute, and 'raw' when the component does not use it yet.
+     */
+    function enumVariableValueType(varName) {
+        const slot = '{{' + varName + '}}';
+        const translatable = TAG_INFO.TRANSLATABLE_ATTRIBUTES || [];
+        let found = null;
+        (function walk(node) {
+            if (found || !node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            if (node.params && typeof node.params === 'object') {
+                for (const [name, v] of Object.entries(node.params)) {
+                    if (typeof v === 'string' && v.includes(slot)) {
+                        found = translatable.includes(name) ? 'raw' : 'value';
+                        return;
+                    }
+                }
+            }
+            if (typeof node.textKey === 'string' && node.textKey.includes(slot)) { found = 'raw'; return; }
+            walk(node.children);
+        })(enumsPanelStructure);
+        return found || 'raw';
+    }
+
     function createEnumCard(varName, enumDef) {
         const card = document.createElement('div');
         card.className = 'preview-enum-card';
@@ -9724,25 +9767,26 @@
         );
         card.appendChild(sourceRow);
         
-        // Detect default type from existing values
-        const rawCount = Object.values(map).filter(v => String(v).startsWith('__RAW__')).length;
-        const litCount = Object.values(map).filter(v => String(v).startsWith('__LIT__')).length;
+        // Detect default type from existing values; with none, from where the component uses the variable
+        const valueTypes = Object.values(map).map(enumValueType);
+        const rawCount = valueTypes.filter(type => type === 'raw').length;
+        const plainCount = valueTypes.filter(type => type === 'value').length;
         const totalCount = mapKeys.length;
-        const detectedDefault = totalCount === 0 ? 'literal'
-            : (litCount > rawCount && litCount >= totalCount / 2) ? 'literal'
-            : (rawCount > litCount && rawCount >= totalCount / 2) ? 'raw'
-            : 'literal';
+        const detectedDefault = totalCount === 0 ? enumVariableValueType(varName)
+            : (plainCount > rawCount && plainCount >= totalCount / 2) ? 'value'
+            : (rawCount > plainCount && rawCount >= totalCount / 2) ? 'raw'
+            : enumVariableValueType(varName);
         
         // Default value type dropdown (card-level)
         const typeRow = document.createElement('div');
         typeRow.className = 'preview-enum-card__field';
-        const litLabel = PreviewConfig.i18n?.enumTypeLiteral || 'Literal';
+        const valueLabel = PreviewConfig.i18n?.enumTypeAttributeValue || 'Attribute value';
         const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
         const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
         typeRow.append(
             QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumValueType || 'Value type') + ':' }),
             QSDom.el('select', { class: 'admin-input admin-input--sm preview-enum-card__type-select' }, [
-                _renderOption('literal', litLabel, detectedDefault === 'literal'),
+                _renderOption('value', valueLabel, detectedDefault === 'value'),
                 _renderOption('raw', rawLabel, detectedDefault === 'raw'),
                 _renderOption('translation', transLabel, detectedDefault === 'translation')
             ])
@@ -9776,11 +9820,9 @@
         
         mapKeys.forEach(key => {
             const rawValue = map[key];
-            const isRaw = String(rawValue).startsWith('__RAW__');
-            const isLit = String(rawValue).startsWith('__LIT__');
             // Per-row type: if it differs from card default, it's an override
-            const rowType = isLit ? 'literal' : isRaw ? 'raw' : 'translation';
-            const displayValue = isRaw ? String(rawValue).slice(7) : isLit ? String(rawValue).slice(7) : rawValue;
+            const rowType = enumValueType(rawValue);
+            const displayValue = rowType === 'raw' ? String(rawValue).slice(7) : rawValue;
             const hasOverride = rowType !== detectedDefault;
             tbody.appendChild(createEnumMapRow(key, displayValue, hasOverride ? rowType : null, detectedDefault));
         });
@@ -9810,7 +9852,7 @@
         addOptionBtn.className = 'admin-btn admin-btn--outline preview-enum-card__add-option';
         addOptionBtn.append(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.plus, 12), ' ' + (PreviewConfig.i18n?.enumAddOption || 'Add Option'));
         addOptionBtn.addEventListener('click', () => {
-            const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'literal';
+            const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'raw';
             tbody.appendChild(createEnumMapRow('', '', null, currentCardType));
             refreshDefaultSelect(card, tbody);
         });
@@ -9851,7 +9893,7 @@
         const tr = document.createElement('tr');
         tr.className = 'preview-enum-card__row';
         
-        const litLabel = PreviewConfig.i18n?.enumTypeLiteral || 'Literal';
+        const valueLabel = PreviewConfig.i18n?.enumTypeAttributeValue || 'Attribute value';
         const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
         const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
         const defaultLabel = PreviewConfig.i18n?.enumTypeDefault || '(default)';
@@ -9912,7 +9954,7 @@
         typeSelect.className = 'admin-input admin-input--sm preview-enum-card__row-type-select';
         typeSelect.append(
             _renderOption('', defaultLabel, false),
-            _renderOption('literal', litLabel, false),
+            _renderOption('value', valueLabel, false),
             _renderOption('raw', rawLabel, false),
             _renderOption('translation', transLabel, false)
         );
@@ -9938,7 +9980,7 @@
                 typeSelect.style.display = 'none';
                 typeLabel.style.display = '';
                 const card = tr.closest('.preview-enum-card');
-                const cardType = card?.querySelector('.preview-enum-card__type-select')?.value || 'literal';
+                const cardType = card?.querySelector('.preview-enum-card__type-select')?.value || 'raw';
                 updateEnumRowValueWidget(valInput, valSelect, cardType);
             } else {
                 updateEnumRowValueWidget(valInput, valSelect, typeSelect.value);
@@ -9983,7 +10025,7 @@
             valInput.style.display = 'none';
             valSelect.style.display = '';
         } else {
-            // Both 'literal' and 'raw' use the free text input
+            // Both 'value' and 'raw' use the free text input
             valInput.style.display = '';
             valSelect.style.display = 'none';
         }
@@ -10035,7 +10077,7 @@
         
         // Get card-level default type
         const cardTypeSelect = card.querySelector('.preview-enum-card__type-select');
-        const cardDefaultType = cardTypeSelect?.value || 'literal';
+        const cardDefaultType = cardTypeSelect?.value || 'raw';
         
         // Collect map entries (applying prefix based on effective type)
         const map = {};
@@ -10053,11 +10095,9 @@
                 value = row.querySelector('.preview-enum-card__value-input')?.value?.trim() || '';
             }
             if (key) {
-                // Apply prefix based on type: __RAW__ for raw text, __LIT__ for literal, nothing for translation
+                // A raw text gets the __RAW__ prefix; a translation key and an attribute value are written as they are
                 if (effectiveType === 'raw' && value) {
                     map[key] = '__RAW__' + value;
-                } else if (effectiveType === 'literal' && value) {
-                    map[key] = '__LIT__' + value;
                 } else {
                     map[key] = value || '';
                 }
