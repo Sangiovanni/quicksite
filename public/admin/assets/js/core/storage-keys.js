@@ -75,6 +75,11 @@ window.QuickSiteStorageKeys = Object.freeze({
     // The panel's backup message put away for good. The name predates the registry
     // and stays, so no one sees the message again.
     workflowsBackupNoteHidden: 'quicksite-ai-tools-backup-note-hidden',
+    // The Workflows panel's Options, as JSON {"noAi": false, "nothingDeleted": false,
+    // "compact": true, "unrunnable": false}: the two switches, the compact view and the
+    // box that shows the workflows the role cannot run. One per browser, for every
+    // project. A missing or malformed part reads as unticked.
+    workflowsOptions:    'qs_workflows_options',
 
     // Operator update notice. Written only in a browser signed in as an account
     // named in operator.php — nobody else runs update-notice.js at all.

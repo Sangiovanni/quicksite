@@ -2,8 +2,11 @@
  * preview-ai-tools.js — the Workflows panel (mode ai-tools: the file keeps the panel's first name, AI tools).
  *
  * In-editor Workflows panel:
- *   list view  → workflow picker: search, two switches (No AI, Nothing deleted), the groups by what you want
- *                to do, each row saying in words what a run does; from FOLD_AT workflows the groups fold and
+ *   list view  → workflow picker: search, then Options (closed by default; its line names the switches on and
+ *                how many rows they hide): No AI, Nothing deleted, the compact view and, for a role that cannot
+ *                run some, the box that shows those greyed, all four kept in this browser; the groups by what you want to do,
+ *                each row saying in words what a run does, each fact with its icon (QSDom.icon()), or in the
+ *                compact view small cards with the icons alone; from FOLD_AT workflows the groups fold and
  *                Recently used appears
  *   runner view → spec runner (3 zones: INPUTS / AI EXCHANGE / EXECUTION)
  *                  + footer line (Model + Touches)
@@ -43,6 +46,10 @@ window.PreviewAiTools = (function () {
     var _searchDebounceId = null;
     var _noAi = false;                       // the No AI switch: only the rows that ask no model
     var _nothingDeleted = false;             // the Nothing deleted switch: only the rows that can delete nothing
+    var _compact = false;                    // the compact view: small cards, the icons alone (kept in this browser)
+    var _unrunnable = [];                    // the workflows the role cannot run (PreviewConfig.aiToolsUnrunnable): never opened
+    var _showUnrunnable = false;             // the box that shows them, greyed; not remembered
+    var _factsIdSeq = 0;                     // a small card's facts get an id its button is described by
     var _listState = { recent: [], open: null }; // what the browser keeps of the list (_readListState())
 
     // Runner view state
@@ -91,6 +98,14 @@ window.PreviewAiTools = (function () {
     var _searchInput = null;
     var _noAiSwitch = null;
     var _nothingDeletedSwitch = null;
+    var _compactSwitch = null;
+    var _unrunnableSwitch = null;
+    var _unrunnableRow = null;
+    var _optionsToggle = null;
+    var _optionsPanel = null;
+    var _optionsSummary = null;
+    var _optionsEmptyEl = null;
+    var _showAllBtn = null;
     var _allList = null;
     var _loadingEl = null;
     var _emptyEl = null;
@@ -150,9 +165,19 @@ window.PreviewAiTools = (function () {
         _searchInput = document.getElementById('ai-tools-search');
         _noAiSwitch = document.getElementById('ai-tools-switch-no-ai');
         _nothingDeletedSwitch = document.getElementById('ai-tools-switch-nothing-deleted');
+        _compactSwitch = document.getElementById('ai-tools-switch-compact');
+        _unrunnableSwitch = document.getElementById('ai-tools-switch-unrunnable');
+        _unrunnableRow = document.getElementById('ai-tools-switch-unrunnable-row');
+        _optionsToggle = document.getElementById('ai-tools-options-toggle');
+        _optionsPanel = document.getElementById('ai-tools-options-panel');
+        _optionsSummary = document.getElementById('ai-tools-options-summary');
+        _optionsEmptyEl = document.getElementById('ai-tools-options-empty');
+        _showAllBtn = document.getElementById('ai-tools-show-all');
         _allList = document.getElementById('ai-tools-all-list');
         _loadingEl = document.getElementById('ai-tools-loading');
         _emptyEl = document.getElementById('ai-tools-empty');
+        // The four boxes are kept in this browser: the closed Options line names what they hide, so none hides a row unseen.
+        _applyKeptOptions();
         _backupBtnEl = document.getElementById('ai-tools-backup-btn');
         _backupBannerEl = document.getElementById('ai-tools-backup-banner');
         _backupHideBtn = document.getElementById('ai-tools-backup-hide');
@@ -184,11 +209,14 @@ window.PreviewAiTools = (function () {
         if (_searchInput) {
             _searchInput.addEventListener('input', _onSearchInput);
         }
-        if (_noAiSwitch) {
-            _noAiSwitch.addEventListener('change', _onSwitchChange);
+        [_noAiSwitch, _nothingDeletedSwitch, _compactSwitch, _unrunnableSwitch].forEach(function (box) {
+            if (box) box.addEventListener('change', _onOptionChange);
+        });
+        if (_optionsToggle) {
+            _optionsToggle.addEventListener('click', _onOptionsToggle);
         }
-        if (_nothingDeletedSwitch) {
-            _nothingDeletedSwitch.addEventListener('change', _onSwitchChange);
+        if (_showAllBtn) {
+            _showAllBtn.addEventListener('click', _onShowAll);
         }
         if (_backupBtnEl) {
             _backupBtnEl.addEventListener('click', _onBackupClick);
@@ -225,6 +253,39 @@ window.PreviewAiTools = (function () {
             if (key !== null) localStorage.setItem(key, '1');
         } catch (e) { /* the message goes for this visit, and comes back on the next */ }
         _showBackupNote(false);
+    }
+
+    /** The Options' four boxes, each by the name it is kept under, with its element. */
+    function _optionBoxes() {
+        return { noAi: _noAiSwitch, nothingDeleted: _nothingDeletedSwitch, compact: _compactSwitch, unrunnable: _unrunnableSwitch };
+    }
+
+    /**
+     * The Options this browser keeps (QuickSiteStorageKeys.workflowsOptions), put on the four boxes. A missing or malformed
+     * part, or a failure to read, leaves its box unticked.
+     */
+    function _applyKeptOptions() {
+        var kept = {};
+        try {
+            var key = _storageKey('workflowsOptions');
+            var raw = key !== null ? JSON.parse(localStorage.getItem(key) || 'null') : null;
+            if (raw && typeof raw === 'object') kept = raw;
+        } catch (e) { /* every box starts unticked */ }
+        var boxes = _optionBoxes();
+        Object.keys(boxes).forEach(function (name) {
+            if (boxes[name]) boxes[name].checked = kept[name] === true;
+        });
+    }
+
+    /** The four boxes as they stand, kept for the next visit. */
+    function _keepOptions() {
+        var state = {};
+        var boxes = _optionBoxes();
+        Object.keys(boxes).forEach(function (name) { state[name] = !!(boxes[name] && boxes[name].checked); });
+        try {
+            var key = _storageKey('workflowsOptions');
+            if (key !== null) localStorage.setItem(key, JSON.stringify(state));
+        } catch (e) { /* the boxes hold for this visit only */ }
     }
 
     function _onBackupClick() {
@@ -291,13 +352,16 @@ window.PreviewAiTools = (function () {
     function _initData() {
         var config = window.PreviewConfig || {};
         _allWorkflows = Array.isArray(config.aiToolsWorkflows) ? config.aiToolsWorkflows.slice() : [];
+        _unrunnable = Array.isArray(config.aiToolsUnrunnable) ? config.aiToolsUnrunnable.slice() : [];
         _groups = Array.isArray(config.workflowGroups) ? config.workflowGroups.slice() : [];
         _listState = _readListState();
+        // The box that shows the workflows the role cannot run is offered only where there is one.
+        if (_unrunnableRow) _unrunnableRow.hidden = _unrunnable.length === 0;
         var groupTitle = {};
         _groups.forEach(function (g) { groupTitle[g.id] = g.title || ''; });
         _factsById = {};
         _hayById = {};
-        _allWorkflows.forEach(function (w) {
+        _allWorkflows.concat(_unrunnable).forEach(function (w) {
             _factsById[w.id] = _factParts(w);
             var facts = _factsById[w.id].map(function (part) { return part.text; }).join(' ');
             // A search reads the title, the description, the second line, the group's name and the tags, which nothing shows.
@@ -347,12 +411,23 @@ window.PreviewAiTools = (function () {
      * A row's second line, part by part: what a run does, in words, from the facts the server derived from the workflow's
      * file (WorkflowManager::rowFacts()): AI or not and how many requests, what it can delete, what it changes, whether it
      * runs any command, what it needs. The groups are the run review's own words (EFFECT_WHAT, EFFECT_DOES), so a row and its
-     * review name the same things. Each part is { kind: 'ai'|'delete'|'change'|'need', text }.
+     * review name the same things. Each part is { kind: 'ai'|'delete'|'change'|'need', text, icon }, its icon a name of
+     * QSDom's icons (FACT_ICONS), or null where a fact has none (what a run changes).
      */
     function _factParts(workflow) {
         // A row the server sent no facts for says nothing of what a run does, rather than guess.
         if (!workflow.facts) return [];
-        var f = workflow.facts;
+        var parts = _factWords(workflow.facts);
+        parts.forEach(function (part) {
+            part.icon = part.kind === 'ai' ? (workflow.facts.ai ? 'ai' : 'noAi') : (FACT_ICONS[part.kind] || null);
+        });
+        return parts;
+    }
+
+    // A fact's icon, by its kind; AI or not draws 'ai' or 'noAi'. What a run changes has none.
+    var FACT_ICONS = { delete: 'canDelete', need: 'needs' };
+
+    function _factWords(f) {
         var effects = Array.isArray(f.effects) ? f.effects : [];
         var parts = [{ kind: 'ai', text: _aiWords(f) }];
         var deleted = {};
@@ -422,10 +497,52 @@ window.PreviewAiTools = (function () {
     }
 
     function _matches(workflow) {
+        return _matchesSwitches(workflow) && _matchesSearch(workflow);
+    }
+
+    function _matchesSwitches(workflow) {
         if (_noAi && workflow.facts && workflow.facts.ai) return false;
         if (_nothingDeleted && _canDelete(workflow)) return false;
+        return true;
+    }
+
+    function _matchesSearch(workflow) {
         var hay = _hayById[workflow.id] || '';
         return _searchWords.every(function (word) { return hay.indexOf(word) !== -1; });
+    }
+
+    /** The Options line opens and closes; its state is not kept. */
+    function _onOptionsToggle() {
+        if (!_optionsToggle || !_optionsPanel) return;
+        var open = _optionsToggle.getAttribute('aria-expanded') !== 'true';
+        _optionsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        _optionsPanel.hidden = !open;
+    }
+
+    /** Show all: the two switches off, so every row the search keeps is back. */
+    function _onShowAll() {
+        if (_noAiSwitch) _noAiSwitch.checked = false;
+        if (_nothingDeletedSwitch) _nothingDeletedSwitch.checked = false;
+        _onOptionChange();
+    }
+
+    /** A box of the Options changed: kept, then the list drawn again. */
+    function _onOptionChange() {
+        _keepOptions();
+        _onSwitchChange();
+    }
+
+    /**
+     * The Options line's words beside its name: the switches that are on, by their own labels, then how many rows they take
+     * from what the search keeps. The rows the role cannot run are not counted: no switch of the person's hides them.
+     */
+    function _renderOptionsSummary(hidden) {
+        if (!_optionsSummary) return;
+        var parts = [_noAiSwitch, _nothingDeletedSwitch]
+            .filter(function (input) { return input && input.checked; })
+            .map(function (input) { return input.parentNode.textContent.trim(); });
+        if (hidden > 0) parts.push(_t('optionsHidden', '{n} hidden').replace('{n}', String(hidden)));
+        _optionsSummary.textContent = parts.length > 0 ? ': ' + parts.join(' · ') : '';
     }
 
     function _onSearchInput(e) {
@@ -438,10 +555,12 @@ window.PreviewAiTools = (function () {
         }, SEARCH_DEBOUNCE_MS);
     }
 
-    /** A switch changed, or the list is drawn again: each switch is read as it stands, as neither is remembered. */
+    /** An option changed, or the list is drawn again: each box is read as it stands. */
     function _onSwitchChange() {
         _noAi = !!(_noAiSwitch && _noAiSwitch.checked);
         _nothingDeleted = !!(_nothingDeletedSwitch && _nothingDeletedSwitch.checked);
+        _compact = !!(_compactSwitch && _compactSwitch.checked);
+        _showUnrunnable = _unrunnable.length > 0 && !!(_unrunnableSwitch && _unrunnableSwitch.checked);
         _renderList();
     }
 
@@ -466,11 +585,21 @@ window.PreviewAiTools = (function () {
         if (!_allList) return;
         _allList.replaceChildren();
         if (_loadingEl) _loadingEl.style.display = 'none';
-        var rows = _allWorkflows.filter(_matches);
-        if (_emptyEl) _emptyEl.style.display = rows.length === 0 ? '' : 'none';
+        // What the search keeps, then what the switches keep of it: the difference is what the Options line counts.
+        var found = _allWorkflows.filter(_matchesSearch);
+        var rows = found.filter(_matchesSwitches);
+        var hidden = found.length - rows.length;
+        _renderOptionsSummary(hidden);
+        // The workflows the role cannot run, greyed, only when asked for; they follow the search and the switches too.
+        var inert = _showUnrunnable ? _unrunnable.filter(_matches) : [];
+        if (inert.length > 0) rows = _inGroupOrder(rows.concat(inert));
+        // Nothing left: the switches hid it (Show all gives it back), or the search found nothing.
+        var hiddenAll = rows.length === 0 && hidden > 0;
+        if (_optionsEmptyEl) _optionsEmptyEl.hidden = !hiddenAll;
+        if (_emptyEl) _emptyEl.style.display = rows.length === 0 && !hiddenAll ? '' : 'none';
         if (rows.length === 0) return;
 
-        var folds = _allWorkflows.length >= FOLD_AT;
+        var folds = _allWorkflows.length + (_showUnrunnable ? _unrunnable.length : 0) >= FOLD_AT;
         if (folds && !_filtering()) {
             var recent = _recentRows();
             if (recent.length > 0) _allList.appendChild(_renderRecent(recent));
@@ -492,6 +621,16 @@ window.PreviewAiTools = (function () {
                 || (_listState.open === null ? first : _listState.open.indexOf(group.id) !== -1);
             _allList.appendChild(_renderGroup(group, inGroup, folds, open));
             first = false;
+        });
+    }
+
+    /** Rows of both lists in one: by group in the panel's order (a group it does not hold last), then by title. */
+    function _inGroupOrder(rows) {
+        var index = {};
+        _groups.forEach(function (g, i) { index[g.id] = i; });
+        var at = function (w) { return Object.prototype.hasOwnProperty.call(index, w.category) ? index[w.category] : _groups.length; };
+        return rows.slice().sort(function (a, b) {
+            return at(a) - at(b) || String(a.title || a.id).localeCompare(String(b.title || b.id), undefined, { sensitivity: 'base' });
         });
     }
 
@@ -545,25 +684,36 @@ window.PreviewAiTools = (function () {
         return el;
     }
 
+    /** A group's rows: full cards, or small ones side by side in the compact view. A row the role cannot run has nothing to press. */
     function _renderRows(rows) {
         var list = document.createElement('div');
-        list.className = 'preview-contextual-ai-tools__tool-list';
-        rows.forEach(function (w) { list.appendChild(_renderCard(w)); });
+        list.className = 'preview-contextual-ai-tools__tool-list'
+            + (_compact ? ' preview-contextual-ai-tools__tool-list--compact' : '');
+        rows.forEach(function (w) {
+            var inert = _unrunnable.indexOf(w) !== -1;
+            list.appendChild(_compact ? _renderSmallCard(w, inert) : _renderCard(w, inert));
+        });
         return list;
     }
 
     // ──────────────────────────── Render: a row ─────────────────────────
 
-    /** A row: its icon and title, the second line (what a run does, in words), then its description. */
-    function _renderCard(workflow) {
-        var card = document.createElement('button');
-        card.type = 'button';
-        card.className = 'preview-contextual-ai-tools__tool-card';
+    /**
+     * A row: its icon and title, the second line (what a run does, in words), then its description. A row the role cannot
+     * run (inert) is no button: greyed, it says so first, and nothing in it opens the workflow.
+     */
+    function _renderCard(workflow, inert) {
+        var card = document.createElement(inert ? 'div' : 'button');
+        card.className = 'preview-contextual-ai-tools__tool-card'
+            + (inert ? ' preview-contextual-ai-tools__tool-card--unrunnable' : '');
         card.dataset.id = workflow.id;
-        card.addEventListener('click', function () {
-            _rememberRecent(workflow.id);
-            _onCardClick(workflow);
-        });
+        if (!inert) {
+            card.type = 'button';
+            card.addEventListener('click', function () {
+                _rememberRecent(workflow.id);
+                _onCardClick(workflow);
+            });
+        }
 
         var header = document.createElement('div');
         header.className = 'preview-contextual-ai-tools__tool-card-header';
@@ -576,6 +726,7 @@ window.PreviewAiTools = (function () {
         header.appendChild(iconEl);
         header.appendChild(titleEl);
         card.appendChild(header);
+        if (inert) card.appendChild(_renderUnrunnableLine());
         card.appendChild(_renderRunFacts(workflow));
 
         if (workflow.description) {
@@ -587,7 +738,10 @@ window.PreviewAiTools = (function () {
         return card;
     }
 
-    /** The second line: one line per part, what can be deleted in the warning colour (the words say it as well). */
+    /**
+     * The second line: one line per part, its icon first (it teaches the icon the compact view shows alone: here the words
+     * beside it are what is read, so the icon is hidden from assistive technology), what can be deleted in the warning colour.
+     */
     function _renderRunFacts(workflow) {
         var facts = document.createElement('span');
         facts.className = 'preview-contextual-ai-tools__tool-card-facts';
@@ -595,8 +749,102 @@ window.PreviewAiTools = (function () {
             var line = document.createElement('span');
             line.className = 'preview-contextual-ai-tools__tool-card-fact'
                 + (part.kind === 'delete' ? ' preview-contextual-ai-tools__tool-card-fact--delete' : '');
-            line.textContent = part.text;
+            var icon = document.createElement('span');
+            icon.className = 'preview-contextual-ai-tools__fact-icon';
+            icon.setAttribute('aria-hidden', 'true');
+            var svg = part.icon ? window.QSDom.icon(part.icon) : null;
+            if (svg) icon.appendChild(svg);
+            line.appendChild(icon);
+            line.appendChild(document.createTextNode(part.text));
             facts.appendChild(line);
+        });
+        return facts;
+    }
+
+    /** The line a row the role cannot run opens with. */
+    function _renderUnrunnableLine() {
+        var line = document.createElement('span');
+        line.className = 'preview-contextual-ai-tools__tool-card-unrunnable';
+        line.textContent = _t('unrunnable', 'Your role can\'t run this workflow');
+        return line;
+    }
+
+    /**
+     * A small card (the compact view): the workflow's icon, bigger, its name under it (cut after three lines, whole as the
+     * card's hover text and accessible name), then the facts' icons alone. Each icon carries its words as its hover text
+     * and its accessible name, and the card's button is described by them; what a run can delete is always there, in the
+     * warning colour. A tap anywhere on the card opens the workflow, whose review says what it does.
+     */
+    function _renderSmallCard(workflow, inert) {
+        var name = workflow.title || workflow.id;
+        var card = document.createElement('div');
+        card.className = 'preview-contextual-ai-tools__small-card'
+            + (inert ? ' preview-contextual-ai-tools__small-card--unrunnable' : '');
+        card.dataset.id = workflow.id;
+        card.title = inert ? name + ' · ' + _t('unrunnable', 'Your role can\'t run this workflow') : name;
+
+        var face = document.createElement(inert ? 'div' : 'button');
+        face.className = 'preview-contextual-ai-tools__small-card-open';
+        var iconEl = document.createElement('span');
+        iconEl.className = 'preview-contextual-ai-tools__small-card-icon';
+        iconEl.setAttribute('aria-hidden', 'true');
+        iconEl.textContent = workflow.icon || '📋';
+        var nameEl = document.createElement('span');
+        nameEl.className = 'preview-contextual-ai-tools__small-card-name';
+        nameEl.textContent = name;
+        face.appendChild(iconEl);
+        face.appendChild(nameEl);
+        card.appendChild(face);
+
+        var facts = _renderFactIcons(workflow);
+        card.appendChild(facts);
+        if (inert) {
+            // Nothing to press: the card is named with its reason, as its line is not drawn here.
+            card.setAttribute('role', 'group');
+            card.setAttribute('aria-label', card.title);
+        } else {
+            face.type = 'button';
+            face.setAttribute('aria-label', name);
+            face.setAttribute('aria-describedby', facts.id);
+            card.addEventListener('click', function () {
+                _rememberRecent(workflow.id);
+                _onCardClick(workflow);
+            });
+        }
+        return card;
+    }
+
+    /**
+     * A small card's facts: one icon per kind (AI or not, can delete, needs), its words those of the row's lines of that
+     * kind; a kind with no words is not drawn, so no icon is ever nameless. What a run changes has no icon.
+     */
+    function _renderFactIcons(workflow) {
+        var facts = document.createElement('span');
+        facts.className = 'preview-contextual-ai-tools__small-card-facts';
+        facts.id = 'ai-tools-facts-' + (++_factsIdSeq);
+        var byKind = {};
+        var kinds = [];
+        (_factsById[workflow.id] || _factParts(workflow)).forEach(function (part) {
+            if (!part.icon || !part.text) return;
+            if (!byKind[part.kind]) {
+                byKind[part.kind] = { icon: part.icon, words: [] };
+                kinds.push(part.kind);
+            }
+            byKind[part.kind].words.push(part.text);
+        });
+        kinds.forEach(function (kind) {
+            var words = byKind[kind].words.join(' · ');
+            var svg = window.QSDom.icon(byKind[kind].icon);
+            if (!svg) return;
+            var icon = document.createElement('span');
+            icon.className = 'preview-contextual-ai-tools__fact-icon'
+                + (kind === 'delete' ? ' preview-contextual-ai-tools__fact-icon--delete' : '');
+            icon.setAttribute('role', 'img');
+            icon.setAttribute('aria-label', words);
+            icon.title = words;
+            icon.dataset.kind = kind;
+            icon.appendChild(svg);
+            facts.appendChild(icon);
         });
         return facts;
     }

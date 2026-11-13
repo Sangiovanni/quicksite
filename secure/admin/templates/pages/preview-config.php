@@ -30,12 +30,14 @@ if (!isset($editConfig)) {
 
 // The Workflows panel's list (mode ai-tools), loaded server-side. A workflow is listed only when
 // the role may send every command a run of it may send, its sub-workflows' included
-// (WorkflowManager::runCommands()). Each row carries what a run does, derived from the workflow's
+// (WorkflowManager::runCommands()); the others go to a list of their own, which the panel shows
+// greyed and inert only when asked to (Options, "Show workflows my role can't run"). Each row carries what a run does, derived from the workflow's
 // file and every workflow it may reach (WorkflowManager::rowFacts()), and the groups come in the
 // schema's order (WorkflowManager::categories()).
 require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $__previewAiToolsWorkflows = [];
+$__previewAiToolsUnrunnable = [];
 $__previewWorkflowGroups = [];
 try {
     $__aiToolsManager = new WorkflowManager();
@@ -59,15 +61,14 @@ try {
     $__aiToolsCategoryOrder = $__aiToolsManager->categories();
     $__aiToolsCategoryIndex = array_flip($__aiToolsCategoryOrder);
     foreach ($__aiToolsSpecs as $__aiToolsSpec) {
+        $__aiToolsRunnable = true;
         if ($__aiToolsAllowed !== null) {
-            $__aiToolsSkip = false;
             foreach ($__aiToolsManager->runCommands($__aiToolsSpec) as $__aiToolsCmd) {
                 if (!in_array($__aiToolsCmd, $__aiToolsAllowed, true)) {
-                    $__aiToolsSkip = true;
+                    $__aiToolsRunnable = false;
                     break;
                 }
             }
-            if ($__aiToolsSkip) continue;
         }
         $__aiToolsMeta = $__aiToolsSpec['meta'] ?? [];
         $__aiToolsCategory = is_string($__aiToolsMeta['category'] ?? null) ? $__aiToolsMeta['category'] : 'other';
@@ -75,7 +76,7 @@ try {
         // A need is shown in the panel's language only where that language holds its key: there is no word to fall back on.
         $__aiToolsFacts['needs'] = $__aiToolsFacts['needsKey'] !== null ? __admin($__aiToolsFacts['needsKey'], '') : '';
         unset($__aiToolsFacts['needsKey']);
-        $__previewAiToolsWorkflows[] = [
+        $__aiToolsRow = [
             'id'              => $__aiToolsSpec['id'],
             'icon'            => $__aiToolsMeta['icon'] ?? '📋',
             'title'           => $__aiToolsMeta['name']
@@ -87,16 +88,25 @@ try {
             'tags'            => array_values(array_filter($__aiToolsMeta['tags'] ?? [], 'is_string')),
             'facts'           => $__aiToolsFacts,
         ];
+        // A workflow the role cannot run goes to a list of its own, which nothing that opens a workflow reads: the panel
+        // shows it greyed, with nothing to press, only when the person asks to see it.
+        if ($__aiToolsRunnable) {
+            $__previewAiToolsWorkflows[] = $__aiToolsRow;
+        } else {
+            $__previewAiToolsUnrunnable[] = $__aiToolsRow;
+        }
     }
-    usort($__previewAiToolsWorkflows, function ($a, $b) use ($__aiToolsCategoryIndex) {
+    $__aiToolsSort = function ($a, $b) use ($__aiToolsCategoryIndex) {
         $aIdx = $__aiToolsCategoryIndex[$a['category']] ?? 999;
         $bIdx = $__aiToolsCategoryIndex[$b['category']] ?? 999;
         if ($aIdx !== $bIdx) return $aIdx - $bIdx;
         return strcasecmp($a['title'], $b['title']);
-    });
+    };
+    usort($__previewAiToolsWorkflows, $__aiToolsSort);
+    usort($__previewAiToolsUnrunnable, $__aiToolsSort);
     // The groups in the schema's order, then any group a file names that the schema does not know, last, by its own name.
     $__aiToolsGroupIds = $__aiToolsCategoryOrder;
-    foreach ($__previewAiToolsWorkflows as $__aiToolsRow) {
+    foreach (array_merge($__previewAiToolsWorkflows, $__previewAiToolsUnrunnable) as $__aiToolsRow) {
         if (!in_array($__aiToolsRow['category'], $__aiToolsGroupIds, true)) $__aiToolsGroupIds[] = $__aiToolsRow['category'];
     }
     foreach ($__aiToolsGroupIds as $__aiToolsGroupId) {
@@ -169,6 +179,9 @@ window.PreviewConfig = {
     // Workflows panel — pre-resolved workflow metadata, each with what a run does
     // (its facts). Role-filtered. One entry per visible workflow.
     aiToolsWorkflows: <?= json_encode($__previewAiToolsWorkflows) ?>,
+    // The workflows the role cannot run, the same shape: shown greyed, with nothing to press, only when the
+    // person asks to see them. Nothing that opens a workflow reads this list.
+    aiToolsUnrunnable: <?= json_encode($__previewAiToolsUnrunnable) ?>,
     // The panel's groups, in order: id, title and the line under it.
     workflowGroups: <?= json_encode($__previewWorkflowGroups) ?>,
     // The edited project's own stylesheet, where /p/<id>/ serves it (the snippet
@@ -692,6 +705,10 @@ window.PreviewConfig = {
             factChanges: <?= json_encode(__admin('preview.workflowsFactChanges', 'Changes: {what}')) ?>,
             factAnyCommand: <?= json_encode(__admin('preview.workflowsFactAnyCommand', 'Can run any command, one that deletes included')) ?>,
             recentTitle: <?= json_encode(__admin('preview.workflowsRecent', 'Recently used')) ?>,
+            // The Options line, closed: how many rows the switches hide
+            optionsHidden: <?= json_encode(__admin('preview.workflowsOptionsHidden', '{n} hidden')) ?>,
+            // A workflow the role cannot run, shown greyed
+            unrunnable: <?= json_encode(__admin('preview.workflowsUnrunnable', "Your role can't run this workflow")) ?>,
             backToList: <?= json_encode(__admin('preview.aiToolsBackToList', '← Back')) ?>,
             sectionYourPrompt: <?= json_encode(__admin('preview.aiToolsSectionYourPrompt', 'Your prompt')) ?>,
             sectionParameters: <?= json_encode(__admin('preview.aiToolsSectionParameters', 'Parameters')) ?>,

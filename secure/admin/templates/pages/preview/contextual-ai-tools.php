@@ -25,16 +25,33 @@
                    autocomplete="off">
         </div>
 
-        <!-- Each switch keeps only the rows it names; neither is remembered -->
-        <div class="preview-contextual-ai-tools__switches">
-            <label class="preview-contextual-ai-tools__switch">
-                <input type="checkbox" id="ai-tools-switch-no-ai" autocomplete="off">
-                <span><?= __admin('preview.workflowsSwitchNoAi', 'No AI') ?></span>
-            </label>
-            <label class="preview-contextual-ai-tools__switch">
-                <input type="checkbox" id="ai-tools-switch-nothing-deleted" autocomplete="off">
-                <span><?= __admin('preview.workflowsSwitchNothingDeleted', 'Nothing deleted') ?></span>
-            </label>
+        <!-- Options, closed by default. Its line says which switches are on and how many rows they hide (the script writes it).
+             The two switches keep only the rows they name; the last box, offered only to a role that cannot run some workflow,
+             shows those greyed. All four are kept in this browser by the script (autocomplete="off": the browser's own form
+             memory never brings one back) -->
+        <div class="preview-contextual-ai-tools__options">
+            <button type="button" class="preview-contextual-ai-tools__options-toggle" id="ai-tools-options-toggle"
+                    aria-expanded="false" aria-controls="ai-tools-options-panel">
+                <span class="preview-contextual-ai-tools__options-title"><?= __admin('preview.workflowsOptions', 'Options') ?></span><span class="preview-contextual-ai-tools__options-summary" id="ai-tools-options-summary"></span>
+            </button>
+            <div class="preview-contextual-ai-tools__switches" id="ai-tools-options-panel" hidden>
+                <label class="preview-contextual-ai-tools__switch">
+                    <input type="checkbox" id="ai-tools-switch-no-ai" autocomplete="off">
+                    <span><?= __admin('preview.workflowsSwitchNoAi', 'No AI') ?></span>
+                </label>
+                <label class="preview-contextual-ai-tools__switch">
+                    <input type="checkbox" id="ai-tools-switch-nothing-deleted" autocomplete="off">
+                    <span><?= __admin('preview.workflowsSwitchNothingDeleted', 'Nothing deleted') ?></span>
+                </label>
+                <label class="preview-contextual-ai-tools__switch">
+                    <input type="checkbox" id="ai-tools-switch-compact" autocomplete="off">
+                    <span><?= __admin('preview.workflowsSwitchCompact', 'Compact view') ?></span>
+                </label>
+                <label class="preview-contextual-ai-tools__switch" id="ai-tools-switch-unrunnable-row" hidden>
+                    <input type="checkbox" id="ai-tools-switch-unrunnable" autocomplete="off">
+                    <span><?= __admin('preview.workflowsSwitchUnrunnable', "Show workflows my role can't run") ?></span>
+                </label>
+            </div>
         </div>
 
         <div class="preview-contextual-ai-tools__section" id="ai-tools-all-section">
@@ -45,6 +62,11 @@
             </div>
             <div class="preview-contextual-ai-tools__empty" id="ai-tools-empty" style="display: none;">
                 <?= __admin('preview.aiToolsEmpty', 'No workflow matches your search and switches.') ?>
+            </div>
+            <!-- The switches hide every row the search keeps: the list says so, and Show all turns them off -->
+            <div class="preview-contextual-ai-tools__empty" id="ai-tools-options-empty" hidden>
+                <p class="preview-contextual-ai-tools__empty-text"><?= __admin('preview.workflowsOptionsHideAll', 'Your options hide every workflow.') ?></p>
+                <button type="button" class="admin-btn admin-btn--outline" id="ai-tools-show-all"><?= __admin('preview.workflowsShowAll', 'Show all') ?></button>
             </div>
         </div>
     </div>

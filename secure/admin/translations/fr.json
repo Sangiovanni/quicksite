@@ -1294,6 +1294,11 @@
         "tagSelect": {
             "searchPlaceholder": "Tapez pour rechercher..."
         },
+        "needs": {
+            "cookieBanner": "Nécessite une bannière de cookies",
+            "consentPages": "Nécessite votre page de politique de cookies ou de confidentialité",
+            "secondLanguage": "Nécessite une deuxième langue"
+        },
         "specs": {
             "shared": {
                 "params": {
