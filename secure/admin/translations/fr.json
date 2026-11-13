@@ -1451,6 +1451,22 @@
             "updateLangSwitch": {
                 "title": "Mettre à jour le sélecteur de langue",
                 "description": "Reconstruire le composant de sélection de langue à partir des langues actuelles du projet."
+            },
+            "translateSite": {
+                "title": "Traduire le site",
+                "description": "Traduit tous les textes du site d'une de ses langues vers une autre : pour une langue tout juste ajoutée, dont les textes sont encore une copie de ceux de la langue par défaut."
+            },
+            "fitCookieBanner": {
+                "title": "Adapter ma bannière de cookies",
+                "description": "Donne à la bannière de cookies et à sa fenêtre l'apparence de votre site. Générez d'abord la bannière, sur la page Compliance."
+            },
+            "fitConsentPages": {
+                "title": "Adapter mes pages de consentement",
+                "description": "Donne aux pages de politique de cookies et de confidentialité l'apparence de votre site. Générez-les d'abord, sur la page Compliance."
+            },
+            "setupThemeSwitch": {
+                "title": "Bouton de changement de thème",
+                "description": "Écrit un bouton clair/sombre, le composant theme-switch. Les visiteurs ne le voient qu'une fois que vous l'avez placé sur une page ou dans le menu."
             }
         }
     },

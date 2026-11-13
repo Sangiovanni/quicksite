@@ -1,11 +1,11 @@
 {
     "$schema": "../schema.json",
-    "id": "build-quicksite-v2",
+    "id": "build-quicksite",
     "version": "1.0.0",
     "meta": {
         "icon": "🚀",
-        "name": "Build QuickSite v2",
-        "description": "Rebuilds the full quicksite-v2 website from scratch: languages, routes, page structures, translations, styles, and favicon. Uses fresh-start as pre-workflow and update-lang-switch as post-workflow.",
+        "name": "Build QuickSite",
+        "description": "Rebuilds the full QuickSite website from scratch: languages, routes, page structures, translations, styles, and favicon. Uses fresh-start as pre-workflow and update-lang-switch as post-workflow.",
         "category": "start",
         "tags": [
             "quicksite",
@@ -88,7 +88,7 @@
             }
         },
         {
-            "comment": "=== 1b. ASSETS — Upload all v2 template images from GitHub",
+            "comment": "=== 1b. ASSETS — Upload all the template's images from GitHub",
             "forEach": "assets",
             "command": "uploadAsset",
             "params": {
