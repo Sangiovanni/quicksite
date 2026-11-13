@@ -72,6 +72,9 @@
             <input type="hidden" id="add-type-input" value="snippet">
         </div>
 
+        <!-- The simple Add: in simple mode, a beginner's list in place of the tabs above -->
+        <?php include '_simple-add.php'; ?>
+
         <!-- Complex Element selection (for Complex type) -->
         <div class="preview-contextual-form__field" id="add-complex-field" style="display: none;">
             <label for="add-complex-kind"><?= __admin('preview.complexKind', 'Kind') ?>:</label>
@@ -272,16 +275,6 @@
                     </button>
                 </div>
             </div>
-        </div>
-        
-        <!-- TextKey Info (read-only, informational) -->
-        <div class="preview-contextual-form__info" id="add-textkey-info" style="display: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-            </svg>
-            <span><?= __admin('preview.textKeyWillGenerate') ?? 'Text key will be auto-generated' ?>: <code id="add-generated-textkey-preview">-</code></span>
         </div>
         
         <!-- Translation-key params (optional, per tag: alt on img/area, title

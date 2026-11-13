@@ -390,6 +390,6 @@
     display: flex;
     gap: 8px;
 }
-.dashboard-memberships__stat--attention .admin-stat__value {
+.dashboard-memberships__stat--attention .admin-figure__value {
     color: var(--admin-accent);
 }

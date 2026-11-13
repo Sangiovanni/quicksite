@@ -7,10 +7,11 @@
         <span><?= __admin('preview.styleModeHint') ?? 'Click an element to edit its style, or use the sections below' ?></span>
     </div>
     <!-- Advanced top row: Source (raw stylesheet editor). Role-gated on
-         editStyles — admin.js filterByPermissions adds .admin-hidden-permission
-         when the user lacks the command. Hidden until Style mode activates
-         (preview.js toggles display alongside the tabs row). -->
-    <div class="preview-contextual-style-advanced" id="contextual-style-advanced" data-requires-command="editStyles" style="display: none;">
+         editStyles and left out of the simple view (editorTools.php, style.source):
+         admin.js filterByPermissions adds .admin-hidden-permission when the user
+         lacks the command. Hidden until Style mode activates (preview.js toggles
+         display alongside the tabs row). -->
+    <div class="preview-contextual-style-advanced" id="contextual-style-advanced"<?= qs_editor_control_attrs('style.source') ?> style="display: none;">
         <button type="button" class="preview-contextual-style-source-btn" id="contextual-style-source-btn" data-tab="source" title="<?= __admin('preview.styleSourceHint', 'Edit the full style.css source') ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                 <polyline points="16 18 22 12 16 6"/>
@@ -26,7 +27,7 @@
         <button type="button" class="preview-contextual-style-tab" data-tab="selectors">
             <?= __admin('preview.selectors') ?? 'Selectors' ?>
         </button>
-        <button type="button" class="preview-contextual-style-tab" data-tab="animations">
+        <button type="button" class="preview-contextual-style-tab" data-tab="animations"<?= qs_editor_control_attrs('style.animations') ?>>
             <?= __admin('preview.animations') ?? 'Animations' ?>
         </button>
     </div>
@@ -394,7 +395,7 @@
                         </svg>
                         <?= __admin('preview.copyStyleFrom') ?? 'Copy From…' ?>
                     </button>
-                    <button type="button" class="admin-btn" id="selector-animate-btn">
+                    <button type="button" class="admin-btn" id="selector-animate-btn"<?= qs_editor_control_attrs('style.animate') ?>>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>

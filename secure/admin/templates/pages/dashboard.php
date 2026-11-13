@@ -228,8 +228,8 @@ if (isset($_GET['denied'])): ?>
             </button>
         </div>
         <!-- Manage Space: the edited project's build, exports and backups, with your own
-             space. It stays when you own nothing and can read one of the three: then the
-             card holds it alone (dashboard.js, owner-space--manage-only). -->
+             space. It stays when you own nothing and can read its build or its backups:
+             then the card holds it alone (dashboard.js, owner-space--manage-only). -->
         <div class="manage-space" id="manage-space">
             <button type="button" class="manage-space__toggle" id="manage-space-toggle">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -257,7 +257,8 @@ if (isset($_GET['denied'])): ?>
                     </div>
                     <div class="manage-space__list" id="manage-builds-list"></div>
                 </div>
-                <!-- Shown by dashboard.js only when the project holds a saved export: the panel's Export keeps none on the server, the API's can. -->
+                <!-- Shown by dashboard.js only when the project holds a saved export: the panel's Export keeps none on the server, the API's can.
+                     Its figures are My total space's for that project, so it shows when you own the project you edit. -->
                 <div class="manage-space__section" id="manage-space-exports" style="display: none;">
                     <div class="manage-space__section-header">
                         <span class="manage-space__section-title">
@@ -285,61 +286,6 @@ if (isset($_GET['denied'])): ?>
     </div>
 </section>
 
-<!-- Storage Overview -->
-<section class="admin-section">
-    <div class="storage-overview" id="storage-overview">
-        <div class="storage-overview__header">
-            <h3 class="storage-overview__title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                    <path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
-                </svg>
-                <?= __admin('dashboard.storage.title') ?>
-            </h3>
-            <span class="storage-overview__total" id="storage-total">--</span>
-        </div>
-        <div class="storage-overview__bar" id="storage-bar">
-            <div class="storage-overview__segment storage-overview__segment--projects" id="storage-seg-projects" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--backups" id="storage-seg-backups" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--builds" id="storage-seg-builds" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--exports" id="storage-seg-exports" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--admin" id="storage-seg-admin" style="width: 0%"></div>
-            <div class="storage-overview__segment storage-overview__segment--system" id="storage-seg-system" style="width: 0%"></div>
-        </div>
-        <div class="storage-overview__legend">
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--projects"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.projects') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-projects">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.backups') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-backups">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.builds') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-builds">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-exports">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--admin"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.admin') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-admin">--</span>
-            </div>
-            <div class="storage-overview__legend-item">
-                <span class="storage-overview__legend-color storage-overview__legend-color--system"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.system') ?></span>
-                <span class="storage-overview__legend-value" id="storage-val-system">--</span>
-            </div>
-        </div>
-    </div>
-</section>
-
 <!-- Memberships summary — numbers filled by dashboard-memberships.js
      from the shared QSMembershipCounts promise (members-badge.js). Visible to
      every authenticated user; a 0-membership account sees zeros + the links. -->
@@ -351,30 +297,30 @@ if (isset($_GET['denied'])): ?>
             <a href="<?= $router->url('members') ?>" class="admin-btn admin-btn--ghost" data-requires-command="proposeMember"><?= __admin('nav.projectMembers', 'Project members') ?></a>
         </div>
     </div>
-    <div class="admin-grid admin-grid--cols-3">
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="dash-mem-projects">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.projects', 'My projects') ?></div>
+    <div class="admin-figures">
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.projects', 'My projects') ?></span>
+            <span class="admin-figure__value" id="dash-mem-projects">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="dash-mem-owned">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.owned', 'Owned') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.owned', 'Owned') ?></span>
+            <span class="admin-figure__value" id="dash-mem-owned">-</span>
         </div>
-        <div class="admin-stat" id="dash-mem-invitations-stat">
-            <div class="admin-stat__value" id="dash-mem-invitations">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.invitations', 'Invitations awaiting you') ?></div>
+        <div class="admin-figure" id="dash-mem-invitations-stat">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.invitations', 'Invitations awaiting you') ?></span>
+            <span class="admin-figure__value" id="dash-mem-invitations">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="dash-mem-requests">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.requests', 'Join requests you sent') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.requests', 'Join requests you sent') ?></span>
+            <span class="admin-figure__value" id="dash-mem-requests">-</span>
         </div>
-        <div class="admin-stat" id="dash-mem-notices-stat">
-            <div class="admin-stat__value" id="dash-mem-notices">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.notices', 'Notices to dismiss') ?></div>
+        <div class="admin-figure" id="dash-mem-notices-stat">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.notices', 'Notices to dismiss') ?></span>
+            <span class="admin-figure__value" id="dash-mem-notices">-</span>
         </div>
-        <div class="admin-stat" id="dash-mem-queue-stat">
-            <div class="admin-stat__value" id="dash-mem-queue">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.memberships.queue', 'Awaiting your validation') ?></div>
+        <div class="admin-figure" id="dash-mem-queue-stat">
+            <span class="admin-figure__label"><?= __admin('dashboard.memberships.queue', 'Awaiting your validation') ?></span>
+            <span class="admin-figure__value" id="dash-mem-queue">-</span>
         </div>
     </div>
 </section>
@@ -623,22 +569,22 @@ if (isset($_GET['denied'])): ?>
 <!-- Quick Stats (loaded via AJAX) -->
 <section class="admin-section">
     <h2 class="admin-section__title"><?= __admin('dashboard.stats.title') ?></h2>
-    <div class="admin-grid admin-grid--cols-4" id="admin-stats">
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-routes">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.routes') ?></div>
+    <div class="admin-figures" id="admin-stats">
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.routes') ?></span>
+            <span class="admin-figure__value" id="stat-routes">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-pages">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.pages') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.pages') ?></span>
+            <span class="admin-figure__value" id="stat-pages">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-components">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.components') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.components') ?></span>
+            <span class="admin-figure__value" id="stat-components">-</span>
         </div>
-        <div class="admin-stat">
-            <div class="admin-stat__value" id="stat-languages">-</div>
-            <div class="admin-stat__label"><?= __admin('dashboard.stats.languages') ?></div>
+        <div class="admin-figure">
+            <span class="admin-figure__label"><?= __admin('dashboard.stats.languages') ?></span>
+            <span class="admin-figure__value" id="stat-languages">-</span>
         </div>
     </div>
 </section>

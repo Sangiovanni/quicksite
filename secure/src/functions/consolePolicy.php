@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/opcacheHygiene.php';
+require_once __DIR__ . '/setupSwitch.php';
 /**
  * The command-console gate.
  *
@@ -68,6 +68,8 @@ require_once __DIR__ . '/opcacheHygiene.php';
  * hands back `true` until the cache lets go. (Creating the file where none existed
  * needs no invalidation. It is the edit that needs it.)
  *
+ * The mechanics live in qs_setup_switch() (setupSwitch.php), shared with the Embed Security page's switch.
+ *
  * @return bool True when this installation offers the command console.
  */
 function qs_console_allowed(): bool
@@ -77,40 +79,6 @@ function qs_console_allowed(): bool
         return $allowed;
     }
 
-    $path = __DIR__ . '/../../management/config/console.php';
-
-    // NEVER CONFIGURED ⇒ ON. This is the fresh-install case, and the reason the
-    // default is ON.
-    if (!is_file($path)) {
-        return $allowed = true;
-    }
-
-    // Present but unreadable is a decision we cannot read, and the only reason
-    // this file exists is that somebody turned the console off.
-    if (!is_readable($path)) {
-        error_log(
-            'QuickSite: console.php is present but unreadable'
-            . ' — the command console stays DISABLED.'
-        );
-        return $allowed = false;
-    }
-
-    // force=true, so it applies whether or not timestamp validation is on.
-    qs_opcache_invalidate($path);
-
-    $cfg = null;
-    ob_start();
-    try {
-        $cfg = require $path;
-    } catch (Throwable $e) {
-        error_log(
-            'QuickSite: ignoring malformed console.php (' . $e->getMessage() . ')'
-            . ' — the command console stays DISABLED.'
-        );
-        $cfg = null;
-    } finally {
-        ob_end_clean();
-    }
-
-    return $allowed = (is_array($cfg) && ($cfg['allow_console'] ?? null) === true);
+    // The rule above, read by the one reader every setup switch shares (setupSwitch.php).
+    return $allowed = qs_setup_switch('console.php', 'allow_console', 'the command console stays DISABLED');
 }

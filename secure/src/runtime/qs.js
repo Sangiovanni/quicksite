@@ -20,8 +20,9 @@
      * The route this page was served for, as the server resolved it.
      *
      * The server writes it before this file loads, in the runtime handoff:
-     * window.QS_ROUTE = { path, params, found, base }, from the same router call
-     * the page was rendered with. Nothing here reads the page's own address. The
+     * window.QS_ROUTE = { path, params, found, base, lang, languages }, from the
+     * same router call the page was rendered with. Nothing here reads the page's
+     * own address. The
      * page may be served under a base the router removed first (the
      * /p/<projectId>/ preview, an installation's URL space, a build's space),
      * and the router also decides the language segment of a multilingual site,
@@ -38,16 +39,29 @@
      *                    URL space, '/' at a site's root. The server composes
      *                    every target an author writes in a {{call:...}}; code
      *                    written by hand composes its own: QS.basePath + 'about'.
+     *
+     * `lang` and `languages` are how the server composes a site address it writes
+     * (processUrl()): the page's language, and the project's languages, [] on a
+     * site in one language. A bound address is composed with them
+     * (_qsComposeSiteAddress()); a page whose handoff carries neither composes
+     * none.
      */
     QS.routeParams = {};
     QS.routePath   = null;
     QS.routeFound  = false;
     QS.basePath    = '/';
+    var _qsSiteAddress = null;
     (function readServedRoute() {
         const route = window.QS_ROUTE;
         if (!route || typeof route !== 'object') return;
         if (typeof route.base === 'string' && /^\/(?:[^/\\]|$)/.test(route.base) && route.base.slice(-1) === '/') {
             QS.basePath = route.base;
+            if (typeof route.lang === 'string' && Array.isArray(route.languages)) {
+                _qsSiteAddress = {
+                    lang: route.lang,
+                    languages: route.languages.filter(function (l) { return typeof l === 'string' && l !== ''; })
+                };
+            }
         }
         if (route.found !== true) return;
         const params = route.params;
@@ -257,6 +271,60 @@
     }
 
     /**
+     * The URL attributes the server composes a site address in (processUrl()), in
+     * any letter case. Mirrors UrlPolicy::REWRITABLE_URL_ATTRIBUTES: both change
+     * with the server's.
+     */
+    var QS_REWRITABLE_URL_ATTRIBUTES = ['href', 'src', 'data', 'poster', 'action', 'formaction', 'cite', 'srcset'];
+
+    /** Letter case folded for ASCII letters alone, as the server's case-blind match folds it. */
+    function _qsAsciiLower(s) {
+        return String(s).replace(/[A-Z]+/g, function (m) { return m.toLowerCase(); });
+    }
+
+    /**
+     * A BOUND ADDRESS MEANS WHAT A WRITTEN ONE MEANS. An address that starts with
+     * one slash is read by a browser from the host's root, but the server reads a
+     * written one from the SITE's, which is not the host's root under /p/<id>/ or a
+     * URL space. So such an address is composed here exactly as processUrl()
+     * composes it (JsonToHtmlRenderer, and the compiled one in a built page), with
+     * the same inputs, from the handoff (QS_ROUTE): the base the page is served
+     * under; then, on a multilingual site, the page's language, unless the
+     * address is under /assets/ or /style/ or already starts with one of the
+     * site's languages; and a lone language code ('/fr') gains a slash. An address
+     * that already holds the base is composed again, as a written one is.
+     *
+     * Every other address is written as it comes. An absolute one, '//host', '#…',
+     * mailto: and tel: the server leaves as they are too. A relative one ('about',
+     * '?page=2') is read by the browser against the page's own address: the server
+     * composes a written relative address against the site's root, and that is
+     * not followed here, as a relative address means the page's neighbourhood.
+     * Without the handoff's language fields (a page from before they existed, or
+     * with no handoff) nothing is composed.
+     */
+    function _qsComposeSiteAddress(value) {
+        if (!_qsSiteAddress) return value;
+        // What the browser reads: leading whitespace and controls dropped, as
+        // _qsSafeNavigationUrl() drops them before it reads the scheme.
+        var v = value.replace(/^[\x00-\x20]+/, '');
+        if (v.charAt(0) !== '/' || v.charAt(1) === '/') return value;
+        var lang = _qsSiteAddress.lang;
+        var langs = _qsSiteAddress.languages;
+        var full = QS.basePath;
+        if (langs.length && lang !== '' && lang !== '0' && !/^\/(?:assets|style)\//i.test(v)
+            && !langs.some(function (l) {
+                return v.slice(1, 1 + l.length) === l && (v.length === 1 + l.length || v.charAt(1 + l.length) === '/');
+            })) {
+            full += lang + '/';
+        }
+        var rest = v.slice(1);
+        if (rest === '') return full;
+        var folded = _qsAsciiLower(rest);
+        if (langs.some(function (l) { return _qsAsciiLower(l) === folded; })) rest += '/';
+        return full + rest;
+    }
+
+    /**
      * WHAT A BINDING MAY WRITE. A binding sets an attribute whose name and value
      * come from data, after the server has rendered the page: a list item's
      * data-bind-attr, an endpoint's scalar response binding, an <img>'s default
@@ -272,15 +340,24 @@
      * the server compiles a handler only from {{call:...}} written in the page;
      * srcdoc on any element, and src or sandbox on an iframe, as the server
      * decided the frame's sandbox from the src and srcdoc it rendered and nothing
-     * decides it again here. Answers why, or null when the name may be written.
+     * decides it again here; any name starting data-consent-, in any letter case,
+     * as the consent layer reads those to decide what a click on its banner or
+     * popup records; content and http-equiv on a meta, which together make a
+     * refresh whose address the server checked only as the page held it. Answers
+     * why, or null when the name may be written.
      */
     function _qsBoundAttributeRefusal(el, name) {
         if (!/^[a-z0-9_:-]+$/i.test(name)) return 'refused a name that is not a valid attribute name';
         var n = name.toLowerCase();
+        var tag = el ? String(el.localName || '').toLowerCase() : '';
         if (/^on[a-z]+$/.test(n)) return 'refused an event-handler attribute';
         if (n === 'srcdoc') return 'refused srcdoc';
-        if ((n === 'src' || n === 'sandbox') && el && String(el.localName || '').toLowerCase() === 'iframe') {
+        if ((n === 'src' || n === 'sandbox') && tag === 'iframe') {
             return 'refused an iframe\'s src or sandbox';
+        }
+        if (n.indexOf('data-consent-') === 0) return 'refused a consent attribute';
+        if ((n === 'content' || n === 'http-equiv') && tag === 'meta') {
+            return 'refused a meta\'s content or http-equiv';
         }
         return null;
     }
@@ -297,9 +374,11 @@
     /**
      * Write one bound attribute, by the rule above. A URL attribute's value is held
      * to the allowlist, and a refused one writes `#`, as UrlPolicy::sanitize() does:
-     * an element bound twice keeps no stale link. Anything else is written as it
-     * comes. A refusal writes nothing, says so on the console and throws nothing,
-     * so the rest of a list renders. Answers whether the attribute was written.
+     * an element bound twice keeps no stale link. An accepted one, in an attribute
+     * the server composes a written address in, is composed as the server composes
+     * it (_qsComposeSiteAddress()). Anything else is written as it comes. A
+     * refusal writes nothing, says so on the console and throws nothing, so the
+     * rest of a list renders. Answers whether the attribute was written.
      */
     function _qsSetBoundAttribute(el, name, value) {
         name = String(name);
@@ -309,9 +388,13 @@
             return false;
         }
         var v = String(value);
-        if (_qsIsUrlAttribute(name) && !_qsSafeNavigationUrl(v)) {
-            _qsBindingWarn('refused a URL with a disallowed scheme and wrote # in', name);
-            v = '#';
+        if (_qsIsUrlAttribute(name)) {
+            if (!_qsSafeNavigationUrl(v)) {
+                _qsBindingWarn('refused a URL with a disallowed scheme and wrote # in', name);
+                v = '#';
+            } else if (QS_REWRITABLE_URL_ATTRIBUTES.indexOf(name.toLowerCase()) !== -1) {
+                v = _qsComposeSiteAddress(v);
+            }
         }
         try {
             el.setAttribute(name, v);
@@ -1179,7 +1262,8 @@
     // exists because `{{call:redirect:javascript:…}}` was one way around it, and
     // a binding, which writes an attribute named by data after the page is
     // rendered, goes through _qsSetBoundAttribute() because it was another: no
-    // handler, no srcdoc, no iframe src or sandbox, no URL outside the allowlist. If
+    // handler, no srcdoc, no iframe src or sandbox, no consent control, no meta
+    // content or http-equiv, no URL outside the allowlist. If
     // author-supplied JavaScript is ever reintroduced deliberately, this stops
     // being a boundary and becomes a naming convention.
     //
@@ -2001,6 +2085,19 @@
         return path.split('.').reduce((o, k) => (o || {})[k], obj);
     }
 
+    /**
+     * A value written as a CSS string, quotes included, for an attribute selector
+     * such as [data-state-list="…"]. Written raw, a quote in the value ends the
+     * string early and a backslash escapes what follows it, so the selector throws
+     * and nothing after it runs. A line break, which a CSS string cannot hold, is
+     * written as its code point.
+     */
+    function _qsCssString(value) {
+        return '"' + String(value).replace(/["\\]/g, '\\$&').replace(/[\n\r\f]/g, function (c) {
+            return '\\' + c.charCodeAt(0).toString(16) + ' ';
+        }) + '"';
+    }
+
     // =========================================================================
     // LIST RENDERING
     // =========================================================================
@@ -2045,7 +2142,7 @@
         const template = _listTemplates[containerSelector];
 
         // Clear container
-        container.innerHTML = '';
+        container.replaceChildren();
 
         // Empty state
         if (items.length === 0) {
@@ -2199,7 +2296,7 @@
         const template = _listTemplates[containerSelector];
 
         // Clear container
-        container.innerHTML = '';
+        container.replaceChildren();
 
         // Empty state
         if (items.length === 0) {
@@ -3210,7 +3307,7 @@
             var dot = ref.indexOf('.');
             if (dot === -1 || ref.slice(0, dot) !== storeId) return;
             var arr = store.state[ref.slice(dot + 1)];
-            renderList('[data-state-list="' + ref + '"]',
+            renderList('[data-state-list=' + _qsCssString(ref) + ']',
                 Array.isArray(arr) ? arr : (arr === undefined || arr === null ? [] : [arr]),
                 el.getAttribute('data-state-empty') || undefined);
         });

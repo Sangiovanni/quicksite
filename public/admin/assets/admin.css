@@ -149,12 +149,14 @@ code,
 /* =============================================================================
    SECURITY WARNING BANNER
    ============================================================================= */
+/* The panel's own colours. The tint lies over the page's background, as the
+   banner sticks under the header and what scrolls beneath must not show through. */
 .admin-security-warning {
-    background: #fff3e0;
-    border-bottom: 1px solid #ffcc02;
+    background: linear-gradient(var(--admin-warning-bg), var(--admin-warning-bg)), var(--admin-bg);
+    border-bottom: 1px solid var(--admin-warning-border);
     padding: 8px var(--space-xl);
     font-size: var(--font-size-sm);
-    color: #5d4037;
+    color: var(--admin-text);
     position: sticky;
     top: var(--admin-header-height);
     z-index: 99;
@@ -169,13 +171,13 @@ code,
 }
 
 .admin-security-warning__link {
-    color: #1565c0;
+    color: var(--admin-accent);
     text-decoration: underline;
     font-weight: var(--font-weight-medium);
 }
 
 .admin-security-warning__link:hover {
-    color: #0d47a1;
+    color: var(--admin-accent-hover);
 }
 
 .admin-security-warning__dismiss {
@@ -184,31 +186,22 @@ code,
     border: none;
     cursor: pointer;
     font-size: var(--font-size-xl);
-    color: #8d6e63;
+    color: var(--admin-text-muted);
     padding: 0 4px;
     line-height: 1;
 }
 
 .admin-security-warning__dismiss:hover {
-    color: #4e342e;
+    color: var(--admin-text);
 }
 
 /* Informational variant — same banner mechanics, no alarm. Used for the
    operator update notice, which reports news rather than a misconfiguration.
-   Only the palette is overridden; layout, stickiness and the dismiss control
-   are the block's own. */
+   Only the tint and its border differ; text, link, layout, stickiness and the
+   dismiss control are the block's own. */
 .admin-security-warning--info {
-    background: #e8f1fb;
-    border-bottom-color: #90caf9;
-    color: #14395e;
-}
-
-.admin-security-warning--info .admin-security-warning__dismiss {
-    color: #5b7fa6;
-}
-
-.admin-security-warning--info .admin-security-warning__dismiss:hover {
-    color: #14395e;
+    background: linear-gradient(var(--admin-info-bg), var(--admin-info-bg)), var(--admin-bg);
+    border-bottom-color: var(--admin-info-border);
 }
 
 /* =============================================================================
@@ -437,8 +430,9 @@ code,
 .admin-account__who {
     display: none;
 }
-/* The panel's language, one of the menu's lines. */
-.admin-account__lang {
+/* The panel's language and the mode, two of the menu's lines, drawn alike. */
+.admin-account__lang,
+.admin-account__mode {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -448,12 +442,14 @@ code,
     font-size: var(--font-size-sm);
 }
 
-.admin-account__lang-label {
+.admin-account__lang-label,
+.admin-account__mode-label {
     opacity: 0.7;
     margin-right: var(--space-xs);
 }
 
-.admin-account__lang-btn {
+.admin-account__lang-btn,
+.admin-account__mode-btn {
     padding: 0.25rem 0.5rem;
     font-size: var(--font-size-xs);
     background: transparent;
@@ -464,18 +460,103 @@ code,
     transition: all var(--transition-fast);
 }
 
-.admin-account__lang-btn:hover {
+.admin-account__lang-btn:hover,
+.admin-account__mode-btn:hover {
     background: var(--admin-bg);
     border-color: var(--admin-primary);
     color: var(--admin-primary);
 }
 
 .admin-account__lang-btn--active,
-.admin-account__lang-btn--active:hover {
+.admin-account__lang-btn--active:hover,
+.admin-account__mode-btn--active,
+.admin-account__mode-btn--active:hover {
     background: var(--admin-primary);
     border-color: var(--admin-primary);
     color: var(--admin-on-accent);
     cursor: default;
+}
+
+/* The simple menu: the page's class, from the account's mode, hides every entry the menu's definition
+   (panelMenu.php) does not call simple. Menu entries only: their pages open at their address as ever.
+   A group with no entry left is not drawn either, and a group with one entry left is drawn as that
+   entry, which admin.js (applyMenuGroups) moves to the group's place. */
+.admin-body--simple [data-menu-advanced],
+.admin-nav__group--empty,
+.admin-nav__group--lone {
+    display: none !important;
+}
+
+/* A page the simple menu does not show, opened in simple: one line at its top saying where it lives, and the switch. Drawn
+   in either mode, shown in simple alone, so a switch shows or hides it with no reload. */
+.admin-mode-notice {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+}
+.admin-body--simple .admin-mode-notice {
+    display: flex;
+}
+.admin-mode-notice__text {
+    flex: 1 1 16rem;
+    min-width: 0;
+}
+
+/* The editor's simple view: what the editor's definition (editorTools.php) leaves out of simple, hidden by the same
+   class, so a switch of mode shows or hides it with no reload. What a role cannot run is hidden by the role's filter,
+   in either mode. */
+.admin-body--simple [data-editor-advanced] {
+    display: none !important;
+}
+
+/* After the first pick: the Mode row glows, three times, where it is (nothing moves across the
+   screen; with reduce motion it does not play, responsive.css), and a bubble under it says the
+   mode can be switched there at any time. */
+@keyframes admin-mode-glow {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 var(--admin-accent-muted);
+    }
+    50% {
+        box-shadow: 0 0 0 4px var(--admin-accent-muted);
+    }
+}
+.admin-account__mode--glow {
+    border-radius: var(--radius-md);
+    animation: admin-mode-glow 0.9s ease-in-out 3;
+}
+.admin-mode-bubble {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    max-width: 16rem;
+    margin: 0 var(--space-md) var(--space-sm);
+    padding: var(--space-sm) var(--space-xs) var(--space-sm) var(--space-md);
+    background: var(--admin-accent-subtle);
+    border: 1px solid var(--admin-border-focus);
+    border-radius: var(--radius-md);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+}
+.admin-mode-bubble__text {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+.admin-mode-bubble__close {
+    display: inline-flex;
+    flex-shrink: 0;
+    padding: var(--space-xs);
+    background: none;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+.admin-mode-bubble__close:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface);
 }
 
 /* The menu button: a phone's way to the panel. */
@@ -666,7 +747,7 @@ code,
 .admin-form-group,
 .manage-space__section,
 .apis-toolbar,
-.apis-stats,
+.admin-figures,
 .apis-empty__desc,
 .admin-category,
 .admin-empty__text {
@@ -916,14 +997,6 @@ input.admin-checkbox {
 
 .admin-grid--cols-2 {
     grid-template-columns: repeat(2, 1fr);
-}
-
-.admin-grid--cols-3 {
-    grid-template-columns: repeat(3, 1fr);
-}
-
-.admin-grid--cols-4 {
-    grid-template-columns: repeat(4, 1fr);
 }
 
 /* =============================================================================
@@ -2201,7 +2274,7 @@ kbd {
     justify-content: flex-end;
 }
 
-/* Storage Overview Styles */
+/* The space card's shell: My total space, with Manage Space at its foot. */
 .storage-overview {
     background: var(--admin-surface);
     border: 1px solid var(--admin-border);
@@ -2266,19 +2339,9 @@ kbd {
     background: var(--admin-success);
 }
 
-.storage-overview__segment--admin,
-.storage-overview__legend-color--admin {
-    background: var(--admin-warning);
-}
-
 .storage-overview__segment--exports,
 .storage-overview__legend-color--exports {
     background: var(--admin-info);
-}
-
-.storage-overview__segment--system,
-.storage-overview__legend-color--system {
-    background: var(--admin-text-muted);
 }
 
 .storage-overview__segment--builds,
@@ -2321,8 +2384,8 @@ kbd {
     color: var(--admin-text);
 }
 
-/* Owner Space Usage — aggregate across every project the caller owns.
-   Reuses the .storage-overview shell; only the per-project list is new. */
+/* Owner Space Usage — aggregate across every project the caller owns, in the
+   .storage-overview shell above, with its per-project list. */
 .owner-space__count {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-normal);
@@ -2652,8 +2715,7 @@ kbd {
 }
 
 .manage-space__clear-btn:hover,
-.preview-toolbar__delete-btn:hover,
-.preview-component-warning__delete:hover {
+.preview-toolbar__delete-btn:hover {
     background: var(--admin-error);
     color: #ffffff;
 }
@@ -2998,34 +3060,6 @@ kbd {
 }
 
 /* APIs Page specific styles */
-
-/* The figures: a label, then its number, on one line, each as narrow as its words */
-.apis-stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm) var(--space-md);
-}
-
-.apis-stat {
-    display: inline-flex;
-    align-items: baseline;
-    gap: var(--space-sm);
-    padding: var(--space-xs) var(--space-md);
-    background: var(--admin-bg-secondary);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-md);
-}
-
-.apis-stat__label {
-    font-size: var(--font-size-sm);
-    color: var(--admin-text-muted);
-}
-
-.apis-stat__value {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-bold);
-    color: var(--admin-accent);
-}
 
 .apis-loading,
 .apis-empty,
@@ -3554,26 +3588,35 @@ kbd {
 }
 
 /* =============================================================================
-   STAT CARDS
+   FIGURES
    ============================================================================= */
-.admin-stat {
-    padding: var(--space-lg);
+/* A row of figures (the dashboard's, the APIs page's): each its label, then its number, on one
+   line, each as narrow as its words; they wrap as the width runs out. */
+.admin-figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm) var(--space-md);
+}
+
+.admin-figure {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
     background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-md);
-    text-align: center;
 }
 
-.admin-stat__value {
-    font-size: var(--font-size-3xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--admin-accent);
-}
-
-.admin-stat__label {
-    margin-top: var(--space-xs);
+.admin-figure__label {
     font-size: var(--font-size-sm);
     color: var(--admin-text-muted);
+}
+
+.admin-figure__value {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--admin-accent);
 }
 
 /* =============================================================================
@@ -3772,6 +3815,119 @@ kbd {
     flex-shrink: 0;
     gap: var(--space-md);
     justify-content: center;
+}
+
+/* The mode chooser (partials/mode-chooser.php), in the one modal: two cards side by side, stacked where two
+   do not fit, and the whole of it scrolling inside the screen's height. Each card is its button. */
+.admin-modal-dialog--chooser {
+    max-width: 56rem;
+    width: calc(100% - 2 * var(--space-md));
+}
+.admin-mode-chooser {
+    gap: var(--space-md);
+    padding: clamp(var(--space-md), 4vw, var(--space-xl));
+    overflow-y: auto;
+    text-align: left;
+}
+.admin-mode-chooser .admin-modal-dialog__title,
+.admin-mode-chooser__intro,
+.admin-mode-chooser__note,
+.admin-mode-chooser__error {
+    margin: 0;
+    text-align: center;
+}
+.admin-mode-chooser__intro,
+.admin-mode-chooser__lead {
+    color: var(--admin-text-muted);
+}
+.admin-mode-chooser__error {
+    color: var(--admin-error);
+}
+.admin-mode-chooser__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
+    gap: var(--space-md);
+}
+.admin-mode-chooser__card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-width: 0;
+    padding: var(--space-md);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.admin-mode-chooser__card:hover,
+.admin-mode-chooser__card:focus-within {
+    background: var(--admin-bg-tertiary);
+    border-color: var(--admin-accent);
+}
+.admin-mode-chooser__name {
+    margin: 0;
+    font-size: var(--font-size-lg);
+    color: var(--admin-text);
+}
+.admin-mode-chooser__lead {
+    margin: 0;
+    font-size: var(--font-size-sm);
+}
+.admin-mode-chooser__list {
+    flex: 1 1 auto;
+    margin: 0;
+    padding-left: var(--space-lg);
+    color: var(--admin-text);
+    font-size: var(--font-size-sm);
+}
+.admin-mode-chooser__item {
+    margin: var(--space-2xs) 0;
+}
+.admin-mode-chooser__item--all,
+.admin-mode-chooser__item--none {
+    margin-left: calc(-1 * var(--space-lg));
+    list-style: none;
+    color: var(--admin-text-muted);
+}
+.admin-mode-chooser__pick {
+    justify-content: center;
+}
+
+/* The chooser's drawings: a menu, slim or full, in the panel's own colours and with no words. */
+.admin-mode-drawing {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.admin-mode-drawing__frame,
+.admin-mode-drawing__drop {
+    fill: var(--admin-bg-secondary);
+    stroke: var(--admin-border);
+    stroke-width: 2;
+}
+.admin-mode-drawing__band {
+    fill: var(--admin-bg-tertiary);
+}
+.admin-mode-drawing__accent {
+    fill: var(--admin-accent);
+}
+.admin-mode-drawing__line {
+    fill: var(--admin-text-light);
+}
+.admin-mode-drawing__pill,
+.admin-mode-drawing__block {
+    fill: var(--admin-surface);
+}
+.admin-mode-drawing__pill--active {
+    fill: var(--admin-accent-muted);
+}
+.admin-mode-drawing__arrow {
+    fill: none;
+    stroke: var(--admin-text-muted);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* =============================================================================
@@ -4267,7 +4423,6 @@ kbd {
 
 .preview-toolbar__add-btn svg,
 .preview-toolbar__delete-btn svg,
-.preview-component-warning__delete svg,
 .preview-theme-actions .admin-btn svg,
 .transition-editor__anim-checkbox input,
 .preview-contextual-js-page-events__chevron,
@@ -5075,23 +5230,6 @@ kbd {
     width: 18px;
     height: 18px;
     color: var(--admin-warning);
-}
-
-.preview-component-warning__delete {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border: 1px solid var(--admin-error);
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--admin-error);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
 }
 
 /* Iframe Warning Banner */
@@ -7251,6 +7389,7 @@ kbd {
 
 .preview-selector-selected__actions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-sm);
     margin-top: var(--space-xs);
 }
@@ -7554,13 +7693,6 @@ kbd {
     padding: 1px 4px;
     border-radius: 3px;
     flex-shrink: 0;
-}
-
-/* Resolved value display for var() */
-.preview-style-property__resolved {
-    font-size: var(--font-size-xs);
-    color: var(--admin-text-muted);
-    font-family: var(--font-mono);
 }
 
 .preview-style-property__delete {
@@ -10865,6 +10997,123 @@ kbd {
     min-height: 0;
 }
 
+/* The picker's upload row (the simple Add's Image, Video and Audio), above the list, which then scrolls in its own box */
+.preview-asset-picker__upload {
+    display: flex;
+    padding: var(--space-sm);
+    border-bottom: 1px solid var(--admin-border);
+}
+.preview-asset-picker__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* The simple Add: a beginner's list of plain elements, each an icon over its name. A grid that wraps to the panel's
+   width: as many to a row as fit, never narrower than its name. */
+.preview-simple-add__items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(5.5rem, 100%), 1fr));
+    gap: var(--space-xs);
+    margin-bottom: var(--space-sm);
+}
+.preview-simple-add__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-xs);
+    min-width: 0;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+.preview-simple-add__item svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+.preview-simple-add__item:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface-hover);
+}
+.preview-simple-add__item[aria-pressed="true"] {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-on-accent);
+}
+/* The Title's three sizes: cards side by side (wrapping where the panel is narrow), each word in its own size. The radio stays,
+   out of sight, for the keyboard; two classes, as the form's own label rule would otherwise draw each card as a plain label. */
+.preview-simple-add__sizes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(5rem, 100%), 1fr));
+    gap: var(--space-xs);
+}
+.preview-simple-add__sizes > .preview-simple-add__size {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3rem;
+    margin: 0;
+    padding: var(--space-xs);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    font-weight: var(--font-weight-bold);
+    line-height: 1.1;
+    text-align: center;
+    overflow-wrap: anywhere;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+.preview-simple-add__sizes > .preview-simple-add__size--big {
+    font-size: var(--font-size-xl);
+}
+.preview-simple-add__sizes > .preview-simple-add__size--medium {
+    font-size: var(--font-size-base);
+}
+.preview-simple-add__sizes > .preview-simple-add__size--small {
+    font-size: var(--font-size-xs);
+}
+.preview-simple-add__size input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.preview-simple-add__sizes > .preview-simple-add__size:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface-hover);
+}
+.preview-simple-add__sizes > .preview-simple-add__size:has(input:checked) {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-on-accent);
+}
+.preview-simple-add__sizes > .preview-simple-add__size:has(input:focus-visible) {
+    outline: 2px solid var(--admin-primary);
+    outline-offset: 2px;
+}
+/* The List's lines: a field and its remove button, one line each */
+.preview-simple-add__list-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+.preview-simple-add__list-row > .admin-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .preview-asset-picker__item {
     display: flex;
     align-items: center;
@@ -14165,10 +14414,13 @@ kbd {
     border-color: var(--admin-border-focus);
 }
 
+/* The chips keep their width where they fit, and wrap where the panel is narrower than they are */
 .preview-contextual-translation__chips {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-xs);
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 .preview-contextual-translation__chip {
     display: inline-flex;

@@ -13,6 +13,33 @@ $baseUrl = rtrim(BASE_URL, '/');
 // The embedSecurity sub-tree, verbatim and under the same dot paths PHP uses,
 // so the JS asks for the path PHP would.
 $qsEmbedSecurityI18n = ['embedSecurity' => AdminTranslation::getInstance()->getRaw('embedSecurity') ?: new stdClass()];
+
+// An installation can decline to show this page (setup item 11, embed-security.php;
+// ABSENT MEANS SHOWN, see embedSecurityPolicy.php). Hidden, it says so plainly, as
+// the console's page does, rather than answer a 404 that would send the next person
+// to debug routing. ⚠ It removes a page, not a rule: the policy stays in force, and
+// getIframeSandbox keeps answering on /management to every role that holds it.
+if (!$router->isEmbedSecurityShown()):
+?>
+<div class="admin-page-header">
+    <h1 class="admin-page-header__title">
+        <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <?= __admin('embedSecurity.title') ?>
+    </h1>
+</div>
+<div class="admin-empty">
+    <svg class="admin-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+    </svg>
+    <h2 class="admin-empty__title"><?= __admin('embedSecurity.disabled.title', 'The Embed Security page is turned off') ?></h2>
+    <p class="admin-empty__text"><?= __admin('embedSecurity.disabled.text') ?></p>
+</div>
+<?php
+    return;
+endif;
 ?>
 
 <script>

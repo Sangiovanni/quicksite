@@ -38,7 +38,7 @@ return [
             'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
             'analyzeReachability', 'listAssets', 'getStyles', 'getRootVariables',
             'listStyleRules', 'getStyleRule', 'listKeyframes', 'getKeyframes',
-            'getAnimatedSelectors', 'listAliases', 'getSizeInfo', 'listJsFunctions',
+            'getAnimatedSelectors', 'listAliases', 'listJsFunctions',
             'listDataBindings', 'listInteractions', 'getPageEvents', 'getStateStores',
             'listSnippets', 'getSnippet', 'getIframeSandbox', 'getBuild',
         ],

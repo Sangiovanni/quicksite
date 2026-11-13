@@ -440,8 +440,8 @@ function qs_account_space_usage(array $params): ApiResponse {
                 'size'           => $grand,
                 'size_formatted' => qs_format_size($grand),
             ],
-            // Same shape as getSizeInfo's by_category so the dashboard's stacked
-            // bar renders owner-scale without a second component.
+            // One entry per segment of My total space's stacked bar on the
+            // dashboard, each with its size and that size as read.
             'by_category' => [
                 'content' => ['size' => $totContent, 'size_formatted' => qs_format_size($totContent)],
                 'backups' => ['size' => $totBackups, 'size_formatted' => qs_format_size($totBackups)],

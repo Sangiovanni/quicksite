@@ -278,6 +278,11 @@ if (!function_exists('qs_runtime_handoff')) {
      *                               router call the page was rendered with:
      *                               ['path' => string, 'params' => array,
      *                                'found' => bool]; null when there is none
+     *   lang:               string  the language this page composed its site
+     *                               addresses with (processUrl()), as that render
+     *                               path holds it
+     *   languages:          array   qs_project_languages(): the project's codes,
+     *                               [] when it is in one language
      *   themeEnabled:       bool
      *   themeToggleEnabled: bool
      *   consentPayload:     ?array  from qs_consent_payload(), null when off
@@ -330,13 +335,24 @@ if (!function_exists('qs_runtime_handoff')) {
         //    URL space, `/`): qs.js composes the one target the server never sees
         //    as an argument — the magic-link `?return=` — against it, and exposes
         //    it as QS.basePath to code an author writes by hand.
+        //
+        //    And what else the page composed its own site addresses with
+        //    (processUrl()): the page's language and the project's languages. A
+        //    binding writes an address from data after the page is served, and
+        //    qs.js composes it as the server composed a written one, so the two
+        //    land in the same place (its _qsComposeSiteAddress()).
         $routeCtx = is_array($ctx['route'] ?? null) ? $ctx['route'] : [];
         $found = ($routeCtx['found'] ?? false) === true;
         $route = [
-            'path'   => $found && is_string($routeCtx['path'] ?? null) ? $routeCtx['path'] : null,
-            'params' => (object) ($found && is_array($routeCtx['params'] ?? null) ? $routeCtx['params'] : []),
-            'found'  => $found,
-            'base'   => $base,
+            'path'      => $found && is_string($routeCtx['path'] ?? null) ? $routeCtx['path'] : null,
+            'params'    => (object) ($found && is_array($routeCtx['params'] ?? null) ? $routeCtx['params'] : []),
+            'found'     => $found,
+            'base'      => $base,
+            'lang'      => (string) ($ctx['lang'] ?? ''),
+            'languages' => array_values(array_filter(
+                is_array($ctx['languages'] ?? null) ? $ctx['languages'] : [],
+                static fn($l): bool => is_string($l) && $l !== ''
+            )),
         ];
         $out .= '<script>window.QS_PROJECT=' . qs_inline_script_json($projectKey)
               . ';window.QS_ROUTE=' . qs_inline_script_json($route) . ';</script>';

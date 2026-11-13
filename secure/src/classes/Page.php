@@ -165,6 +165,12 @@ class Page {
         'assetVersion'       => $assetVersion,
         'projectKey'         => $projectKey,
         'route'              => $__route,
+        // What this page's compiled processUrl() composed its site addresses with,
+        // so qs.js composes a bound one the same way: the compiled page's own
+        // language expression, on the language it was given, and the project's
+        // languages.
+        'lang'               => qs_system_placeholders(['lang' => $this->lang])['__lang'],
+        'languages'          => qs_project_languages(),
         'themeEnabled'       => $themeEnabled,
         'themeToggleEnabled' => $toggleEnabled,
         'consentPayload'     => $__consentPayload,

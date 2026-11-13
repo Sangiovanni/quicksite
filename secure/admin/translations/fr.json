@@ -396,13 +396,9 @@
             "title": "Commandes par catégorie"
         },
         "storage": {
-            "title": "Aperçu du stockage",
-            "projects": "Projets",
             "backups": "Sauvegardes",
             "builds": "Builds",
             "exports": "Exports",
-            "admin": "Admin",
-            "system": "Système",
             "manageSpace": "Gérer l'espace",
             "buildsPage": "Ouvrir la page des compilations",
             "noItems": "Aucun élément",
@@ -555,6 +551,18 @@
         "errors": {
             "docNotFound": "Documentation de la commande introuvable",
             "docLoadFailed": "Échec du chargement de la documentation :"
+        },
+        "select": {
+            "storageItem": "Choisir un élément de stockage",
+            "collectedDatum": "Choisir une donnée collectée",
+            "collectedDatumCustom": "Un autre identifiant…",
+            "collectedDatumCustomHint": "Saisissez un identifiant absent de la liste : la donnée est créée.",
+            "collectedDatumPlaceholder": "L'identifiant de la donnée",
+            "collectedDatumExisting": "Données collectées"
+        },
+        "setRouteResolver": {
+            "sitemapNote": "Le plan du site a un éditeur pour le résolveur d'une route :",
+            "sitemapLink": "ouvrir le plan du site"
         }
     },
     "history": {
@@ -801,6 +809,26 @@
         "noteAmazon": "Login with Amazon demande l'adresse d'une politique de confidentialité et attend des adresses de retour en https.",
         "noteMeta": "Ajoutez l'autorisation email et laissez l'application en mode Développement pendant vos tests : seuls les comptes ayant un rôle sur l'application peuvent se connecter."
     },
+    "panelMode": {
+        "bubble": "Vous pouvez passer de Simple à Avancé ici, à tout moment.",
+        "bubbleClose": "Fermer",
+        "saveFailed": "Votre choix n'a pas pu être enregistré. Réessayez.",
+        "chooser": {
+            "title": "Quel menu voulez-vous ?",
+            "intro": "Les deux menus ouvrent le même panneau. Choisissez celui qui vous convient.",
+            "simpleLead": "Les pages qu'il faut pour construire et publier un site.",
+            "advancedLead": "Toutes les pages du panneau, les techniques aussi.",
+            "everythingInSimple": "Tout ce que contient Simple, et en plus :",
+            "pickSimple": "Choisir Simple",
+            "pickAdvanced": "Choisir Avancé",
+            "note": "Vous pouvez changer cela à tout moment depuis le menu du compte, en haut à droite.",
+            "advancedNone": "Les mêmes pages pour l'instant : les autres viennent avec un rôle dans un projet."
+        },
+        "notice": {
+            "text": "Cette page est dans le menu Avancé : vous l'avez ouverte par son adresse ou un lien.",
+            "switch": "Passer en Avancé"
+        }
+    },
     "nav": {
         "authentication": "Authentification",
         "oauth-providers": "Fournisseurs OAuth",
@@ -832,7 +860,10 @@
         "inspect": "Inspecter",
         "interactions": "Interactions",
         "sitemap": "Plan du site",
-        "optimize": "Optimiser"
+        "optimize": "Optimiser",
+        "mode": "Mode",
+        "modeSimple": "Simple",
+        "modeAdvanced": "Avancé"
     },
     "optimize": {
         "title": "Outils d'optimisation",
@@ -996,7 +1027,11 @@
     },
     "embedSecurity": {
         "title": "S\u00e9curit\u00e9 d'int\u00e9gration",
-        "subtitle": "G\u00e9rer les r\u00e8gles de sandbox iframe et les permissions d'int\u00e9gration"
+        "subtitle": "G\u00e9rer les r\u00e8gles de sandbox iframe et les permissions d'int\u00e9gration",
+        "disabled": {
+            "title": "La page Sécurité d'intégration est désactivée",
+            "text": "L'opérateur de cette installation a choisi de ne pas l'afficher. Cela retire une page, pas une règle : la politique d'intégration reste en vigueur, et chaque commande répond toujours sur l'API de gestion à tout appelant dont le rôle le permet."
+        }
     },
     "settings": {
         "title": "Paramètres",
@@ -2045,7 +2080,6 @@
         "paramName": "nom du paramètre",
         "paramValue": "valeur",
         "addAnother": "Ajouter un autre",
-        "textKeyWillGenerate": "La clé de texte sera générée automatiquement",
         "translationKeyParams": "Attributs traduits",
         "searchOrTypeKey": "Rechercher ou saisir une clé de traduction",
         "textContent": "Contenu textuel",
@@ -2241,7 +2275,68 @@
         "textModeHint": "Cliquez sur n'importe quel texte pour le modifier directement",
         "styleModeHint": "Cliquez sur un élément pour modifier son style, ou utilisez les sections ci-dessous",
         "jsModeHint": "Cliquez sur un élément pour gérer ses interactions JavaScript",
+        "simpleAdd": {
+            "pick": "Que voulez-vous ajouter ?",
+            "items": {
+                "text": "Texte",
+                "title": "Titre",
+                "button": "Bouton",
+                "link": "Lien",
+                "image": "Image",
+                "video": "Vidéo",
+                "audio": "Audio",
+                "list": "Liste",
+                "block": "Bloc"
+            },
+            "text": "Texte",
+            "textPlaceholder": "Tapez le texte…",
+            "size": "Taille",
+            "big": "Grand",
+            "medium": "Moyen",
+            "small": "Petit",
+            "titleHint": "Cette page a déjà un grand titre. Les moteurs de recherche lisent le grand titre d'une page comme son sujet : un seul par page, c'est mieux.",
+            "buttonText": "Texte du bouton",
+            "buttonInForm": "Il se place dans un formulaire : il enverra le formulaire.",
+            "buttonNoForm": "Il ne fait rien tant qu'on ne lui donne pas d'action, en mode Avancé, dans Interactions.",
+            "linkText": "Texte du lien",
+            "linkTo": "Mène à",
+            "linkPickPage": "— choisissez une page —",
+            "linkOutside": "Une adresse extérieure…",
+            "linkUrl": "Adresse",
+            "newTab": "Ouvrir dans un nouvel onglet",
+            "file": "Fichier",
+            "filePlaceholder": "Choisissez un fichier",
+            "choose": "Choisir…",
+            "upload": "Envoyer un fichier…",
+            "uploading": "Envoi…",
+            "uploadFailed": "L'envoi a échoué.",
+            "description": "Courte description",
+            "descriptionHint": "Lue à voix haute aux personnes qui ne voient pas l'image, et affichée quand elle ne peut pas se charger.",
+            "mediaControls": "Affiché avec ses commandes de lecture.",
+            "listItems": "Éléments",
+            "listItem": "Élément {n}",
+            "listMore": "Ajouter une ligne",
+            "listRemove": "Retirer cette ligne",
+            "blockHint": "Une boîte vide : sélectionnez-la, puis ajoutez des éléments dedans.",
+            "textRequired": "Tapez d'abord le texte.",
+            "pageRequired": "Choisissez une page, ou une adresse extérieure.",
+            "urlRequired": "Tapez l'adresse.",
+            "urlInvalid": "Tapez l'adresse complète, en commençant par https://",
+            "fileRequired": "Choisissez d'abord un fichier.",
+            "keysFailed": "Le texte n'a pas pu être enregistré : rien n'a été ajouté.",
+            "addFailed": "L'élément n'a pas pu être ajouté."
+        },
+        "modeSwitch": {
+            "title": "Changer de mode ?",
+            "closes": "Passer en mode {mode} ferme {tool}. Ce qui n'y est pas enregistré sera perdu.",
+            "redraws": "Passer en mode {mode} recommence le formulaire Ajouter. Ce qui y est tapé sera perdu.",
+            "switch": "Changer",
+            "stay": "Rester"
+        },
         "addModeHint": "Sélectionnez d'abord un élément pour ajouter des frères ou enfants",
+        "iframeWarningText": "Une intégration de cette page vient d'un site que la politique d'intégration de cette installation ne liste pas : elle s'exécute avec les limites les plus strictes et peut rester vide.",
+        "iframeWarningLink": "Voir la politique",
+        "iframeWarningDismiss": "Fermer",
         "editModeHint": "Sélectionnez d'abord un élément pour modifier sa structure",
         "styleSource": "Source",
         "styleSourceHint": "Modifier le fichier style.css complet",

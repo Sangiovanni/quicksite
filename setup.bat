@@ -29,9 +29,10 @@ REM   8. Command console      - offer the raw command runner at /admin/command?
 REM   9. Default language     - the language a new project starts in
 REM  10. Idle sign-out        - how long the panel may go unused before it signs
 REM                             you out
+REM  11. Embed security page  - show the embed policy's page in the panel?
 REM
 REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5
-REM and 7-10 write config files under the secure folder. Item 6 only reads.
+REM and 7-11 write config files under the secure folder. Item 6 only reads.
 REM
 REM Before anything else, it checks the PHP version: older than 8.3, it stops.
 REM
@@ -167,6 +168,7 @@ echo   Storage quotas:     !QUOTA_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
 echo   Default language:   !DEFLANG_LABEL!
 echo   Idle sign-out:      !IDLE_LABEL!
+echo   Embed security:     !EMBED_LABEL!
 echo.
 echo     1^) Rename the public folder
 echo     2^) Rename the secure folder
@@ -178,6 +180,7 @@ echo     7^) Storage quotas (per user)
 echo     8^) Offer / withhold the command console ^(/admin/command^)
 echo     9^) Default language for new projects
 echo    10^) Idle sign-out ^(how long the panel may go unused^)
+echo    11^) Show / hide the Embed Security page ^(/admin/embed-security^)
 echo     q^) Finish
 echo.
 set "CHOICE="
@@ -193,6 +196,7 @@ if "!CHOICE!"=="7" goto :go_quota
 if "!CHOICE!"=="8" goto :go_console
 if "!CHOICE!"=="9" goto :go_deflang
 if "!CHOICE!"=="10" goto :go_idle
+if "!CHOICE!"=="11" goto :go_embed
 if /i "!CHOICE!"=="q" goto :finish
 if "!CHOICE!"=="" goto :finish
 echo   Unknown choice: !CHOICE!
@@ -252,6 +256,11 @@ call :item_idle
 call :pause_menu
 goto :menu
 
+:go_embed
+call :item_embed
+call :pause_menu
+goto :menu
+
 REM ==========================================================
 REM Finish
 REM ==========================================================
@@ -272,6 +281,7 @@ echo   Storage quotas:     !QUOTA_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
 echo   Default language:   !DEFLANG_LABEL!
 echo   Idle sign-out:      !IDLE_LABEL!
+echo   Embed security:     !EMBED_LABEL!
 echo.
 echo   Next steps:
 echo     1. Point your vhost DocumentRoot at the public folder
@@ -461,6 +471,16 @@ if exist "!CONSOLE_FILE!" (
     set "CONSOLE_LABEL=off  (value unreadable - check console.php)"
     findstr /c:"    'allow_console' => false," "!CONSOLE_FILE!" >nul 2>&1 && set "CONSOLE_LABEL=off  (/admin/command is not offered)"
     findstr /c:"    'allow_console' => true," "!CONSOLE_FILE!" >nul 2>&1 && set "CONSOLE_LABEL=on"
+)
+
+REM ABSENT MEANS SHOWN for the Embed Security page too, and a broken file hides
+REM it, for the console's reason: the file exists only to say no.
+set "EMBED_FILE=!CONFIG_DIR!\embed-security.php"
+set "EMBED_LABEL=shown  (default - embed-security.php not created yet)"
+if exist "!EMBED_FILE!" (
+    set "EMBED_LABEL=hidden  (value unreadable - check embed-security.php)"
+    findstr /c:"    'show_embed_security' => false," "!EMBED_FILE!" >nul 2>&1 && set "EMBED_LABEL=hidden  (/admin/embed-security is not in the menu)"
+    findstr /c:"    'show_embed_security' => true," "!EMBED_FILE!" >nul 2>&1 && set "EMBED_LABEL=shown"
 )
 
 REM The default language for new projects. ABSENT MEANS 'en', and so does a
@@ -1424,6 +1444,100 @@ set "IW_SECS=!ID_SECS!"
 call :idle_words
 echo   + Idle sign-out: !IDLE_WORDS!
 echo     Every session follows it from its next request.
+goto :eof
+
+REM ==========================================================
+REM Item 11 - the Embed Security page
+REM ==========================================================
+REM The page shows the installation's embed policy (embed-policy.json),
+REM read-only: no author can change it from the panel, so a deployer may decide
+REM nobody needs to see it. ABSENT MEANS SHOWN, so this item declines to write a
+REM file when the answer is "show": the file exists only to say no.
+REM
+REM AND IT IS NOT A SECURITY CONTROL. Hiding the page removes a page, not a
+REM rule: the policy stays in force, and every command stays reachable at
+REM /management/ to any caller whose role allows it.
+:item_embed
+call :read_state
+echo.
+echo Embed Security page
+echo.
+echo   Should the admin panel show the Embed Security page at
+echo   /admin/embed-security - a read-only view of the embed policy, the
+echo   sandbox the installation puts around iframes embedded in a page?
+echo.
+echo   show  the default. The page is in the panel's Settings menu, for
+echo         the advanced mode.
+echo   hide  the page leaves the menu and says it was turned off. Nobody
+echo         can change the policy from the panel anyway: you set it in
+echo         embed-policy.json.
+echo.
+echo   Currently: !EMBED_LABEL!
+echo.
+echo   ^^! This is NOT a security control. The embed policy stays in
+echo     force either way, and every command stays reachable at
+echo     /management/ to any caller whose role allows it.
+echo.
+
+set "ANSWER="
+set /p "ANSWER=  Show the Embed Security page on this installation? [Y/n]: "
+
+REM Enter accepts the SHIPPED DEFAULT, which here is show.
+set "EMB_VALUE=true"
+if /i "!ANSWER!"=="n" set "EMB_VALUE=false"
+if /i "!ANSWER!"=="no" set "EMB_VALUE=false"
+
+if not exist "!CONFIG_DIR!" (
+    echo   X Error: config folder not found: !CONFIG_DIR!
+    goto :eof
+)
+
+REM Accepting when no file exists LEAVES IT ABSENT, as item 8 does: absent
+REM already means shown.
+if /i "!EMB_VALUE!"=="true" (
+    if not exist "!EMBED_FILE!" (
+        echo.
+        echo   + Embed Security stays shown - embed-security.php left absent,
+        echo     which is what a fresh install has.
+        goto :eof
+    )
+)
+
+REM The .example is the shipped documentation and is never edited: the live
+REM file is a COPY with the value patched.
+if not exist "!EMBED_FILE!" (
+    if not exist "!CONFIG_DIR!\embed-security.php.example" (
+        echo   X Error: neither embed-security.php nor embed-security.php.example is present
+        echo     !CONFIG_DIR!
+        goto :eof
+    )
+    copy /y "!CONFIG_DIR!\embed-security.php.example" "!EMBED_FILE!" >nul
+)
+
+set "PS_EMB_TEMP=%TEMP%\qs_setup_embed.ps1"
+echo $f = '!EMBED_FILE!' > "%PS_EMB_TEMP%"
+echo $v = '!EMB_VALUE!' >> "%PS_EMB_TEMP%"
+REM -Encoding UTF8 is load-bearing, as in item 8.
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_EMB_TEMP%"
+echo $c = $c -replace "'show_embed_security'\s*=>\s*\w+", ("'show_embed_security' => " + $v) >> "%PS_EMB_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_EMB_TEMP%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_EMB_TEMP%" <nul >nul 2>&1
+del "%PS_EMB_TEMP%" 2>nul
+
+findstr /c:"    'show_embed_security' => !EMB_VALUE!," "!EMBED_FILE!" >nul 2>&1
+if errorlevel 1 (
+    echo   X Could not set the value automatically.
+    echo     Edit this file by hand and set 'show_embed_security' =^> !EMB_VALUE!:
+    echo     !EMBED_FILE!
+    goto :eof
+)
+if /i "!EMB_VALUE!"=="false" (
+    echo   + Embed Security page: hidden
+    echo     It is no longer in the menu, and says it was turned off. The
+    echo     embed policy is unchanged.
+) else (
+    echo   + Embed Security page: shown
+)
 goto :eof
 
 REM ==========================================================

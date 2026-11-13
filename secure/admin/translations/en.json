@@ -543,13 +543,9 @@
             "error": "Failed to load project info"
         },
         "storage": {
-            "title": "Storage Overview",
-            "projects": "Projects",
             "backups": "Backups",
             "builds": "Builds",
             "exports": "Exports",
-            "admin": "Admin",
-            "system": "System",
             "manageSpace": "Manage Space",
             "buildsPage": "Open builds page",
             "noItems": "No items",
@@ -767,7 +763,13 @@
             "eventsLessCommon": "Less common",
             "eventCustom": "Type an event that is not listed…",
             "eventCustomHint": "Use an event name the element does not normally carry",
-            "eventCustomPlaceholder": "Event name, for example onclick"
+            "eventCustomPlaceholder": "Event name, for example onclick",
+            "storageItem": "Select a storage item",
+            "collectedDatum": "Select a collected datum",
+            "collectedDatumCustom": "Another id…",
+            "collectedDatumCustomHint": "Type an id the list does not have: the datum is created.",
+            "collectedDatumPlaceholder": "The datum's id",
+            "collectedDatumExisting": "Collected data"
         },
         "empty": {
             "noKeys": "No keys found",
@@ -925,6 +927,10 @@
             "login": "Signing in from this console would mint a second session on top of the one this panel is already using. The parameters and documentation below are complete \u2014 call it against the Management API instead.",
             "logoutSession": "Running this from the console would end the session this panel is using and sign you out mid-page. Use Logout in the account menu instead. The parameters and documentation below are complete.",
             "registerDisabled": "This installation does not accept self-registration (registration.allow_self_registration is off), so this command answers 403 to every caller \u2014 the console included. The parameters and documentation below are complete, and describe what it does where the setting is on."
+        },
+        "setRouteResolver": {
+            "sitemapNote": "The Sitemap has an editor for a route's resolver:",
+            "sitemapLink": "open the Sitemap"
         }
     },
     "history": {
@@ -1184,6 +1190,26 @@
         "noteAmazon": "Login with Amazon asks for a privacy notice address, and expects its return addresses to use https.",
         "noteMeta": "Add the email permission, and keep the app in Development mode while you test: only accounts with a role on the app can sign in."
     },
+    "panelMode": {
+        "bubble": "You can switch between Simple and Advanced here at any time.",
+        "bubbleClose": "Close",
+        "saveFailed": "Your choice could not be saved. Try again.",
+        "chooser": {
+            "title": "How should your menu look?",
+            "intro": "Both menus open the same panel. Pick the one that suits you.",
+            "simpleLead": "The pages you need to build and publish a site.",
+            "advancedLead": "Every page of the panel, the technical ones too.",
+            "everythingInSimple": "Everything in Simple, plus:",
+            "pickSimple": "Choose Simple",
+            "pickAdvanced": "Choose Advanced",
+            "note": "You can change this at any time from the account menu, top right.",
+            "advancedNone": "The same pages for now: the others come with a role in a project."
+        },
+        "notice": {
+            "text": "This page is in the Advanced menu: you reached it from its address or a link.",
+            "switch": "Switch to Advanced"
+        }
+    },
     "nav": {
         "oauth-providers": "OAuth providers",
         "members": "Members",
@@ -1229,7 +1255,10 @@
         "authentication": "Authentication",
         "compliance": "Compliance",
         "storage": "Storage",
-        "privacy": "Privacy"
+        "privacy": "Privacy",
+        "mode": "Mode",
+        "modeSimple": "Simple",
+        "modeAdvanced": "Advanced"
     },
     "optimize": {
         "title": "Optimization Tools",
@@ -1465,6 +1494,10 @@
         "blockEverything": "Block everything",
         "errors": {
             "loadFailed": "Failed to load the embed policy"
+        },
+        "disabled": {
+            "title": "The Embed Security page is turned off",
+            "text": "The operator of this installation chose not to show it. This removes a page, not a rule: the embed policy stays in force, and every command still answers on the Management API to any caller whose role allows it."
         }
     },
     "settings": {
@@ -2106,7 +2139,7 @@
         "fullPage": "Full Page",
         "componentSoon": "Component isolation coming soon",
         "componentWarning": "Editing component template - changes affect all :count usage(s)",
-        "iframeWarningText": "This page contains embedded iframes. If an embed appears empty, its host is not allowed by this installation's embed policy.",
+        "iframeWarningText": "An embed on this page comes from a site this installation's embed policy does not list, so it runs with the strictest limits and may stay empty.",
         "iframeWarningLink": "View policy",
         "iframeWarningDismiss": "Dismiss",
         "iframeTitle": "Website Preview",
@@ -2777,7 +2810,6 @@
         "paramName": "param name",
         "paramValue": "value",
         "addAnother": "Add another",
-        "textKeyWillGenerate": "Text key will be auto-generated",
         "textKeyAutoGenerated": "Auto-generated text key",
         "translationKeyParams": "Translated attributes",
         "searchOrTypeKey": "Search or type a translation key",
@@ -2993,6 +3025,64 @@
         "textModeHint": "Click any text in the preview to edit it inline",
         "styleModeHint": "Click an element to edit its style, or use the sections below",
         "jsModeHint": "Click an element to manage its JavaScript interactions",
+        "simpleAdd": {
+            "pick": "What do you want to add?",
+            "items": {
+                "text": "Text",
+                "title": "Title",
+                "button": "Button",
+                "link": "Link",
+                "image": "Image",
+                "video": "Video",
+                "audio": "Audio",
+                "list": "List",
+                "block": "Block"
+            },
+            "text": "Text",
+            "textPlaceholder": "Type the text…",
+            "size": "Size",
+            "big": "Big",
+            "medium": "Medium",
+            "small": "Small",
+            "titleHint": "This page already has a big title. Search engines read a page's big title as its subject, so one per page is best.",
+            "buttonText": "Button text",
+            "buttonInForm": "It lands inside a form: it will send the form.",
+            "buttonNoForm": "It does nothing until it is given an action, in Advanced mode under Interactions.",
+            "linkText": "Link text",
+            "linkTo": "Goes to",
+            "linkPickPage": "— choose a page —",
+            "linkOutside": "An outside address…",
+            "linkUrl": "Address",
+            "newTab": "Open in a new tab",
+            "file": "File",
+            "filePlaceholder": "Choose a file",
+            "choose": "Choose…",
+            "upload": "Upload a file…",
+            "uploading": "Uploading…",
+            "uploadFailed": "The upload failed.",
+            "description": "Short description",
+            "descriptionHint": "Read aloud to people who cannot see the image, and shown when it cannot load.",
+            "mediaControls": "Shown with its play controls.",
+            "listItems": "Items",
+            "listItem": "Item {n}",
+            "listMore": "Add an item",
+            "listRemove": "Remove this item",
+            "blockHint": "An empty box: select it, then add elements inside it.",
+            "textRequired": "Type the text first.",
+            "pageRequired": "Choose a page, or an outside address.",
+            "urlRequired": "Type the address.",
+            "urlInvalid": "Type the full address, starting with https://",
+            "fileRequired": "Choose a file first.",
+            "keysFailed": "The text could not be saved, so nothing was added.",
+            "addFailed": "The element could not be added."
+        },
+        "modeSwitch": {
+            "title": "Switch mode?",
+            "closes": "Switching to {mode} closes {tool}. Anything not saved there will be lost.",
+            "redraws": "Switching to {mode} starts the Add form again. Anything typed in it will be lost.",
+            "switch": "Switch",
+            "stay": "Stay"
+        },
         "addModeHint": "Select an element first to add siblings or children",
         "editModeHint": "Select an element first to edit its structure",
         "styleSource": "Source",

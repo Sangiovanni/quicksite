@@ -105,8 +105,9 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge, and each share on its entry (My memberships, Project members); the queue's count also per project (`adjudicationByProject`), which the Project members page names; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
+| `js/core/panel-mode.js` | The mode (*The mode: simple or advanced* above): the account menu's **Mode** row, the chooser for an account with no mode, and what follows the first pick (the account menu open, the row's glow, the bubble). Loaded on every page of a signed-in account, after `admin.js`. |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
-| `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, delegation. |
+| `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, the menu's groups after both filters (`applyMenuGroups()`), `canRun(command)` (the one answer to whether a page shows a control: the role holds the command, and a project-scoped command has a project), delegation. |
 
 **Tooltips: the panel's bubble.** A tooltip in the panel is a plain `title` attribute, in a
 template or written by a script; `bubble.js` shows it instead of the browser. It shows on mouse
@@ -160,7 +161,7 @@ hover opened leaves it open, and the next click closes it. While a menu is pinne
 other. In the phone's panel a group expands in place and has no hover; it closes when another group
 opens, with the panel, by its arrow or on Escape, never on the way to a press elsewhere in the
 panel, which would move the next entry from under the finger. The **account menu**, which
-your name and role open, holds My account, the panel's language, Log out and Log out everywhere,
+your name and role open, holds My account, the panel's language, the mode, Log out and Log out everywhere,
 and on a phone says your name and role as its first line. One helper opens and closes all three kinds of menu
 (`QuickSiteAdmin.initHeaderMenus()`), so they close by the same rules: one at a time, but for a
 group inside the open panel; on Escape, which puts the focus back on what opened it; on a click or
@@ -168,6 +169,52 @@ tap outside; when the focus leaves; and when the page changes. A menu's box stay
 window at any width. The **Members** group's count is everything that waits; its two entries each
 show their share: **My memberships** what waits for you (invitations and notices), **Project
 members** the join requests waiting for your validation, across the projects you run.
+
+**The mode: simple or advanced.** Each account chooses the menu it sees. **Simple** shows Dashboard,
+Build (Visual Editor, Builds), Media, Sitemap, Members (My memberships, Project members) and Settings
+(Settings, AI connections). **Advanced** shows every page: Commands, History and API Endpoints in
+Build, Authentication, Compliance (Storage, Privacy), Optimize and Embed Security besides. The mode
+decides the menu and nothing else: every page opens at its address for anyone whose role allows it,
+in either mode, and no permission, control or command reads the mode. A page the advanced menu reaches
+and the simple one does not (Commands, History, API Endpoints, Authentication, Storage, Privacy, Optimize,
+Embed Security), opened in simple from its address or a link, says so in one line at its top, *This page is
+in the Advanced menu: you reached it from its address or a link.*, with **Switch to Advanced**, the *Mode*
+row's own switch (`qs_admin_menu_page_is_advanced()`; drawn in either mode, shown by the simple class). What simple shows is one definition
+in code, `secure/admin/functions/panelMenu.php` (`qs_admin_menu()`): every entry with its words, its
+icon, the commands its role filter needs, the setup switch that can take it off the installation, and
+whether simple shows it; an entry it does not mark simple is advanced. `layout.php` draws the menu from
+it, every entry the installation offers, and marks each advanced one `data-menu-advanced`; the page's
+`admin-body--simple` class, set by the server from the account's mode, hides those, so the first frame
+is right and a switch needs no reload. Once permissions load the role filter hides what the role cannot
+use (`data-requires-command`), and `QuickSiteAdmin.applyMenuGroups()` then draws a group with no entry
+left as nothing and a group with one entry left as that entry, a plain link with its own words, icon
+and count; it runs again after a switch. The Visual Editor needs only what reading a page needs, so a
+viewer has it in the menu; Build's other entries need `editStructure` too.
+
+The mode is kept on the account, in `users.php` (`panel_mode`), beside the starred projects, and
+written through `/admin/state/panel-mode` (`{"mode": "simple"|"advanced"}`, any other value refused),
+so it follows the account to another browser. An account with no mode has not chosen: the first panel
+page it loads while signed in, whichever page that is, opens the **chooser**, and the menu behind it is
+simple. Sign-in, register and first run never show it. The chooser is the panel's one modal
+(`QuickSiteUtils.openModal()`, see *Dialogs* below), opened once permissions have loaded; it closes
+only by a pick (Escape and the backdrop do nothing). Its two cards, Simple on the left and Advanced on
+the right, each hold a drawing of the menu (inline SVG in the panel's colours, no words) and the list of
+pages that mode's menu reaches for this role, from the same definition and through the same role filter;
+the Advanced list starts *Everything in Simple, plus:*, or says the pages are the same for now when the
+role gives nothing more. A card is its button. In bold, it says the mode can be changed at any time from
+the account menu. A pick that cannot be saved keeps the chooser open and says so. After the pick the
+account menu opens, its **Mode** row glows three times where it is (with the system's *reduce motion*,
+it does not), and a bubble under the row, with a ×, says the mode can be switched there at any time;
+the bubble goes with its × or with the menu, and does not come back. The **Mode** row (*Mode: Simple |
+Advanced*, under the language, the current mode marked) switches at once and saves; a save that fails
+puts the menu back and says so in a toast. `js/core/panel-mode.js` answers the row and the chooser.
+
+The visual editor draws a view of its own for each mode (§8.1, *The simple view*), so it hears a switch
+both ways. Before it, `panel-mode.js` asks each function in `window.QuickSitePanelModeGuards` (an array
+a page fills, whenever its script runs), with the mode about to be drawn, for `true` or `false`, or a
+promise of one: one `false` and nothing switches. After it, `quicksite:panel-mode` fires on the document,
+its detail `{mode}`, whenever the class changes (a switch, a failed save putting the mode back, the
+chooser's pick). With no guard registered the switch happens at once, as on every other page.
 
 `--admin-header-height` follows the header's real height at every width, in any language and at
 any text size: `admin.js` writes it on `:root` from a `ResizeObserver`, and `admin.css` and
@@ -200,6 +247,7 @@ whose click it holds is followed afterwards, a mode or tab switch happens afterw
 | Focus | It takes the focus: the confirm button, **Cancel** for a `type: 'danger'` one (a question before a delete or an overwrite: its button is red), the text field of a prompt (Enter there is OK). Tab stays inside. Closing gives the focus back where it was. |
 | Keys | While it is open no key reaches the page: not the editor's shortcuts (Delete, Escape), not the panel's (`g d`, `?`), not a modal underneath. Escape and a click on the backdrop answer no. |
 | Words | Its message keeps its line breaks and is shown as text. Default title *Confirm Action* and buttons *Confirm* / *Cancel* (`common`), or the `title`, `confirmText`, `cancelText` given; a prompt has no title unless given, its question is the field's label, and `defaultValue` / `placeholder` fill the field. |
+| The one modal | Both are drawn in `QuickSiteUtils.openModal(box, options)`, which does the layer, the focus, Tab and the keys for any content; the mode chooser uses it with no dismissal, so Escape and the backdrop do nothing there and only its own buttons close it. |
 | The one exception | Leaving the page with unsaved CSS Source edits (closing the tab, reloading) is the browser's own `beforeunload` question: a page cannot replace it (§8.10). |
 
 ### 5.2 Shared components
@@ -262,6 +310,7 @@ There is no workflow browser or spec-runner page: both are subsumed by the visua
 | `preview-transition-editor.js` | Transition-property editor. |
 | `preview-js-interactions.js` | Element-level interaction (event) editor + verb picker (§9.9). |
 | `preview-translation.js` | Translation Manager mode (§8.9). |
+| `preview-simple-add.js` | The simple Add (§8.1, *The simple Add*): what each item of the list sends, its keys' names, and taking back a refused add. |
 | `preview-ai-tools.js` | Workflows mode (`ai-tools`, the file named after the panel's first name, AI tools) — workflow list, runner, batch execution (§8.12). |
 | `preview-drag.js` | Drag-mode UX. |
 | `contextual-complex/` | Per-kind complex-element wizards (§8.7). |
@@ -336,6 +385,10 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
 | `sidebarWidth` | localStorage | `preview-sidebar-resize.js` — the visual editor's options panel's width in pixels, as its handle left it; stored as `quicksite_sidebar_width` |
 | `previewFrame` | localStorage | `preview.js` — the visual editor's device and each device frame's last size, as JSON (`{"device": "mobile", "sizes": {"mobile": [375, 667], "tablet": [768, 1024]}}`); one per browser, for every project. A missing, malformed or out-of-range part gives that part's default (§8.3) |
+| `toolsShowNames` | localStorage | `preview.js` — whether the editor's tool row shows each tool's name beside its icon (**Show names**): `'false'` hides them, anything else shows them; stored as `quicksite-tools-show-names` |
+| `emulateComponent`, `emulatePage` | localStorage | `preview.js` — the sample values an Emulation fills the preview with, as JSON: per component (`qs_emulate_<component>`) and per page (`qs_emulate_page_<route>`); kept in this browser, nothing written to the project |
+| `addLastTab` | localStorage | `preview.js` — the tab the advanced Add form last opened on |
+| `addPreviewExpanded`, `addPositionExpanded`, `addAdvancedExpanded` | localStorage | `preview.js` — whether each folding section of the Add form is open (`'1'`) or folded (`'0'`); `contextual-add.php` names each on its header (`data-storage-key`) |
 | `workflowsList` | localStorage | `preview-ai-tools.js` — the Workflows panel's workflows last opened, newest first (three kept), and the groups left open once the list folds, as JSON (`{"recent": ["restyle"], "open": ["look"]}`); one per browser, for every project. A missing or malformed part reads as empty, and a failure to read or write is silent (§8.12) |
 | `workflowsBackupNoteHidden` | localStorage | `preview-ai-tools.js` — the Workflows panel's backup message put away for good (`'1'`); stored as `quicksite-ai-tools-backup-note-hidden`, its name from before the registry (§8.12) |
 | `updateCheckAt` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
@@ -348,7 +401,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `starredProjects` (the account's starred project ids, §8.0), `writeRate`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `starredProjects` (the account's starred project ids, §8.0), `panelMode` (the account's mode, `null` until its first pick: a display preference, never an authorization input), `writeRate`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` + `window.QS_SETTINGS_I18N` | `baseUrl`, `commandUrl`, `aiSettingsUrl`, `quicksiteVersion`; the `settings` and `common` sub-trees, verbatim |
 | `templates/pages/apis.php` | `window.QS_APIS_I18N` | the `apis` and `common` sub-trees, verbatim |
 | `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `window.QS_EMBED_SECURITY_I18N` | `baseUrl`; the `embedSecurity` sub-tree, verbatim |
@@ -401,14 +454,35 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **Select** | `select` | Click an element → inspect node, add a sibling/child (a child only where the element can hold one: not a text, a component or a void element such as an image), **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
 | **Drag** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. A press selects an element, and **Lock** keeps it selected through any number of drops. A finger scrolls the page: a tap selects, and only a locked element is dragged, by a press on it. |
 | **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. A paste is plain text on one line — the clipboard's text, each run of line breaks a space — inserted as typing is, so Ctrl+Z undoes it; when an edit ends, the element holds exactly the text saved. |
-| **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
+| **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. In advanced mode, designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. An element's event list offers the events the interaction commands accept, in two groups: **Common for** the element's tag, and **Less common**. |
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **Workflows** | `ai-tools` | In-editor workflow runner. A searchable list of the workflows, grouped by what you want to do, each row saying in words what a run does; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
+**Which tools a role sees.** Each tool, and each of Select's buttons, is offered only to a role that holds the commands it sends, in either mode: one definition, `secure/admin/functions/editorTools.php` (`qs_editor_controls()`), draws them as `data-requires-command`, which the role filter reads once permissions load (§5.1). Select reads, so every role has it. A viewer has Select alone, with none of its buttons; an editor has every tool but CSS; a designer and the roles above it have them all. Workflows needs what adding an element needs: every shipped workflow but one writes the site, and the one left runs what is pasted into it. A tool not offered cannot be entered (`switchMode()` goes to Select instead), and the Delete key acts only where the Delete button is offered. The server still checks each command's role.
+
+**The simple view.** In simple mode (§5.1) the editor leaves out what a beginner does not need: the **Interactions** tool, CSS's **Source** and **Motion** (the tab, and a selected selector's **Animate**), and Select's **Save as Snippet** and **Save as Component**. Select's **Add** opens the simple Add in place of the five tabs. The same definition marks each of these `data-editor-advanced`, which the page's simple class hides, so a switch shows or hides them at once. A switch that would close the tool in use (Interactions, Source, Motion) or start an open Add form again first asks, **Switch** or **Stay**, saying what not saved there would be lost; **Stay** changes nothing. After **Switch** the editor leaves a tool the mode no longer shows for Select (Motion for Theme, Source for the page), and an open Add form starts again in the new mode on the same element and position. With nothing open, the switch happens at once. The mode decides what is drawn and nothing else.
+
+**The simple Add.** A list of nine plain elements, each with a small form of its own, Before / After / Inside, Cancel and Add (`_simple-add.php`; what each sends, `preview-simple-add.js`):
+
+| Item | What is added | Its form |
+|---|---|---|
+| **Text** | a paragraph, `<p>` | its text |
+| **Title** | `<h1>` (Big), `<h2>` (Medium) or `<h3>` (Small) | its size, three cards side by side, each word in its own size; its text. It starts on Big on a page with no big title and on Medium on one that has one; while Big is picked on such a page, it says search engines read a page's big title as its subject, so one per page is best — a hint, never a refusal |
+| **Button** | `<button>` with its text: `type="submit"` where it lands inside a form (it sends the form), `type="button"` anywhere else | its text, and a line saying which: it sends the form, or it does nothing until an action is given to it in Advanced, under Interactions |
+| **Link** | `<a>` with its text and `href`; `target="_blank"` when **Open in a new tab** is ticked (unticked at first) | its text; where it goes: a page of the site from a list (a page whose address takes a parameter is not listed) or an outside address, written in full (`https://`, `http://`, `mailto:` or `tel:`) |
+| **Image** | `<img>` with its `src`, and its short description as its `alt`, a key of its own; no description, no `alt` | a file from Media; the short description |
+| **Video**, **Audio** | `<video>` / `<audio>` with its `src`, and its play controls (the engine's default) | a file from Media |
+| **List** | a bulleted list, `<ul>`, an `<li>` per line | its lines: three to start, **+ Add an item** adds one and each line's **×** removes it (one always stays); a line left empty takes its placeholder's words (*Item 3*) |
+| **Block** | a plain box, `<div>`, empty | nothing: it is selected once added, an empty box you can see, to add elements inside |
+
+There is no class, no ID and no key-or-literal choice: each text gets a translation key of its own, written in every language of the project, the text in the language being edited and empty in the others (the Translations tool lists those as unset), and named as the engine names the keys it generates: `<page>.item<N>` (a nested page's slashes as dots), `menu.item<N>`, `footer.item<N>`, `component.<name>.item<N>`, after the highest such number already used. Image, Video and Audio take their file with **Choose…**, which opens the Media picker; there it carries **Upload a file…** above the list, for a role that may upload, and the file uploaded is picked at once. Nothing opens by itself: **Add Element** with no file says so and puts the focus on **Choose…**. The form opens on **Inside** when the element selected is empty and can hold others (a new Block, an empty form), on **After** otherwise. Every item goes through the same commands as the advanced form: `addNode`, and for the List `addComplexElement` (its `list` kind), which adds the whole list or nothing. The keys are written first (`setTranslationKeys`, one call per language); when the element is then refused, the keys that add wrote are deleted again (`deleteTranslationKeys`), the form stays open and says why. The list is fixed in code: each item needs a form of its own.
+
+**The embed warning.** A banner above the page warns while the structure being edited (a page, the menu, the footer or a component) holds an embed (`<iframe>`) that the installation's embed policy does not cover: its address names no host the policy lists (the host itself or a subdomain of it, matched as `IframeSandbox` matches it), it has no host of its own (a relative address, which is this site), it names this site's own host, or it carries a `srcdoc`. Such an embed runs with the policy's default sandbox, the strictest the deployer set, and may stay empty. The policy is read with `getIframeSandbox`, once per page load; the check runs on the first structure shown, on every move through the Edit list and after every change of structure. The banner's **View policy** link to Embed Security is there only where the installation shows that page (setup item 11, §9.17); its × hides the banner until the page is loaded again. In the editor an embed lets the pointer through, so a click on it selects it, wherever it sits on the page (one at a page's top level included).
+
 **Picking a target.** Picking the Menu or the Footer in the Edit list selects nothing, as picking a page does, and scrolls it into view in the frame. The frame shows a page with its menu and footer around it, so in Select a click on an element outside the target, whichever of the three it is, asks whether to switch: a yes moves the Edit list there with nothing selected, and a no leaves the outline and the panel on what was selected before. Workflows asks nothing, as a selection there acts on nothing, and Select does not take over a selection another tool made outside the target.
 
-**Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. An element added *inside* one that holds text takes that text (`addNode` moves the target's text into the new element when the new element can hold children), and the canvas shows it there at once, the text once, without a reload. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
+**Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. An element added *inside* one that holds text takes that text (`addNode` moves the target's text into the new element when the new element can hold children), and the canvas shows it there at once, the text once, without a reload. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas, an element just added included; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
 
 **Saving a selection as a snippet.** Select mode's *save as snippet* flow asks for a name and offers one checkbox: **"Save to my personal snippets (reusable in all my projects)"**. Leave it unchecked and the snippet belongs to the project you are editing, where every member of that project can use it. Tick it and the snippet goes to your own library instead — it follows you into every project you work on, and nobody else can see it, insert it, or delete it. The Add panel's **Snippet** tab lists all three tiers in one picker — the snippets shipped with the engine, your personal ones, and the current project's — with each entry labelled by the tier it came from. See [COMMAND_API.md](COMMAND_API.md) for how a name that exists in more than one tier resolves.
 
@@ -514,7 +588,7 @@ and the field is still empty.
 | Animations | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` |
 | Interactions / events | `listJsFunctions`, `listDataBindings`, `listInteractions`, `addInteraction`, `editInteraction`, `deleteInteraction`, `addPageEvent`, `editPageEvent`, `deletePageEvent` |
 | State + integrations | `getStateStores`, `setStateStores`, `listApiEndpoints`, `editApi`, `listOAuthProviders`, `setOAuthCredentials`, `listStorageItems`, `addStorageItem` |
-| Assets / misc | `listAssets`, `help`, `backupProject` |
+| Assets / misc | `listAssets`, `uploadAsset` (the Media picker's upload, in the simple Add), `getIframeSandbox` (the embed warning), `help`, `backupProject` |
 
 For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
 
@@ -1098,7 +1172,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id" with a button copying the id, *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename**, **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any: the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. An account that owns no project but can read one of the three sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures both cards. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
+| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id" with a button copying the id, *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename**, **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any and you own it (their count and size are *My total space*'s own figures for that project): the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. An account that owns no project but can read the build or the backups sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures the card. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
@@ -1108,7 +1182,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
-| **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. |
+| **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. An installation can hide the page (setup item 11, `embed-security.php`, `qs_embed_security_shown()`; absent, it is shown): it leaves the menu and says it was turned off, while the policy stays in force and `getIframeSandbox` keeps answering every role that holds it. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
 
 ### 9.1 API Registry (/admin/apis)
@@ -1372,9 +1446,11 @@ field list is exactly what you declared.
 The picker writes to the endpoint's `responseBindings` array via
 `editApi`. A binding that sets an attribute (its **Attribute** field) names
 one an author could write on the page: an event handler (`onclick` and the
-like), `srcdoc` or a malformed name is refused, and the save stops with
+like), `srcdoc`, any `data-consent-*` name (what a click on the consent
+banner records) or a malformed name is refused, and the save stops with
 *Error saving bindings* naming the binding. The browser holds every binding
-to the same rule, as described for `data-bind-attr` in §9.6. Component-list
+to the same rule, and writes no `meta`'s `content` or `http-equiv` either
+(a binding names no tag here), as described for `data-bind-attr` in §9.6. Component-list
 bindings have this shape:
 
 ```json
@@ -2408,12 +2484,19 @@ init / `setState` / `fetchState`:
     instead. *This is the same `data-bind` mechanism used by componentList
     bindings — see §9.2 for the full template-population reference.*
   - A binding sets only what an author could write on the page. It never sets
-    an event handler, `srcdoc`, or an iframe's `src` or `sandbox`: saving one
+    an event handler, `srcdoc`, an iframe's `src` or `sandbox`, any
+    `data-consent-*` name, or a `meta`'s `content` or `http-equiv`: saving one
     is refused with a message naming the node, and the browser writes nothing
     and says so once on the console. A URL attribute (`href`, `src` and the
     like) whose value names a scheme other than `http`, `https`, `mailto` and
     `tel` is written as `#`, so an image or a link from an API keeps to the
     addresses a page may hold.
+  - A bound address starting with one `/` lands where the same written address
+    lands: in `href`, `src` and the other attributes a written address is
+    composed in, it gets the site's base (`/p/<id>/` in the preview, a URL
+    space in a build under one) and, on a multilingual site, the page's
+    language, outside `/assets/` and `/style/`. Any other value is written as
+    it comes: a relative one is read against the page's own address.
   - An optional `data-state-empty="some text"` on the container provides the
     text shown when the array is empty (replaces the empty container content
     with that string).
@@ -3825,10 +3908,13 @@ Each field is built from the parameter's `help` entry:
 | `description` | Under the field. |
 | `default` | Under the field as **Default:** — what the command uses when the field is left empty. |
 | `validation` | Under the field as **Validation:**. |
+| `enum` | The values the command takes, and no other: the field is a list of exactly those, starting blank (an optional one left blank is not sent). `addStorageItem`'s and `editStorageItem`'s scope and category are such lists. |
 
 A parameter `help` types as `object`, `array` or a choice of the two (`object|array`) is a JSON box: what it holds is sent as JSON. A field starts empty, JSON boxes included, and a field left empty is not sent: an optional parameter the form was not given is absent from the request, so the command applies its own default.
 
 The fields come in up to three groups, by what `help` says of each parameter: **Required Parameters**, which the form will not send without; **Required in Some Cases** — `help` marks the parameter `conditional`, and its description says when it is needed (`addNode`'s `tag` for an element, `textKey` or `textValue` for a text) — which the form never requires, since a request of the other kind must leave it out; and **Optional Parameters**.
+
+`deleteStorageItem`'s and `editStorageItem`'s `id` is a searchable list of the project's storage items (`listStorageItems`); `deleteCollectedDatum`'s `id` one of its collected data (`getPrivacyStatus`); `setCollectedDatum`, which creates or edits, offers the existing ids with a way to type a new one. Each list comes from a read every role that may run the command holds, so it shows nothing its reader cannot read, and it is read again after the command succeeds. `setRouteResolver`'s form has one line under the route field linking to the Sitemap, where each route's resolver has an editor of its own (§9.7).
 
 `addNode`'s and `editNode`'s `tag` is a searchable list of every tag the commands accept, grouped and described as the visual editor's **HTML Tag** picker shows them; the tags that picker leaves out sit in its **Other** group. `editNode`'s starts blank, which keeps the node's tag.
 
@@ -4003,7 +4089,7 @@ deep-dive.
 | `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open; its row shows while the category has a declared key | §9.10 |
 | `data-consent-asks` | consent | `true` / `false` | Shows the element only on a site that asks its visitors anything, or with `false` only on a site with nothing to ask, followed at each page load; left alone with the layer off and in the visual editor. The generated cookie policy puts it on its preferences button's paragraph and the consent record's row, and when that row is the table's only row on the table, with a line valued `false` beside it | §9.10 |
 | `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
-| `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent; never an event handler, `srcdoc`, or an iframe's `src` or `sandbox`, and a URL with a scheme outside the allowlist is written as `#` | §9.2 |
+| `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent; never an event handler, `srcdoc`, an iframe's `src` or `sandbox`, a `data-consent-*` name, or a meta's `content` or `http-equiv`; a URL with a scheme outside the allowlist is written as `#`, and one starting with one `/` is composed as a written one is | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |
 | `data-error-for` | form | field `name` | Container for `QS.validate` error messages — set value to the input's `name` | §8.7 (field-row / form-scaffold) |
 | `data-qs-complex` | complex | `table` (today) | Marks a complex-element subtree root — enables Translate-from-CSV | §8.7 (Translate from CSV) |

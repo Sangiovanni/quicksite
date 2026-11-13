@@ -47,6 +47,26 @@ window.QuickSiteStorageKeys = Object.freeze({
     // gives that part's default.
     previewFrame:        'qs_preview_frame',
 
+    // Visual editor — whether the tool row shows each tool's name beside its
+    // icon: 'false' hides them, anything else (or nothing) shows them.
+    toolsShowNames:      'quicksite-tools-show-names',
+
+    // Visual editor — the sample values a component's or a page's Emulation
+    // fills the preview with, as JSON, per component (the key gets the
+    // component's name appended) and per page (the key gets the page's route
+    // appended). Kept in this browser; nothing is written to the project.
+    emulateComponent:    'qs_emulate_',
+    emulatePage:         'qs_emulate_page_',
+
+    // Visual editor — the Add form (advanced): the tab it last opened on, and
+    // whether each of its folding sections is open ('1') or folded ('0'). The
+    // three section keys are named on their headers in contextual-add.php
+    // (data-storage-key), which the editor reads.
+    addLastTab:          'qs-add-last-tab',
+    addPreviewExpanded:  'qs-add-preview-expanded',
+    addPositionExpanded: 'qs-add-position-expanded',
+    addAdvancedExpanded: 'qs-add-advanced-expanded',
+
     // Visual editor — the Workflows panel: the workflows last opened, newest first,
     // and the groups left open once the list folds, as JSON {"recent": ["restyle"],
     // "open": ["look"]}. One per browser, for every project. A missing or malformed

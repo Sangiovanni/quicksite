@@ -9,6 +9,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // the edited project's languages
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // flattenRoutes()
+require_once SECURE_FOLDER_PATH . '/admin/functions/editorTools.php'; // what each tool needs, what simple leaves out
 
 // Get auth token for API calls
 $token = $router->getToken();

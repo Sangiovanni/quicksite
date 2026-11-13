@@ -9,7 +9,8 @@
         <span class="preview-component-warning__text" id="preview-component-warning-text"></span>
     </div>
 
-    <!-- Iframe Warning Banner (shown when page contains iframe nodes) -->
+    <!-- Embed warning: shown while the structure edited holds an embed outside the embed policy (preview.js,
+         updateIframeWarning()); its link only where this installation shows Embed Security -->
     <div class="preview-iframe-warning" id="preview-iframe-warning" style="display: none;">
         <svg class="preview-iframe-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -17,7 +18,9 @@
         <span class="preview-iframe-warning__text">
             <?= __admin('preview.iframeWarningText') ?>
         </span>
+        <?php if ($router->isEmbedSecurityShown()): ?>
         <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link"><?= __admin('preview.iframeWarningLink') ?> &rarr;</a>
+        <?php endif; ?>
         <button type="button" class="preview-iframe-warning__close" id="preview-iframe-warning-close" title="<?= __admin('preview.iframeWarningDismiss') ?>">&times;</button>
     </div>
 

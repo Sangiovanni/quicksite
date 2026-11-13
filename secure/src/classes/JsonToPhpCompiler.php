@@ -599,7 +599,11 @@ class JsonToPhpCompiler {
         } else {
             // Tag with attributes - need to handle system placeholders
             $output .= $prefix . '"<' . $tag;
-            
+
+            // A meta's refresh: the content whose address a built page draws
+            // safe (metaRefreshGuard()).
+            $refreshGuard = strtolower($tag) === 'meta' ? $this->metaRefreshGuard($params) : null;
+
             // URL-sink recognition + rewriting scope come from the shared
             // UrlPolicy (R-6, same class the renderer uses) — see per-attr below.
             foreach ($params as $attrName => $attrValue) {
@@ -679,85 +683,11 @@ class JsonToPhpCompiler {
                     continue;
                 }
                 
-                // Scheme safety applies to ANY URL sink (namespace-aware, e.g.
-                // xlink:href); BASE_URL/language rewriting only to the classic
-                // rewritable set (UrlPolicy::REWRITABLE_URL_ATTRIBUTES).
-                $isUrlAttr    = UrlPolicy::isUrlAttribute($attrName);
-                $needsRewrite = UrlPolicy::isRewritableUrlAttribute($attrName);
-                
-                // Check if value contains system placeholders
-                if (is_string($attrValue) && strpos($attrValue, '{{__') !== false) {
-                    // Contains system placeholder - generate dynamic PHP
-                    $phpValue = $this->convertPlaceholdersToPhp($attrValue);
-                    
-                    // Check if this is a buildLanguageSwitchUrl() call - these return complete URLs
-                    $isLanguageSwitch = strpos($phpValue, 'buildLanguageSwitchUrl(') !== false;
-                    
-                    if ($needsRewrite && !$isLanguageSwitch) {
-                        // Wrap with processUrl (BASE_URL/lang). Placeholders are
-                        // system-generated URLs, not attacker-controlled schemes.
-                        $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(processUrl(' . $phpValue . ', $__lang), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
-                    } else {
-                        $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $phpValue . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
-                    }
-                } elseif (is_string($attrValue) && in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true)
-                          && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
-                          && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
-                    // A translation KEY in a translatable attribute. Emitted as a
-                    // runtime lookup for the same reason a text node is: which
-                    // translation file answers depends on the request's language.
-                    $output .= ' ' . $attrName . '=\\"" . htmlspecialchars($translator->translate('
-                             . var_export($attrValue, true)
-                             . '), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
-                } else {
-                    // A literal prefix marks "use this verbatim, do not translate".
-                    // The renderer strips both prefixes, so the compiler does too —
-                    // left in, the marker would ship to the visitor in a built page.
-                    if (is_string($attrValue)
-                        && (strpos($attrValue, '__RAW__') === 0 || strpos($attrValue, '__LIT__') === 0)) {
-                        $attrValue = substr($attrValue, 7);
-                    }
-
-                    // Static value — the attacker-controlled case. Make it
-                    // scheme-SAFE at COMPILE time (shared UrlPolicy) so the
-                    // deployed literal can never carry a dangerous scheme; this
-                    // covers the non-rewritable sinks (xlink:href, …) too.
-                    if (is_string($attrValue) && $this->hasRuntimePlaceholder($attrValue)) {
-                        // {{param:}} / {{resolved:}} carry REQUEST-time values, so
-                        // the substitution is a call, not a fold. Both surfaces
-                        // substitute inside attributes; without it a visitor
-                        // would be served data-slug="{{param:slug}}" verbatim.
-                        //
-                        // ⚠ THE POLICY MUST SEE THE SUBSTITUTED VALUE. Sanitising
-                        // the literal placeholder and substituting afterwards would
-                        // let a route param inject a scheme past the check — on
-                        // either surface. So UrlPolicy::sanitize wraps the
-                        // substitution at RUNTIME rather than folding at compile
-                        // time, and processUrl composes on top of the safe value.
-                        $expr = 'qs_apply_runtime_placeholders(' . var_export($attrValue, true) . ', $__routeParams)';
-                        if ($isUrlAttr) {
-                            $expr = 'UrlPolicy::sanitize(' . $expr . ')';
-                            if ($needsRewrite) {
-                                $expr = 'processUrl(' . $expr . ', $__lang)';
-                            }
-                        }
-                        $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $expr . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
-                    } elseif ($isUrlAttr && is_string($attrValue)) {
-                        // No runtime placeholder: the value is fully known, so the
-                        // policy can be applied once, here.
-                        $safeValue = UrlPolicy::sanitize($attrValue);
-                        if ($needsRewrite) {
-                            // Still BASE_URL/lang-rewritten at deploy, on a safe value.
-                            $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(processUrl(' . var_export($safeValue, true) . ', $__lang), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
-                        } else {
-                            $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . var_export($safeValue, true) . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
-                        }
-                    } else {
-                        $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(';
-                        $output .= var_export($attrValue, true);
-                        $output .= ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
-                    }
+                $expr = $this->attributeValueExpr($attrName, $attrValue);
+                if ($refreshGuard !== null && $attrName === $refreshGuard['key'] && is_string($attrValue)) {
+                    $expr = $this->refreshContentExpr($expr, $attrName, $attrValue, $refreshGuard['httpEquiv']);
                 }
+                $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $expr . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
             }
             
             if ($isIframe) {
@@ -783,7 +713,169 @@ class JsonToPhpCompiler {
         
         return $output;
     }
-    
+
+    /**
+     * The PHP expression a built page evaluates for one attribute's value, which
+     * compileTagNode() writes inside htmlspecialchars(). For a string, a number
+     * or any other scalar the renderer would write: the caller has already
+     * dropped what is no value (an array, a boolean, null, an empty string where
+     * empty means nothing) and an event handler.
+     */
+    private function attributeValueExpr(string $attrName, $attrValue): string {
+        // Scheme safety applies to ANY URL sink (namespace-aware, e.g.
+        // xlink:href); BASE_URL/language rewriting only to the classic
+        // rewritable set (UrlPolicy::REWRITABLE_URL_ATTRIBUTES).
+        $isUrlAttr    = UrlPolicy::isUrlAttribute($attrName);
+        $needsRewrite = UrlPolicy::isRewritableUrlAttribute($attrName);
+
+        // Check if value contains system placeholders
+        if (is_string($attrValue) && strpos($attrValue, '{{__') !== false) {
+            // Contains system placeholder - generate dynamic PHP
+            $phpValue = $this->convertPlaceholdersToPhp($attrValue);
+
+            // Check if this is a buildLanguageSwitchUrl() call - these return complete URLs
+            $isLanguageSwitch = strpos($phpValue, 'buildLanguageSwitchUrl(') !== false;
+
+            if ($needsRewrite && !$isLanguageSwitch) {
+                // Wrap with processUrl (BASE_URL/lang). Placeholders are
+                // system-generated URLs, not attacker-controlled schemes.
+                return 'processUrl(' . $phpValue . ', $__lang)';
+            }
+            return $phpValue;
+        }
+        if (is_string($attrValue) && in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true)
+            && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
+            && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
+            // A translation KEY in a translatable attribute. Emitted as a
+            // runtime lookup for the same reason a text node is: which
+            // translation file answers depends on the request's language.
+            return '$translator->translate(' . var_export($attrValue, true) . ')';
+        }
+
+        // A literal prefix marks "use this verbatim, do not translate".
+        // The renderer strips both prefixes, so the compiler does too —
+        // left in, the marker would ship to the visitor in a built page.
+        if (is_string($attrValue)
+            && (strpos($attrValue, '__RAW__') === 0 || strpos($attrValue, '__LIT__') === 0)) {
+            $attrValue = substr($attrValue, 7);
+        }
+
+        // Static value — the attacker-controlled case. Make it
+        // scheme-SAFE at COMPILE time (shared UrlPolicy) so the
+        // deployed literal can never carry a dangerous scheme; this
+        // covers the non-rewritable sinks (xlink:href, …) too.
+        if (is_string($attrValue) && $this->hasRuntimePlaceholder($attrValue)) {
+            // {{param:}} / {{resolved:}} carry REQUEST-time values, so
+            // the substitution is a call, not a fold. Both surfaces
+            // substitute inside attributes; without it a visitor
+            // would be served data-slug="{{param:slug}}" verbatim.
+            //
+            // ⚠ THE POLICY MUST SEE THE SUBSTITUTED VALUE. Sanitising
+            // the literal placeholder and substituting afterwards would
+            // let a route param inject a scheme past the check — on
+            // either surface. So UrlPolicy::sanitize wraps the
+            // substitution at RUNTIME rather than folding at compile
+            // time, and processUrl composes on top of the safe value.
+            $expr = 'qs_apply_runtime_placeholders(' . var_export($attrValue, true) . ', $__routeParams)';
+            if ($isUrlAttr) {
+                $expr = 'UrlPolicy::sanitize(' . $expr . ')';
+                if ($needsRewrite) {
+                    $expr = 'processUrl(' . $expr . ', $__lang)';
+                }
+            }
+            return $expr;
+        }
+        if ($isUrlAttr && is_string($attrValue)) {
+            // No runtime placeholder: the value is fully known, so the
+            // policy can be applied once, here.
+            $safeValue = UrlPolicy::sanitize($attrValue);
+            // Still BASE_URL/lang-rewritten at deploy, on a safe value.
+            return $needsRewrite
+                ? 'processUrl(' . var_export($safeValue, true) . ', $__lang)'
+                : var_export($safeValue, true);
+        }
+        return var_export($attrValue, true);
+    }
+
+    /**
+     * An attribute's value as a built page draws it, when this compile already
+     * knows it: a string with no placeholder, its literal prefix dropped. Null
+     * when only the request can tell (a placeholder, a translation key), and for
+     * anything but a string. For an attribute that is no URL: a URL's value is
+     * also made safe and composed (attributeValueExpr()).
+     */
+    private function staticAttributeValue(string $attrName, $attrValue): ?string {
+        if (!is_string($attrValue) || strpos($attrValue, '{{__') !== false) {
+            return null;
+        }
+        if (in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true)
+            && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
+            && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
+            return null;
+        }
+        if (strpos($attrValue, '__RAW__') === 0 || strpos($attrValue, '__LIT__') === 0) {
+            $attrValue = substr($attrValue, 7);
+        }
+        return $this->hasRuntimePlaceholder($attrValue) ? null : $attrValue;
+    }
+
+    /**
+     * Which param of a meta holds the content of a refresh, and whether it is
+     * one: ['key' => the content's param, 'httpEquiv' => null when this compile
+     * knows the meta is a refresh, else the expression of its http-equiv, which
+     * decides when the page is served]. Null when the meta is no refresh, or has
+     * no content to draw safe.
+     *
+     * A browser keeps the first attribute of a name in any letter case, so the
+     * first `http-equiv` decides and the first `content` is the one drawn safe.
+     * ⚠ THIS SELECTION RULE AND JsonToHtmlRenderer::refreshContentKey()'S MUST STAY
+     * IDENTICAL, as the iframe's are: one meta must not refresh in one surface
+     * and not the other.
+     */
+    private function metaRefreshGuard(array $params): ?array {
+        $httpEquivKey = null;
+        $contentKey = null;
+        foreach ($params as $attrName => $attrValue) {
+            $lowerName = strtolower((string) $attrName);
+            if ($lowerName === 'http-equiv' && $httpEquivKey === null) {
+                $httpEquivKey = (string) $attrName;
+            } elseif ($lowerName === 'content' && $contentKey === null) {
+                $contentKey = (string) $attrName;
+            }
+        }
+        if ($httpEquivKey === null || $contentKey === null || !is_string($params[$httpEquivKey])) {
+            return null;
+        }
+        $known = $this->staticAttributeValue($httpEquivKey, $params[$httpEquivKey]);
+        if ($known !== null) {
+            return UrlPolicy::isRefresh($known) ? ['key' => $contentKey, 'httpEquiv' => null] : null;
+        }
+        return ['key' => $contentKey, 'httpEquiv' => $this->attributeValueExpr($httpEquivKey, $params[$httpEquivKey])];
+    }
+
+    /**
+     * A refresh's content, its address drawn safe (UrlPolicy::safeRefreshContent()):
+     * folded here when this compile knows the content, and left exactly as it was
+     * when that content holds no refused address; otherwise checked when the page
+     * is served, on the value it then holds. $httpEquivExpr is null when the meta
+     * is known to be a refresh, else the expression that decides it.
+     */
+    private function refreshContentExpr(string $expr, string $attrName, string $attrValue, ?string $httpEquivExpr): string {
+        $known = $this->staticAttributeValue($attrName, $attrValue);
+        if ($known !== null) {
+            $safe = UrlPolicy::safeRefreshContent($known);
+            if ($safe === $known) {
+                return $expr;
+            }
+            return $httpEquivExpr === null
+                ? var_export($safe, true)
+                : 'UrlPolicy::safeMetaContent(' . $httpEquivExpr . ', ' . $expr . ')';
+        }
+        return $httpEquivExpr === null
+            ? 'UrlPolicy::safeRefreshContent((string) (' . $expr . '))'
+            : 'UrlPolicy::safeMetaContent(' . $httpEquivExpr . ', (string) (' . $expr . '))';
+    }
+
     /**
      * Compile a component node (inline component structure)
      */

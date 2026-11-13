@@ -29,9 +29,10 @@
 #   9. Default language     — the language a new project starts in
 #  10. Idle sign-out        — how long the panel may go unused before it signs
 #                             you out
+#  11. Embed security page  — show the embed policy's page in the panel?
 #
 # Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5 and
-# 7-10 write config files under the secure folder. Item 6 only reads.
+# 7-11 write config files under the secure folder. Item 6 only reads.
 #
 # Before anything else, it checks the PHP version: older than 8.3, it stops.
 #
@@ -342,6 +343,31 @@ console_label() {
         true)  echo -e "on" ;;
         false) echo -e "${YELLOW}off${NC}  ${DIM}(/admin/command is not offered)${NC}" ;;
         *)     echo -e "${YELLOW}off${NC}  ${DIM}(value unreadable — check console.php)${NC}" ;;
+    esac
+}
+
+# 'true' | 'false' | '' when embed-security.php has not been created yet.
+#
+# ⚠ ABSENT MEANS SHOWN, as for the console (item 8): the page is a read-only view
+# of the embed policy and grants nothing. The trailing comma is load-bearing, for
+# the reason console_current gives.
+embed_current() {
+    first_capture "$(CONFIG_DIR)/embed-security.php" \
+        "'show_embed_security'[[:space:]]*=>[[:space:]]*\([a-zA-Z]*\),"
+}
+
+# A broken embed-security.php hides the page (the only reason to create the file
+# is to hide it), so "no file" and "value unreadable" are opposite answers here too.
+embed_label() {
+    if [ ! -f "$(CONFIG_DIR)/embed-security.php" ]; then
+        echo -e "shown  ${DIM}(default — embed-security.php not created yet)${NC}"
+        return
+    fi
+    local v; v="$(embed_current)"
+    case "$v" in
+        true)  echo -e "shown" ;;
+        false) echo -e "${YELLOW}hidden${NC}  ${DIM}(/admin/embed-security is not in the menu)${NC}" ;;
+        *)     echo -e "${YELLOW}hidden${NC}  ${DIM}(value unreadable — check embed-security.php)${NC}" ;;
     esac
 }
 
@@ -1486,6 +1512,96 @@ item_idle() {
 }
 
 # ==========================================================
+# Item 11 — the Embed Security page
+# ==========================================================
+# The page shows the installation's embed policy (embed-policy.json), read-only:
+# no author can change it from the panel, so a deployer may decide nobody needs
+# to see it. ABSENT MEANS SHOWN, so this item declines to write a file when the
+# answer is "show": the file exists only to say no.
+#
+# ⚠ AND IT IS NOT A SECURITY CONTROL. Hiding the page removes a page, not a rule:
+# the policy stays in force, and every command stays reachable at /management/
+# to any caller whose role allows it.
+item_embed() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    local live="$cfg_dir/embed-security.php"
+    local example="$cfg_dir/embed-security.php.example"
+
+    echo ""
+    echo -e "${BOLD}Embed Security page${NC}"
+    echo ""
+    echo "  Should the admin panel show the Embed Security page at"
+    echo "  /admin/embed-security — a read-only view of the embed policy, the"
+    echo "  sandbox the installation puts around iframes embedded in a page?"
+    echo ""
+    echo "  show  the default. The page is in the panel's Settings menu, for"
+    echo "        the advanced mode."
+    echo "  hide  the page leaves the menu and says it was turned off. Nobody"
+    echo "        can change the policy from the panel anyway: you set it in"
+    echo "        embed-policy.json."
+    echo ""
+    echo -e "  Currently: $(embed_label)"
+    echo ""
+    echo -e "  ${DIM}⚠ This is NOT a security control. The embed policy stays in${NC}"
+    echo -e "  ${DIM}force either way, and every command stays reachable at${NC}"
+    echo -e "  ${DIM}/management/ to any caller whose role allows it.${NC}"
+    echo ""
+
+    local ANSWER
+    read -r -p "  Show the Embed Security page on this installation? [Y/n]: " ANSWER || true
+
+    # Enter accepts the SHIPPED DEFAULT, which here is show.
+    local VALUE="true"
+    case "${ANSWER:-}" in
+        [nN]|[nN][oO]) VALUE="false" ;;
+    esac
+
+    if [ ! -d "$cfg_dir" ]; then
+        echo -e "  ${RED}✗ Error: config folder not found:${NC} $cfg_dir"
+        return 0
+    fi
+
+    # Accepting when no file exists LEAVES IT ABSENT, as item 8 does: absent
+    # already means shown.
+    if [ "$VALUE" = "true" ] && [ ! -f "$live" ]; then
+        echo ""
+        echo -e "  ${GREEN}✓${NC} Embed Security stays shown — embed-security.php left absent,"
+        echo "    which is what a fresh install has."
+        return 0
+    fi
+
+    # The .example is the shipped documentation and is never edited: the live
+    # file is a COPY with the value patched.
+    if [ ! -f "$live" ]; then
+        if [ -f "$example" ]; then
+            cp "$example" "$live"
+        else
+            echo -e "  ${RED}✗ Error: neither embed-security.php nor embed-security.php.example is present${NC}"
+            echo "    $cfg_dir"
+            return 0
+        fi
+    fi
+
+    # Anchored to start-of-line so the value quoted inside the file's own
+    # comments is left alone.
+    sed -i "s|^\( *\)'show_embed_security'[[:space:]]*=>[[:space:]]*[a-zA-Z]*|\1'show_embed_security' => $VALUE|" "$live"
+
+    if [ "$(embed_current)" = "$VALUE" ]; then
+        if [ "$VALUE" = "false" ]; then
+            echo -e "  ${GREEN}✓${NC} Embed Security page: ${BOLD}hidden${NC}"
+            echo -e "  ${DIM}  It is no longer in the menu, and says it was turned off. The${NC}"
+            echo -e "  ${DIM}  embed policy is unchanged.${NC}"
+        else
+            echo -e "  ${GREEN}✓${NC} Embed Security page: ${BOLD}shown${NC}"
+        fi
+    else
+        echo -e "  ${RED}✗ Could not set the value automatically.${NC}"
+        echo "    Edit this file by hand and set 'show_embed_security' => $VALUE:"
+        echo "    $live"
+    fi
+}
+
+# ==========================================================
 # The menu
 # ==========================================================
 show_header() {
@@ -1506,6 +1622,7 @@ show_menu() {
     echo -e "  Command console:    $(console_label)"
     echo -e "  Default language:   $(deflang_label)"
     echo -e "  Idle sign-out:      $(idle_label)"
+    echo -e "  Embed security:     $(embed_label)"
     echo ""
     echo "    1) Rename the public folder"
     echo "    2) Rename the secure folder"
@@ -1517,6 +1634,7 @@ show_menu() {
     echo "    8) Offer / withhold the command console (/admin/command)"
     echo "    9) Default language for new projects"
     echo "   10) Idle sign-out (how long the panel may go unused)"
+    echo "   11) Show / hide the Embed Security page (/admin/embed-security)"
     echo "    q) Finish"
     echo ""
 }
@@ -1546,6 +1664,7 @@ while true; do
         8) item_console; pause_for_menu ;;
         9) item_deflang; pause_for_menu ;;
         10) item_idle; pause_for_menu ;;
+        11) item_embed; pause_for_menu ;;
         q|Q|"") break ;;
         *) echo -e "  ${RED}Unknown choice: $CHOICE${NC}" ;;
     esac
@@ -1569,6 +1688,7 @@ echo -e "  Storage quotas:     $(quota_label)"
 echo -e "  Command console:    $(console_label)"
 echo -e "  Default language:   $(deflang_label)"
 echo -e "  Idle sign-out:      $(idle_label)"
+echo -e "  Embed security:     $(embed_label)"
 echo ""
 
 if [ -n "$OWNERSHIP_WARNING" ]; then

@@ -283,6 +283,20 @@ class AdminRouter {
     }
 
     /**
+     * Does this installation show the Embed Security page (setup item 11,
+     * embed-security.php)? Absent config means YES — see embedSecurityPolicy.php.
+     *
+     * ⚠ It is NOT a permission, as isConsoleEnabled() is not: hidden, the page
+     * leaves the menu and says it was turned off, while the embed policy stays in
+     * force and getIframeSandbox keeps answering on /management to every role that
+     * holds it. It removes reach, not access.
+     */
+    public function isEmbedSecurityShown(): bool {
+        require_once SECURE_FOLDER_PATH . '/src/functions/embedSecurityPolicy.php';
+        return qs_embed_security_shown();
+    }
+
+    /**
      * Has this install been bootstrapped — i.e. does ANY account exist?
      *
      * The test is the REGISTRY BEING EMPTY, not users.php existing: a file that

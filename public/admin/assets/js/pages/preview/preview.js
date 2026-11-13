@@ -63,7 +63,6 @@
     const ctxNodeEditParams = document.getElementById('ctx-node-edit-params');
     const ctxNodeDelete = document.getElementById('ctx-node-delete');
     const ctxNodeDuplicate = document.getElementById('ctx-node-duplicate');
-    const ctxNodeStyle = document.getElementById('ctx-node-style');
     const ctxNodeSaveSnippet = document.getElementById('ctx-node-save-snippet');
     const ctxNodeVariables = document.getElementById('ctx-node-variables');
     // Translate-from-CSV: button + modal refs. Shown when the selected
@@ -342,13 +341,15 @@
         const radio = addPositionPicker?.querySelector(`input[name="add-position"][value="${value}"]`);
         if (radio) radio.checked = true;
     };
+    // The simple Add's hints follow the position the person picks (a Button inside a form sends it).
+    addPositionPicker?.addEventListener('change', function() {
+        if (window.PreviewSimpleAdd) PreviewSimpleAdd.refresh();
+    });
     const addCustomParamsList = document.getElementById('add-custom-params-list');
     const addAnotherParamBtn = document.getElementById('add-another-param');
-    const addTextKeyInfo = document.getElementById('add-textkey-info');
     // Text-node tab refs
     const addTextField = document.getElementById('add-text-field');
     const addTextValueInput = document.getElementById('add-text-value');
-    const addGeneratedTextKeyPreview = document.getElementById('add-generated-textkey-preview');
     // Translation-key params (alt on img/area, title on iframe — the set is
     // TagRegistry::TRANSLATION_KEY_PARAMS, arriving via TAG_INFO).
     const addTransKeyParams = document.getElementById('add-transkey-params');
@@ -1386,7 +1387,7 @@
             url += '?_component=' + encodeURIComponent(editName) + '&_editor=1';
             // Include emulation data if available
             try {
-                const raw = localStorage.getItem('qs_emulate_' + editName);
+                const raw = localStorage.getItem(QuickSiteStorageKeys.emulateComponent + editName);
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
@@ -1474,7 +1475,7 @@
      */
     function _getPageEmulationData(routePath) {
         if (!routePath) return null;
-        const storageKey = 'qs_emulate_page_' + routePath;
+        const storageKey = QuickSiteStorageKeys.emulatePage + routePath;
         try {
             const raw = localStorage.getItem(storageKey);
             if (!raw) return null;
@@ -1909,36 +1910,107 @@
     // ==================== Iframe Warning Banner ====================
     
     /**
-     * Check if the page structure contains iframe nodes and show/hide banner
+     * Whether an embed takes the embed policy's default sandbox, the strictest the deployer set: its address
+     * matches no host the policy lists. That is an address with no host of its own (a relative one, which
+     * resolves to this site), an address naming no host the policy lists, and a srcdoc frame, which never
+     * loads its src. The host is read and matched as IframeSandbox reads and matches it (extractHostname(),
+     * matchesDomain(): the host itself, or any subdomain of it; an address carrying a user name has no host);
+     * this site's own host is never one the policy can list, so it falls to the default too.
+     *
+     * @param {string} src the embed's address as authored
+     * @param {boolean} hasSrcdoc whether the embed carries a srcdoc
+     * @param {string[]} hosts the policy's host names (getIframeSandbox)
+     * @returns {boolean}
+     */
+    function embedOutsidePolicy(src, hasSrcdoc, hosts) {
+        if (hasSrcdoc) return true;
+        const host = embedHost(src);
+        if (host === null) return true;
+        return !(hosts || []).some(name => {
+            const d = String(name || '').trim().toLowerCase();
+            return d !== '' && (host === d || host.endsWith('.' + d));
+        });
+    }
+
+    /** The lower-case host an embed's address names, or null (IframeSandbox::extractHostname()). */
+    function embedHost(src) {
+        const s = String(src == null ? '' : src).trim();
+        // A host is named only after "//": with a scheme ("https://") or scheme-relative ("//host"). Anything
+        // else is a path, which resolves against this site.
+        const m = /^(?:[A-Za-z][A-Za-z0-9+.-]*:)?\/\/([^/?#]*)/.exec(s);
+        if (!m) return null;
+        const authority = m[1];
+        if (authority.indexOf('@') !== -1) return null;
+        let host = authority;
+        if (host.charAt(0) === '[') {
+            const close = host.indexOf(']');
+            host = close === -1 ? host : host.slice(0, close + 1);
+        } else {
+            const colon = host.lastIndexOf(':');
+            if (colon !== -1) host = host.slice(0, colon);
+        }
+        host = host.toLowerCase();
+        return host === '' ? null : host;
+    }
+
+    // The policy's host names, read once per page load (it changes only on the server's disk, by the deployer).
+    let embedPolicyHostsPromise = null;
+    function embedPolicyHosts() {
+        if (!embedPolicyHostsPromise) {
+            embedPolicyHostsPromise = QuickSiteAdmin.apiRequest('getIframeSandbox', 'GET').then(res => {
+                const hosts = res && res.ok && res.data && res.data.data && Array.isArray(res.data.data.hosts) ? res.data.data.hosts : null;
+                if (!hosts) throw new Error('getIframeSandbox');
+                return hosts.map(h => String(h && h.name || ''));
+            });
+            embedPolicyHostsPromise.catch(() => { embedPolicyHostsPromise = null; });
+        }
+        return embedPolicyHostsPromise;
+    }
+
+    /** Every embed of a structure: [{src, srcdoc}] for each <iframe> node, nested ones included. */
+    function embedsIn(structure) {
+        const out = [];
+        (function walk(node) {
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            if (!node || typeof node !== 'object') return;
+            if (String(node.tag || '').toLowerCase() === 'iframe') {
+                const params = (node.params && typeof node.params === 'object') ? node.params : {};
+                out.push({ src: typeof params.src === 'string' ? params.src : '', srcdoc: Object.prototype.hasOwnProperty.call(params, 'srcdoc') });
+            }
+            if (Array.isArray(node.children)) node.children.forEach(walk);
+        })(structure);
+        return out;
+    }
+
+    /**
+     * The embed warning: shown while the structure being edited (a page, the menu, the footer or a component)
+     * holds an embed outside the embed policy (embedOutsidePolicy()), hidden otherwise and once dismissed.
      */
     async function updateIframeWarning(editType, editName) {
         if (!iframeWarning || iframeWarningDismissed) return;
-        
-        // Only show for pages, not components/layouts
-        if (editType !== 'page') {
+        const urlParams = editType === 'page' ? ['page', ...String(editName).split('/')]
+            : editType === 'component' ? ['component', editName]
+            : editType === 'layout' ? [editName] : null;
+        if (!urlParams || !editName) {
             iframeWarning.style.display = 'none';
             return;
         }
-        
         try {
-            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, ['page', ...editName.split('/')]);
-            if (result.ok && result.data?.data?.structure) {
-                const hasIframe = (function check(node) {
-                    if (!node) return false;
-                    if (node.tag === 'iframe') return true;
-                    if (Array.isArray(node.children)) return node.children.some(check);
-                    return false;
-                })(result.data.data.structure);
-                
-                iframeWarning.style.display = hasIframe ? 'flex' : 'none';
-            } else {
+            const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
+            const embeds = result.ok && result.data?.data ? embedsIn(result.data.data.structure) : [];
+            if (embeds.length === 0) {
                 iframeWarning.style.display = 'none';
+                return;
             }
+            const hosts = await embedPolicyHosts();
+            // The answer for a structure no longer shown is dropped.
+            if (editType !== currentEditType || editName !== currentEditName || iframeWarningDismissed) return;
+            iframeWarning.style.display = embeds.some(e => embedOutsidePolicy(e.src, e.srcdoc, hosts)) ? 'flex' : 'none';
         } catch (e) {
             iframeWarning.style.display = 'none';
         }
     }
-    
+
     if (iframeWarningClose) {
         iframeWarningClose.addEventListener('click', function() {
             iframeWarningDismissed = true;
@@ -2471,8 +2543,37 @@
         switchMode(mode, preselect);
     }
 
+    /** Whether the panel is in simple mode (the page's class, which the account's mode sets). */
+    function isSimpleView() {
+        return document.body.classList.contains('admin-body--simple');
+    }
+
+    /**
+     * Whether a control of the editor's definition (editorTools.php) is offered here: its role holds what it
+     * needs (the role filter has not hidden it, and has run when the control needs a command) and the mode
+     * shows it. The server still decides what runs; this decides what the editor offers.
+     */
+    function controlOffered(el) {
+        if (!el) return false;
+        if (el.classList.contains('admin-hidden-permission')) return false;
+        if (el.hasAttribute('data-requires-command')
+            && !(window.QuickSiteAdmin && QuickSiteAdmin.permissions && QuickSiteAdmin.permissions.loaded)) return false;
+        if (el.hasAttribute('data-editor-advanced') && isSimpleView()) return false;
+        return true;
+    }
+
+    /** Whether a tool is offered here: its button is (controlOffered()), and nothing has put it aside. */
+    function toolOffered(mode) {
+        // The Add form is Select's, reached by its Add or Edit Params, which follow the same definition.
+        if (mode === 'add') return true;
+        const btn = Array.from(modeBtns).find(b => b.dataset.mode === mode);
+        return controlOffered(btn) && btn.style.display !== 'none';
+    }
+
     /** setMode() once nothing is left to ask. */
     function switchMode(mode, preselect) {
+        // A tool this role or this mode does not offer is never entered: Select instead.
+        if (mode !== 'select' && !toolOffered(mode)) mode = 'select';
         // A tool that selects without asking (AI tools, Interactions) may hold an element outside the
         // target. Select acts on what it holds, so it does not start from one.
         if (mode === 'select' && switchFor(selectedStruct)) hideNodePanel();
@@ -3114,6 +3215,7 @@
         // An Add form left open follows the new selection's positions.
         if (contextualAddMode === 'add' && contextualAddForm && contextualAddForm.style.display !== 'none') {
             _syncAddPositionOptions();
+            if (window.PreviewSimpleAdd) PreviewSimpleAdd.refresh();
         }
         
         // If Variables panel is open, refresh it for the new node instead of hiding
@@ -4320,8 +4422,8 @@
             
             // Delete or Backspace - Delete selected node
             if (e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey)) {
-                // Only if we have a selected node
-                if (selectedStruct && selectedNode != null) {
+                // Only if we have a selected node, and only where the Delete button is offered (the role)
+                if (selectedStruct && selectedNode != null && controlOffered(ctxNodeDelete)) {
                     e.preventDefault();
                     deleteSelectedNode();
                 }
@@ -4363,6 +4465,8 @@
      */
     function broadcastStructureChanged() {
         window.dispatchEvent(new CustomEvent('qs:editor:structure-changed'));
+        // An embed added or removed shows or hides the embed warning.
+        updateIframeWarning(currentEditType, currentEditName);
     }
 
     async function deleteTextOnlyNode() {
@@ -4628,8 +4732,10 @@
         
         // Tools show names checkbox
         if (toolsShowNames && toolsRow) {
-            // Restore state from localStorage (default: show names = true)
-            const showNames = localStorage.getItem('quicksite-tools-show-names') !== 'false';
+            // Restore state from localStorage (default: show names = true). A browser that refuses the
+            // site's storage shows the names and keeps no change of them.
+            let showNames = true;
+            try { showNames = localStorage.getItem(QuickSiteStorageKeys.toolsShowNames) !== 'false'; } catch (e) { showNames = true; }
             toolsShowNames.checked = showNames;
             if (!showNames) {
                 toolsRow.classList.add('preview-tools--icons-only');
@@ -4641,36 +4747,12 @@
                 } else {
                     toolsRow.classList.add('preview-tools--icons-only');
                 }
-                localStorage.setItem('quicksite-tools-show-names', this.checked);
+                try { localStorage.setItem(QuickSiteStorageKeys.toolsShowNames, this.checked); } catch (e) { /* not kept */ }
             });
         }
         
         if (ctxNodeDelete) {
             ctxNodeDelete.addEventListener('click', deleteSelectedNode);
-        }
-        
-        if (ctxNodeStyle) {
-            ctxNodeStyle.addEventListener('click', function() {
-                // Store element info for style mode preselection
-                const preselect = {
-                    classes: selectedElementClasses,
-                    tag: selectedElementTag,
-                    selector: null
-                };
-                
-                // Determine best selector: first class or tag
-                if (selectedElementClasses && selectedElementClasses !== '-') {
-                    const firstClass = selectedElementClasses.split(' ')[0].trim();
-                    if (firstClass) {
-                        preselect.selector = '.' + firstClass;
-                    }
-                } else if (selectedElementTag && selectedElementTag !== '-') {
-                    preselect.selector = selectedElementTag.toLowerCase();
-                }
-                
-                // Switch to style mode with preselection data
-                setMode('style', preselect);
-            });
         }
         
         // Save as Snippet
@@ -4810,14 +4892,15 @@
             
             // Read stored state (default: expanded for position, collapsed for others)
             const defaultCollapsed = key !== 'qs-add-position-expanded';
-            const stored = localStorage.getItem(key);
+            let stored = null;
+            try { stored = localStorage.getItem(key); } catch (e) { stored = null; }
             const isCollapsed = stored !== null ? stored === '0' : defaultCollapsed;
             section.classList.toggle('collapsed', isCollapsed);
             
             // Toggle on click
             header.addEventListener('click', function() {
                 const nowCollapsed = section.classList.toggle('collapsed');
-                localStorage.setItem(key, nowCollapsed ? '0' : '1');
+                try { localStorage.setItem(key, nowCollapsed ? '0' : '1'); } catch (e) { /* not kept */ }
             });
         });
     }
@@ -4890,10 +4973,19 @@
         // in 'add' mode — it's a no-op then.
         _resetContextualAddMode();
 
-        // Reset form state — use remembered tab or default to 'snippet'
-        const rememberedTab = localStorage.getItem('qs-add-last-tab');
-        const VALID_TABS = ['tag', 'component', 'snippet', 'complex'];
-        sidebarAddNodeType = VALID_TABS.includes(rememberedTab) ? rememberedTab : 'snippet';
+        // In simple mode the form is the simple Add (preview-simple-add.js) in place of the five tabs.
+        const simple = isSimpleView() && !!window.PreviewSimpleAdd;
+        if (addTypeField) addTypeField.style.display = simple ? 'none' : '';
+        if (simple) {
+            sidebarAddNodeType = 'simple';
+        } else {
+            // Reset form state — use remembered tab or default to 'snippet'. A browser that refuses the
+            // site's storage opens the form on the default tab.
+            let rememberedTab = null;
+            try { rememberedTab = localStorage.getItem(QuickSiteStorageKeys.addLastTab); } catch (e) { rememberedTab = null; }
+            const VALID_TABS = ['tag', 'component', 'snippet', 'complex'];
+            sidebarAddNodeType = VALID_TABS.includes(rememberedTab) ? rememberedTab : 'snippet';
+        }
         sidebarAddCustomParamsCount = 0;
         sidebarAddSelectedComponentData = null;
         
@@ -4921,7 +5013,9 @@
         updateSidebarAddNodeTypeUI();
         updateSidebarAddMandatoryParams();
         updateSidebarAddTransKeyParams();
-        updateSidebarAddTextKeyPreview();
+        if (window.PreviewSimpleAdd) {
+            if (simple) PreviewSimpleAdd.open(); else PreviewSimpleAdd.close();
+        }
         
         // Refresh contextual suggestions for new selection context
         if (addTagSelector) addTagSelector.refreshSuggestions();
@@ -5095,6 +5189,7 @@
         // updateSidebarAddNodeTypeUI(); it would un-hide things we want
         // hidden (it's wired for Add Element's tab-driven UX).
         if (addTypeField) addTypeField.style.display = 'none';        // tabs
+        if (window.PreviewSimpleAdd) PreviewSimpleAdd.close();        // the simple Add's list
         if (addTagField) addTagField.style.display = 'none';          // tag picker
         if (addPositionSection) addPositionSection.style.display = 'none';
         if (addPreviewSection) addPreviewSection.style.display = 'none';
@@ -5655,14 +5750,59 @@
         }
     }
     
-    // Asset picker: opens a dropdown/modal to browse and select an asset
-    async function openAssetPicker(targetInput, category) {
+    /**
+     * The picker's upload row (options.upload): a file sent to uploadAsset, then picked at once. Offered to a
+     * role that may upload. Returns ONE Element.
+     */
+    function _renderAssetUpload(targetInput, accept, onPicked) {
+        const words = PreviewConfig.i18n.simpleAdd || {};
+        const file = QSDom.el('input', { type: 'file', accept: accept || '', hidden: '' });
+        const btn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--outline', text: words.upload || 'Upload a file…' });
+        btn.addEventListener('click', () => file.click());
+        file.addEventListener('change', async () => {
+            const picked = file.files && file.files[0];
+            if (!picked) return;
+            btn.disabled = true;
+            btn.textContent = words.uploading || 'Uploading…';
+            try {
+                const form = new FormData();
+                form.append('file', picked);
+                const res = await QuickSiteAdmin.apiUpload('uploadAsset', form);
+                const path = res && res.ok && res.data && res.data.data ? res.data.data.path : '';
+                if (!path) throw new Error((res && res.data && res.data.message) || (words.uploadFailed || 'The upload failed.'));
+                onPicked(path, picked.type || '');
+            } catch (err) {
+                showToast(err.message || (words.uploadFailed || 'The upload failed.'), 'error');
+                btn.disabled = false;
+                btn.textContent = words.upload || 'Upload a file…';
+                file.value = '';
+            }
+        });
+        return QSDom.el('div', { class: 'preview-asset-picker__upload' }, [btn, file]);
+    }
+
+    // Asset picker: opens a dropdown/modal to browse and select an asset.
+    // options.upload: an upload row at the top (options.accept: what the file dialog offers).
+    async function openAssetPicker(targetInput, category, options) {
+        const opts = options || {};
         // Remove any existing picker
         document.querySelector('.preview-asset-picker')?.remove();
-        
+
         const picker = document.createElement('div');
         picker.className = 'preview-asset-picker';
-        picker.appendChild(QSDom.el('div', { class: 'preview-asset-picker__loading', text: PreviewConfig.i18n.loading || 'Loading...' }));
+        // With an upload row, the list is drawn below it; without, in the picker itself, as ever.
+        const body = opts.upload && QuickSiteAdmin.canRun('uploadAsset') ? QSDom.el('div', { class: 'preview-asset-picker__body' }) : picker;
+        if (body !== picker) {
+            picker.appendChild(_renderAssetUpload(targetInput, opts.accept, (path, mime) => {
+                targetInput.value = path;
+                targetInput.dispatchEvent(new Event('input'));
+                picker.remove();
+                document.removeEventListener('mousedown', closeHandler);
+                showAssetPreview(targetInput, path, mime);
+            }));
+            picker.appendChild(body);
+        }
+        body.appendChild(QSDom.el('div', { class: 'preview-asset-picker__loading', text: PreviewConfig.i18n.loading || 'Loading...' }));
         
         // Position near the input, clamped to viewport
         const rect = targetInput.getBoundingClientRect();
@@ -5681,8 +5821,11 @@
             picker.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
             picker.style.maxHeight = availH + 'px';
         }
-        picker.style.left = rect.left + 'px';
-        picker.style.width = Math.max(rect.width + 50, 320) + 'px';
+        // As wide as the field and a little more, 320 at least, and inside the window: on a phone it takes the width there is.
+        // The bounds are CSS's own min() and max(), so no script reads the window's width (the panel's three views).
+        const pickerWidth = Math.max(rect.width + 50, 320) + 'px';
+        picker.style.width = 'min(' + pickerWidth + ', 100vw - 1rem)';
+        picker.style.left = 'max(0.5rem, min(' + rect.left + 'px, 100vw - 0.5rem - min(' + pickerWidth + ', 100vw - 1rem)))';
         document.body.appendChild(picker);
 
         // Close on click outside
@@ -5699,7 +5842,7 @@
             const response = await QuickSiteAdmin.apiRequest('listAssets', 'GET', null, urlParams);
             
             if (!response.ok || !response.data?.data) {
-                picker.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadFailed));
+                body.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadFailed));
                 return;
             }
             
@@ -5713,11 +5856,11 @@
                 }
             }
             if (assets.length === 0) {
-                picker.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsNone));
+                body.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsNone));
                 return;
             }
-            
-            picker.replaceChildren();
+
+            body.replaceChildren();
             const list = document.createElement('div');
             list.className = 'preview-asset-picker__list';
             
@@ -5759,9 +5902,9 @@
                 list.appendChild(item);
             });
             
-            picker.appendChild(list);
+            body.appendChild(list);
         } catch (err) {
-            picker.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadError));
+            body.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadError));
             console.error('[Preview] Asset picker error:', err);
         }
     }
@@ -5803,13 +5946,6 @@
         row.appendChild(container);
     }
     
-    // Update text key preview.
-    // Auto-textKey generation on add was removed — elements are now added EMPTY,
-    // so there is no key to preview. Always hide the info row. (Adding text to an
-    // element is a separate Text-mode action — see the Text-authoring follow-up.)
-    function updateSidebarAddTextKeyPreview() {
-        if (addTextKeyInfo) addTextKeyInfo.style.display = 'none';
-    }
     
 
     
@@ -5818,7 +5954,7 @@
         tab.addEventListener('click', function() {
             sidebarAddNodeType = this.dataset.type;
             if (addTypeInput) addTypeInput.value = sidebarAddNodeType;
-            localStorage.setItem('qs-add-last-tab', sidebarAddNodeType);
+            try { localStorage.setItem(QuickSiteStorageKeys.addLastTab, sidebarAddNodeType); } catch (e) { /* not kept: the next form opens on the default tab */ }
             updateSidebarAddTypeTabs(sidebarAddNodeType);
             updateSidebarAddNodeTypeUI();
             // The Text tab starts on Inside, the other tabs on After (as the form opens)
@@ -5832,8 +5968,6 @@
                 populateComplexKindPicker();
             } else if (sidebarAddNodeType === 'text') {
                 updateAddTextFieldsForType();
-            } else {
-                updateSidebarAddTextKeyPreview();
             }
         });
     });
@@ -7464,7 +7598,6 @@
     addTagSelect?.addEventListener('change', function() {
         updateSidebarAddMandatoryParams();
         updateSidebarAddTransKeyParams();
-        updateSidebarAddTextKeyPreview();
         
         // Show info message for iframe tag
         let iframeInfo = addMandatoryParamsContainer?.parentElement?.querySelector('.preview-iframe-info');
@@ -7577,6 +7710,8 @@
                 await addComplexNode();
             } else if (sidebarAddNodeType === 'text') {
                 await addTextNode();
+            } else if (sidebarAddNodeType === 'simple') {
+                await PreviewSimpleAdd.submit();
             }
         } catch (error) {
             console.error('[Preview] Add node error:', error);
@@ -10201,7 +10336,7 @@
             }
             
             // Load existing emulation data from localStorage
-            const storageKey = 'qs_emulate_' + currentEditName;
+            const storageKey = QuickSiteStorageKeys.emulateComponent + currentEditName;
             let savedData = {};
             try { savedData = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch(e) {}
             
@@ -10411,7 +10546,7 @@
             if (previousSaved && previousSaved.useLive) {
                 data.useLive = true;
             }
-            const storageKey = 'qs_emulate_page_' + currentEditName;
+            const storageKey = QuickSiteStorageKeys.emulatePage + currentEditName;
             if (hasValues || data.useLive) {
                 localStorage.setItem(storageKey, JSON.stringify(data));
             } else {
@@ -10436,7 +10571,7 @@
             }
         });
 
-        const storageKey = 'qs_emulate_' + currentEditName;
+        const storageKey = QuickSiteStorageKeys.emulateComponent + currentEditName;
 
         if (hasValues) {
             localStorage.setItem(storageKey, JSON.stringify(data));
@@ -10458,8 +10593,8 @@
             || currentEditType === undefined
             || currentEditType === null);
         const storageKey = isPageEmulation
-            ? 'qs_emulate_page_' + currentEditName
-            : 'qs_emulate_' + currentEditName;
+            ? QuickSiteStorageKeys.emulatePage + currentEditName
+            : QuickSiteStorageKeys.emulateComponent + currentEditName;
         localStorage.removeItem(storageKey);
 
         // Reset all fields
@@ -10519,7 +10654,7 @@
                 data[section][varName] = value;
             });
         }
-        const storageKey = 'qs_emulate_page_' + currentEditName;
+        const storageKey = QuickSiteStorageKeys.emulatePage + currentEditName;
         const hasValues = Object.keys(data.routeParams).length > 0
                        || Object.keys(data.resolved).length > 0;
         if (hasValues || data.useLive) {
@@ -10876,6 +11011,107 @@
     }
     
     
+    // ==================== The simple Add ====================
+
+    /** The simple Add added its element: as the HTML Tag tab's add ends (the toast, the form closed, the element shown). */
+    function _finishSimpleAdd(r) {
+        showToast(PreviewConfig.i18n.nodeAdded || 'Element added', 'success');
+        hideSidebarAddForm();
+        const t = r.target || {};
+        if (r.command === 'addNode' && r.data && r.data.html && t.node) {
+            sendToIframe('insertNode', {
+                struct: t.struct,
+                targetNode: t.node,
+                position: r.position,
+                html: r.data.html,
+                newNodeId: r.data.newNodeId,
+                movedText: r.data.movedTextKeyChildren || 0
+            });
+        } else {
+            reloadPreview();
+        }
+        broadcastStructureChanged();
+    }
+
+    if (window.PreviewSimpleAdd) {
+        PreviewSimpleAdd.init({
+            target: () => ({ struct: selectedStruct, node: selectedNode, frameNode: selectedFrameNode }),
+            position: getAddPosition,
+            structInfo: () => parseStruct(selectedStruct),
+            frameDocument: () => {
+                try { return iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document) || null; } catch (e) { return null; }
+            },
+            editedLanguage: () => (langSelect && langSelect.value) || defaultLang,
+            openAssetPicker: openAssetPicker,
+            holdsChildren: () => selectedHoldsChildren,
+            setPosition: (p) => { setAddPosition(p); _syncAddPositionOptions(); },
+            finish: _finishSimpleAdd
+        });
+    }
+
+    // ==================== The panel's mode ====================
+    // A switch of mode (the account menu's Mode row, js/core/panel-mode.js) applies at once. Before it, the editor
+    // says what the switch would close or start again, and the person may stay; after it, the editor leaves what
+    // the new mode does not show.
+
+    /** What a switch to `toMode` would take away here: {tool} (a tool or part the mode hides) or {addForm}, or null. */
+    function _modeSwitchLoss(toMode) {
+        const addFormOpen = currentMode === 'add' && contextualAddMode === 'add'
+            && contextualAddForm && contextualAddForm.style.display !== 'none';
+        if (addFormOpen) return { addForm: true };
+        if (toMode !== 'simple') return null;
+        const words = (el) => (el ? el.textContent.trim() : '');
+        if (currentMode === 'js') {
+            return { tool: words(Array.from(modeBtns).find(b => b.dataset.mode === 'js')) };
+        }
+        if (currentMode === 'style' && window.PreviewStyleSource && PreviewStyleSource.isActive()) {
+            return { tool: words(sourceBtn) };
+        }
+        if (currentMode === 'style' && activeStyleTab === 'animations') {
+            return { tool: words(styleTabs && styleTabs.querySelector('[data-tab="animations"]')) };
+        }
+        return null;
+    }
+
+    (window.QuickSitePanelModeGuards = window.QuickSitePanelModeGuards || []).push(function (toMode) {
+        const loss = _modeSwitchLoss(toMode);
+        if (!loss) return true;
+        const words = PreviewConfig.i18n.modeSwitch || {};
+        const modeName = toMode === 'simple' ? (words.simple || 'Simple') : (words.advanced || 'Advanced');
+        const message = loss.addForm
+            ? (words.redraws || 'Switching to {mode} starts the Add form again. Anything typed in it will be lost.')
+            : (words.closes || 'Switching to {mode} closes {tool}. Anything not saved there will be lost.').split('{tool}').join(loss.tool);
+        return QuickSiteUtils.confirm(message.split('{mode}').join(modeName), {
+            title: words.title || 'Switch mode?',
+            type: 'warning',
+            confirmText: words.switch || 'Switch',
+            cancelText: words.stay || 'Stay'
+        });
+    });
+
+    document.addEventListener('quicksite:panel-mode', function () {
+        // A tool the mode no longer shows: left for Select. The person answered the switch's question already, so
+        // nothing asks again (switchMode(), not setMode()), and Source's unsaved edits go with it.
+        if (currentMode !== 'add' && !toolOffered(currentMode)) {
+            switchMode('select', null);
+        }
+        if (currentMode === 'style') {
+            if (window.PreviewStyleSource && PreviewStyleSource.isActive() && !controlOffered(sourceAdvancedRow)) deactivateSource();
+            const animationsTab = styleTabs && styleTabs.querySelector('[data-tab="animations"]');
+            if (activeStyleTab === 'animations' && !controlOffered(animationsTab)) {
+                styleTabs.querySelector('[data-tab="theme"]')?.click();
+            }
+        }
+        // An Add form open at the switch starts again in the new mode, on the same element and position.
+        if (currentMode === 'add' && contextualAddMode === 'add' && contextualAddForm && contextualAddForm.style.display !== 'none') {
+            const position = getAddPosition();
+            showSidebarAddForm();
+            setAddPosition(position);
+            _syncAddPositionOptions();
+            if (window.PreviewSimpleAdd) PreviewSimpleAdd.refresh();
+        }
+    });
+
     // ==================== Public API ====================
     
     window.PreviewManager = {
@@ -10884,6 +11120,7 @@
         refreshEditList: refreshEditList,
         setDevice: setDevice,
         setMode: setMode,
+        embedOutsidePolicy: embedOutsidePolicy,
         getCurrentDevice: () => currentDevice,
         getCurrentMode: () => currentMode,
         highlightNode: (struct, node) => sendToIframe('highlightNode', { struct, node }),
@@ -10944,6 +11181,12 @@
         
         // Update component warning on initial load
         updateComponentWarning(currentEditType, currentEditName);
+        // And the embed warning, as navigateTo() does for every later structure
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => updateIframeWarning(currentEditType, currentEditName));
+        } else {
+            updateIframeWarning(currentEditType, currentEditName);
+        }
         // Update layout toggles visibility on initial load
         updateLayoutToggles(currentEditType, currentEditName);
         // The title field reads through the panel's API client, which a later script of the

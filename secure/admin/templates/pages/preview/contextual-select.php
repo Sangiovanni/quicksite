@@ -35,14 +35,14 @@
         </div>
         
         <div class="preview-contextual-info__actions" id="ctx-node-actions">
-            <button type="button" class="admin-btn admin-btn--success" id="ctx-node-add" title="<?= __admin('preview.addNode') ?? 'Add Element' ?>">
+            <button type="button" class="admin-btn admin-btn--success" id="ctx-node-add"<?= qs_editor_control_attrs('select.add') ?> title="<?= __admin('preview.addNode') ?? 'Add Element' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 <span><?= __admin('preview.addNode') ?? 'Add' ?></span>
             </button>
-            <button type="button" class="admin-btn admin-btn--primary" id="ctx-node-edit-params" title="<?= __admin('preview.editParams') ?? 'Edit Params' ?>">
+            <button type="button" class="admin-btn admin-btn--primary" id="ctx-node-edit-params"<?= qs_editor_control_attrs('select.edit-params') ?> title="<?= __admin('preview.editParams') ?? 'Edit Params' ?>">
                 <!-- Edit/pencil icon (Feather-style) — paired with Add (create) and Duplicate (copy). -->
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -50,14 +50,14 @@
                 </svg>
                 <span><?= __admin('preview.editParams') ?? 'Edit Params' ?></span>
             </button>
-            <button type="button" class="admin-btn" id="ctx-node-duplicate" title="<?= __admin('preview.duplicateNode') ?? 'Duplicate Element' ?> (D)">
+            <button type="button" class="admin-btn" id="ctx-node-duplicate"<?= qs_editor_control_attrs('select.duplicate') ?> title="<?= __admin('preview.duplicateNode') ?? 'Duplicate Element' ?> (D)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
                 <span><?= __admin('preview.duplicateNode') ?? 'Duplicate' ?></span>
             </button>
-            <button type="button" class="admin-btn" id="ctx-node-save-snippet" title="<?= __admin('preview.saveAsSnippet') ?? 'Save as Snippet' ?>">
+            <button type="button" class="admin-btn" id="ctx-node-save-snippet"<?= qs_editor_control_attrs('select.save-snippet') ?> title="<?= __admin('preview.saveAsSnippet') ?? 'Save as Snippet' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M19.562 12.097l1.531 2.653a3.5 3.5 0 0 1-3.03 5.25H5.937a3.5 3.5 0 0 1-3.031-5.25l1.53-2.653"/>
                     <path d="M12 15V2"/>
@@ -65,14 +65,14 @@
                 </svg>
                 <span><?= __admin('preview.saveSnippet') ?? 'Save Snippet' ?></span>
             </button>
-            <button type="button" class="admin-btn" id="ctx-node-save-component" title="<?= __admin('preview.saveAsComponent') ?? 'Save as Component' ?>">
+            <button type="button" class="admin-btn" id="ctx-node-save-component"<?= qs_editor_control_attrs('select.save-component') ?> title="<?= __admin('preview.saveAsComponent') ?? 'Save as Component' ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                     <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
                 </svg>
                 <span><?= __admin('preview.saveComponent') ?? 'Save Component' ?></span>
             </button>
-            <button type="button" class="admin-btn admin-btn--danger" id="ctx-node-delete" title="<?= __admin('common.delete') ?> (Del)">
+            <button type="button" class="admin-btn admin-btn--danger" id="ctx-node-delete"<?= qs_editor_control_attrs('select.delete') ?> title="<?= __admin('common.delete') ?> (Del)">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -80,21 +80,21 @@
                 <span><?= __admin('common.delete') ?? 'Delete' ?></span>
             </button>
             <!-- Variables button (component-only, shown/hidden by JS) -->
-            <button type="button" class="admin-btn" id="ctx-node-variables" title="<?= __admin('preview.variables') ?? 'Variables' ?>" style="display: none;">
+            <button type="button" class="admin-btn" id="ctx-node-variables"<?= qs_editor_control_attrs('select.variables') ?> title="<?= __admin('preview.variables') ?? 'Variables' ?>" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
                 </svg>
                 <span><?= __admin('preview.variables') ?? 'Variables' ?></span>
             </button>
             <!-- Enums button (component-only, shown/hidden by JS) -->
-            <button type="button" class="admin-btn" id="ctx-node-enums" title="<?= __admin('preview.enums') ?? 'Enums' ?>" style="display: none;">
+            <button type="button" class="admin-btn" id="ctx-node-enums"<?= qs_editor_control_attrs('select.enums') ?> title="<?= __admin('preview.enums') ?? 'Enums' ?>" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
                 </svg>
                 <span><?= __admin('preview.enums') ?? 'Enums' ?></span>
             </button>
             <!-- Emulation button (component-only, shown/hidden by JS) -->
-            <button type="button" class="admin-btn" id="ctx-node-emulation" title="<?= __admin('preview.emulation') ?? 'Variable Emulation' ?>" style="display: none;">
+            <button type="button" class="admin-btn" id="ctx-node-emulation"<?= qs_editor_control_attrs('select.emulation') ?> title="<?= __admin('preview.emulation') ?? 'Variable Emulation' ?>" style="display: none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
@@ -103,7 +103,7 @@
             <!-- Translate from CSV button (complex-element only — currently
                  only Table; shown when selected node has data-qs-complex='table').
                  Opens the translate-csv modal. -->
-            <button type="button" class="admin-btn" id="ctx-node-translate-csv" title="<?= __admin('preview.translateCsv', 'Translate from CSV') ?>" style="display: none;">
+            <button type="button" class="admin-btn" id="ctx-node-translate-csv"<?= qs_editor_control_attrs('select.translate-csv') ?> title="<?= __admin('preview.translateCsv', 'Translate from CSV') ?>" style="display: none;">
                 <!-- "language / translate" icon: two stacked horizontal text-lines + a tiny arrow hint -->
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 5h12"/><path d="M9 3v2"/>
