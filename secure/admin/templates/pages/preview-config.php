@@ -352,6 +352,13 @@ window.PreviewConfig = {
         invalidId: <?= json_encode(__admin('preview.invalidId', 'Invalid ID — start with a letter or underscore; letters, digits, hyphens and underscores only (no spaces).')) ?>,
         optional: <?= json_encode(__admin('preview.optional', 'Optional')) ?>,
         eventTooltips: <?= json_encode(AdminTranslation::getInstance()->getRaw('preview.eventTooltips') ?: new stdClass()) ?>,
+        // The simple Add's words (preview-simple-add.js, and the picker's upload row)
+        simpleAdd: <?= qs_inline_script_json(AdminTranslation::getInstance()->getRaw('preview.simpleAdd') ?: new stdClass()) ?>,
+        // A switch of mode that would close a tool or start the Add form again asks first
+        modeSwitch: <?= qs_inline_script_json(array_merge(
+            (array) (AdminTranslation::getInstance()->getRaw('preview.modeSwitch') ?: []),
+            ['simple' => __admin('nav.modeSimple'), 'advanced' => __admin('nav.modeAdvanced')]
+        )) ?>,
         selectNodeFirst: <?= json_encode(__admin('preview.selectNodeFirst', 'Select an element first')) ?>,
         selectorOrThis: <?= json_encode(__admin('preview.selectorOrThis', 'selector or this')) ?>,
         targetAttribute: <?= json_encode(__admin('preview.targetAttribute', 'Attribute (optional)')) ?>,
@@ -919,6 +926,9 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => Ad
             . '?v=' . filemtime($_ceJs) . '"></script>' . "\n";
     }
 ?>
+
+<!-- The simple Add (Select → Add in simple mode): its list's sends. Before preview.js, which hands it the target. -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-simple-add.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-simple-add.js') ?>"></script>
 
 <!-- Preview JavaScript (Main) -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview.js') ?>"></script>

@@ -13,6 +13,13 @@
  * advanced menu opened in simple (the same class), nothing else:
  * every page still opens at its address for a role that may open it, and nothing here is asked by the server.
  *
+ * A page that draws a view of its own for each mode (the visual editor) hears a switch two ways:
+ *  - before it: each function in window.QuickSitePanelModeGuards is asked, with the mode about to be drawn, and answers
+ *    true or false (or a promise of it). One false and nothing switches: the page has asked the person, who chose to stay.
+ *    An array a page fills whenever it loads, so a page's script may run before this one.
+ *  - after it: 'quicksite:panel-mode' on the document, its detail {mode}, each time the class changes (a switch, a failed
+ *    save putting the mode back, the chooser's pick).
+ *
  * @requires js/core/api.js (QuickSiteAPI.setPanelMode), js/core/utils.js (openModal, showToast), admin.js
  */
 (function () {
@@ -26,10 +33,22 @@
         return WORDS[key] || fallback;
     }
 
-    /** The menu as one mode draws it: the page's class, then the groups (ruling: one entry left is a link). */
+    /** The menu as one mode draws it: the page's class, then the groups (ruling: one entry left is a link); the page told. */
     function drawMenu(mode) {
         document.body.classList.toggle('admin-body--simple', mode !== 'advanced');
         window.QuickSiteAdmin.applyMenuGroups();
+        document.dispatchEvent(new CustomEvent('quicksite:panel-mode', { detail: { mode: mode } }));
+    }
+
+    /** Whether the page lets a switch to `mode` happen: every guard asked in turn, true unless one says no. */
+    function guardsAllow(mode) {
+        var guards = Array.isArray(window.QuickSitePanelModeGuards) ? window.QuickSitePanelModeGuards.slice() : [];
+        return guards.reduce(function (ok, guard) {
+            return ok.then(function (yes) {
+                if (!yes || typeof guard !== 'function') return yes;
+                return Promise.resolve(guard(mode)).then(function (answer) { return answer !== false; }, function () { return false; });
+            });
+        }, Promise.resolve(true));
     }
 
     /** The Mode row: the current mode marked, none before the first pick. */
@@ -56,10 +75,25 @@
 
     var current = MODES.indexOf(CONFIG.panelMode) === -1 ? null : CONFIG.panelMode;
     var saving = false;
+    var asking = false;
 
-    /** Switch to `mode` at once; a failed save puts the menu and the row back and says so. */
+    /** Switch to `mode` once the page lets it (guardsAllow()): at once where no page asks. */
     function switchTo(mode) {
-        if (saving || mode === current || MODES.indexOf(mode) === -1) return;
+        if (saving || asking || mode === current || MODES.indexOf(mode) === -1) return;
+        if (!Array.isArray(window.QuickSitePanelModeGuards) || window.QuickSitePanelModeGuards.length === 0) {
+            apply(mode);
+            return;
+        }
+        asking = true;
+        guardsAllow(mode).then(function (yes) {
+            asking = false;
+            if (yes) apply(mode);
+        });
+    }
+
+    /** Switch to `mode` now; a failed save puts the menu and the row back and says so. */
+    function apply(mode) {
+        if (saving || mode === current) return;
         var was = current;
         current = mode;
         saving = true;

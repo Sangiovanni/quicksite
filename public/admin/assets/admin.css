@@ -503,6 +503,13 @@ code,
     min-width: 0;
 }
 
+/* The editor's simple view: what the editor's definition (editorTools.php) leaves out of simple, hidden by the same
+   class, so a switch of mode shows or hides it with no reload. What a role cannot run is hidden by the role's filter,
+   in either mode. */
+.admin-body--simple [data-editor-advanced] {
+    display: none !important;
+}
+
 /* After the first pick: the Mode row glows, three times, where it is (nothing moves across the
    screen; with reduce motion it does not play, responsive.css), and a bubble under it says the
    mode can be switched there at any time. */
@@ -2708,8 +2715,7 @@ kbd {
 }
 
 .manage-space__clear-btn:hover,
-.preview-toolbar__delete-btn:hover,
-.preview-component-warning__delete:hover {
+.preview-toolbar__delete-btn:hover {
     background: var(--admin-error);
     color: #ffffff;
 }
@@ -4417,7 +4423,6 @@ kbd {
 
 .preview-toolbar__add-btn svg,
 .preview-toolbar__delete-btn svg,
-.preview-component-warning__delete svg,
 .preview-theme-actions .admin-btn svg,
 .transition-editor__anim-checkbox input,
 .preview-contextual-js-page-events__chevron,
@@ -5225,23 +5230,6 @@ kbd {
     width: 18px;
     height: 18px;
     color: var(--admin-warning);
-}
-
-.preview-component-warning__delete {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
-    border: 1px solid var(--admin-error);
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--admin-error);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
 }
 
 /* Iframe Warning Banner */
@@ -7401,6 +7389,7 @@ kbd {
 
 .preview-selector-selected__actions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-sm);
     margin-top: var(--space-xs);
 }
@@ -7704,13 +7693,6 @@ kbd {
     padding: 1px 4px;
     border-radius: 3px;
     flex-shrink: 0;
-}
-
-/* Resolved value display for var() */
-.preview-style-property__resolved {
-    font-size: var(--font-size-xs);
-    color: var(--admin-text-muted);
-    font-family: var(--font-mono);
 }
 
 .preview-style-property__delete {
@@ -11015,6 +10997,123 @@ kbd {
     min-height: 0;
 }
 
+/* The picker's upload row (the simple Add's Image, Video and Audio), above the list, which then scrolls in its own box */
+.preview-asset-picker__upload {
+    display: flex;
+    padding: var(--space-sm);
+    border-bottom: 1px solid var(--admin-border);
+}
+.preview-asset-picker__body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+/* The simple Add: a beginner's list of plain elements, each an icon over its name. A grid that wraps to the panel's
+   width: as many to a row as fit, never narrower than its name. */
+.preview-simple-add__items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(5.5rem, 100%), 1fr));
+    gap: var(--space-xs);
+    margin-bottom: var(--space-sm);
+}
+.preview-simple-add__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-xs);
+    min-width: 0;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+.preview-simple-add__item svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+.preview-simple-add__item:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface-hover);
+}
+.preview-simple-add__item[aria-pressed="true"] {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-on-accent);
+}
+/* The Title's three sizes: cards side by side (wrapping where the panel is narrow), each word in its own size. The radio stays,
+   out of sight, for the keyboard; two classes, as the form's own label rule would otherwise draw each card as a plain label. */
+.preview-simple-add__sizes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(5rem, 100%), 1fr));
+    gap: var(--space-xs);
+}
+.preview-simple-add__sizes > .preview-simple-add__size {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3rem;
+    margin: 0;
+    padding: var(--space-xs);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    font-weight: var(--font-weight-bold);
+    line-height: 1.1;
+    text-align: center;
+    overflow-wrap: anywhere;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+.preview-simple-add__sizes > .preview-simple-add__size--big {
+    font-size: var(--font-size-xl);
+}
+.preview-simple-add__sizes > .preview-simple-add__size--medium {
+    font-size: var(--font-size-base);
+}
+.preview-simple-add__sizes > .preview-simple-add__size--small {
+    font-size: var(--font-size-xs);
+}
+.preview-simple-add__size input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.preview-simple-add__sizes > .preview-simple-add__size:hover {
+    color: var(--admin-text);
+    background: var(--admin-surface-hover);
+}
+.preview-simple-add__sizes > .preview-simple-add__size:has(input:checked) {
+    background: var(--admin-primary);
+    border-color: var(--admin-primary);
+    color: var(--admin-on-accent);
+}
+.preview-simple-add__sizes > .preview-simple-add__size:has(input:focus-visible) {
+    outline: 2px solid var(--admin-primary);
+    outline-offset: 2px;
+}
+/* The List's lines: a field and its remove button, one line each */
+.preview-simple-add__list-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+.preview-simple-add__list-row > .admin-input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .preview-asset-picker__item {
     display: flex;
     align-items: center;
@@ -14315,10 +14414,13 @@ kbd {
     border-color: var(--admin-border-focus);
 }
 
+/* The chips keep their width where they fit, and wrap where the panel is narrower than they are */
 .preview-contextual-translation__chips {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-xs);
-    flex: 0 0 auto;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 .preview-contextual-translation__chip {
     display: inline-flex;

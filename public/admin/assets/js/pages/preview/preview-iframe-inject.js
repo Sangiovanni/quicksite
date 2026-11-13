@@ -428,6 +428,12 @@
         
         console.log('[QuickSite] Node inserted successfully:', newNodeId);
         
+        // An element added empty (a box, a list with nothing yet) gets the empty-element hint, as on load, so it
+        // can be seen and selected
+        if (currentMode === 'select' || currentMode === 'drag') {
+            scanEmptyElements();
+        }
+        
         // Select the new element and notify parent (this updates the info bar)
         selectElementAndNotify(newElement);
         newElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -916,6 +922,13 @@
     
     // Find the selectable target (bubble up to component if inside one)
     function getSelectableTarget(el, mouseX, mouseY) {
+        // An embed lets the pointer through (preview-iframe-overlay.css), so what lies under it is whatever holds it: for an
+        // embed at a page's top level that is <body>, which carries no editor attributes. The embed under the pointer is the
+        // target wherever it sits.
+        if (mouseX !== undefined && mouseY !== undefined) {
+            var embedAnywhere = findEmbedAtPoint(document, mouseX, mouseY);
+            if (embedAnywhere) el = embedAnywhere;
+        }
         if (!el || el === document.body || el === document.documentElement) return null;
         if (ignoreTags.includes(el.tagName)) return null;
 
