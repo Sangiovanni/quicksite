@@ -1299,6 +1299,16 @@
             "consentPages": "Nécessite votre page de politique de cookies ou de confidentialité",
             "secondLanguage": "Nécessite une deuxième langue"
         },
+        "templates": {
+            "landingPage": {
+                "title": "Page d'atterrissage",
+                "description": "Une page : une accroche, trois atouts et un appel à l'action. Violet."
+            },
+            "starterBusiness": {
+                "title": "Starter Business",
+                "description": "Quatre pages (accueil, à propos, services, contact) avec un menu et un pied de page. Turquoise."
+            }
+        },
         "specs": {
             "shared": {
                 "params": {
@@ -1439,21 +1449,30 @@
                 "title": "Exécuter un lot de commandes",
                 "description": "Collez et exécutez un lot de commandes JSON directement — aucune génération de prompt nécessaire."
             },
-            "starterBusiness": {
-                "title": "Starter Business",
-                "description": "Site web business avec menu, pied de page, 4 pages et thème turquoise. Langue unique."
-            },
-            "starterBusinessMultilingual": {
-                "title": "Starter Business (Multilingue)",
-                "description": "Site web business avec traductions EN + FR et thème sombre ambre."
-            },
-            "landingPage": {
-                "title": "Page d'Atterrissage",
-                "description": "Landing page avec hero, fonctionnalités et sections CTA. Thème violet dégradé."
-            },
-            "landingPageMultilingual": {
-                "title": "Page d'Atterrissage (Multilingue)",
-                "description": "Landing page avec traductions EN + FR et sélecteur de langue."
+            "startFromTemplate": {
+                "title": "Partir d'un modèle",
+                "description": "Construit un site prêt à l'emploi à partir du modèle choisi : en une langue ou plusieurs, avec un thème sombre si vous le souhaitez. Il remplace le contenu du projet.",
+                "params": {
+                    "template": {
+                        "label": "Modèle"
+                    },
+                    "multilingual": {
+                        "label": "Plusieurs langues",
+                        "help": "Construit le site dans chaque langue cochée, avec un sélecteur de langue dans son pied de page"
+                    },
+                    "languages": {
+                        "label": "Langues",
+                        "help": "Les langues dans lesquelles ce modèle est écrit. Cochez-en au moins deux."
+                    },
+                    "language": {
+                        "label": "Langue principale",
+                        "help": "La langue qu'un visiteur voit en premier"
+                    },
+                    "darkMode": {
+                        "label": "Inclure le mode sombre",
+                        "help": "Ajoute les couleurs sombres du modèle et un bouton clair/sombre dans son menu"
+                    }
+                }
             },
             "freshStart": {
                 "title": "Nouveau Départ",
@@ -1571,6 +1590,14 @@
         "aiToolsLoading": "Chargement…",
         "aiToolsEmpty": "Aucun workflow ne correspond à votre recherche et à vos filtres.",
         "aiToolsBackToList": "← Retour",
+        "workflowsTemplatePreview": "Aperçu",
+        "workflowsTemplatePreviewOf": "Aperçu de {name}",
+        "workflowsTemplatePreviewTitle": "Aperçu : {name}",
+        "workflowsTemplatePreviewFrame": "Aperçu de {name}",
+        "workflowsTemplatePreviewNote": "L'aperçu montre toutes les options activées : toutes les langues du modèle et son bouton clair/sombre. Une exécution ne construit que ce que vous choisissez.",
+        "workflowsTemplateTheme": "Thème",
+        "workflowsTemplateThemeLight": "Clair",
+        "workflowsTemplateThemeDark": "Sombre",
         "aiToolsSectionYourPrompt": "Votre invite",
         "aiToolsSectionParameters": "Paramètres",
         "aiToolsSectionGeneralPrompt": "Invite générale",

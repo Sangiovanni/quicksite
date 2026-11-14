@@ -1,0 +1,39 @@
+{
+    "template": "9809dd5197a77fcb30f228d58eae08ac935d10af217a8e58ed16e6c459133d1a",
+    "engine": "6faf895d642357c2557b1ddfcccdb22da0f0fd9e758bb1d85e8ba145db6a2b36",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "about",
+        "services",
+        "contact"
+    ],
+    "scripts": true,
+    "files": [
+        "dark/en/about.html",
+        "dark/en/contact.html",
+        "dark/en/home.html",
+        "dark/en/services.html",
+        "dark/fr/about.html",
+        "dark/fr/contact.html",
+        "dark/fr/home.html",
+        "dark/fr/services.html",
+        "dark/style/style.css",
+        "light/en/about.html",
+        "light/en/contact.html",
+        "light/en/home.html",
+        "light/en/services.html",
+        "light/fr/about.html",
+        "light/fr/contact.html",
+        "light/fr/home.html",
+        "light/fr/services.html",
+        "light/style/style.css"
+    ]
+}

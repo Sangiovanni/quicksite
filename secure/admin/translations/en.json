@@ -1862,6 +1862,16 @@
             "consentPages": "Needs your cookie policy or privacy page",
             "secondLanguage": "Needs a second language"
         },
+        "templates": {
+            "landingPage": {
+                "title": "Landing Page",
+                "description": "One page: a hero, three features and a call to action. Purple."
+            },
+            "starterBusiness": {
+                "title": "Starter Business",
+                "description": "Four pages (home, about, services, contact) with a menu and a footer. Teal."
+            }
+        },
         "specs": {
             "shared": {
                 "params": {
@@ -2032,21 +2042,30 @@
                 "title": "Run Command Batch",
                 "description": "Paste and execute a JSON command batch directly — no prompt generation needed."
             },
-            "starterBusiness": {
-                "title": "Starter Business",
-                "description": "Business website with menu, footer, 4 pages and teal theme. Single language."
-            },
-            "starterBusinessMultilingual": {
-                "title": "Starter Business (Multilingual)",
-                "description": "Business website with EN + FR translations and dark amber theme."
-            },
-            "landingPage": {
-                "title": "Landing Page",
-                "description": "Single-page landing with hero, features and CTA sections. Purple gradient theme."
-            },
-            "landingPageMultilingual": {
-                "title": "Landing Page (Multilingual)",
-                "description": "Single-page landing with EN + FR translations and language switcher."
+            "startFromTemplate": {
+                "title": "Start from a template",
+                "description": "Builds a ready-made site from the template you pick: in one language or several, with a dark theme if you want one. It replaces what the project holds.",
+                "params": {
+                    "template": {
+                        "label": "Template"
+                    },
+                    "multilingual": {
+                        "label": "Several languages",
+                        "help": "Builds the site in each language you tick, with a language switch in its footer"
+                    },
+                    "languages": {
+                        "label": "Languages",
+                        "help": "The languages this template is written in. Tick at least two."
+                    },
+                    "language": {
+                        "label": "Main language",
+                        "help": "The language a visitor gets first"
+                    },
+                    "darkMode": {
+                        "label": "Include dark mode",
+                        "help": "Adds the template's dark colours and a light/dark button in its menu"
+                    }
+                }
             },
             "freshStart": {
                 "title": "Fresh Start",
@@ -2174,6 +2193,14 @@
         "workflowsOptionsHideAll": "Your options hide every workflow.",
         "workflowsShowAll": "Show all",
         "workflowsUnrunnable": "Your role can't run this workflow",
+        "workflowsTemplatePreview": "Preview",
+        "workflowsTemplatePreviewOf": "Preview {name}",
+        "workflowsTemplatePreviewTitle": "Preview: {name}",
+        "workflowsTemplatePreviewFrame": "Preview of {name}",
+        "workflowsTemplatePreviewNote": "The preview shows every option on: all the template's languages and its light/dark button. A run builds only what you choose.",
+        "workflowsTemplateTheme": "Theme",
+        "workflowsTemplateThemeLight": "Light",
+        "workflowsTemplateThemeDark": "Dark",
         "workflowsFactNoAi": "No AI",
         "workflowsFactPaste": "No AI: you paste the commands",
         "workflowsFactAiOne": "Uses AI: one request",

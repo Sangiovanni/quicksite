@@ -86,3 +86,67 @@ With cron, once an hour:
 
 Exit code: `0` when it swept, had nothing to do, or found another sweep running;
 `1` when it refused to run (from a web request).
+
+---
+
+## `template-previews.php` — build the templates' previews
+
+### What it does
+
+*Start from a template* offers each site template of `secure/admin/workflows/templates/`
+with a **Preview** button. What that button shows is built by this tool: for each
+template, the pages QuickSite's own build answers for it, in every language the
+template is written in, in its light theme and in its dark theme when it has one.
+They are kept as static files under `public/admin/assets/template-previews/`.
+
+It touches no account and no project of the installation. It copies QuickSite's own
+files to a temporary folder, serves that copy with PHP's built-in server on a free
+local port, runs each template there as the panel runs it, builds it, fetches every
+page, and removes the copy.
+
+### When you need it
+
+- you changed a template's file, or added one: its card shows no **Preview** button
+  until its preview is built again;
+- you are releasing a version: a preview records which engine built it, and one built
+  by another engine is stale even when no template changed. The engine, here, is the
+  engine's source folder, every command file, the workflows a template's run goes
+  through, and this tool: a change to any of them makes every preview stale.
+
+A preview is never built by the panel: opening a page does not start a build.
+
+### How to run it
+
+From the installation's root folder:
+
+```bash
+php secure/tools/template-previews.php            # build the previews that are stale or missing
+php secure/tools/template-previews.php --all      # build every preview again
+php secure/tools/template-previews.php --check    # build nothing; say which are stale
+php secure/tools/template-previews.php --help
+```
+
+If the `secure` folder was renamed at setup, use its new name. It needs PHP's command
+line, with `proc_open` and `allow_url_fopen` available, and nothing else.
+
+### What it prints
+
+```
+QuickSite template previews
+  fresh      landing-page
+  stale      starter-business: its template changed
+  built      starter-business, light: 26 steps, 8 pages in en, fr
+  built      starter-business, dark: 26 steps, 8 pages in en, fr
+Every preview is fresh.
+```
+
+- **fresh**: built from this template's file, by this engine;
+- **stale**: *it has no preview*, *its template changed*, *it was built by another
+  engine*, *a file of it is missing*, or *its template is gone* (the preview is then
+  removed);
+- **built**: one line per theme.
+
+A build that fails replaces nothing: the previous preview stays as it was.
+
+Exit code: `0` when every preview is fresh; `1` when it refused to run, a build
+failed, or `--check` found a stale preview.

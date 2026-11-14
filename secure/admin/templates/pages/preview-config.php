@@ -709,6 +709,15 @@ window.PreviewConfig = {
             optionsHidden: <?= json_encode(__admin('preview.workflowsOptionsHidden', '{n} hidden')) ?>,
             // A workflow the role cannot run, shown greyed
             unrunnable: <?= json_encode(__admin('preview.workflowsUnrunnable', "Your role can't run this workflow")) ?>,
+            // A picker of templates, and the dialog that shows a template's built preview
+            templatePreview: <?= json_encode(__admin('preview.workflowsTemplatePreview', 'Preview')) ?>,
+            templatePreviewOf: <?= json_encode(__admin('preview.workflowsTemplatePreviewOf', 'Preview {name}')) ?>,
+            templatePreviewTitle: <?= json_encode(__admin('preview.workflowsTemplatePreviewTitle', 'Preview: {name}')) ?>,
+            templatePreviewFrame: <?= json_encode(__admin('preview.workflowsTemplatePreviewFrame', 'Preview of {name}')) ?>,
+            templatePreviewNote: <?= json_encode(__admin('preview.workflowsTemplatePreviewNote', "The preview shows every option on: all the template's languages and its light/dark button. A run builds only what you choose.")) ?>,
+            templateTheme: <?= json_encode(__admin('preview.workflowsTemplateTheme', 'Theme')) ?>,
+            templateThemeLight: <?= json_encode(__admin('preview.workflowsTemplateThemeLight', 'Light')) ?>,
+            templateThemeDark: <?= json_encode(__admin('preview.workflowsTemplateThemeDark', 'Dark')) ?>,
             backToList: <?= json_encode(__admin('preview.aiToolsBackToList', '← Back')) ?>,
             sectionYourPrompt: <?= json_encode(__admin('preview.aiToolsSectionYourPrompt', 'Your prompt')) ?>,
             sectionParameters: <?= json_encode(__admin('preview.aiToolsSectionParameters', 'Parameters')) ?>,

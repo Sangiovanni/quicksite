@@ -3,7 +3,8 @@
  * WorkflowManager - Manages workflow specification loading, validation, and rendering
  * 
  * This class handles:
- * - Loading workflow JSON files from the core/ directory
+ * - Loading workflow JSON files from the core/ directory, and the site templates of templates/
+ *   that a workflow may take its steps from
  * - Validating workflows against the JSON schema
  * - Fetching data requirements via CommandRunner
  * - Rendering prompt templates with variable substitution
@@ -25,6 +26,9 @@ class WorkflowManager {
     
     /** @var array Cached workflows */
     private array $workflowsCache = [];
+
+    /** @var array|null The templates folder as listTemplates() read it, once per request */
+    private ?array $templatesCache = null;
     
     /** @var string Project ID */
     private string $projectId;
@@ -176,6 +180,7 @@ class WorkflowManager {
                     $workflow['_filePath'] = $path;
                     $workflow['_folder'] = dirname($path);
                     $workflow['_source'] = 'core';
+                    $this->offerTemplates($workflow);
 
                     $this->workflowsCache[$workflowId] = $workflow;
                     return $workflow;
@@ -184,6 +189,165 @@ class WorkflowManager {
         }
         
         return null;
+    }
+
+    /**
+     * The site templates a workflow may take its steps from: every valid file of `templates/`, by id, in the files' order.
+     *
+     * Templates are SHIPPED, as workflows are: one folder is read, and nothing a request names reaches a file outside
+     * it (loadTemplate()). A file is a template when it is a JSON object whose `id` is its file's name, with a list of
+     * languages and a list of steps that each name a command; any other file is left out and logged.
+     *
+     * @return array<string, array> id => the template's file as an array
+     */
+    public function listTemplates(): array {
+        if ($this->templatesCache !== null) return $this->templatesCache;
+        $this->templatesCache = [];
+        $files = glob($this->workflowsBasePath . '/templates/*.json') ?: [];
+        sort($files);
+        foreach ($files as $file) {
+            $id = basename($file, '.json');
+            $text = (string) @file_get_contents($file);
+            $template = json_decode($text, true);
+            $why = $this->templateRefusal($id, $template);
+            if ($why !== null) {
+                error_log("[WorkflowManager] template '{$id}' left out: {$why}");
+                continue;
+            }
+            // The file's hash with one kind of line ending, as the previews' tool takes it: a checkout's endings change nothing.
+            $template['_hash'] = hash('sha256', str_replace("\r\n", "\n", $text));
+            $this->templatesCache[$id] = $template;
+        }
+        return $this->templatesCache;
+    }
+
+    /** One template by its id, or null: an id is letters, digits, hyphens and underscores, and names a file listTemplates() holds. */
+    public function loadTemplate(string $templateId): ?array {
+        if (!RegexPatterns::match('identifier_alphanum', $templateId)) return null;
+        return $this->listTemplates()[$templateId] ?? null;
+    }
+
+    /** Why a file of `templates/` is no template, or null when it is one. */
+    private function templateRefusal(string $id, $template): ?string {
+        if (!RegexPatterns::match('identifier_alphanum', $id)) return 'its file name is not an id';
+        if (!is_array($template)) return 'it is not a JSON object';
+        if (($template['id'] ?? null) !== $id) return 'its id is not its file name';
+        $languages = $template['languages'] ?? null;
+        if (!is_array($languages) || $languages === [] || array_filter($languages, static fn($l) => !is_string($l) || $l === '') !== []) {
+            return 'it lists no languages';
+        }
+        $steps = $template['steps'] ?? null;
+        if (!is_array($steps) || $steps === []) return 'it has no steps';
+        foreach ($steps as $step) {
+            if (!is_array($step) || !is_string($step['command'] ?? null) || $step['command'] === '') return 'a step names no command';
+        }
+        if (isset($template['data']) && !is_array($template['data'])) return 'its data is not an object';
+        return null;
+    }
+
+    /**
+     * What a template's file says of itself, for a picker: its id, icon, name and line (in the panel's language, from its
+     * keys, else as the file writes them), its languages, whether it holds a dark theme, and its file's hash.
+     */
+    public function templateChoice(array $template): array {
+        if (!function_exists('__workflow')) {
+            require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
+        }
+        $id = (string) $template['id'];
+        $text = static function (string $field) use ($template, $id): string {
+            $direct = is_string($template[$field] ?? null) ? $template[$field] : '';
+            $key = $template[$field . 'Key'] ?? null;
+            if (!is_string($key) || $key === '') return $direct !== '' ? $direct : ($field === 'title' ? $id : '');
+            return (string) __workflow($template, $key, $direct !== '' ? $direct : ($field === 'title' ? $id : ''));
+        };
+        return [
+            'id' => $id,
+            'icon' => is_string($template['icon'] ?? null) ? $template['icon'] : '',
+            'title' => $text('title'),
+            'description' => $text('description'),
+            'languages' => array_values($template['languages']),
+            'dark' => is_array($template['data']['dark'] ?? null) && $template['data']['dark'] !== [],
+            'hash' => (string) ($template['_hash'] ?? ''),
+            'picture' => $this->templatePicture($id),
+            'preview' => $this->templatePreview($id, (string) ($template['_hash'] ?? '')),
+        ];
+    }
+
+    /** The folder of the panel's own assets, or null outside a web request (a tool, a probe): no picture and no preview then. */
+    private function panelAssets(): ?string {
+        return defined('ADMIN_ASSET_ROOT') ? rtrim(str_replace('\\', '/', (string) ADMIN_ASSET_ROOT), '/') . '/admin/assets' : null;
+    }
+
+    /** A template's picture among the panel's images (templates/<id>.webp, .jpg or .png), as its file name, or null. */
+    private function templatePicture(string $id): ?string {
+        $assets = $this->panelAssets();
+        if ($assets === null) return null;
+        foreach (['webp', 'jpg', 'png'] as $ext) {
+            if (is_file("$assets/images/templates/$id.$ext")) return "$id.$ext";
+        }
+        return null;
+    }
+
+    /**
+     * A template's built preview, when the panel may show it: the one the previews' tool wrote for this very file (its
+     * hash is the file's). A preview of a template that changed since is not shown. Whether the engine that built it is
+     * today's is the tool's own check (--check), run at each release: an installed engine changes only with one.
+     *
+     * @return array{themes: string[], languages: string[], pages: string[], scripts: bool}|null
+     */
+    private function templatePreview(string $id, string $hash): ?array {
+        $assets = $this->panelAssets();
+        if ($assets === null || $hash === '') return null;
+        $manifest = json_decode((string) @file_get_contents("$assets/template-previews/$id/preview.json"), true);
+        if (!is_array($manifest) || ($manifest['template'] ?? null) !== $hash) return null;
+        $list = static fn($v): array => array_values(array_filter(is_array($v) ? $v : [], 'is_string'));
+        $themes = $list($manifest['themes'] ?? null);
+        $pages = $list($manifest['pages'] ?? null);
+        if ($themes === [] || $pages === []) return null;
+        return [
+            'themes' => $themes,
+            'languages' => $list($manifest['languages'] ?? null),
+            'pages' => $pages,
+            'scripts' => !empty($manifest['scripts']),
+        ];
+    }
+
+    /** A `template` parameter is given its choices as the workflow loads: every template, as templateChoice() says it. */
+    private function offerTemplates(array &$workflow): void {
+        if (empty($workflow['parameters']) || !is_array($workflow['parameters'])) return;
+        foreach ($workflow['parameters'] as &$param) {
+            if (!is_array($param) || ($param['type'] ?? null) !== 'template') continue;
+            $param['templates'] = array_map([$this, 'templateChoice'], array_values($this->listTemplates()));
+        }
+        unset($param);
+    }
+
+    /**
+     * The template a run of this workflow takes its steps from: the one its `stepsFrom` parameter names. Null for a
+     * workflow with no `stepsFrom`, and for a run that names none yet. A name that is no template is refused whole
+     * (an exception), so no phase of that run is resolved: not the workflows that run before its steps either.
+     */
+    private function chosenTemplate(array $workflow, array $userParams): ?array {
+        $paramId = $workflow['stepsFrom'] ?? null;
+        if (!is_string($paramId) || $paramId === '') return null;
+        $chosen = $userParams[$paramId] ?? '';
+        if ($chosen === '' || $chosen === null) return null;
+        $template = is_string($chosen) ? $this->loadTemplate($chosen) : null;
+        if ($template === null) {
+            throw new InvalidArgumentException("workflow '" . ($workflow['id'] ?? '') . "': no such template");
+        }
+        return $template;
+    }
+
+    /** The steps a workflow's file can send: its own, and for one that takes its steps from a template, every template's. */
+    private function everyStep(array $workflow): array {
+        $steps = array_values(array_filter($workflow['steps'] ?? [], 'is_array'));
+        if (is_string($workflow['stepsFrom'] ?? null) && $workflow['stepsFrom'] !== '') {
+            foreach ($this->listTemplates() as $template) {
+                foreach ($template['steps'] as $step) $steps[] = $step;
+            }
+        }
+        return $steps;
     }
     
     /**
@@ -363,6 +527,18 @@ class WorkflowManager {
     public function generateSteps(array $workflow, array $userParams = [], array $fetchedData = [], array $configData = []): array {
         $expandedSteps = [];
 
+        // A workflow that takes its steps from a template runs the chosen template's, with the template's own data
+        // (its texts, its dark theme) as static data.
+        $template = $this->chosenTemplate($workflow, $userParams);
+        if ($template !== null) {
+            $workflow['steps'] = $template['steps'];
+            $workflow['staticData'] = array_merge(
+                is_array($template['data'] ?? null) ? $template['data'] : [],
+                ['template' => ['id' => $template['id'], 'languages' => array_values($template['languages'])]],
+                is_array($workflow['staticData'] ?? null) ? $workflow['staticData'] : []
+            );
+        }
+
         // Merge static data defined in the workflow itself
         if (!empty($workflow['staticData']) && is_array($workflow['staticData'])) {
             $fetchedData = array_merge($workflow['staticData'], $fetchedData);
@@ -435,6 +611,12 @@ class WorkflowManager {
      *               'label'? => string (a repeated entry's item)]
      */
     public function getWorkflowPhases(array $workflow, array $userParams = []): array {
+        // A run that takes its steps from a template has no phase until one is chosen, and none at all for a name
+        // that is no template (chosenTemplate() refuses it): Fresh Start never runs ahead of steps that do not exist.
+        if (is_string($workflow['stepsFrom'] ?? null) && $workflow['stepsFrom'] !== ''
+            && $this->chosenTemplate($workflow, $userParams) === null) {
+            return [];
+        }
         $phases = [];
         $this->collectPhases($workflow, $userParams, 'main', [], $phases, []);
         return $this->settleRequests($phases);
@@ -462,7 +644,8 @@ class WorkflowManager {
 
     /**
      * The commands a run of this workflow may send, for a role check: the related commands and the
-     * steps' commands of every workflow it may reach (reachableWorkflows()).
+     * steps' commands of every workflow it may reach (reachableWorkflows()); for one that takes its
+     * steps from a template, every template's (everyStep()).
      */
     public function runCommands(array $workflow): array {
         $commands = [];
@@ -470,8 +653,8 @@ class WorkflowManager {
             foreach (($reached['relatedCommands'] ?? []) as $command) {
                 if (is_string($command) && $command !== '') $commands[] = $command;
             }
-            foreach (($reached['steps'] ?? []) as $step) {
-                if (is_array($step) && is_string($step['command'] ?? null) && $step['command'] !== '') $commands[] = $step['command'];
+            foreach ($this->everyStep($reached) as $step) {
+                if (is_string($step['command'] ?? null) && $step['command'] !== '') $commands[] = $step['command'];
             }
         }
         return array_values(array_unique($commands));
@@ -501,7 +684,7 @@ class WorkflowManager {
                 if (!empty($reached['answerRules']['anyCommand'])) $any = true;
                 $steps = array_map(static fn($command) => ['command' => $command], array_filter($reached['relatedCommands'] ?? [], 'is_string'));
             } else {
-                $steps = array_filter($reached['steps'] ?? [], 'is_array');
+                $steps = $this->everyStep($reached);
             }
             foreach ($steps as $step) {
                 $effect = $this->stepEffect($step);
@@ -1999,6 +2182,21 @@ class WorkflowManager {
             }
         }
         
+        // A workflow that takes its steps from a template names the parameter that picks it, and that parameter is a
+        // picker of templates. It asks no model: its steps are a file's.
+        if (isset($workflow['stepsFrom'])) {
+            $picker = null;
+            foreach (($workflow['parameters'] ?? []) as $param) {
+                if (is_array($param) && ($param['id'] ?? null) === $workflow['stepsFrom']) $picker = $param;
+            }
+            if (!is_string($workflow['stepsFrom']) || $picker === null || ($picker['type'] ?? null) !== 'template') {
+                $errors[] = "'stepsFrom' must name a parameter of this workflow whose type is template";
+            }
+            if (isset($workflow['promptTemplate'])) {
+                $errors[] = "A workflow with 'stepsFrom' takes its steps from a template: it has no promptTemplate";
+            }
+        }
+
         // Validate pins / warnings — must be string arrays whose IDs map to existing files.
         $warnings = [];
         if (isset($workflow['promptTemplate'], $workflow['steps'])) {
@@ -2362,9 +2560,24 @@ class WorkflowManager {
     /**
      * Resolve $each loops in params
      * Used for generating arrays from fetched data (data.langData.languages) or param values
+     *
+     * An object that carries `$if` (a condition, read as a step's) is kept without it when the condition holds, and
+     * left out of its list or object when it does not: a template's menu holds its theme switch only when dark mode
+     * is chosen.
      */
     private function resolveEachLoops(array $params, array $context): array {
+        $wasList = array_is_list($params);
+        $dropped = false;
         foreach ($params as $key => $value) {
+            if (is_array($value) && array_key_exists('$if', $value)) {
+                if (!is_string($value['$if']) || !$this->evaluateStepCondition($value['$if'], $context)) {
+                    unset($params[$key]);
+                    $dropped = true;
+                    continue;
+                }
+                unset($value['$if']);
+                $params[$key] = $value;
+            }
             if (is_array($value)) {
                 // Check if this is an $each loop
                 if (isset($value['$each'])) {
@@ -2401,6 +2614,6 @@ class WorkflowManager {
             }
         }
         
-        return $params;
+        return $dropped && $wasList ? array_values($params) : $params;
     }
 }

@@ -1014,9 +1014,10 @@ window.PreviewAiTools = (function () {
         try {
             var keys = Object.keys(paramValues);
             var vals = keys.map(function (k) { return paramValues[k]; });
-            var args = keys.concat(['param', 'return (' + expr + ');']);
+            // `chosen` holds, for each picker of templates, the template picked (or null): chosen.template.dark.
+            var args = keys.concat(['param', 'chosen', 'return (' + expr + ');']);
             var fn = Function.apply(null, args);
-            return !!fn.apply(null, vals.concat([paramValues]));
+            return !!fn.apply(null, vals.concat([paramValues, _chosenTemplates()]));
         } catch (e) {
             console.warn('[PreviewAiTools] condition eval failed:', expr, e);
             return true;
@@ -1040,6 +1041,8 @@ window.PreviewAiTools = (function () {
     }
 
     function _onParamChanged(changedParamId) {
+        var changed = _findParam(changedParamId);
+        if (changed && changed.type === 'template') _applyTemplateChoice(changed);
         _updateParamVisibility();
         _updateDependentSelects(changedParamId);
         _renderParamErrors();
@@ -1097,8 +1100,11 @@ window.PreviewAiTools = (function () {
         }
 
         if (typeof of === 'object') {
-            var keep = of.filterFrom ? _refValues(of.filterFrom) : null;
-            if (keep) options = options.filter(function (o) { return keep.indexOf(o.value) !== -1; });
+            // filterFrom names one parameter or several: each one that holds something narrows the list.
+            [].concat(of.filterFrom || []).forEach(function (id) {
+                var keep = _refValues(id);
+                if (keep) options = options.filter(function (o) { return keep.indexOf(o.value) !== -1; });
+            });
             var drop = of.excludeFrom ? _refValues(of.excludeFrom) : null;
             if (drop) options = options.filter(function (o) { return drop.indexOf(o.value) === -1; });
         }
@@ -1112,6 +1118,11 @@ window.PreviewAiTools = (function () {
     function _refValues(id) {
         var refParam = _findParam(id);
         if (!refParam || !_isParamVisible(refParam)) return null;
+        if (refParam.type === 'template') {
+            // A picker of templates stands for the languages of the template picked.
+            var picked = _chosenTemplate(refParam);
+            return picked && Array.isArray(picked.languages) && picked.languages.length > 0 ? picked.languages : null;
+        }
         var refVal = _paramValues[id];
         var list = Array.isArray(refVal) ? refVal : (refVal != null && refVal !== '' ? [refVal] : []);
         return list.length > 0 ? list : null;
@@ -1825,6 +1836,8 @@ window.PreviewAiTools = (function () {
             });
         } else if (type === 'selector') {
             return _renderSelectorInput(param);
+        } else if (type === 'template') {
+            return _renderTemplatePicker(param);
         } else if (type === 'hidden') {
             return null;
         } else {
@@ -1890,6 +1903,246 @@ window.PreviewAiTools = (function () {
         ph.className = 'preview-contextual-ai-tools__param-placeholder';
         ph.textContent = _t('paramOptionsEmpty', 'No options available.');
         return ph;
+    }
+
+    // ──────────────────────────── A picker of templates ─────────────────
+
+    /** The template a picker holds, or null: the choice its parameter lists under the value picked. */
+    function _chosenTemplate(param) {
+        var list = param && Array.isArray(param.templates) ? param.templates : [];
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === _paramValues[param.id]) return list[i];
+        }
+        return null;
+    }
+
+    /** Each picker's template by its parameter's id, as a field's condition reads it (chosen.template.dark). */
+    function _chosenTemplates() {
+        var out = {};
+        var params = (_activeWorkflowSpec && _activeWorkflowSpec.parameters) || [];
+        for (var i = 0; i < params.length; i++) {
+            if (params[i].type === 'template') out[params[i].id] = _chosenTemplate(params[i]);
+        }
+        return out;
+    }
+
+    /**
+     * What a picked template sets in the other fields: a list its languages filter starts with all of them ticked, and
+     * a tick box the template does not offer (its condition no longer holds) goes back to unticked, on screen too.
+     */
+    function _applyTemplateChoice(picker) {
+        var template = _chosenTemplate(picker);
+        var params = (_activeWorkflowSpec && _activeWorkflowSpec.parameters) || [];
+        for (var i = 0; i < params.length; i++) {
+            var p = params[i];
+            var of = p.optionsFrom;
+            if (p.type === 'tag-select' && of && typeof of === 'object' && [].concat(of.filterFrom || []).indexOf(picker.id) !== -1) {
+                _paramValues[p.id] = template && Array.isArray(template.languages) ? template.languages.slice() : [];
+            }
+            if (p.type === 'checkbox' && p.condition && _paramValues[p.id] && !_isParamVisible(p)) {
+                _paramValues[p.id] = false;
+                var box = _runnerView ? _runnerView.querySelector('[data-param-control="' + p.id + '"]') : null;
+                if (box) box.checked = false;
+            }
+        }
+    }
+
+    /** The address of one of the panel's own assets. */
+    function _assetUrl(path) {
+        var cfg = window.PreviewConfig || {};
+        return (cfg.adminUrl || '') + 'assets/' + path;
+    }
+
+    /**
+     * A picker of templates: a group of radio cards the field's label names, one per template (its picture, or its
+     * icon when it has none, then its name and its line). A template with a built preview has a Preview button.
+     */
+    function _renderTemplatePicker(param) {
+        var list = Array.isArray(param.templates) ? param.templates : [];
+        if (list.length === 0) return _renderEmptyOptionsPlaceholder();
+        var group = document.createElement('div');
+        group.className = 'preview-contextual-ai-tools__template-picker';
+        group.setAttribute('role', 'radiogroup');
+        group.setAttribute('aria-labelledby', _paramControlId(param.id) + '-label');
+        for (var i = 0; i < list.length; i++) {
+            group.appendChild(_renderTemplateCard(param, list[i], group));
+        }
+        return group;
+    }
+
+    function _renderTemplateCard(param, template, group) {
+        var card = document.createElement('div');
+        card.className = 'preview-contextual-ai-tools__template-card';
+        card.dataset.template = template.id;
+        var picked = _paramValues[param.id] === template.id;
+        card.classList.toggle('preview-contextual-ai-tools__template-card--chosen', picked);
+
+        var choice = document.createElement('label');
+        choice.className = 'preview-contextual-ai-tools__template-choice';
+        var radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.className = 'preview-contextual-ai-tools__template-radio';
+        radio.name = _paramControlId(param.id);
+        radio.value = template.id;
+        radio.checked = picked;
+        radio.addEventListener('change', function () {
+            if (!radio.checked) return;
+            _paramValues[param.id] = template.id;
+            var cards = group.children;
+            for (var c = 0; c < cards.length; c++) {
+                cards[c].classList.toggle('preview-contextual-ai-tools__template-card--chosen', cards[c] === card);
+            }
+            _onParamChanged(param.id);
+        });
+        choice.appendChild(radio);
+        choice.appendChild(_renderTemplatePicture(template));
+        var text = document.createElement('span');
+        text.className = 'preview-contextual-ai-tools__template-text';
+        var name = document.createElement('span');
+        name.className = 'preview-contextual-ai-tools__template-name';
+        name.textContent = template.title || template.id;
+        text.appendChild(name);
+        if (template.description) {
+            var line = document.createElement('span');
+            line.className = 'preview-contextual-ai-tools__template-line';
+            line.textContent = template.description;
+            text.appendChild(line);
+        }
+        choice.appendChild(text);
+        card.appendChild(choice);
+        if (template.preview) card.appendChild(_renderTemplatePreviewButton(param, template));
+        return card;
+    }
+
+    /** A template's picture; its icon when it has none. Neither is read aloud: the card's name is its words. */
+    function _renderTemplatePicture(template) {
+        var box = document.createElement('span');
+        box.className = 'preview-contextual-ai-tools__template-picture';
+        if (template.picture) {
+            var img = document.createElement('img');
+            img.src = _assetUrl('images/templates/' + template.picture);
+            img.alt = '';
+            box.appendChild(img);
+        } else {
+            box.classList.add('preview-contextual-ai-tools__template-picture--icon');
+            box.setAttribute('aria-hidden', 'true');
+            box.textContent = template.icon || '📋';
+        }
+        return box;
+    }
+
+    function _renderTemplatePreviewButton(param, template) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'preview-contextual-ai-tools__template-preview';
+        btn.textContent = _t('templatePreview', 'Preview');
+        btn.setAttribute('aria-label', _t('templatePreviewOf', 'Preview {name}').replace('{name}', template.title || template.id));
+        btn.addEventListener('click', function () { _openTemplatePreview(param, template); });
+        return btn;
+    }
+
+    /** The address of a page of a template's built preview, among the panel's assets. */
+    function _templatePreviewUrl(template, theme, lang, page) {
+        return _assetUrl('template-previews/' + encodeURIComponent(template.id) + '/' + encodeURIComponent(theme) + '/'
+            + (lang ? encodeURIComponent(lang) + '/' : '') + encodeURIComponent(page) + '.html');
+    }
+
+    /**
+     * A template's built preview, in the panel's dialog: the pages the engine built for it, in a frame that is given
+     * no access to the panel (no same-origin; scripts only when the preview keeps one, the theme switch's). The
+     * frame opens on its first theme, in the language the form holds for this template when it is the one picked (the
+     * select its languages filter), else in the template's first.
+     */
+    function _openTemplatePreview(picker, template) {
+        var utils = window.QuickSiteUtils;
+        var preview = template.preview;
+        if (!utils || typeof utils.openModal !== 'function' || !preview) return;
+        var name = template.title || template.id;
+        var lang = '';
+        if (preview.languages.length > 0) {
+            lang = preview.languages[0];
+            var params = (_activeWorkflowSpec && _activeWorkflowSpec.parameters) || [];
+            for (var i = 0; i < params.length; i++) {
+                var of = params[i].optionsFrom;
+                if (params[i].type !== 'select' || !of || typeof of !== 'object' || [].concat(of.filterFrom || []).indexOf(picker.id) === -1) continue;
+                if (_paramValues[picker.id] === template.id && preview.languages.indexOf(_paramValues[params[i].id]) !== -1) {
+                    lang = _paramValues[params[i].id];
+                }
+                break;
+            }
+        }
+        var page = preview.pages.indexOf('home') !== -1 ? 'home' : preview.pages[0];
+
+        var modal = document.createElement('div');
+        modal.className = 'admin-modal-dialog preview-contextual-ai-tools__template-dialog';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'ai-tools-template-preview-title');
+
+        var head = document.createElement('div');
+        head.className = 'preview-contextual-ai-tools__template-dialog-head';
+        var title = document.createElement('h2');
+        title.id = 'ai-tools-template-preview-title';
+        title.className = 'preview-contextual-ai-tools__template-dialog-title';
+        title.textContent = _t('templatePreviewTitle', 'Preview: {name}').replace('{name}', name);
+        head.appendChild(title);
+
+        var frame = document.createElement('iframe');
+        frame.className = 'preview-contextual-ai-tools__template-frame';
+        frame.setAttribute('sandbox', preview.scripts ? 'allow-scripts' : '');
+        frame.setAttribute('referrerpolicy', 'no-referrer');
+        frame.title = _t('templatePreviewFrame', 'Preview of {name}').replace('{name}', name);
+
+        var themeButtons = [];
+        var show = function (theme) {
+            frame.src = _templatePreviewUrl(template, theme, lang, page);
+            themeButtons.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.theme === theme ? 'true' : 'false'); });
+        };
+        if (preview.themes.length > 1) {
+            var themes = document.createElement('div');
+            themes.className = 'preview-contextual-ai-tools__template-themes';
+            themes.setAttribute('role', 'group');
+            themes.setAttribute('aria-label', _t('templateTheme', 'Theme'));
+            preview.themes.forEach(function (theme) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'preview-contextual-ai-tools__template-theme';
+                b.dataset.theme = theme;
+                b.textContent = theme === 'dark' ? _t('templateThemeDark', 'Dark') : _t('templateThemeLight', 'Light');
+                b.addEventListener('click', function () { show(theme); });
+                themeButtons.push(b);
+                themes.appendChild(b);
+            });
+            head.appendChild(themes);
+        }
+        var shown = null;
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'preview-contextual-ai-tools__template-close';
+        close.textContent = _commonWord('close');
+        close.addEventListener('click', function () { if (shown) shown.close(); });
+        head.appendChild(close);
+        modal.appendChild(head);
+
+        var note = document.createElement('p');
+        note.className = 'preview-contextual-ai-tools__template-dialog-note';
+        note.textContent = _t('templatePreviewNote', "The preview shows every option on: all the template's languages and its light/dark button. A run builds only what you choose.");
+        modal.appendChild(note);
+        modal.appendChild(frame);
+
+        // The frame's page takes the keyboard while the focus is in it; past its last link the focus comes back here.
+        var back = document.createElement('span');
+        back.tabIndex = 0;
+        back.className = 'preview-contextual-ai-tools__template-dialog-end';
+        back.addEventListener('focus', function () { close.focus(); });
+        modal.appendChild(back);
+
+        show(preview.themes[0]);
+        shown = utils.openModal(modal, {
+            focusable: function () { return themeButtons.concat([close, frame]); },
+            first: close,
+            dismiss: function () { if (shown) shown.close(); }
+        });
     }
 
     function _renderTagSelect(param, options) {

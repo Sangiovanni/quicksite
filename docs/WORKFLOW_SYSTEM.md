@@ -9,11 +9,12 @@
 3. [Files Involved](#files-involved)
 4. [Workflow Types](#workflow-types)
 5. [Adding a workflow](#adding-a-workflow)
-6. [JSON Spec Reference](#json-spec-reference)
-7. [Markdown Template Reference](#markdown-template-reference)
-8. [Execution Flow](#execution-flow)
-9. [Condition Syntax](#condition-syntax)
-10. [Known Patterns & Gotchas](#known-patterns--gotchas)
+6. [Site templates](#site-templates)
+7. [JSON Spec Reference](#json-spec-reference)
+8. [Markdown Template Reference](#markdown-template-reference)
+9. [Execution Flow](#execution-flow)
+10. [Condition Syntax](#condition-syntax)
+11. [Known Patterns & Gotchas](#known-patterns--gotchas)
 
 ---
 
@@ -85,6 +86,9 @@ User fills parameters in the Workflows panel
 | `<secure>/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` |
 | `<secure>/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` |
 | `<secure>/admin/workflows/examples/*.md` | Example fragments referenced via `{{> example.X}}` |
+| `<secure>/admin/workflows/templates/*.json` | Site templates: what *Start from a template* builds, one file per template (see *Site templates*) |
+| `public/admin/assets/template-previews/<template>/` | Each template's built preview, written by `<secure>/tools/template-previews.php` |
+| `public/admin/assets/images/templates/<template>.jpg` | Each template's picture in the picker (`.webp` and `.png` are read too) |
 
 **Workflows are extensible by file.** There is no in-app authoring surface and no
 authoring command: a workflow *is* a JSON spec, plus a Markdown template beside it
@@ -314,6 +318,82 @@ that replaces a language's texts does the same.
 
 ---
 
+## Site templates
+
+*Start from a template* (`start-from-template.json`) is one workflow for every ready-made site. Its first
+parameter is a picker of templates; its steps are the picked template's. It asks no model.
+
+**A template is one file**, `<secure>/admin/workflows/templates/<id>.json`. Put a file there and the picker
+offers it: nothing else is edited. Like workflows, templates are shipped files: only that folder is read, and
+a run names a template by its id.
+
+```json
+{
+    "id": "my-template",
+    "icon": "🏠",
+    "title": "My template",
+    "description": "One line under the name",
+    "languages": ["en", "fr"],
+    "steps": [
+        { "command": "editStructure", "params": { "type": "menu", "structure": [
+            { "tag": "nav", "children": [
+                { "tag": "a", "params": { "href": "/" }, "children": [{ "textKey": "site.name" }] },
+                { "$if": "param.darkMode === true", "component": "theme-switch", "data": {} }
+            ] }
+        ] } },
+        { "command": "setTranslationKeys", "condition": "param.multilingual !== true", "forEach": "param.language",
+          "params": { "language": "{{$value}}", "translations": "{{texts.{{$value}}}}" } },
+        { "command": "setTranslationKeys", "condition": "param.multilingual === true", "forEach": "param.languages",
+          "params": { "language": "{{$value}}", "translations": "{{texts.{{$value}}}}" } }
+    ],
+    "data": {
+        "texts": { "en": { "site": { "name": "My site" } }, "fr": { "site": { "name": "Mon site" } } },
+        "dark": { "--color-bg": "#111111" }
+    }
+}
+```
+
+| Key | What it is |
+|---|---|
+| `id` | The file's name without `.json`. A file whose `id` is not its name is left out. |
+| `title`, `description` | The name and the line on the template's card, as written. `titleKey` and `descriptionKey` name a translation instead (the shipped templates use them). |
+| `icon` | Shown on the card when the template has no picture |
+| `languages` | The languages the template is written in. A run offers these and no other. |
+| `steps` | The template's commands, read as any workflow's steps (see *`steps`*): `condition`, `forEach`, `filter`, placeholders and `$if`. |
+| `data` | What the steps read, by key: `{{texts.fr}}`, `{{dark}}`. A template whose `data.dark` is not empty is offered with a dark mode. |
+
+**What a run chooses, and what the steps read:**
+
+| Field | In a step | What the row does with it |
+|---|---|---|
+| Template | `param.template` | The steps are that file's |
+| Several languages | `param.multilingual` | Runs *Setup Languages* with the languages ticked, then *Update Language Switch* |
+| Languages | `param.languages` | The template's languages, at least two ticked |
+| Main language | `param.language` | The site's default language, one of the template's |
+| Include dark mode | `param.darkMode` | Runs *Theme Switch Button*; shown only for a template with dark colours |
+
+A run goes through *Fresh Start*, *Setup Languages*, *Update Language Switch* when the site has several
+languages, *Theme Switch Button* when it has a dark mode, then the template's steps. The languages are set
+before the template's steps, since a language's texts can only be sent once the language exists.
+
+**Adding a language to a template:** add its code to `languages` and its texts under `data.texts`. The
+shipped templates send each chosen language's texts with one step, `{{texts.{{$value}}}}`, so nothing else
+changes.
+
+**The picture and the preview.** A template's picture is `public/admin/assets/images/templates/<id>.jpg`
+(`.webp` or `.png`); without one its card shows its icon. Its preview is built by a tool, from a shell:
+
+```
+php <secure>/tools/template-previews.php
+```
+
+It builds each template with every one of its languages, in its light theme and in its dark theme when it
+has one, and keeps the pages as static files under `public/admin/assets/template-previews/<id>/`. The panel
+shows a preview only while it matches the template's file: change the file, and its card shows no **Preview**
+button until the tool has run again. `--check` builds nothing and says which previews are stale.
+
+---
+
 ## JSON Spec Reference
 
 ### Required Fields
@@ -423,6 +503,7 @@ Hidden parameters (those failing their own `condition`) skip validation entirely
 - `number` — numeric input (renders `<input type="number">`)
 - `nodeSelector` — visual node picker from page structures
 - `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the Workflows panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc.
+- `template` — a picker of site templates: one radio card per file of `templates/`, with its picture, its name and its line. Its value is the template's id. It takes no `options`: the engine lists the folder. See *Site templates*.
 - `hidden` — not shown in UI, value set programmatically
 
 **Default values from data**: `default` accepts either a literal value or a template string referencing fetched `dataRequirements`. For example:
@@ -476,6 +557,11 @@ Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. Wit
 `"searchable": true` beside the `type` of a `select` or a `tag-select` gives its list a search that matches an option's name and its value: the `select` becomes a dropdown you type in, the `tag-select` gets a search field above its checkboxes that hides the options that do not match but never one already ticked. On any other type it is ignored.
 
 **Conditional visibility:** `"condition": "multilingual === true"` — references another parameter's ID (not prefixed with `param.`).
+
+**Fields that follow a picked template.** Beside a `template` parameter:
+- a condition reads the template picked as `chosen.<the parameter's id>`, which is empty until one is picked: `"condition": "chosen.template && chosen.template.dark === true"`. It holds the template's `languages` and `dark`.
+- `filterFrom` may name the `template` parameter: the options are then limited to the picked template's languages. `filterFrom` also takes a list of parameters, each narrowing the options in turn: `"filterFrom": ["template", "languages"]`.
+- when a template is picked, a `tag-select` its languages filter starts with all of them ticked.
 
 #### `dataRequirements` (array)
 System data fetched before execution via `CommandRunner`:
@@ -554,6 +640,12 @@ For manual workflows. Each step:
 }
 ```
 
+**A part of `params` kept only on a condition.** An object anywhere inside `params` that carries `$if` is kept, without that key, when its condition holds, and left out when it does not. The condition is read as a step's `condition`. A structure can hold a node for one choice only:
+
+```json
+{ "$if": "param.darkMode === true", "component": "theme-switch", "data": {} }
+```
+
 A step that fails is counted and the run carries on, unless it sets `abortOnFail: true`: the run then stops at that step — the later steps and phases do not run, and the rest is kept for later. `retryOn` lists the HTTP statuses that send the step again, up to `maxRetries` times (default 3), `retryDelayMs` apart (default 1000).
 
 **What a run warns about.** Before a step runs, the panel says what it deletes or changes, read from the step itself (`WorkflowManager::stepEffect()`): a read and a command that adds something are never warned; a step deletes when its command's name begins with delete, remove, clear, reset or purge, when its help marks it destructive, when it deletes a node, or when it gives a component an empty structure; any other write to the site's content changes it. There is nothing to declare: a new deleting step is warned as one. A step whose help marks it destructive and that deletes nothing stops a run the same way and says what it does (`restoreBackup`: it puts a backup back, over the project's current state).
@@ -575,6 +667,9 @@ The `in` / `not_in` operators are the foundation of diff-style workflows. For ex
 ```
 
 Paired with the symmetric `not_in` step against `param.languages` filtered by `data.langData.languages`, this lets a workflow synchronise the project state with the user's selection — only adding new items and only deleting absent ones, leaving the rest untouched.
+
+#### `stepsFrom` (string)
+The id of one of the workflow's parameters, of type `template`. The workflow's steps are then the picked template's, and the template's `data` is the run's static data; the workflow's own `steps` stays empty. A run with no template picked has no phase. A run that names something that is no template is refused whole: none of its phases is resolved, the workflows before its steps included. A workflow with `stepsFrom` has no `promptTemplate`. See *Site templates*.
 
 #### `preWorkflows` / `postWorkflows` (array)
 Sub-workflows to run before/after. Can be a simple string ID or an object with `id`, `params`, `condition`, `forEach` with its `filter` and `label`, and `request`. Each one runs as a phase of its own (one per item with `forEach`), and may be an AI workflow (see *Sub-Workflows*).

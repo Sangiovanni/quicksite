@@ -78,6 +78,10 @@
       "description": "Static data available in steps via forEach or template placeholders. Keys become data paths (e.g., 'assets' is referenced as forEach: 'assets').",
       "additionalProperties": true
     },
+    "stepsFrom": {
+      "type": "string",
+      "description": "The id of one of this workflow's parameters, of type `template`: the workflow's steps are those of the template that parameter picks (a file of templates/, see definitions.siteTemplate), and the template's `data` is the run's static data. With no template picked the run has no phase; with a name that is no template nothing of the run is resolved, the workflows before it included. Such a workflow has no promptTemplate, and its own `steps` stays empty."
+    },
     "preWorkflows": {
       "type": "array",
       "description": "Workflows to run BEFORE this workflow's steps. Each can optionally specify params and a condition.",
@@ -110,8 +114,8 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "hidden"],
-            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc."
+            "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "template", "hidden"],
+            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc. `template` is a picker of the site templates in templates/: one radio card per file, with its picture, its name and its line, and a Preview button when it has a built preview. Its value is the template's id. The engine lists the choices itself (no `options`): every valid file of the folder, so a file added there is offered with no other change. Another field's `condition` reads the template picked as `chosen.<this parameter's id>` (its `languages`, `dark`), and a field whose `optionsFrom.filterFrom` names this parameter is limited to the picked template's languages."
           },
           "searchable": {
             "type": "boolean",
@@ -180,8 +184,11 @@
                     }
                   },
                   "filterFrom": {
-                    "type": "string",
-                    "description": "Another parameter ID whose current value(s) restrict the available options. The filter only applies when the referenced param is currently visible (its own `condition` evaluates truthy) AND its value is non-empty. Otherwise the full optionsFrom list is used. Useful for cascading selects (e.g. 'defaultLanguage' restricted to languages picked in the multi-select 'languages')."
+                    "oneOf": [
+                      { "type": "string" },
+                      { "type": "array", "items": { "type": "string" } }
+                    ],
+                    "description": "Another parameter ID whose current value(s) restrict the available options, or a list of them, each narrowing the list in turn. The filter only applies when the referenced param is currently visible (its own `condition` evaluates truthy) AND its value is non-empty. Otherwise the full optionsFrom list is used. Useful for cascading selects (e.g. 'defaultLanguage' restricted to languages picked in the multi-select 'languages'). A parameter of type `template` stands for the languages of the template picked."
                   },
                   "excludeFrom": {
                     "type": "string",
@@ -205,7 +212,7 @@
           },
           "condition": {
             "type": "string",
-            "description": "Conditional expression to show/hide this parameter. Supports: ==, ===, !=, !==, >, <, >=, <=, &&, ||, ! (negation), and truthy checks. Example: 'multilingual === true', 'pages > 1 && multilingual !== false'"
+            "description": "Conditional expression to show/hide this parameter. Supports: ==, ===, !=, !==, >, <, >=, <=, &&, ||, ! (negation), and truthy checks. Example: 'multilingual === true', 'pages > 1 && multilingual !== false'. `chosen.<id>` is the template a parameter of type `template` holds, or null: 'chosen.template && chosen.template.dark === true'."
           },
           "structures": {
             "type": "array",
@@ -394,7 +401,7 @@
         },
         "params": {
           "type": "object",
-          "description": "Parameters for the command. Supports {{config.X}}, {{param.X}}, {{dataRequirementId.path}}, and in forEach: {{$key}}, {{$value}}, {{$value.field}}",
+          "description": "Parameters for the command. Supports {{config.X}}, {{param.X}}, {{dataRequirementId.path}}, and in forEach: {{$key}}, {{$value}}, {{$value.field}}. An object anywhere inside that carries `$if` (a condition, read as a step's `condition`) is kept without that key when the condition holds, and left out of its list or object when it does not: a menu's structure holds { \"$if\": \"param.darkMode === true\", \"component\": \"theme-switch\" } only for a run with dark mode.",
           "additionalProperties": true
         },
         "abortOnFail": {
@@ -441,6 +448,57 @@
         }
       },
       "required": ["$each", "$item"]
+    },
+    "siteTemplate": {
+      "type": "object",
+      "description": "A site template: one file of templates/, named <id>.json, that a workflow with `stepsFrom` runs. Shipped, as workflows are: only that folder is read. A file that does not hold what is required here is left out of every picker.",
+      "required": ["id", "languages", "steps"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The template's id: its file's name without .json (letters, digits, hyphens, underscores)"
+        },
+        "version": { "type": "string" },
+        "icon": {
+          "type": "string",
+          "description": "Emoji shown on the template's card when it has no picture"
+        },
+        "titleKey": {
+          "type": "string",
+          "description": "Translation key for the template's name (the shipped templates)"
+        },
+        "title": {
+          "type": "string",
+          "description": "The template's name as written here: what a file with no key shows, and the fallback of titleKey. With neither, the id."
+        },
+        "descriptionKey": {
+          "type": "string",
+          "description": "Translation key for the one line under the name"
+        },
+        "description": {
+          "type": "string",
+          "description": "That line as written here"
+        },
+        "languages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "The language codes the template is written in, the first one first in its preview. A run offers these and no other; a language is added by adding its code here and its texts under data."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The template's commands, read as a workflow's steps: condition, forEach, filter, placeholders and `$if`. They read the run's parameters as param.<id>, the keys of `data` as data paths, and `template.id` / `template.languages`.",
+          "items": {
+            "$ref": "#/definitions/specCommand"
+          }
+        },
+        "data": {
+          "type": "object",
+          "description": "What the template's steps read: the run's static data. The shipped templates keep here their texts per language (`texts`), their colours (`light`), their dark theme's colours (`dark`) and their stylesheet (`styles`). A template with a non-empty `dark` is offered with a dark mode.",
+          "additionalProperties": true
+        }
+      }
     }
   }
 }

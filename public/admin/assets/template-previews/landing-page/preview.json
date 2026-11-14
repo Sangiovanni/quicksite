@@ -1,0 +1,24 @@
+{
+    "template": "0e209f14045935405d428bf75e0d0e41ab489ae9603f14c718a8994cc0a1416b",
+    "engine": "6faf895d642357c2557b1ddfcccdb22da0f0fd9e758bb1d85e8ba145db6a2b36",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home"
+    ],
+    "scripts": true,
+    "files": [
+        "dark/en/home.html",
+        "dark/fr/home.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/fr/home.html",
+        "light/style/style.css"
+    ]
+}
