@@ -516,13 +516,31 @@
         });
     }
 
-    function _renderContactRow(contact, onUse, onForget) {
-        return el('div', { class: 'members-match-row members-match-row--contact' }, [
-            el('span', { class: 'members-row__title' }, [el('strong', { text: contact.name })]),
-            el('code', { class: 'members-row__id', text: contact.user_id }),
-            _renderActionBtn(T.contactUse || 'members.contacts.use', ICON_CHECK, 'ghost', function () { onUse(contact); }),
-            _renderActionBtn(T.contactForget || 'members.contacts.forget', ICON_X, 'ghost', function () { onForget(contact); }),
-        ]);
+    /** The contact this user id names on the caller's list, or null. */
+    function contactOf(userId) {
+        for (var i = 0; i < state.contacts.length; i++) {
+            if (state.contacts[i].user_id === userId) return state.contacts[i];
+        }
+        return null;
+    }
+
+    /**
+     * An invitation or a proposal answered that no account has this id: a contact who deleted their account
+     * before a deletion took accounts off every list, or one written by hand. The panel forgets them, and says
+     * so in place of the server's message. Somebody found by a search, not on the list, is only refused.
+     */
+    function forgetGoneContact(res, picked) {
+        if (!res || res.status !== 404 || !res.data || res.data.code !== 'user.not_found' || !picked || !contactOf(picked.user_id)) {
+            return false;
+        }
+        selfRequest('remove-contact', 'POST', { user_id: picked.user_id }).then(function () { loadContacts(); });
+        toast(T.contactGone || 'members.contacts.gone', 'warning');
+        return true;
+    }
+
+    /** One person of the list in its dropdown: the name, with the id the dropdown shows under it and searches too. */
+    function _renderContactOption(contact) {
+        return el('option', { value: contact.user_id, text: contact.name, 'data-description': contact.user_id });
     }
 
     function _renderPickedRow(match) {
@@ -544,31 +562,65 @@
         var findBtn = document.getElementById('btn-' + prefix + '-find');
         var results = document.getElementById(prefix + '-find-results');
         var contactsBlock = document.getElementById(prefix + '-contacts');
-        var contactsList = document.getElementById(prefix + '-contacts-list');
+        var contactsSelect = document.getElementById(prefix + '-contacts-select');
+        var forgetBtn = document.getElementById('btn-' + prefix + '-contact-forget');
+        var contactsPicker = null;
         var picked = null;
 
         if (!nameInput || !findBtn || !results) return { getPicked: function () { return null; }, reset: function () {} };
+
+        /** The dropdown shows the picked person when they are on the list, else nobody; Forget acts on that one. */
+        function showPickedInContacts() {
+            if (!contactsSelect) return;
+            var contact = picked ? contactOf(picked.user_id) : null;
+            contactsSelect.value = contact ? contact.user_id : '';
+            if (contactsPicker) contactsPicker.refresh();
+            if (forgetBtn) forgetBtn.disabled = !contact;
+        }
 
         function pick(match) {
             picked = match;
             clearNode(results);
             results.appendChild(_renderPickedRow(match));
             if (sendBtn) sendBtn.disabled = false;
+            showPickedInContacts();
         }
 
-        // The contacts shortcut. Hidden entirely while the list is empty: a new
-        // account has nobody on it, and an empty panel above the search box is
-        // noise on the one page where the search box is the whole point.
+        // The contacts shortcut: one searchable dropdown of the people on the
+        // list, a name each with its id under it. Hidden entirely while the list
+        // is empty: a new account has nobody on it, and an empty panel above the
+        // search box is noise on the one page where the search box is the whole point.
         function renderContacts() {
-            if (!contactsBlock || !contactsList) return;
-            clearNode(contactsList);
+            if (!contactsBlock || !contactsSelect) return;
+            clearNode(contactsSelect);
             if (!state.contacts.length) {
                 contactsBlock.hidden = true;
                 return;
             }
             contactsBlock.hidden = false;
-            state.contacts.forEach(function (c) {
-                contactsList.appendChild(_renderContactRow(c, pick, forgetContact));
+            contactsSelect.appendChild(el('option', { value: '' }));
+            state.contacts.forEach(function (c) { contactsSelect.appendChild(_renderContactOption(c)); });
+            if (!contactsPicker && window.QSSearchableSelect) {
+                contactsPicker = new window.QSSearchableSelect(contactsSelect, { placeholder: T.contactPick || 'members.contacts.pick' });
+            }
+            showPickedInContacts();
+        }
+        if (contactsSelect) {
+            contactsSelect.addEventListener('change', function () {
+                var contact = contactOf(contactsSelect.value);
+                if (contact) pick(contact);
+            });
+        }
+        if (forgetBtn && contactsSelect) {
+            forgetBtn.addEventListener('click', function () {
+                var contact = contactOf(contactsSelect.value);
+                if (!contact) return;
+                if (picked && picked.user_id === contact.user_id) {
+                    picked = null;
+                    clearNode(results);
+                    if (sendBtn) sendBtn.disabled = true;
+                }
+                forgetContact(contact);
             });
         }
         contactRenderers.push(renderContacts);
@@ -614,6 +666,7 @@
                 nameInput.value = '';
                 clearNode(results);
                 if (sendBtn) sendBtn.disabled = true;
+                showPickedInContacts();
             },
         };
     }
@@ -648,6 +701,8 @@
                     document.getElementById('invite-note').value = '';
                     refreshLists();
                     notifyMembershipChange();
+                } else if (forgetGoneContact(res, picked)) {
+                    finder.reset();
                 } else {
                     sendBtn.disabled = false;
                     toast(serverMessage(res), res && res.status === 409 ? 'warning' : 'error');
@@ -683,6 +738,8 @@
                     document.getElementById('propose-note').value = '';
                     refreshLists();
                     notifyMembershipChange();
+                } else if (forgetGoneContact(res, picked)) {
+                    finder.reset();
                 } else {
                     sendBtn.disabled = false;
                     toast(serverMessage(res), res && res.status === 409 ? 'warning' : 'error');

@@ -101,7 +101,8 @@
 .members-chip--owned   { background: var(--admin-warning-bg); color: var(--admin-warning); }
 .members-chip--editing,
 .members-chip--you { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
-.members-chip--invite   { background: var(--admin-info-bg); color: var(--admin-info); }
+.members-chip--invite,
+.members-chip--role_changed { background: var(--admin-info-bg); color: var(--admin-info); }
 .members-chip--request  { background: var(--admin-warning-bg); color: var(--admin-warning); }
 .members-chip--proposal { background: var(--admin-accent-muted); color: var(--admin-accent-hover); }
 .members-chip--refused,
@@ -256,12 +257,14 @@
 .members-contacts .admin-hint {
     margin: 0 0 10px;
 }
-.members-contacts__list {
-    display: flex;
-    flex-direction: column;
+/* The dropdown and Forget: side by side while there is room, Forget under the dropdown when there is not (a phone).
+   The dropdown keeps its text on one line, so its box may shrink below that line and cut it with an ellipsis. */
+.members-contacts .members-find-row {
+    flex-wrap: wrap;
 }
-.members-match-row--contact {
-    background: var(--admin-bg-secondary);
+.members-contacts .members-find-row__name {
+    flex: 1 1 12rem;
+    min-width: 0;
 }
 
 /* ---- Invite / propose form rows ---- */

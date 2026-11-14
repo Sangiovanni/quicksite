@@ -506,13 +506,25 @@
     // ============================================================
 
     // A notice's chip: its words by status. `approved` (your own join request, accepted) is
-    // the one that is good news; dismissing it leaves the membership as it is.
+    // the one that is good news; dismissing it, or `role_changed` (someone else changed your
+    // role), leaves the membership as it is. A project can hold both at once: one row each.
     var NOTICE_LABEL_KEYS = {
         refused: 'statusRefused',
         removed: 'statusRemoved',
         deleted: 'statusDeleted',
         approved: 'statusApproved',
+        role_changed: 'statusRoleChanged',
     };
+
+    /** A role notice's two roles: "from <old> to <new>". @returns {HTMLElement} */
+    function _renderRoleChange(n) {
+        return el('span', { class: 'members-row__chips' }, [
+            el('span', { class: 'members-row__subtle', text: T.roleFrom || 'from' }),
+            _renderRoleChip(n.from),
+            el('span', { class: 'members-row__subtle', text: T.roleTo || 'to' }),
+            _renderRoleChip(n.to),
+        ]);
+    }
 
     function _renderNoticeRow(n) {
         var statusLabel = T[NOTICE_LABEL_KEYS[n.status] || 'statusDeleted'];
@@ -521,14 +533,18 @@
                 el('span', { class: 'members-chip members-chip--' + n.status, text: statusLabel }),
                 el('strong', { class: 'members-row__notice-name', text: projectLabel(n.project, n.project_name) }),
             ]),
-            _renderMeta([n.at || null]),
         ];
+        if (n.status === 'role_changed') main.push(_renderRoleChange(n));
+        main.push(_renderMeta([
+            n.by ? (T.changedBy || 'Changed by') + ' ' + (n.by.name || n.by.user_id) : null,
+            n.at || null,
+        ]));
         if (n.note) {
             main.push(el('span', { class: 'members-row__subtle', text: (T.reason || 'Reason') + ':' }));
             main.push(_renderNote(n.note));
         }
         return _renderRow(main, [
-            _renderActionBtn(T.dismiss || 'Dismiss', ICON_CHECK, 'ghost', function () { onDismiss(n.project); }),
+            _renderActionBtn(T.dismiss || 'Dismiss', ICON_CHECK, 'ghost', function () { onDismiss(n.project, n.status); }),
         ]);
     }
 
@@ -543,8 +559,9 @@
         notices.forEach(function (n) { root.appendChild(_renderNoticeRow(n)); });
     }
 
-    function onDismiss(project) {
-        account('dismiss-notice', 'POST', { project: project }).then(function (res) {
+    // The notice named: a project can hold two at once (a member entry's two marks).
+    function onDismiss(project, notice) {
+        account('dismiss-notice', 'POST', { project: project, notice: notice }).then(function (res) {
             if (res && res.ok) {
                 toast(T.dismissedMsg || 'Notice dismissed', 'success');
             } else {

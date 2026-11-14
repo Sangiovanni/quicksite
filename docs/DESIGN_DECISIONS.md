@@ -15801,3 +15801,93 @@ The three views stay as they were: a computer has all three devices, a tablet sh
 **Alternatives considered**: the two markers kept apart (`__RAW__` for text, `__LIT__` for every attribute: two names for one meaning, which the preview and the build each read their own way); `__LIT__` kept readable as the same marker (every reader carrying two spellings of one thing); `__LIT__` as the one name; the marker removed from any attribute before anything reads the value (a link marked `__RAW__` would still get its base and language, but the marker would pass the URL check, the refresh test, a binding's target and the save checks, each needing it removed at the right moment); a refusal of the marker on an address (refusing a value that harms nothing once it is drawn as written); a `srcset` rebuilt tidily from its parts (a page whose only change is an address would change elsewhere too); a refused file dropped from the `srcset` (every other refused address is drawn `#`); a written `?…` read against the page (route parameters preferred: "I would prefer use the params /:slug we use"); the build's check applied to every URL attribute holding a system placeholder (no safety gained where `processUrl()` stands in front, and the compiled text of every page with a language switch would change).
 
 **Source**: the faults found while a bound address was made to compose as a written one, Sangio's rulings of 2026-11-12 and his answers of 2026-11-13; beta.12. `secure/src/classes/UrlPolicy.php` (`srcsetAddresses()`, `mapSrcset()`, `refusedSrcsetAddress()`), `secure/src/classes/JsonToHtmlRenderer.php` (`renderAttribute()`, `processUrl()`), `secure/src/classes/JsonToPhpCompiler.php` (`attributeValueExpr()`, `staticSrcsetExpr()`), `secure/src/functions/nodeParamPolicy.php`, `secure/src/runtime/qs.js` (`_qsMapSrcset()`, `renderList()`, `QS.exchangeMagicLink`), `public/admin/assets/js/pages/preview/preview.js` (the enum card, the snippet preview).
+
+### A member is told when someone else changes their role, by name; the one who changed it is not (locked 2026-11-13)
+
+**Amends**: *An accepted join request leaves a notice, and dismissing it ends nothing* (see above). A change made to
+your access while you are away is told, whichever way it goes.
+
+**Decision**: When `changeMemberRole` changes a member's role, or `transferOwnership` makes a member the owner, the
+member's own entry in their `users.php` copy carries a role notice (`role_change`: the role they were last told of,
+the new role, the account that made the change, the date), and *My memberships* lists **Role changed**: the project,
+*from* the old role *to* the new one, and *Changed by* the account's name as the roster shows it, read when the
+notice is listed. A second change before they dismiss it keeps the first role and takes the latest role, account and
+date; a change back to that first role takes the notice away. The one who makes a change is never told of it: the
+departing owner of a transfer gets nothing, and a role notice of theirs still waiting goes, since they chose the role
+they keep. The notice is a mark on the live member entry, beside the approved notice: a project can hold both, one row
+each, each dismissed on its own (`dismiss-notice` takes `notice`, the kind to clear; without it every notice of the
+project goes), and the menu's dot and the dashboard count each row. The shared repair keeps the mark while the roster
+lists the person as a member and never writes one. A role changed by editing `members.json` by hand tells nobody: no
+one made it through QuickSite, and the copy keeps no role to compare with.
+
+**Reasoning**: A role that loses a right loses its controls at the next page (every control a role cannot use is
+hidden from it), so without a word the person sees the panel shrink and does not know why. Sangio raised it during a
+run of the editor's simple view and agreed the shape: a notice on *My memberships*, as for a refusal, a removal, a
+deleted project and an accepted request. He chose, on a recommendation put to him, that it names who made the change: the
+roster already shows that name to every member. Asked what a project shows when two notices
+wait at once, he answered "as many row as they are needed for every potential case that can happen at the same
+time". The first role and the latest one say what changed since the person last knew, which the latest change alone
+does not when they never saw the one before it.
+
+**Alternatives considered**: no notice (the person learns from the controls that disappear); an email (QuickSite sends
+none, and a notice is where the panel already tells a member what was decided about them); a notice that does not
+name who made the change; a notice to the one who made it too (they know); the latest change only, from a role the
+person never held to their knowledge; the role notice replacing the approved one (one notice per project, the
+accepted request lost unread); the changer's name stored when the notice is written (a name the roster no longer
+shows, where *Invited by* reads it when listed).
+
+**Source**: Sangio's idea in a UX run of the editor's simple view, his ruling of 2026-11-13 and his answers of the
+same day; beta.12. `secure/src/functions/AuthManagement.php` (`QS_MEMBERSHIP_ROLE_CHANGED`,
+`qs_membership_role_change()`, `qs_membership_note_role_change()`, `qs_membership_reconciled_entry()`),
+`secure/management/command/changeMemberRole.php`, `secure/management/command/transferOwnership.php`,
+`secure/admin/functions/membershipSelf.php` (`qs_membership_list_invitations()`, `qs_membership_dismiss_notice()`),
+`public/admin/assets/js/pages/memberships.js`.
+
+### A panel language that lacks a word shows it in English, key by key (locked 2026-11-13)
+
+**Decision**: `AdminTranslation` lays a language's words over the English ones key by key. A word the language's file
+leaves out is English wherever it sits, even inside a section the file holds, through `__admin()`, `has()` and every
+sub-tree `getRaw()` hands a page; only a word `en.json` lacks too shows its key. The editor's words keep their rule:
+`preview-config.php` asks each one with no fallback of its own.
+
+**Reasoning**: English was laid under the language one section at a time, so a section the French file held hid
+every English word it left out: in French, 131 of the editor's words showed their key (`preview.pageTitle` among
+them), 786 across the panel. A key on screen does make a missing word findable, but the panel is then unusable in
+that language for that word, and what a language lacks is counted from the word files. Sangio took it with a second
+finding of the same measurement, the command categories read again at every question.
+
+**Alternatives considered**: writing the missing French words now (the language work that follows does, with every
+word renamed after the panel's last changes); a fallback written at each call (two places for one English word, and
+the editor's words are asked with none on purpose); English under French one section at a time (as before: a section
+present hides the rest).
+
+**Source**: a measurement of the editor's Workflows rows in French, Sangio's answer of 2026-11-13; beta.12.
+`secure/admin/functions/AdminTranslation.php` (`loadTranslations()`, `layOver()`).
+
+### A deleted account leaves every contact list, and the list is one searchable dropdown (locked 2026-11-14)
+
+**Decision**: When an account deletes itself, its id leaves every other account's list of people worked with
+(`contacts` on each `users.php` record) in the same write that deletes the account. The list is still never checked
+against the accounts when it is read. An id no account has that is still on a list (written by hand, or kept from
+before a deletion took it out) is forgotten by the panel when an invitation or a proposal to it answers
+`404 user.not_found`, and the toast says the account no longer exists. On the Invite and Propose forms the list is one
+searchable dropdown, the panel's own (`QSSearchableSelect`): each person by name with their `user_id` under it, the
+search matching either; choosing someone selects them as a search match does, and a *Forget* button beside it drops the
+person chosen.
+
+**Reasoning**: Sangio, in his UX run of the role notice: accounts deleted long ago were still on his list, and a list
+that grows by one row per person "might look ugly". He proposed two ways to clear the gone ones: when the page shows,
+or when an invitation to one fails. The list was built never to be checked against the accounts when it is read: a
+caller can put any id on it, so a list that dropped the ids no account has would answer whether an account exists.
+Taking the id out where the account goes keeps that true at no cost to a page load; the failed invitation catches what
+the deletion could not reach (no migration). For the dropdown he asked for one that exists rather than a new one.
+
+**Alternatives considered**: pruning when the page shows (it reopens the question the list was built not to answer,
+though an invitation already answers it to anyone who owns a project); only forgetting on a failed invitation (a gone
+account stays listed until it is used); a one-time cleanup of the lists already written (no migration); keeping the
+rows and adding a search box over them; *Forget* on the *Selected* row under the lookup.
+
+**Source**: Sangio's request of 2026-11-14 and his answers ("Yes, as recommended"); beta.12.
+`secure/admin/functions/accountSelf.php` (`qs_account_delete()`), `secure/admin/functions/contacts.php`,
+`public/admin/assets/js/pages/members.js` (`forgetGoneContact()`, the contacts dropdown),
+`secure/admin/templates/pages/members.php`.

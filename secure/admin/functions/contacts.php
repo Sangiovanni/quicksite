@@ -39,6 +39,14 @@
  * can go stale if they rename; it refreshes the next time the caller looks them
  * up and works with them again, which is a real lookup they performed.
  *
+ * A person who deletes their account leaves every list in the same write that
+ * deletes it (qs_account_delete()), so no list keeps someone who no longer
+ * exists, and still nothing is resolved when a list is read. An id no account
+ * has can still be on a list (one written by hand, or kept from before the
+ * deletion took it out): inviting or proposing it answers 404 user.not_found,
+ * which the inviting caller is told whatever the list holds, and the panel
+ * forgets that contact then.
+ *
  * Ids are still SHAPE-checked (usr_ + 32 hex) — that is a storage-integrity
  * rule, not an existence check, and it answers identically for a well-formed id
  * that exists and a well-formed id that does not.

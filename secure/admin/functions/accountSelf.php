@@ -304,12 +304,20 @@ function qs_account_delete(array $params): ApiResponse {
 
     // ------------------------------------------------------------- the record
     // Footprint is clean; drop the identity. The users.php `projects` status
-    // mirror (including any tombstones) dies with the record.
+    // mirror (including any tombstones) dies with the record, and in the same
+    // write the account leaves every other account's contact list
+    // (contacts.php): a list that is never checked against the accounts when
+    // it is read stays true because the one way an account goes takes it out.
     $deleted = qs_users_mutate(function (array &$cfg) use ($userId) {
         if (!isset($cfg['users'][$userId])) {
             return false;
         }
         unset($cfg['users'][$userId]);
+        foreach ($cfg['users'] as $otherId => $other) {
+            if (is_array($other) && is_array($other['contacts'] ?? null) && array_key_exists($userId, $other['contacts'])) {
+                unset($cfg['users'][$otherId]['contacts'][$userId]);
+            }
+        }
         return true;
     });
     if ($deleted !== true) {

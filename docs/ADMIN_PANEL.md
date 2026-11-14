@@ -416,7 +416,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings. Never the username — the deletion's typed confirmation is checked by the server (§9.13) |
 | `templates/pages/command-form.php` | `window.QS_COMMAND_FORM_I18N` | the `commandForm`, `commands` and `common` translation sub-trees, emitted **verbatim under their own dot paths** (`AdminTranslation::getRaw()`) rather than copied field by field — the page's JS asks for the same path PHP would. `JSON_HEX_TAG` keeps a translation value from closing the script element. |
 
-A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves, so an untranslated string shows on screen instead of hiding behind English. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts, the words of the searchable dropdown (`selectPlaceholder`, `search`, `noResults`, `noMatchesFor`, `createFromSearch`; §9.9.2) and those of the project star (`starred`, `starProject`, `unstarProject`, `starFailed`; §8.0). `QuickSiteUtils.tCommon(name)` reads one; a word the page was not given shows its key.
+A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves. A language's words are laid over the English ones **key by key** (`AdminTranslation`), so a word its file leaves out reaches every sub-tree and every `__admin()` call in English, even inside a section the file holds; only a word no file holds, English included, shows its path. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts, the words of the searchable dropdown (`selectPlaceholder`, `search`, `noResults`, `noMatchesFor`, `createFromSearch`; §9.9.2) and those of the project star (`starred`, `starProject`, `unstarProject`, `starFailed`; §8.0). `QuickSiteUtils.tCommon(name)` reads one; a word the page was not given shows its key.
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
@@ -2906,6 +2906,8 @@ covers the editor UX.
 - **Actions** (hover-revealed) — `+` to add a child, `⋯` to open the
   context menu (Add child / View in editor / Open page / Edit title /
   Configure resolver / Delete route, with Delete greyed for the home route).
+  View in editor opens the editor on that page: the **Edit:** list set to it
+  and the preview showing it.
   Home is the site's root, so its children are the top-level routes: on home,
   `+` and Add child open the form `+ Add root route` opens.
 
@@ -3595,7 +3597,13 @@ vs. awaiting the person's answer; withdraw while pending), **Notices**
 (refused / removed / deleted with the recorded reason → dismiss, which also
 unblocks re-requesting; and **Join request accepted**, in green, when a request
 of yours was approved — dismissing it takes the notice away and leaves you a
-member), and a **Request to join** form (project id, with or
+member; and **Role changed**, in blue, when someone else changed your role in a
+project — the project, *from* the role you were last told of *to* the new one, and
+*Changed by* the account that made the latest change, by the name the roster shows;
+a second change before you dismiss it keeps the first role, a change back to it takes
+the notice away, and the one who makes a change is never told of it. A project can
+hold both of these at once, one row each, each dismissed on its own; the menu's dot
+and the dashboard count each row), and a **Request to join** form (project id, with or
 without the `#` it is shown with, + mandatory note; every error code mapped to a
 human message). Reading the inbox repairs your own copy of each pending entry from
 its project's roster, by the rule the header's menu is repaired with (§8.0): an
@@ -3604,7 +3612,7 @@ no longer lists goes, and a roster that cannot be read is left alone. An accepte
 request's notice is listed only while the roster lists you as a member; a later
 removal or deletion replaces it with its own notice, and leaving the project takes
 it away with the membership. No repair writes one: it exists only when the approval
-wrote it.
+wrote it. The role notice follows the same rule, written only by the change.
 
 **Project members** (`/admin/members`) manages the **edited** project — a banner
 re-states the project ("Name #id") + the caller's role, and the page follows the header
@@ -3630,8 +3638,10 @@ caller's role changed).
 
 **People you have worked with** sits above the lookup on both the Invite and the
 Propose form, and is the same list on each: everyone the caller has already
-invited or proposed, offered with a *Use* button that selects them exactly as a
-search match does, and a *Forget* button that drops them. The block is hidden
+invited or proposed, in one searchable dropdown (each person by name, with their
+`user_id` under it; the search matches either). Choosing someone selects them
+exactly as a search match does, and the *Forget* button beside it drops the person
+chosen. The block is hidden
 entirely until there is somebody on it, so a new account never sees an empty
 panel above the search box. Somebody who is not on the list is still found the
 way they always were — by their exact public name — and succeeding at that, then
@@ -3647,6 +3657,11 @@ installation's accounts, so it can only ever show the caller something they
 already found themselves. A name that changes afterwards refreshes the next time
 they look that person up and work with them again; the `user_id` shown beside it
 is what the invitation actually uses, so an out-of-date name never misdirects one.
+A person who deletes their account leaves every list in the same write, so nobody
+keeps someone who no longer exists. An id no account has, still on a list (one
+written by hand, or kept from before an account's deletion took it out), is
+forgotten when an invitation or a proposal to it answers that no account has it,
+and the toast says so.
 
 **Who can see this site** is `setProjectVisibility`, and it is **owner-only** —
 the `project.visibility` category sits at the delete/transfer tier, so an admin

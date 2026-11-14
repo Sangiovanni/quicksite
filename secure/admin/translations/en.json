@@ -266,6 +266,10 @@
             "statusRemoved": "Removed from project",
             "statusDeleted": "Project deleted",
             "statusApproved": "Join request accepted",
+            "statusRoleChanged": "Role changed",
+            "roleFrom": "from",
+            "roleTo": "to",
+            "changedBy": "Changed by",
             "reason": "Reason"
         },
         "request": {
@@ -348,9 +352,10 @@
         },
         "contacts": {
             "title": "People you have worked with",
-            "hint": "Everyone you have already invited or proposed, so you do not have to type their exact name again. Someone new still has to be looked up once.",
-            "use": "Use",
+            "hint": "Everyone you have already invited or proposed, so you do not have to type their exact name again: choose them in the list, which you can search. Someone new still has to be looked up once.",
+            "pick": "Choose someone you have worked with",
             "forget": "Forget",
+            "gone": "This account no longer exists: it was removed from the people you have worked with.",
             "forgotten": "Removed from your list",
             "forgetFailed": "Could not remove that person from your list.",
             "saveFailed": "They were added to the project, but could not be saved to your list.",

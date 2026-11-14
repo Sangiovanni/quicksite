@@ -1600,17 +1600,22 @@
         PreviewState.setCallback('hotReloadCss', hotReloadCss);
     }
 
-    /**
-     * opts.keepMode: the tool stays open. For a move the author did not ask for, in the AI tools,
-     * where a run's review and answer box are.
-     */
-    function navigateTo(editType, editName, opts) {
+    /** The frame on one structure: the loading veil, and the overlay injected again once it loads. */
+    function loadFrame(editType, editName) {
         showLoading();
         startLoadingTimeout();
         overlayInjected = false;
         currentEditType = editType;
         currentEditName = editName;
         iframe.src = buildUrl(editType, editName);
+    }
+
+    /**
+     * opts.keepMode: the tool stays open. For a move the author did not ask for, in the AI tools,
+     * where a run's review and answer box are.
+     */
+    function navigateTo(editType, editName, opts) {
+        loadFrame(editType, editName);
         
         // Reset tool state: switch back to select mode and clear selection.
         if (currentMode !== 'select' && !(opts && opts.keepMode)) {
@@ -11180,6 +11185,9 @@
     
     // Check for deep-link target from URL parameter (e.g., ?target=page-home)
     const urlTarget = new URLSearchParams(window.location.search).get('target');
+    // A page or a component the link set the list to: the frame, which opened on the site's root,
+    // moves to it below. A menu or a footer is left to the first page, as the list is.
+    let deepLinked = false;
     if (urlTarget && targetSelect) {
         // Parse target format: "page-home", "component-card", "menu", "footer"
         const parsed = parseStruct(urlTarget);
@@ -11188,6 +11196,7 @@
             const option = targetSelect.querySelector(`option[value="${CSS.escape(selectValue)}"]`);
             if (option) {
                 showEditTarget(selectValue);
+                deepLinked = !selectValue.startsWith('layout:');
             }
         }
         // Clean URL without reloading
@@ -11217,6 +11226,11 @@
             // Legacy format fallback
             currentEditType = 'page';
             currentEditName = value;
+        }
+        // A deep link (the Sitemap's edit link) set the list: the frame moves to it, as the list's own
+        // change moves it. Without one, the frame's first address already shows the list's first page.
+        if (deepLinked) {
+            loadFrame(currentEditType, currentEditName);
         }
         
         // Update component warning on initial load

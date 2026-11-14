@@ -36,8 +36,9 @@ const COMMAND_NAME = container.dataset.commandName || '';
  * command-form.php emits.
  *
  * A path that resolves to nothing returns THE PATH ITSELF. That is
- * deliberate: an untranslated string has to be visible on screen and
- * findable by a scan, which a hardcoded English fallback would hide.
+ * deliberate: a string no word file holds has to be visible on screen and
+ * findable by a scan, which a hardcoded English fallback would hide (a word
+ * a language lacks arrives in English, laid under it by the server).
  *
  * @param {string} path            e.g. 'commandForm.select.typeFirst'
  * @param {Object} [params]        :name markers to substitute, as PHP's t() does

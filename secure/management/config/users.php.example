@@ -58,11 +58,16 @@
  *                    'deleted' (dismissable from the memberships page).
  *                    A member entry whose own join request was approved
  *                    also carries `notice: 'approved'` until the person
- *                    dismisses it; the membership stays.
+ *                    dismisses it; the membership stays. A member entry
+ *                    whose role someone else changed carries `role_change`
+ *                    ({from, to, by, at}: the role the person was last told
+ *                    of, the role now, who made the latest change and when)
+ *                    until the person dismisses it; it is display only,
+ *                    never a role anything reads for access.
  *                    'member' and pending entries are rebuilt from
- *                    members.json; a terminal notice and the approved
- *                    notice are NOT — a cache repair (reconcileMemberships)
- *                    keeps them.
+ *                    members.json; a terminal notice, the approved notice
+ *                    and the role notice are NOT — a cache repair
+ *                    (reconcileMemberships) keeps them.
  */
 
 // QuickSite ships NO working credential — this file is a SHAPE REFERENCE, not a

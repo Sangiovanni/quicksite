@@ -106,8 +106,8 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'selected'         => __admin('members.invite.selected', 'Selected'),
     'inviteSentMsg'    => __admin('members.invite.sentMsg', 'Invitation sent'),
     'proposeSentMsg'   => __admin('members.propose.sentMsg', 'Proposal recorded — an admin or the owner must validate it'),
-    'contactUse'        => __admin('members.contacts.use'),
-    'contactForget'     => __admin('members.contacts.forget'),
+    'contactPick'       => __admin('members.contacts.pick'),
+    'contactGone'       => __admin('members.contacts.gone'),
     'contactForgotten'  => __admin('members.contacts.forgotten'),
     'contactForgetFailed' => __admin('members.contacts.forgetFailed'),
     'contactSaveFailed' => __admin('members.contacts.saveFailed'),
@@ -207,9 +207,14 @@ window.QS_MEMBERS_I18N = <?= json_encode([
                  put in it — a new account has nobody, and an empty panel above
                  the search box helps no one. -->
             <div class="members-contacts" id="invite-contacts" hidden>
-                <h3 class="members-contacts__title"><?= __admin('members.contacts.title') ?></h3>
+                <h3 class="members-contacts__title" id="invite-contacts-title"><?= __admin('members.contacts.title') ?></h3>
                 <p class="admin-hint"><?= __admin('members.contacts.hint') ?></p>
-                <div class="members-contacts__list" id="invite-contacts-list"></div>
+                <div class="members-find-row">
+                    <div class="admin-form-group members-find-row__name">
+                        <select id="invite-contacts-select" class="admin-input" aria-labelledby="invite-contacts-title"></select>
+                    </div>
+                    <button type="button" id="btn-invite-contact-forget" class="admin-btn admin-btn--ghost" disabled><?= __admin('members.contacts.forget') ?></button>
+                </div>
             </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
@@ -253,9 +258,14 @@ window.QS_MEMBERS_I18N = <?= json_encode([
             <p class="admin-hint"><?= __admin('members.propose.hint', 'Vouch for someone: an admin or the owner validates your proposal before the person is even told. Your note IS the vouch — make it count.') ?></p>
             <?php endif; ?>
             <div class="members-contacts" id="propose-contacts" hidden>
-                <h3 class="members-contacts__title"><?= __admin('members.contacts.title') ?></h3>
+                <h3 class="members-contacts__title" id="propose-contacts-title"><?= __admin('members.contacts.title') ?></h3>
                 <p class="admin-hint"><?= __admin('members.contacts.hint') ?></p>
-                <div class="members-contacts__list" id="propose-contacts-list"></div>
+                <div class="members-find-row">
+                    <div class="admin-form-group members-find-row__name">
+                        <select id="propose-contacts-select" class="admin-input" aria-labelledby="propose-contacts-title"></select>
+                    </div>
+                    <button type="button" id="btn-propose-contact-forget" class="admin-btn admin-btn--ghost" disabled><?= __admin('members.contacts.forget') ?></button>
+                </div>
             </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">

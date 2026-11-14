@@ -105,14 +105,33 @@ class AdminTranslation {
             $this->translations = json_decode(file_get_contents($currentFile), true) ?? [];
         }
         
-        // Load fallback if different
+        // English under the language, key by key: a word the language's file leaves out shows
+        // in English wherever it sits, never as its key, even in a section the file holds.
         if ($this->currentLang !== $this->fallbackLang) {
             $fallbackFile = $translationDir . '/' . $this->fallbackLang . '.json';
             if (file_exists($fallbackFile)) {
                 $fallback = json_decode(file_get_contents($fallbackFile), true) ?? [];
-                $this->translations = array_merge($fallback, $this->translations);
+                $this->translations = self::layOver($fallback, $this->translations);
             }
         }
+    }
+
+    /**
+     * $over laid on $under key by key, in $over's order, then what only $under holds. Where both
+     * hold a section (a JSON object, an empty one included) at one key, the two sections are laid
+     * the same way; anywhere else $over's value wins whole. The word files hold no list, and a list
+     * would be taken whole from $over, never merged item by item.
+     */
+    private static function layOver(array $under, array $over): array {
+        $section = static fn($v): bool => is_array($v) && ($v === [] || !array_is_list($v));
+        $out = [];
+        foreach ($over as $key => $value) {
+            $base = $under[$key] ?? null;
+            $out[$key] = $section($value) && $section($base)
+                ? self::layOver($base, $value)
+                : $value;
+        }
+        return $out + $under;
     }
 
     /**

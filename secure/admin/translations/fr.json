@@ -220,6 +220,10 @@
             "statusRefused": "Demande refusée",
             "statusRemoved": "Retiré du projet",
             "statusDeleted": "Projet supprimé",
+            "statusRoleChanged": "Rôle modifié",
+            "roleFrom": "de",
+            "roleTo": "à",
+            "changedBy": "Modifié par",
             "reason": "Motif"
         },
         "request": {
@@ -296,6 +300,11 @@
             "sentMsg": "Invitation envoyée",
             "nameRequired": "Tapez d'abord le nom public exact.",
             "pickRequired": "Cherchez et sélectionnez d'abord une personne."
+        },
+        "contacts": {
+            "hint": "Toutes les personnes que vous avez déjà invitées ou proposées, pour ne pas retaper leur nom exact : choisissez-les dans la liste, où vous pouvez chercher. Une personne nouvelle doit encore être cherchée une fois.",
+            "pick": "Choisissez une personne avec qui vous avez travaillé",
+            "gone": "Ce compte n'existe plus : il a été retiré des personnes avec qui vous avez travaillé."
         },
         "propose": {
             "title": "Proposer un membre",

@@ -23,9 +23,10 @@
     /**
      * Resolve one admin string by its FULL dot path.
      *
-     * A path that resolves to nothing returns THE PATH ITSELF, so an
-     * untranslated string is visible on screen and findable by a scan
-     * instead of being hidden behind an English fallback.
+     * A path that resolves to nothing returns THE PATH ITSELF, so a string
+     * no word file holds is visible on screen and findable by a scan instead
+     * of being hidden behind an English fallback here (a word a language
+     * lacks arrives in English, laid under it by the server).
      *
      * @param {string} path       e.g. 'settings.ai.configured'
      * @param {Object} [params]   :name markers to substitute, as PHP's t() does

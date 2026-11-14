@@ -85,19 +85,31 @@ const QS_GLOBAL_ACCESS_GRANTING = ['any'];
  * Load the command CATEGORY map (categories.php — the trust-coherent authz map).
  * category => ['scope'=>'project'|'global', 'access'?=>'any'|'none', 'commands'=>[]].
  *
+ * Read once per request and kept for the rest of it: the permission check, the role
+ * lists, help and the dispatcher ask for it many times in one request (an editor load
+ * asks about every command), and it is the same file throughout. Each request reads it
+ * afresh, past OPcache, so an edit to categories.php is seen by the next request. A
+ * long-running process (a setup tool, a CLI script) that changes categories.php while
+ * it runs is not a case this serves: it keeps the map it read first.
+ *
  * @return array
  */
 function loadCategoriesConfig(): array {
+    static $categories = null;
+    if ($categories !== null) {
+        return $categories;
+    }
     $configPath = SECURE_FOLDER_PATH . '/management/config/categories.php';
 
     if (!file_exists($configPath)) {
         return [];
     }
 
-    // Invalidate opcode cache if available (config changes must be seen live)
+    // Past the opcode cache, so the request reads the file as it is now.
     qs_opcache_invalidate($configPath);
 
-    return require $configPath;
+    $categories = require $configPath;
+    return $categories;
 }
 
 /**
@@ -519,6 +531,83 @@ function qs_membership_has_approved_notice($entry): bool {
 }
 
 /**
+ * The notice a member entry carries when someone else changed the person's role in the project
+ * (changeMemberRole, and transferOwnership for the new owner). It is the entry's `role_change` field:
+ * `from` the role the person was last told of, `to` the role the latest change gave, `by` the account
+ * that made the latest change, `at` its date. Like the approved notice it is a mark on a live member
+ * entry, and the two can wait side by side; dismissing it takes the mark off and leaves the membership
+ * as it is. members.json keeps no record of it, so no repair ever adds one.
+ */
+const QS_MEMBERSHIP_ROLE_CHANGED = 'role_changed';
+
+/** The role notice a cache entry carries (a member entry with a sound `role_change`), or null. */
+function qs_membership_role_change($entry): ?array {
+    if (!is_array($entry) || !qs_cache_entry_is_member($entry) || !is_array($entry['role_change'] ?? null)) {
+        return null;
+    }
+    $c = $entry['role_change'];
+    foreach (['from', 'to', 'by', 'at'] as $field) {
+        if (!is_string($c[$field] ?? null) || $c[$field] === '') {
+            return null;
+        }
+    }
+    if (!isValidRole($c['from']) || !isValidRole($c['to']) || $c['from'] === $c['to']) {
+        return null;
+    }
+    return ['from' => $c['from'], 'to' => $c['to'], 'by' => $c['by'], 'at' => $c['at']];
+}
+
+/**
+ * Tell a member that their role in a project changed: the role notice on their own cache entry. The
+ * notice says what changed since the person was last told: a second change before they dismiss it
+ * keeps the first `from` and takes the latest `to`, `by` and date, and a change back to that first
+ * role takes the notice away. A change the person made themselves ($by null: the departing owner of
+ * a transfer) tells them nothing, and takes away a role notice still waiting, since they chose the
+ * role they hold. An entry that is no member entry while the roster lists the person as a member
+ * becomes one (the repair's rule).
+ *
+ * Secondary, like every mirror write: members.json has already changed, and a failure is the
+ * caller's to log.
+ *
+ * @param string|null $by the account that made the change; null when the person made it themselves
+ * @return bool false only when the write failed; true when it was written or there was nothing to write
+ */
+function qs_membership_note_role_change(string $userId, string $project, string $from, string $to, ?string $by): bool {
+    $today = date('Y-m-d');
+    $nothing = false;
+    $written = qs_users_mutate(function (array &$cfg) use ($userId, $project, $from, $to, $by, $today, &$nothing) {
+        if (!isset($cfg['users'][$userId])) {
+            $nothing = true; // an account the registry no longer has: nobody to tell
+            return false;
+        }
+        $current = $cfg['users'][$userId]['projects'][$project] ?? null;
+        $isMember = is_array($current) && ($current['status'] ?? 'member') === 'member';
+        if ($by === null) {
+            if (!$isMember || !array_key_exists('role_change', $current)) {
+                $nothing = true;
+                return false;
+            }
+            unset($cfg['users'][$userId]['projects'][$project]['role_change']);
+            return true;
+        }
+        $entry = $isMember ? $current : qs_membership_mirror_entry('member', $today);
+        $earlier = qs_membership_role_change($entry);
+        $first = $earlier !== null ? $earlier['from'] : $from;
+        unset($entry['role_change']);
+        if ($first !== $to) {
+            $entry['role_change'] = ['from' => $first, 'to' => $to, 'by' => $by, 'at' => $today];
+        }
+        if ($entry === $current) {
+            $nothing = true;
+            return false;
+        }
+        $cfg['users'][$userId]['projects'][$project] = $entry;
+        return true;
+    });
+    return $written === true || $nothing;
+}
+
+/**
  * Write ONE entry of a user's `projects` cache (the status mirror) through the
  * users.php writer — the single mirror-write path for the membership commands
  * $entry null = remove the entry. Mirror writes are SECONDARY: the failure
@@ -546,7 +635,8 @@ function qs_membership_cache_set(string $userId, string $project, ?array $entry)
 /**
  * The statuses of a terminal notice in a user's `projects` cache: a refusal, a removal, a deleted
  * project. members.json keeps no record of them, so no repair rebuilds or prunes one. The approved
- * notice is not among them: it is a mark on a live member entry (QS_MEMBERSHIP_APPROVED).
+ * notice and the role notice are not among them: each is a mark on a live member entry
+ * (QS_MEMBERSHIP_APPROVED, QS_MEMBERSHIP_ROLE_CHANGED).
  */
 const QS_MEMBERSHIP_NOTICES = ['refused', 'removed', 'deleted'];
 
@@ -594,9 +684,9 @@ function qs_membership_desired_statuses(array $members): array {
  * null when none) and the status their roster gives them ($status, null when it lists them in no
  * engaged state). An engaged status gets its mirror entry, keeping the date the current entry
  * carries (`created` on a member entry, `at` on a pending one); a member keeps the approved notice
- * the entry carries, and no repair ever adds one (members.json keeps no record of it); with no
- * status a terminal notice is kept, and anything else, a member or pending entry the roster
- * contradicts, is dropped (null), the approved notice with it. The one rule of
+ * and the role notice the entry carries, and no repair ever adds one (members.json keeps no record
+ * of either); with no status a terminal notice is kept, and anything else, a member or pending entry
+ * the roster contradicts, is dropped (null), its notices with it. The one rule of
  * reconcileMemberships (per project), qs_membership_sync_account() (per account), a switch of the
  * edited project (qs_admin_set_selected_project()) and the inbox (qs_membership_list_invitations()).
  */
@@ -609,6 +699,9 @@ function qs_membership_reconciled_entry($current, ?string $status, string $today
         }
         if ($status === 'member' && qs_membership_has_approved_notice($current)) {
             $want['notice'] = QS_MEMBERSHIP_APPROVED;
+        }
+        if ($status === 'member' && ($change = qs_membership_role_change($current)) !== null) {
+            $want['role_change'] = $change;
         }
         return $want;
     }
@@ -877,15 +970,19 @@ function getAllCommands(): array {
 /**
  * Reverse index: command name -> its category (from categories.php).
  * Unmapped command -> null (hasPermission treats that as DENY, fail-closed).
+ * Built once per request, from the map loadCategoriesConfig() keeps for it.
  *
  * @param string $command
  * @return string|null category name, or null if unmapped
  */
 function getCommandCategory(string $command): ?string {
-    $index = [];
-    foreach (loadCategoriesConfig() as $cat => $def) {
-        foreach (($def['commands'] ?? []) as $cmd) {
-            $index[$cmd] = $cat;
+    static $index = null;
+    if ($index === null) {
+        $index = [];
+        foreach (loadCategoriesConfig() as $cat => $def) {
+            foreach (($def['commands'] ?? []) as $cmd) {
+                $index[$cmd] = $cat;
+            }
         }
     }
     return $index[$command] ?? null;

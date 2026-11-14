@@ -32,7 +32,7 @@
  *   POST /admin/self/accept-invitation        {"project"}
  *   POST /admin/self/decline-invitation       {"project"}
  *   POST /admin/self/leave-project            {"project"}
- *   POST /admin/self/dismiss-notice           {"project"}
+ *   POST /admin/self/dismiss-notice           {"project","notice"?}
  *   POST /admin/self/request-to-join          {"project","note"}
  *   POST /admin/self/withdraw-request         {"project","user_id"?}
  *

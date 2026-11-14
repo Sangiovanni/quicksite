@@ -683,7 +683,7 @@
     }
 
     /* My memberships and Project members: a row's buttons go under its text, every one in reach;
-       a contact's id has a line of its own */
+       a found person's id has a line of its own */
     /* Project members: a project's line in the notice wraps, its button under its name */
     .api-card__name,
     .api-auth-token,
