@@ -144,9 +144,13 @@ Every preview is fresh.
 - **stale**: *it has no preview*, *its template changed*, *it was built by another
   engine*, *a file of it is missing*, or *its template is gone* (the preview is then
   removed);
+- **refused**: the template breaks the rule of the three views (see
+  `docs/WORKFLOW_SYSTEM.md`, *Site templates*): its stylesheet names a width other than
+  `(max-width: 64rem)` and `(max-width: 40rem)`, holds a second block of either, puts the
+  phone's before the tablet's, or a rule after them. No preview is built for it;
 - **built**: one line per theme.
 
 A build that fails replaces nothing: the previous preview stays as it was.
 
 Exit code: `0` when every preview is fresh; `1` when it refused to run, a build
-failed, or `--check` found a stale preview.
+failed, `--check` found a stale preview, or a template was refused.

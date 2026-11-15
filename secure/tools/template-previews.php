@@ -26,6 +26,13 @@
  * the build the same way, fetches every page, and removes the copy. It needs PHP's
  * command line alone.
  *
+ * WHAT IT REFUSES. A template fits a phone, a tablet and a computer at QuickSite's two
+ * limits, the panel's own: a media query that names a width is `(max-width: 64rem)` or
+ * `(max-width: 40rem)`, written so; a stylesheet holds at most one block of each, the
+ * tablet's first, and no plain rule after them (it would win over them). A template that
+ * breaks it gets no preview, and --check names it. A query that names no width is not
+ * this rule's (see docs/WORKFLOW_SYSTEM.md, Site templates).
+ *
  * WHEN A PREVIEW IS STALE. Each preview records the hash of the template it was built
  * from and a fingerprint of the engine's files that built it (the engine's source folder,
  * every command, the workflows a template's run goes through, and this tool). A preview
@@ -33,7 +40,8 @@
  * version number says. --check is what a release runs.
  *
  * Exit codes: 0 = every preview is fresh (after building, or as checked); 1 = refused
- * to run, a build failed, or --check found a stale preview.
+ * to run, a build failed, --check found a stale preview, or a template breaks the rule
+ * of the three views.
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -53,6 +61,9 @@ const QS_TP_WORKFLOW = 'start-from-template';
 const QS_TP_WORKFLOWS = ['start-from-template', 'fresh-start', 'setup-languages', 'update-lang-switch', 'setup-theme-switch'];
 /** An attribute only the site's runtime serves: a page that carries one cannot be previewed without it. */
 const QS_TP_NEEDS_RUNTIME = '/\s(on[a-z]+|data-bind[a-z-]*|data-list-template|data-(?:state|storage|auth|consent)-[a-z-]+)=/i';
+/** The only widths a template's stylesheet names: QuickSite's two limits, a tablet up to 64rem and a phone up to 40rem, in this order. */
+const QS_TP_TABLET = '(max-width: 64rem)';
+const QS_TP_PHONE = '(max-width: 40rem)';
 
 $args = array_slice($argv ?? [], 1);
 if (in_array('--help', $args, true) || in_array('-h', $args, true)) {
@@ -126,6 +137,56 @@ function qs_tp_stale(string $id, string $templateFile, string $previewsDir, stri
     return null;
 }
 
+/** Why one media query breaks the rule of the three views, or null: a query that names a width names one of the two, written so. */
+function qs_tp_width_query(string $query): ?string {
+    $query = preg_replace('/\s+/', ' ', trim($query));
+    if (!preg_match('/(^|[^a-z-])((min|max)-)?(device-)?width\b/i', $query)) return null;
+    return in_array($query, [QS_TP_TABLET, QS_TP_PHONE], true) ? null : "a width that is neither the tablet's nor the phone's: @media $query";
+}
+
+/**
+ * Why a template breaks the rule of the three views, or null. Every text of the template file is read: a stylesheet it
+ * sends (any text holding a media query), and the media query a step names for one rule (`mediaQuery`). In a stylesheet,
+ * at most one block of each width, the tablet's first, and after the first of them only at-rules: a plain rule after them
+ * would override them.
+ */
+function qs_tp_widths(array $template): ?string {
+    $found = null;
+    array_walk_recursive($template, static function ($value, $key) use (&$found): void {
+        if ($found !== null || !is_string($value)) return;
+        if ($key === 'mediaQuery') { $found = qs_tp_width_query($value); return; }
+        if (stripos($value, '@media') === false) return;
+        $css = (string) preg_replace('~/\*.*?\*/~s', '', $value);
+        preg_match_all('/@media\b([^{]*)\{/i', $css, $m, PREG_OFFSET_CAPTURE);
+        $seen = [];
+        foreach ($m[1] as $i => [$query, ]) {
+            $query = preg_replace('/\s+/', ' ', trim($query));
+            if (($why = qs_tp_width_query($query)) !== null) { $found = $why; return; }
+            if (!in_array($query, [QS_TP_TABLET, QS_TP_PHONE], true)) continue;
+            if (isset($seen[$query])) { $found = "a second block of @media $query"; return; }
+            if ($query === QS_TP_TABLET && isset($seen[QS_TP_PHONE])) { $found = 'the phone block before the tablet block'; return; }
+            $seen[$query] = $m[0][$i][1];
+        }
+        if ($seen === []) return;
+        // From the first width block on, a rule at the top level is an at-rule: a plain rule there would win over the blocks.
+        $depth = 0;
+        $prelude = '';
+        for ($at = min($seen), $n = strlen($css); $at < $n; $at++) {
+            $c = $css[$at];
+            if ($c === '{') {
+                if ($depth === 0 && ($p = trim($prelude)) !== '' && $p[0] !== '@') { $found = "a rule after the width blocks: $p"; return; }
+                $depth++;
+                $prelude = '';
+            } elseif ($c === '}') {
+                $depth = max(0, $depth - 1);
+            } elseif ($depth === 0) {
+                $prelude .= $c;
+            }
+        }
+    });
+    return $found;
+}
+
 $templates = [];
 foreach (glob($templatesDir . '/*.json') ?: [] as $file) {
     $t = json_decode((string) file_get_contents($file), true);
@@ -134,13 +195,19 @@ foreach (glob($templatesDir . '/*.json') ?: [] as $file) {
         echo "  skipped    $id: not a template\n";
         continue;
     }
-    $templates[$id] = ['file' => $file, 'languages' => array_values($t['languages']), 'dark' => !empty($t['data']['dark'])];
+    $templates[$id] = ['file' => $file, 'languages' => array_values($t['languages']), 'dark' => !empty($t['data']['dark']), 'widths' => qs_tp_widths($t)];
 }
 ksort($templates);
 $engine = qs_tp_engine();
 $todo = [];
 echo 'QuickSite template previews' . ($checkOnly ? ' (check)' : '') . "\n";
+$refused = 0;
 foreach ($templates as $id => $t) {
+    if ($t['widths'] !== null) {
+        printf("  %-10s %s: %s\n", 'refused', $id, $t['widths']);
+        $refused++;
+        continue;
+    }
     $why = qs_tp_stale($id, $t['file'], $previewsDir, $engine);
     printf("  %-10s %s%s\n", $why === null ? 'fresh' : 'stale', $id, $why === null ? '' : ": $why");
     if ($why !== null || $all) $todo[$id] = $t;
@@ -154,12 +221,13 @@ foreach ($orphans as $id) printf("  %-10s %s: its template is gone\n", 'stale', 
 
 if ($checkOnly) {
     $stale = count(array_filter(array_keys($templates), static fn($id) => qs_tp_stale($id, $templates[$id]['file'], $previewsDir, $engine) !== null)) + count($orphans);
+    if ($refused > 0) echo "$refused refused: a template's stylesheet names only QuickSite's two widths (see docs/WORKFLOW_SYSTEM.md, Site templates).\n";
     echo $stale === 0 ? "Every preview is fresh.\n" : "$stale stale: run this tool without --check, and keep what it writes.\n";
-    exit($stale === 0 ? 0 : 1);
+    exit($stale === 0 && $refused === 0 ? 0 : 1);
 }
 if ($todo === [] && $orphans === []) {
-    echo "Nothing to build.\n";
-    exit(0);
+    echo $refused > 0 ? "Nothing to build; $refused refused.\n" : "Nothing to build.\n";
+    exit($refused > 0 ? 1 : 0);
 }
 
 // ── The run ───────────────────────────────────────────────────────────────────
@@ -474,5 +542,6 @@ if ($failed) {
 }
 $stale = 0;
 foreach ($templates as $id => $t) if (qs_tp_stale($id, $t['file'], $previewsDir, $engine) !== null) $stale++;
+if ($refused > 0) echo "$refused refused: no preview built for it.\n";
 echo $stale === 0 ? "Every preview is fresh.\n" : "$stale still stale.\n";
-exit($stale === 0 ? 0 : 1);
+exit($stale === 0 && $refused === 0 ? 0 : 1);

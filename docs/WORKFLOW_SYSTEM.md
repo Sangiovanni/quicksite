@@ -380,6 +380,28 @@ before the template's steps, since a language's texts can only be sent once the 
 shipped templates send each chosen language's texts with one step, `{{texts.{{$value}}}}`, so nothing else
 changes.
 
+**A template fits a phone, a tablet and a computer.** QuickSite has two limits, the panel's own: a phone up
+to `40rem` (640 px), a tablet up to `64rem` (1024 px), a computer above. A template is never made for one of them
+alone, and it fits from the narrowest phone in use, 320 px wide, up.
+
+- **Wrap first.** A layout that needs no width uses none: a grid's columns as `minmax(min(320px, 100%), 1fr)`, a
+  title's size as a `clamp()` whose largest value is the computer's, `flex-wrap: wrap` on a row of links,
+  `overflow-wrap: break-word` for a word longer than the screen. Each fits every width with no media query.
+- **When a width is needed,** only `@media (max-width: 64rem)` (the tablet) and `@media (max-width: 40rem)` (the
+  phone), written exactly so: at most one block of each, at the end of the stylesheet, the tablet's before the
+  phone's, and no plain rule after them, which would override them. A template that needs neither has none. A
+  `rem` in a media query is the browser's default text size, never the site's root size: the limits stay 640 and
+  1024 px whatever the site sets on `html`, and grow only for a visitor who raised their browser's text size.
+- **Nothing is out of reach.** At every width, no page is wider than the screen, no text is cut, and every link and
+  button can be reached. A menu that does not fit wraps onto another row; on a phone, a bar fixed or sticky at
+  the top scrolls with the page, so it never covers what is under it.
+- **What the run's options add fits too:** the language switch and the light/dark button take their look from the
+  template's stylesheet.
+
+The tool below refuses a template whose stylesheet names another width, holds a second block of either, puts the
+phone's before the tablet's, or a plain rule after them: it builds no preview for it, and `--check` names it. A
+media query that names no width (`prefers-reduced-motion`, say) is not this rule's.
+
 **The picture and the preview.** A template's picture is `public/admin/assets/images/templates/<id>.jpg`
 (`.webp` or `.png`); without one its card shows its icon. Its preview is built by a tool, from a shell:
 
