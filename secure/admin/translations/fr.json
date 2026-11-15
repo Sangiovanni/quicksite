@@ -567,7 +567,9 @@
             "collectedDatumCustom": "Un autre identifiant…",
             "collectedDatumCustomHint": "Saisissez un identifiant absent de la liste : la donnée est créée.",
             "collectedDatumPlaceholder": "L'identifiant de la donnée",
-            "collectedDatumExisting": "Données collectées"
+            "collectedDatumExisting": "Données collectées",
+            "siteOrRoute": "Tout le site (laisser vide), ou une page",
+            "mediaPicture": "Choisir une image de Media…"
         },
         "setRouteResolver": {
             "sitemapNote": "Le plan du site a un éditeur pour le résolveur d'une route :",

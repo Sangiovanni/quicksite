@@ -85,6 +85,10 @@ class PageManagement {
         $header .= '<html lang="' . htmlspecialchars($this->lang) . '"' . $themeAttr . '>';
         $header .="<head>";
         $header .= '<title>' . htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</title>';
+        // The description, Open Graph and X tags a platform draws a shared link's card from, right after the
+        // title: one producer for both shells (socialPreview.php), as a build writes them (Page.php).
+        require_once SECURE_FOLDER_PATH . '/src/functions/socialPreview.php';
+        $header .= qs_social_head_tags($title, $this->lang, $trimParameters);
         // The icon (CONFIG['FAVICON_PATH'], else the conventional assets path),
         // linked only when its file is in the project's public folder: a link to
         // a file that is not there fails on every page view. Checked here on

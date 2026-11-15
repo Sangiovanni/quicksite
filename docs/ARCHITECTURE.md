@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `public/p/` + `secure/projects/<projectId>/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. The public half is a single entry point, `index.php`, through which every project is served. |
-| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 148 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 150 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. It also owns the things that are **not** about developing a project — the installation's update check, the panel's own per-user state, and everything to do with the signed-in account and its access to projects — which are served from its own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) rather than being commands. |
 
 ```
@@ -199,7 +199,7 @@ ApiResponse::create(201, 'route.created')
 
 **One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. A translation key the element names that has no text yet gets the builder's starting text, written where the key has none, its words read by key from `secure/src/translations/<lang>.json`. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
 
-The full list of 148 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 150 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -593,8 +593,9 @@ qs_load_project_context(<projectId>)
 renderBootstrap
   └── defines QS_PUBLIC_BASE, the root-relative base all in-page URLs
         compose against: always derived from the request (/p/<projectId>/).
-        The QS_PUBLIC_BASE_URL env var feeds only the absolute form a
-        sitemap is written with. The same derivation answers on the
+        The QS_PUBLIC_BASE_URL env var feeds only the absolute forms: the
+        one a sitemap is written with, and the full addresses of a page's
+        link-preview tags (§6.4). The same derivation answers on the
         management path, where the editor renders page FRAGMENTS (see
         below); only the constant is specific to this entry point
   │
@@ -615,15 +616,16 @@ Page template
   ├── new JsonToHtmlRenderer (or in build mode, the compiled PHP runs directly)
   ├── renders structure → HTML body
   └── PageManagement::render() (in a build, Page::render()) emits <!doctype>,
-        <head> with the page's <title>, then the menu, the page and the footer
-        with no element around them: one body on both, the author places the
-        landmarks
+        <head> with the page's <title> and its link-preview tags (§6.4),
+        then the menu, the page and the footer with no element around them:
+        one body on both, the author places the landmarks
 ```
 
 Emitted URLs are **root-relative**: a page links to `/p/mysite/about` on the install's own
 hostname and to `/about` once built and deployed — the same rendered HTML carries no scheme or
 host, so it survives domain moves, HTTPS switches, and reverse proxies. The absolute base
-exists only where a spec demands one (`sitemap.txt`).
+exists only where a spec demands one (`sitemap.txt`, and the link-preview tags of a page's head,
+which Open Graph asks to be full addresses: §6.4).
 
 That base is a property of the **project**, not of the request that happens to ask for it. The
 visual editor renders single nodes through the management API rather than through this entry
@@ -687,7 +689,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 148 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 150 commands.
 
 ### 6.3 Routing — exact and parameterised routes
 
@@ -748,6 +750,54 @@ The response carries a `warnings` array of `{ type, message }` entries. The site
 - **Param defaults**. A route with required params 404s when the URL is missing a segment. Users who want optional captures hand-author both shapes (`/products/:product` and `/products/:product/:variant`).
 - **Case-insensitive matching**. Paths are case-sensitive, matching Unix filesystem + HTTP convention.
 
+### 6.4 Link previews — the tags a shared link's card is drawn from
+
+A platform that draws a card for a shared link (Facebook, X, LinkedIn, WhatsApp, Discord, Slack,
+Telegram, iMessage) reads the page's `<head>` as the server sends it: its crawler runs no script.
+So every page carries, right after its `<title>`, the description, Open Graph and X tags, written by
+one function both page shells call (`socialPreview.php`: `PageManagement::render()` on
+`/p/<projectId>/`, `Page::render()` in a build, which carries the file). A page has one set of tags:
+each platform draws its own card, on a phone and on a computer, from the same tags.
+
+Each tag is written only when it has a value, in this order, escaped as the title is (a line break
+or another control character becomes a space):
+
+| Tag | Its value |
+|---|---|
+| `<meta name="description">` | the translation key `page.descriptions.<route>` in the page's language (`default.json` on a one-language site, as the title), with the title's placeholders (`{{param:NAME}}`, `{{resolved:NAME}}`) filled; none, no tag |
+| `og:title` | the page's `<title>` |
+| `og:description` | the description above |
+| `og:type` | `website` |
+| `og:url` | the address the page was served at, without its query string, each segment encoded, written as the site links its pages: no trailing slash but on a language's home (`fr/`) |
+| `og:site_name` | the translation key `site.name` |
+| `og:locale`, `og:locale:alternate` | the page's language and the territory the author gave it (`fr_FR`); a language with no territory writes none. On a multilingual site, each other language that has one is an alternate |
+| `og:image`, `og:image:width`, `og:image:height`, `og:image:type`, `og:image:alt` | the page's picture, else the site's: a file of Media's images, with the size, the type and the description Media's metadata holds; a picture no longer in Media writes none |
+| `twitter:card` | the page's card type, else the site's, else `summary_large_image` for a page with a picture and `summary` without |
+| `twitter:site` | the site's X account |
+| `theme-color` | the site's theme colour |
+
+The values are the project's `data/social-preview.json`: the site's picture, card type, X account,
+theme colour and territories, and each page's picture and card type. `setSocialPreview` writes them
+and a page's description; `getSocialPreview` answers them with what each page's tags say, the
+warnings per platform and the platform table they come from. A response that is not a page of the
+site (a 404) carries the theme colour alone.
+
+**Every address in these tags is a full one**, composed when the page is served by one function,
+`qs_full_address()` (`requestRuntime.php`, which a build carries), on `/p/<projectId>/` and in a
+build alike:
+
+- the scheme: `https` when the server says so (`HTTPS`, or port 443) or when a proxy in front says
+  `X-Forwarded-Proto: https`; the forwarded scheme can only upgrade, never downgrade;
+- the host: the validated one (`qs_request_host()`: its shape check and `QS_TRUSTED_HOSTS`, §7);
+- the base: the address the deployment declares in `QS_PUBLIC_BASE_URL` (§7) when it declares one
+  (an absolute address is taken whole, its scheme included; a path is completed with the request's
+  scheme and host), otherwise the base the request derives: `/p/<projectId>/`, or a build's `/` or
+  `/<space>/`;
+- the path.
+
+No request header reaches an address any other way: a malformed `Host`, a host outside
+`QS_TRUSTED_HOSTS` or an `X-Forwarded-Host` changes none.
+
 ---
 
 ## 7. Multi-project model
@@ -795,9 +845,15 @@ Two per-vhost variables remain, and neither selects a project:
   authoring install cannot derive from the request it is answering, so the deployer declares it.
   It also covers sub-path mounts and reverse proxies, where the request-derived origin would be
   wrong. In-page links, scripts and stylesheets are root-relative, need no declaration and are
-  never moved by one: a page composes them against the base it is served under.
+  never moved by one: a page composes them against the base it is served under. The full
+  addresses of a page's link-preview tags (§6.4) are composed against it too, on
+  `/p/<projectId>/` and in a build, which reads it from its own vhost.
 - `QS_TRUSTED_HOSTS` (optional) pins the Host header: a request presenting any other host has
   its URLs composed against the first listed host instead.
+
+A proxy that ends HTTPS in front of the server says so with `X-Forwarded-Proto: https`, and the
+full addresses of a page's link-preview tags then start with `https://` (§6.4). The header can
+only upgrade the scheme: no other value of it changes an address.
 
 Copy-paste vhosts for both servers ship in `secure/deploy/apache-vhosts.conf.example` and
 `secure/deploy/nginx-vhosts.conf.example` (shared hosting can put the same `SetEnv` lines in a
@@ -1339,7 +1395,7 @@ your-server/
     ├── config.php  routes.php  nginx_routes.conf
     ├── data/       aliases, route-resolvers, api-endpoints, embed-policy,
     │               the precomputed consent payload, the OAuth providers the
-    │               project uses and their build keys
+    │               project uses and their build keys, the social values
     ├── src/classes/    render + route + translate, plus the server-side data
     │                   path: DataResolver, OutboundUrlPolicy, IframeSandbox,
     │                   OAuthHandler
@@ -1368,7 +1424,9 @@ whole site at its root. The two answer opposite questions.
 The front controller derives its paths from its own location, not from
 `DOCUMENT_ROOT`: the build created the layout, so the depth is known. Every URL
 the site emits composes against a root-relative base built from the URL space,
-which survives a domain move, a scheme change and a reverse proxy.
+which survives a domain move, a scheme change and a reverse proxy. The one
+exception is the link-preview tags of a page's head, whose full addresses are
+composed when the page is served (§6.4).
 
 It also carries the two things a public surface owes its visitors regardless of
 which web server is in front of it:
@@ -1402,7 +1460,8 @@ files are split along that line so both halves cannot drift:
 | `ApiEndpointManager` — add/edit/validate, compile the client bundle | `apiRegistry.php` — look up an API, an endpoint, its `callableFrom` |
 | `resolverHelpers.php` — validate a config, generate schema samples | `resolverRegistry.php` — read the sidecar, hold the per-request values |
 | `consentHelpers.php` — derive the payload from the storage registry | the precomputed payload, plus `qs_consent_hydration_script()` |
-| `storageHelpers.php`, `projectContext.php` | `requestRuntime.php` — the validated host, the project-namespaced cookie name |
+| `storageHelpers.php`, `projectContext.php` | `requestRuntime.php` — the validated host, the project-namespaced cookie name, the request's scheme, the address the deployment declares and the composer of a full address |
+| `socialPreviewHelpers.php` — write the social values, check a picture against Media, the platform table and its warnings | `socialPreview.php` — read the values, write a page's link-preview tags |
 | `utilsManagement.php` | `jsonIo.php` — the one JSON writer three runtime files needed |
 
 The authoring file requires the runtime one, so there is a single definition of
@@ -1482,7 +1541,9 @@ Then:
 10. Copy `routes.php` and `config.php`, the runtime classes and function files
     (§11.2), the translations (all languages when the project is multilingual,
     `default.json` otherwise), and the project data a served page reads:
-    aliases, route resolvers and the API registry — plus the install-wide embed
+    aliases, route resolvers and the API registry, and the social values, compiled
+    with the Media entry (size, type, description) of each picture they name and
+    the build carries — plus the install-wide embed
     policy, bundled from the installation's own config rather than the project,
     so a built site keeps the same iframe sandbox rules the installation applies.
     The consent payload is PRECOMPUTED here rather than copied, because deriving

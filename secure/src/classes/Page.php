@@ -86,6 +86,12 @@ class Page {
             $themeScript = '<script>' . $js . '</script>';
         }
         // ─────────────────────────────────────────────────────────────────
+
+        // The description, Open Graph and X tags a platform draws a shared link's card from, one per line
+        // right after the title: the producer the live render calls too (socialPreview.php), reading the
+        // social values this build carries.
+        require_once SECURE_FOLDER_PATH . '/src/functions/socialPreview.php';
+        $socialTags = qs_social_head_tags($title, $lang, $__tp, '    ', "\n");
         ?>
 <!DOCTYPE html>
 <html lang="<?= htmlspecialchars($lang, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>"<?= $themeAttr ?>>
@@ -93,6 +99,7 @@ class Page {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></title>
+<?= $socialTags ?>
 <?php if (is_string($iconPath)): ?>
     <link rel="icon" href="<?= htmlspecialchars(qs_page_icon_href($iconPath, '/' . $spacePrefix), ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>">
 <?php endif; ?>

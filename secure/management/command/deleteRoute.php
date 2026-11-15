@@ -305,6 +305,15 @@ foreach ($routesToDelete as $routeSegments) {
 }
 
 // ============================================================================
+// CLEAN UP SOCIAL VALUES
+// ============================================================================
+// A deleted page's picture and card type leave the project's social values
+// (data/social-preview.json), as its events, layout and resolvers do.
+
+require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php';
+$socialCleaned = qs_social_forget_routes(PROJECT_PATH, $deletedRouteNames);
+
+// ============================================================================
 // SUCCESS RESPONSE
 // ============================================================================
 
@@ -319,6 +328,7 @@ ApiResponse::create(200, 'route.deleted')
         'aliases_removed' => $deletedAliases,
         'page_events_cleaned' => $pageEventsCleanup['cleaned'] ?? [],
         'resolvers_cleaned' => $deletedResolverRoutes,
+        'social_cleaned' => $socialCleaned,
     ])
     ->send();
 

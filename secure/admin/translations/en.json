@@ -717,6 +717,8 @@
             "endpointRef": "Select an endpoint (@api/endpoint)...",
             "snippet": "Select snippet...",
             "allRoutes": "All routes (leave empty)",
+            "siteOrRoute": "The whole site (leave empty), or a page",
+            "mediaPicture": "Select a picture from Media...",
             "allCommands": "All commands (leave empty)",
             "commandCustom": "Type another command name\u2026",
             "commandCustomHint": "A log can hold a command that has since been removed",

@@ -772,6 +772,30 @@ function flattenRoutes(array $routes, string $prefix = ''): array {
 }
 
 /**
+ * The page keys a project's routes make, for every reader of translation keys (getUnusedTranslationKeys,
+ * analyzeTranslations, validateTranslations): each route's title, `page.titles.<route>`, which every page reads,
+ * so it is used and required; and each description, `page.descriptions.<route>`, which a page MAY have, so it is
+ * used where a language holds it and never missing where it does not. Every route counts, a nested or a
+ * parameter route's page included: each has a title and a description of its own.
+ *
+ * @param array $routes       the project's routes (routes.php)
+ * @param array $translations one language's translations: the descriptions it holds are answered ([] for none)
+ * @return array{titles: string[], descriptions: string[]}
+ */
+function qs_page_translation_keys(array $routes, array $translations): array {
+    $titles = [];
+    $descriptions = [];
+    $held = is_array($translations['page']['descriptions'] ?? null) ? $translations['page']['descriptions'] : [];
+    foreach (flattenRoutes($routes) as $route) {
+        $titles[] = 'page.titles.' . $route;
+        if (array_key_exists($route, $held)) {
+            $descriptions[] = 'page.descriptions.' . $route;
+        }
+    }
+    return ['titles' => $titles, 'descriptions' => $descriptions];
+}
+
+/**
  * Check if a route path exists in nested routes structure
  * 
  * @param string $routePath Route path to check (e.g., 'guides/getting-started')

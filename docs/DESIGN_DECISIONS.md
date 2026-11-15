@@ -15891,3 +15891,51 @@ rows and adding a search box over them; *Forget* on the *Selected* row under the
 `secure/admin/functions/accountSelf.php` (`qs_account_delete()`), `secure/admin/functions/contacts.php`,
 `public/admin/assets/js/pages/members.js` (`forgetGoneContact()`, the contacts dropdown),
 `secure/admin/templates/pages/members.php`.
+
+### Every page carries its link-preview tags, their addresses composed when it is served (locked 2026-11-14)
+
+**Decision**: Every page writes, right after its `<title>`, the description, Open Graph and X tags a platform draws a
+shared link's card from, in the HTML the server sends (the platforms' crawlers run no script). One function produces
+them and both page shells call it, the live render on `/p/<projectId>/` and a build's (`socialPreview.php`, which a
+build carries). With nothing set, a page writes its title, its type (`website`), its address and the site's name.
+The values are one JSON file in the project (`data/social-preview.json`): site-wide a default picture, the card type,
+an optional X account, an optional theme colour and a territory per language; per page a picture and a card type.
+The page's value wins, else the site's, else what is derived. The texts are translation keys: the title is the page's
+title, a new `page.descriptions.<route>` per language is the description (with the title's placeholders), `site.name`
+is the site's name, the picture's description in Media is `og:image:alt`, read through one function. `og:locale` is
+written only for a language the author gave a territory, with no table of territories in the engine. Two commands of
+their own: `getSocialPreview` (every role: the values, each page's tags per language, the warnings per platform, the
+platform table) and `setSocialPreview` (editor and above, beside `setSiteMapConfig`). The picture comes from Media and
+is never SVG; a picture under a platform's minimum or recommended size, a file over its limit or in a format it does
+not show, a text past what it shows are warned, never refused; the picture's shape is not warned at all, the card
+being shown instead. Every figure lives in one table in the engine, each with its source and the date it was read.
+Every address in the tags is a full one, composed per request by one function in `requestRuntime.php`, which a build
+carries: the request's scheme (a proxy's `X-Forwarded-Proto: https` upgrades it, nothing downgrades it), its validated
+host (its shape check and `QS_TRUSTED_HOSTS`), the base the deployment declares in `QS_PUBLIC_BASE_URL` or else the
+one the request derives, and the path. `_oauthIsHttps()` answers with the same scheme test, and
+`qs_resolve_public_base()` reads the declared base through the same reader, both answering as before.
+
+**Reasoning**: Sangio's idea: the card a shared link gets "render randomly" without the tags, "and each has its
+specificities", and this was "the last time to add such slice before the translation rework". On the address he
+corrected the first proposal: QuickSite need not be told its public address, it composes it when the page is served,
+and "be careful the build need to work too": a build's base was a path and it did not carry the file that read
+`QS_PUBLIC_BASE_URL`, so a deployed build could not be given its address and behind a proxy ending HTTPS its cards
+would have said `http://`. On the values: "it's a project management so maybe it's worth creating command just for
+this". On the description he added a field beside the title in the editor, so the texts are the keys the title already
+is. On the picture's shape: "We should not care, we should have a preview for each platform if possible (with a last
+update for each platform, in case they change). And so the user will see the render directly and adapt manually if
+needed." Seven of the eight platforms read the same Open Graph tags and only X has tags of its own, so a page has one
+set of tags for everyone.
+
+**Alternatives considered**: an address stored as a project setting (the request already holds it, and a build moves);
+tags per device (no platform reads such a thing: each draws its own card per device from one set); the texts written in
+the JSON file instead of translation keys (a second place for a page's words, outside the translation tools); a
+separate social title (the page's title is what the platforms show); a table of territories in the engine (the
+installation's language codes carry no region, and the author knows theirs); an option per platform (only X reads tags
+of its own); a warning for a shape far from each platform's (the preview shows the crop).
+
+**Source**: the design round of 2026-11-14 (Sangio's rulings, each asked with a recommendation) and his answers to the
+worker's questions the same day; beta.12. `secure/src/functions/socialPreview.php`, `socialPreviewHelpers.php`,
+`requestRuntime.php` (`qs_request_is_https()`, `qs_declared_public_base()`, `qs_full_address()`),
+`secure/src/classes/Page.php`, `PageManagement.php`, `secure/management/command/getSocialPreview.php`,
+`setSocialPreview.php`, `build.php`.

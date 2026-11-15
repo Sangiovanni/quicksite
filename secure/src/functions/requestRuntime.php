@@ -1,7 +1,8 @@
 <?php
 /**
  * Request-shaped helpers a SERVED page needs — the validated host, and the
- * project-namespaced cookie name.
+ * project-namespaced cookie name; the request's scheme, the address the deployment
+ * declares and the one composer of a full address (qs_full_address()).
  *
  * Both were parked inside much larger files for historical reasons rather than
  * because they belong there: `qs_request_host()` sat in projectContext.php,
@@ -97,6 +98,157 @@ if (!function_exists('qs_request_origin')) {
             || ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443);
 
         return ($https ? 'https://' : 'http://') . qs_request_host();
+    }
+}
+
+if (!function_exists('qs_request_is_https')) {
+    /**
+     * Whether this request reached the site over HTTPS: the server says so (`HTTPS` set to anything
+     * but "off"), the port is 443, or a proxy in front says `X-Forwarded-Proto: https`.
+     *
+     * The forwarded scheme can only UPGRADE: any other value of the header changes nothing, so a
+     * request cannot make a page served over HTTPS name itself `http://`. The one scheme test of a
+     * served page: `_oauthIsHttps()` answers with it, and every full address the page carries is
+     * composed with it (qs_full_address()).
+     *
+     * PRE-INIT SAFE: touches no constants.
+     */
+    function qs_request_is_https(): bool
+    {
+        if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
+            return true;
+        }
+        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+            return true;
+        }
+        if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
+            return true;
+        }
+        return false;
+    }
+}
+
+if (!function_exists('qs_public_base_normalize')) {
+    /**
+     * Validate + normalise ONE candidate base value.
+     *
+     * Accepted shapes (anything else → null, caller logs and falls through):
+     *   - absolute http(s) URL  → ['abs' => scheme://host/path/, 'path' => /path/]
+     *   - root-relative path    → ['abs' => null,               'path' => /path/]
+     * Both forms come back with EXACTLY one trailing slash on every component —
+     * the invariant that kills two silent-failure modes
+     * (no-leading-slash relative links, glued-host absolutes) and the
+     * pre-existing `//` in emitted asset URLs.
+     *
+     * It lives here, beside the composer, because a build carries this file and not renderBootstrap.php.
+     *
+     * @return array{abs: ?string, path: string}|null
+     */
+    function qs_public_base_normalize(string $value): ?array
+    {
+        $value = trim($value);
+        if ($value === '' || preg_match('/[\s\0]/', $value) === 1) {
+            return null;
+        }
+        // A base carries no query/fragment — composing against one is malformed.
+        if (strpos($value, '?') !== false || strpos($value, '#') !== false) {
+            return null;
+        }
+
+        if ($value[0] === '/') {
+            $path = '/' . trim($value, '/');
+            $path = ($path === '/') ? '/' : $path . '/';
+            return ['abs' => null, 'path' => $path];
+        }
+
+        if (preg_match('#^https?://#i', $value) === 1) {
+            $parts = parse_url($value);
+            if ($parts === false || empty($parts['host'])) {
+                return null;
+            }
+            $origin = strtolower($parts['scheme']) . '://' . $parts['host'];
+            if (isset($parts['port'])) {
+                $origin .= ':' . $parts['port'];
+            }
+            $path = '/' . trim($parts['path'] ?? '/', '/');
+            $path = ($path === '/') ? '/' : $path . '/';
+            return ['abs' => $origin . $path, 'path' => $path];
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('qs_declared_public_base')) {
+    /**
+     * The public address the DEPLOYMENT declares for the site, normalised, or null when it declares none.
+     *
+     * The server variable `QS_PUBLIC_BASE_URL` (per vhost: SetEnv / fastcgi_param; .htaccess SetEnv on
+     * shared hosting): an absolute http(s) address, or a root-relative path the request's own scheme
+     * and host complete. The one reader of it: qs_resolve_public_base() (a sitemap's absolute form)
+     * and qs_full_address() (every full address a page carries) both ask here.
+     *
+     * A malformed value is logged, once per request, and read as no value: a config typo degrades an
+     * address, it never takes a page down.
+     *
+     * @return array{abs: ?string, path: string}|null
+     */
+    function qs_declared_public_base(): ?array
+    {
+        static $read = [];
+        $env = $_SERVER['QS_PUBLIC_BASE_URL'] ?? $_SERVER['REDIRECT_QS_PUBLIC_BASE_URL'] ?? '';
+        if (!is_string($env) || $env === '') {
+            return null;
+        }
+        if (array_key_exists($env, $read)) {
+            return $read[$env];
+        }
+        $declared = qs_public_base_normalize($env);
+        if ($declared === null) {
+            error_log(
+                "QuickSite: ignoring malformed QS_PUBLIC_BASE_URL='{$env}' "
+                . '(expected an absolute http(s) URL or a root-relative path) — using the derived base.'
+            );
+        }
+        return $read[$env] = $declared;
+    }
+}
+
+if (!function_exists('qs_full_address')) {
+    /**
+     * The full address (scheme, host and path) of a path on the site this request serves: the one
+     * composer of an absolute address a served page carries, on `/p/<projectId>/` and in a build alike.
+     *
+     *   - the deployment declared an absolute address (`QS_PUBLIC_BASE_URL`): that address, then the path;
+     *   - it declared a path: this request's scheme and host, that path, then the path;
+     *   - it declared nothing: this request's scheme and host, the base this request derives, then the path.
+     *
+     * The scheme is qs_request_is_https()'s (a proxy's `X-Forwarded-Proto: https` upgrades it, nothing
+     * downgrades it), the host qs_request_host()'s (its shape check and `QS_TRUSTED_HOSTS`): no request
+     * header reaches the address any other way. A declared absolute address is the deployer's word and
+     * is taken whole, its scheme included.
+     *
+     * @param string      $sitePath    a path relative to the site's base, already encoded, no leading
+     *                                 slash: '' for the home page, 'fr/about', 'assets/images/x.png'
+     * @param string|null $derivedBase the root-relative base this request derives; null reads
+     *                                 QS_PUBLIC_BASE (a served page: `/p/<projectId>/`, or a build's `/` or
+     *                                 `/<space>/`), else `/`
+     */
+    function qs_full_address(string $sitePath, ?string $derivedBase = null): string
+    {
+        $sitePath = ltrim($sitePath, '/');
+        $declared = qs_declared_public_base();
+        if ($declared !== null && $declared['abs'] !== null) {
+            return $declared['abs'] . $sitePath;
+        }
+        if ($declared !== null) {
+            $base = $declared['path'];
+        } else {
+            $derived = $derivedBase ?? (defined('QS_PUBLIC_BASE') ? (string) QS_PUBLIC_BASE : '/');
+            $norm = qs_public_base_normalize($derived !== '' ? $derived : '/');
+            $base = $norm !== null ? $norm['path'] : '/';
+        }
+        return (qs_request_is_https() ? 'https://' : 'http://') . qs_request_host() . $base . $sitePath;
     }
 }
 

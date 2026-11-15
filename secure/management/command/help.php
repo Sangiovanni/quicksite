@@ -99,7 +99,8 @@ $GLOBALS['__help_commands'] = [
                 'failed_files' => [],
                 'aliases_removed' => ['/old-guides'],
                 'page_events_cleaned' => ['guides'],
-                'resolvers_cleaned' => ['guides']
+                'resolvers_cleaned' => ['guides'],
+                'social_cleaned' => ['guides']
             ]
         ],
         'error_responses' => [
@@ -111,7 +112,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.',
             '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.'
         ],
-        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config and the resolvers of every route it deletes. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned.'
+        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config, the resolvers and the social values (setSocialPreview\'s picture and card type) of every route it deletes. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned, social_cleaned.'
     ],
     
     'setRouteLayout' => [
@@ -934,6 +935,163 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Sending only one of excludedRoutes / customUrls merges onto the stored value rather than clearing the other. Requires route.write (editor and above) — getSiteMap remains readable by viewers but can no longer write anything.'
     ],
 
+    'getSocialPreview' => [
+        'description' => 'Reads what the card a shared link of the site gets is drawn from, and what each page\'s description, Open Graph and X tags will say: the site\'s social values; each page\'s values (or one page\'s), with its picture as Media holds it; per language, the page\'s title and description, its tags and the warnings per platform; and the platform table those warnings come from, each figure with its source and the date it was read.',
+        'method' => 'GET',
+        'url_structure' => '/management/p/<projectId>/getSocialPreview',
+        'parameters' => [
+            'route' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'One page, by its route path (about-us, guides/installation, products/:slug). Omit for every page.',
+                'example' => 'about-us',
+                'validation' => 'The rule every page command shares: each segment letters, digits, hyphens and underscores, or ":" and a parameter name; an existing route; at most 200 bytes; no "..", backslash or NUL byte. A special page (404, 500, 403, 401) carries no social tags and is refused.'
+            ]
+        ],
+        'example_get' => 'GET /management/p/<projectId>/getSocialPreview?route=about-us or GET /management/p/<projectId>/getSocialPreview',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Social preview of page \'about-us\'',
+            'data' => [
+                'project' => 'h4w8tn3ra',
+                'multilingual' => false,
+                'languages' => ['en'],
+                'site' => ['picture' => 'images/banner.png', 'xAccount' => '@example', 'themeColor' => '#336699', 'locales' => ['en' => 'GB']],
+                'pages' => [
+                    'about-us' => [
+                        'values' => ['cardType' => 'large'],
+                        'picture' => ['key' => 'images/banner.png', 'from' => 'site', 'inMedia' => true, 'path' => 'assets/images/banner.png', 'width' => 1200, 'height' => 630, 'type' => 'image/png', 'bytes' => 48211],
+                        'cardType' => ['value' => 'large', 'from' => 'page'],
+                        'languages' => [
+                            'en' => [
+                                'title' => 'About us',
+                                'description' => 'Who we are and what we make.',
+                                'tags' => [
+                                    ['attribute' => 'name', 'name' => 'description', 'content' => 'Who we are and what we make.'],
+                                    ['attribute' => 'property', 'name' => 'og:title', 'content' => 'About us'],
+                                    ['attribute' => 'property', 'name' => 'og:url', 'content' => 'https://example.com/p/h4w8tn3ra/about-us'],
+                                    ['attribute' => 'property', 'name' => 'og:image', 'content' => 'https://example.com/p/h4w8tn3ra/assets/images/banner.png'],
+                                    ['attribute' => 'name', 'name' => 'twitter:card', 'content' => 'summary_large_image']
+                                ],
+                                'warnings' => [
+                                    ['platform' => 'facebook', 'code' => 'title.cut', 'limit' => 60, 'actual' => 72, 'message' => 'Facebook shows about 60 characters of a title']
+                                ]
+                            ]
+                        ]
+                    ]
+                ],
+                'platforms' => ['facebook' => ['name' => 'Facebook', 'checked' => '2026-11-14', 'checker' => 'https://developers.facebook.com/tools/debug/', 'picture' => ['…'], 'title' => ['…'], 'description' => ['…']]]
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'called without the /p/<projectId>/ marker',
+            '400.validation.invalid_value' => 'a parameter other than route (errors[0].reason unknown_field)',
+            '400.validation.invalid_type' => 'route is not a string',
+            '400.validation.invalid_length' => 'route longer than 200 bytes',
+            '400.validation.invalid_format' => 'a route with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule',
+            '404.route.not_found' => 'the route is not one of the project\'s, or is a special page (errors[0].reason special_page)'
+        ],
+        'notes' => 'Read-only, every role. The tags are made by the one producer a served page calls, so they are the page\'s own, in their order, each written only when it has a value: description, og:title, og:description, og:type (website), og:url, og:site_name (the key site.name), og:locale and og:locale:alternate (only for a language the site gave a territory), og:image with og:image:width, og:image:height, og:image:type and og:image:alt (Media\'s description of the picture), twitter:card, twitter:site, theme-color. The page\'s value wins, else the site\'s, else what is derived: twitter:card is summary_large_image for a page with a picture and summary without. Each address is full: composed for this request\'s scheme and host and the project\'s /p/<projectId>/ base, or from the address the deployment declares in QS_PUBLIC_BASE_URL (a built site composes its own when served). A placeholder ({{param:NAME}}, {{resolved:NAME}}) in a title or a description stays as written here; a served page fills it. picture.inMedia false names a picture that is no longer in Media: the page writes no og:image. A warning never refuses anything; its code is picture.too_small, picture.small, picture.too_large, picture.format, title.cut or description.cut, judged against each platform\'s figures in platforms (X by the card the page asks for), and a figure a platform does not publish is said so there, with the source of the value used.'
+    ],
+
+    'setSocialPreview' => [
+        'description' => 'Writes what the card a shared link of the site gets is drawn from: the site\'s social values, or one page\'s, and a page\'s description in one language. A served page writes them as its description, Open Graph and X tags.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/setSocialPreview',
+        'parameters' => [
+            'route' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The page whose values are written, by its route path. Omit (or send empty) to write the site\'s values.',
+                'example' => 'about-us',
+                'validation' => 'The rule every page command shares: each segment letters, digits, hyphens and underscores, or ":" and a parameter name; an existing route; at most 200 bytes; no "..", backslash or NUL byte. A special page (404, 500, 403, 401) carries no social tags and is refused.'
+            ],
+            'picture' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The picture of the card, site-wide or the page\'s own: a file of Media\'s images, named as Media\'s list names it. Empty removes it.',
+                'example' => 'images/banner.png',
+                'validation' => 'images/ and a file name not starting with a dot; a file Media holds, of an image type, never SVG'
+            ],
+            'cardType' => [
+                'required' => false,
+                'type' => 'string',
+                'enum' => ['large', 'small'],
+                'description' => 'The card X draws: large (summary_large_image, a wide picture) or small (summary, a square thumbnail). Site-wide or the page\'s own. Empty removes it.',
+                'example' => 'large'
+            ],
+            'xAccount' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Site only: the site\'s X account (twitter:site), with or without its @. Empty removes it.',
+                'example' => '@example',
+                'validation' => '@ (added when left out), then 1 to 15 letters, digits or underscores'
+            ],
+            'themeColor' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Site only: the theme colour (theme-color): the colour bar of a Discord card, and a phone browser\'s bar for a visitor. Empty removes it.',
+                'example' => '#336699',
+                'validation' => '# and 6 hexadecimal digits, or 3, each written twice (#369 is written #336699: Discord reads 6 or 8 digits alone); a colour name or a CSS function is refused'
+            ],
+            'locales' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Site only: each language\'s territory, for og:locale (fr with FR writes fr_FR). Merged language by language; an empty territory removes that language\'s. A language with no territory writes no og:locale.',
+                'example' => ['en' => 'GB', 'fr' => 'FR'],
+                'validation' => 'Each key one of the project\'s languages; each territory two letters (written in capitals)'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Page only, with lang: the page\'s description in that language (the key page.descriptions.<route>), for <meta name="description"> and og:description. It takes the title\'s placeholders ({{param:NAME}}, {{resolved:NAME}}). Empty removes it.',
+                'example' => 'Who we are and what we make.',
+                'validation' => 'At most 500 characters'
+            ],
+            'lang' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The language of description; required with it, refused without it.',
+                'example' => 'en',
+                'validation' => 'One of the project\'s languages (getLangList returns them)'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/setSocialPreview with body: {"picture": "images/banner.png", "xAccount": "@example", "themeColor": "#336699", "locales": {"en": "GB", "fr": "FR"}} (the site) or {"route": "about-us", "cardType": "large", "description": "Who we are and what we make.", "lang": "en"} (a page)',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Social values of page \'about-us\' saved',
+            'data' => [
+                'project' => 'h4w8tn3ra',
+                'route' => 'about-us',
+                'values' => ['cardType' => 'large'],
+                'description' => [
+                    'lang' => 'en',
+                    'text' => 'Who we are and what we make.',
+                    'removed' => false,
+                    'translation_key' => 'page.descriptions.about-us'
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'called without the /p/<projectId>/ marker',
+            '400.validation.missing_field' => 'no value to write was sent',
+            '400.validation.invalid_value' => 'a value the command refuses, named by errors[0].field: a picture not in Media, not an image or in SVG, a card type that is neither large nor small, an X account, a colour or a territory not shaped as one (reason invalid_value); a field this target does not hold, such as xAccount with a route or description without one, or lang without description (reason unknown_field)',
+            '400.validation.invalid_type' => 'a value that is not a string, locales that is not an object, or a route that is not a string',
+            '400.validation.invalid_length' => 'a description longer than 500 characters, or a route longer than 200 bytes',
+            '400.validation.invalid_format' => 'a route with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; or the description\'s key collides with a translation of another shape',
+            '400.validation.required' => 'description sent without lang',
+            '400.validation.unsupported_language' => 'lang, or a key of locales, is not one of the project\'s languages; errors[0].allowed lists what it takes',
+            '403.auth.forbidden' => 'the caller\'s role does not grant route.write (a viewer cannot write social values)',
+            '404.route.not_found' => 'the route is not one of the project\'s, or is a special page (errors[0].reason special_page)',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.file_write_failed' => 'the social values or the description could not be written',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
+        ],
+        'notes' => 'Requires route.write (editor and above), beside setSiteMapConfig. The values live in <secure>/projects/<projectId>/data/social-preview.json: the site\'s, and each page\'s picture and card type; a value not sent is kept, a value sent empty is removed, every value is checked before anything is written. The description is a translation key, written as editTitle writes a title (translate/default.json kept in step: a single-language site reads it); removed, it leaves the language\'s file, and default.json when no other language holds it. A page\'s value wins over the site\'s; a built site carries the values (and each picture\'s size, type and description) and writes the same tags. deleteRoute removes a deleted page\'s values. getSocialPreview answers what each page\'s tags will say and the warnings per platform.'
+    ],
+
     'analyzeReachability' => [
         'description' => 'Analyzes route reachability via BFS from the home page. Follows internal links in page structures, menu, and footer to find orphan routes that are not reachable through any navigation path.',
         'method' => 'GET',
@@ -1630,7 +1788,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment.'
+        'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment. Every route\'s title (page.titles.<route>, a nested route\'s included) is required; a page\'s description (page.descriptions.<route>) is optional and never missing.'
     ],
     
     'getUnusedTranslationKeys' => [
@@ -1674,7 +1832,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Identifies orphaned translations not referenced by any page, menu, footer, or component. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys.'
+        'notes' => 'Identifies orphaned translations not referenced by any page, menu, footer, or component. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys. Every route\'s title (page.titles.<route>, a nested route\'s included) and every page description a language holds (page.descriptions.<route>, setSocialPreview) count as used.'
     ],
     
     'analyzeTranslations' => [
@@ -4759,14 +4917,14 @@ $GLOBALS['__help_commands'] = [
                 'owner_user_id' => 'usr_0123456789abcdef0123456789abcdef'
             ]
         ],
-        'notes' => 'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG, and for a .css file the stylesheet scan every CSS writer runs — see editStyles). A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create. Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space, and config.json, routes.json, config/project.json and the folders config/, translate/, data/, snippets/, public/ and templates/model/json/ spelled exactly so, in lowercase (CONFIG.JSON or Templates/ is refused). One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it, and a name the engine reads would import differently on a system that tells case apart. Entries outside the project folder are ignored. The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: every language is in this installation\'s language list (getLanguageList), the default language is one of the listed ones, the flags are true or false, the theme default is light, dark or system, the favicon is an image under /assets/images/ with a favicon extension, and the build size limit, which no command writes, is a positive whole number. Language names are not imported: a project stores codes only, and names come from the installation\'s list. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path. An archive names its languages: config.json at the project root, with LANGUAGES_SUPPORTED. An archive with no config.json is refused WHOLE with 400 (reason missing_file, errors[0].file config.json), and so is one whose config.json has no LANGUAGES_SUPPORTED, an empty {} included (reason invalid_setting, errors[0].value LANGUAGES_SUPPORTED); nothing is created. An import never chooses a project\'s languages. A LANGUAGE_DEFAULT the archive leaves out is the first language of its list. Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either. The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule. Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing. The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php. PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner. The storage registry (data/storage.json) takes only what a command could write: every item is checked by the rule addStorageItem applies, and one that breaks it refuses the WHOLE archive with 400 (reason invalid_storage_item). An OAuth key file the archive carries (data/oauth-secrets.json, written as it is) is made readable by the server\'s account only. The imported project always gets a new id, drawn like createProject\'s (data.project): an archive never brings its id, so an import can neither take an id in use nor replace an existing project. Its name is the one sent, else the archive\'s own (the name in its config/project.json, else its project folder\'s name, each only when it follows the name rule); a name file the archive carries is replaced by the project\'s own. An archive that offers no usable name, imported without one, is refused with 400 validation.missing_field and nothing is created. Compatible with exports from exportProject.',
+        'notes' => 'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG, and for a .css file the stylesheet scan every CSS writer runs — see editStyles). A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create. Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space, and config.json, routes.json, config/project.json and the folders config/, translate/, data/, snippets/, public/ and templates/model/json/ spelled exactly so, in lowercase (CONFIG.JSON or Templates/ is refused). One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it, and a name the engine reads would import differently on a system that tells case apart. Entries outside the project folder are ignored. The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: every language is in this installation\'s language list (getLanguageList), the default language is one of the listed ones, the flags are true or false, the theme default is light, dark or system, the favicon is an image under /assets/images/ with a favicon extension, and the build size limit, which no command writes, is a positive whole number. Language names are not imported: a project stores codes only, and names come from the installation\'s list. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path. An archive names its languages: config.json at the project root, with LANGUAGES_SUPPORTED. An archive with no config.json is refused WHOLE with 400 (reason missing_file, errors[0].file config.json), and so is one whose config.json has no LANGUAGES_SUPPORTED, an empty {} included (reason invalid_setting, errors[0].value LANGUAGES_SUPPORTED); nothing is created. An import never chooses a project\'s languages. A LANGUAGE_DEFAULT the archive leaves out is the first language of its list. Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either. The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule. Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing. The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php. PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner. The storage registry (data/storage.json) takes only what a command could write: every item is checked by the rule addStorageItem applies, and one that breaks it refuses the WHOLE archive with 400 (reason invalid_storage_item). The social values (data/social-preview.json) take only what setSocialPreview could write: its two parts (site, pages), the fields of each and the shape of every value, a page named as a route; one that breaks it refuses the WHOLE archive with 400 (reason invalid_social_value). A page or a picture the archive no longer holds is accepted: it writes no tag. An OAuth key file the archive carries (data/oauth-secrets.json, written as it is) is made readable by the server\'s account only. The imported project always gets a new id, drawn like createProject\'s (data.project): an archive never brings its id, so an import can neither take an id in use nor replace an existing project. Its name is the one sent, else the archive\'s own (the name in its config/project.json, else its project folder\'s name, each only when it follows the name rule); a name file the archive carries is replaced by the project\'s own. An archive that offers no usable name, imported without one, is refused with 400 validation.missing_field and nothing is created. Compatible with exports from exportProject.',
         'error_responses' => [
             '413.request.body_too_large' => 'The archive exceeded the server\'s post_max_size, so PHP discarded the request before the command ran. The response carries the real limit.',
             '413.validation.size_limit_exceeded' => 'Archive exceeds an entry-count, size or compression-ratio limit',
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
-            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), missing_file (the project folder has no config.json), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (no LANGUAGES_SUPPORTED in config.json, a setting the command that writes it would refuse, or a language this installation\'s list does not hold — errors[0].value names the setting), invalid_storage_item (an item of data/storage.json that addStorageItem would refuse: a key with whitespace or named __proto__, an unknown scope or category — errors[0].value names the key), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
+            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), missing_file (the project folder has no config.json), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (no LANGUAGES_SUPPORTED in config.json, a setting the command that writes it would refuse, or a language this installation\'s list does not hold — errors[0].value names the setting), invalid_storage_item (an item of data/storage.json that addStorageItem would refuse: a key with whitespace or named __proto__, an unknown scope or category — errors[0].value names the key), invalid_social_value (a value of data/social-preview.json that setSocialPreview would refuse, or a part, a field or a page name it never writes — errors[0].value names it), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
             '400.validation.incomplete_project' => 'Imported project is incomplete.',
             '400.validation.invalid_format' => 'The name holds a control character.',
             '400.validation.invalid_length' => 'The name has more than 60 characters once trimmed.',

@@ -515,6 +515,13 @@ const FIELD_PICKERS = {
         { kind: 'select', param: 'language', source: 'languages' }
     ],
     getStateStores:              { kind: 'select', param: 'route', source: 'routes', allowEmpty: true },
+    // A social preview: every page when the route is left empty, the site's values when it is left empty on a write.
+    getSocialPreview:            { kind: 'select', param: 'route', source: 'routes', allowEmpty: true },
+    setSocialPreview: [
+        { kind: 'select', param: 'route', source: 'routes', allowEmpty: true, placeholder: 'commandForm.select.siteOrRoute' },
+        { kind: 'picture', param: 'picture', placeholder: 'commandForm.select.mediaPicture' },
+        { kind: 'select', param: 'lang', source: 'languages' }
+    ],
     // addPageEvent's `event` takes the same three literals its two siblings
     // already offer as a dropdown (the server's allowlist is one shared array);
     // it was the only one of the three still asking you to type them.
@@ -1042,14 +1049,47 @@ async function _initArmSelect(form, cfg) {
     if (!select) return null;
 
     // allowEmpty keeps the blank option meaningful: getStateStores reads
-    // "omit to retrieve stores for ALL routes".
-    const placeholder = cfg.source === 'languages'
-        ? t('commandForm.select.language')
-        : (cfg.allowEmpty ? t('commandForm.select.allRoutes') : t('commandForm.select.route'));
+    // "omit to retrieve stores for ALL routes". A row whose blank means something
+    // else names its own words (setSocialPreview: the whole site).
+    const placeholder = cfg.placeholder
+        ? t(cfg.placeholder)
+        : cfg.source === 'languages'
+            ? t('commandForm.select.language')
+            : (cfg.allowEmpty ? t('commandForm.select.allRoutes') : t('commandForm.select.route'));
 
     _makeSearchable(select, placeholder);
     await _populateArm(select, cfg.source || 'routes', [], placeholder);
     return select;
+}
+
+/**
+ * A picture from Media: a searchable dropdown of Media's images, each written as
+ * Media names it (`images/<file>`), SVG left out (no platform draws one, and
+ * setSocialPreview refuses it). The panel's assets arm answers file names; a read
+ * that fails leaves the field a text box, still submittable.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row: param, placeholder (a word's key)
+ */
+async function _initMediaPicturePicker(form, cfg) {
+    const input = form.querySelector('[name="' + cfg.param + '"]');
+    if (!input || input.tagName === 'SELECT') return;
+    let rows;
+    try {
+        rows = await QuickSiteAdmin.fetchHelperData('assets', ['images']);
+    } catch (e) {
+        return;
+    }
+    if (!Array.isArray(rows)) return;
+    const pictures = rows
+        .filter(row => !/\.svgz?$/i.test(String(row.value)))
+        .map(row => ({ value: 'images/' + row.value, label: row.label }));
+    const select = _swapForSelect(form, cfg.param);
+    if (!select) return;
+    const placeholder = t(cfg.placeholder);
+    _makeSearchable(select, placeholder);
+    _placeholder(select, pictures.length ? placeholder : t('commandForm.empty.noImages'));
+    _appendOptions(select, pictures);
 }
 
 /**
@@ -1854,6 +1894,8 @@ async function applyPagePickers() {
             await _initArmSelect(form, cfg);
         } else if (cfg.kind === 'suggest') {
             await _initRouteSuggest(form, cfg);
+        } else if (cfg.kind === 'picture') {
+            await _initMediaPicturePicker(form, cfg);
         } else if (cfg.kind === 'structure') {
             await _initStructurePicker(form, cfg);
         } else if (cfg.kind === 'snippet') {

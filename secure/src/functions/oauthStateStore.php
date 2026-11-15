@@ -86,18 +86,11 @@ function _oauthEnsureSession(): void {
  * vanishes because the cookie was never accepted). Auto-detect keeps
  * dev (`http://local.quicksite`) working without sacrificing the
  * `Secure` attribute in production.
+ *
+ * The test itself is the served page's one scheme test, qs_request_is_https() (requestRuntime.php).
  */
 function _oauthIsHttps(): bool {
-    if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
-        return true;
-    }
-    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
-        return true;
-    }
-    if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
-        return true;
-    }
-    return false;
+    return qs_request_is_https();
 }
 
 /**

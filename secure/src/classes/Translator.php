@@ -20,6 +20,29 @@ class Translator {
     }
 
     /**
+     * The text a key holds in the loaded language, or null when it holds none (absent, empty, or not
+     * a text) — answered QUIETLY. translate() logs every key it cannot resolve; a key a page may leave
+     * out on purpose, its description (`page.descriptions.<route>`), is no missing translation, and a
+     * page without one must not write a log line on every view. Same file, same path rule.
+     */
+    public static function lookup(string $key): ?string {
+        if (self::$translations === null) {
+            self::loadTranslations();
+        }
+        $current = self::$translations;
+        foreach (explode('.', $key) as $segment) {
+            if (!is_array($current) || !isset($current[$segment])) {
+                return null;
+            }
+            $current = $current[$segment];
+        }
+        if (!is_scalar($current) || (string) $current === '') {
+            return null;
+        }
+        return (string) $current;
+    }
+
+    /**
      * @param string|null $langFromRouter The language the router already
      *                                    resolved, if any. Null (or a code the
      *                                    project does not declare) falls
