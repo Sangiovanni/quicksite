@@ -1307,6 +1307,18 @@
             "starterBusiness": {
                 "title": "Starter Business",
                 "description": "Quatre pages (accueil, à propos, services, contact) avec un menu et un pied de page. Turquoise."
+            },
+            "appointments": {
+                "title": "Rendez-vous",
+                "description": "Une page pour un salon ou un cabinet : prestations avec durées et prix, équipe, horaires, bouton pour réserver. Vert."
+            },
+            "foodAndDrink": {
+                "title": "Restauration",
+                "description": "Pensé pour le téléphone : un accueil et une carte avec les prix, les horaires, l'adresse, des boutons pour appeler ou commander. Rouge."
+            },
+            "trades": {
+                "title": "Artisans et services à domicile",
+                "description": "Accueil et devis : services, zone desservie, raisons de vous faire confiance, bouton pour demander un devis. Bleu marine et ambre."
             }
         },
         "specs": {
@@ -1471,6 +1483,26 @@
                     "darkMode": {
                         "label": "Inclure le mode sombre",
                         "help": "Ajoute les couleurs sombres du modèle et un bouton clair/sombre dans son menu"
+                    },
+                    "businessName": {
+                        "label": "Nom de l'entreprise",
+                        "help": "Affiché dans le menu, les titres et le pied de page. Laissé vide, le nom d'exemple du modèle."
+                    },
+                    "phone": {
+                        "label": "Numéro de téléphone",
+                        "help": "Affiché sur le site, et appelé par ses boutons Appeler. Des chiffres, des espaces et un + au début seulement. Laissé vide, le numéro d'exemple du modèle."
+                    },
+                    "email": {
+                        "label": "Adresse e-mail",
+                        "help": "Affichée sur le site, et utilisée par ses liens e-mail. Laissée vide, l'adresse d'exemple du modèle."
+                    },
+                    "address": {
+                        "label": "Adresse",
+                        "help": "L'adresse postale affichée sur le site, sur une ligne. Laissée vide, l'adresse d'exemple du modèle."
+                    },
+                    "bookingUrl": {
+                        "label": "Lien de réservation ou de commande",
+                        "help": "Là où mène le bouton Réserver ou Commander du modèle : la page du service que vous utilisez, commençant par https://. Laissé vide, un lien d'exemple."
                     }
                 }
             },

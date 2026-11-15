@@ -1,0 +1,29 @@
+{
+    "template": "83f0c025772a3bd4dfa08c4f661bee66e6525d26155fe027a349cbaefb87166f",
+    "engine": "86902e53dbfd660ec1eae200188f51b1d1f9a8dd26df254417e4ea396be94acf",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "quote"
+    ],
+    "scripts": true,
+    "files": [
+        "dark/en/home.html",
+        "dark/en/quote.html",
+        "dark/fr/home.html",
+        "dark/fr/quote.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/en/quote.html",
+        "light/fr/home.html",
+        "light/fr/quote.html",
+        "light/style/style.css"
+    ]
+}

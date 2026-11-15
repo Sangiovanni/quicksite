@@ -1870,6 +1870,18 @@
             "starterBusiness": {
                 "title": "Starter Business",
                 "description": "Four pages (home, about, services, contact) with a menu and a footer. Teal."
+            },
+            "appointments": {
+                "title": "Appointments",
+                "description": "One page for a salon or a practice: services with times and prices, the team, hours, a button to book. Green."
+            },
+            "foodAndDrink": {
+                "title": "Food and drink",
+                "description": "Phone first: a home page and a menu with prices, the hours, the address, buttons to call or order. Red."
+            },
+            "trades": {
+                "title": "Trades and home services",
+                "description": "Home and quote pages: services, the area served, why trust you, a button to ask for a quote. Navy and amber."
             }
         },
         "specs": {
@@ -2064,6 +2076,26 @@
                     "darkMode": {
                         "label": "Include dark mode",
                         "help": "Adds the template's dark colours and a light/dark button in its menu"
+                    },
+                    "businessName": {
+                        "label": "Business name",
+                        "help": "Shown in the menu, the titles and the footer. Left empty, the template's sample name."
+                    },
+                    "phone": {
+                        "label": "Phone number",
+                        "help": "Shown on the site, and called by its Call buttons. Digits, spaces and a leading + only. Left empty, the template's sample number."
+                    },
+                    "email": {
+                        "label": "E-mail address",
+                        "help": "Shown on the site, and written to by its e-mail links. Left empty, the template's sample address."
+                    },
+                    "address": {
+                        "label": "Address",
+                        "help": "The street address shown on the site, on one line. Left empty, the template's sample address."
+                    },
+                    "bookingUrl": {
+                        "label": "Booking or ordering link",
+                        "help": "Where the template's Book or Order button leads: the page of the service you use, starting with https://. Left empty, a sample link."
                     }
                 }
             },

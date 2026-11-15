@@ -1,0 +1,143 @@
+/* GLOBAL */
+html { scroll-behavior: smooth; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.6; background: var(--color-bg); overflow-wrap: break-word; }
+h1, h2, h3 { font-family: Georgia, 'Times New Roman', serif; font-weight: 500; line-height: 1.2; color: var(--color-text); }
+a { color: var(--color-primary); }
+ul { list-style: none; }
+
+/* MENU */
+.site-nav { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 2rem; padding: 1rem 2rem; background: var(--color-surface); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 100; }
+.nav-logo { font-family: Georgia, 'Times New Roman', serif; font-size: 1.35rem; color: var(--color-primary); text-decoration: none; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 0.25rem 1.75rem; margin-left: auto; }
+.nav-links a { color: var(--color-text); text-decoration: none; font-weight: 500; padding: 0.35rem 0; border-bottom: 2px solid transparent; transition: border-color 0.2s; }
+.nav-links a:hover { border-bottom-color: var(--color-accent); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: 0.6rem 1.6rem; border-radius: 2rem; border: 2px solid var(--color-primary); font-weight: 600; text-decoration: none; text-align: center; transition: background 0.2s, color 0.2s; }
+.btn-primary { background: var(--color-primary); color: var(--color-on-primary); }
+.btn-primary:hover { background: var(--color-primary-strong); border-color: var(--color-primary-strong); }
+.btn-ghost { background: transparent; color: var(--color-primary); }
+.btn-ghost:hover { background: var(--color-primary); color: var(--color-on-primary); }
+
+/* HERO: the words beside a drawn arch, where a photo of the place goes */
+.hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr)); gap: 2.5rem 3rem; align-items: center; max-width: 70rem; margin: 0 auto; padding: 4.5rem 2rem; }
+.hero-kicker { color: var(--color-accent); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.75rem; }
+.hero h1 { font-size: clamp(2.1rem, 5vw + 1rem, 3.5rem); margin-bottom: 1rem; }
+.hero-lead { font-size: 1.15rem; color: var(--color-text-muted); max-width: 32rem; margin-bottom: 2rem; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.hero-art { position: relative; min-height: 20rem; max-width: 24rem; width: 100%; margin: 0 auto; border-radius: 12rem 12rem 1rem 1rem; background: radial-gradient(circle at 68% 26%, var(--color-accent-soft) 0 3.25rem, transparent 3.3rem), linear-gradient(165deg, var(--color-primary) 0%, var(--color-primary-strong) 100%); overflow: hidden; }
+.hero-art::before { content: ''; position: absolute; left: 12%; bottom: -8%; width: 46%; height: 62%; border-radius: 0 100% 0 100%; background: var(--color-accent); opacity: 0.9; }
+.hero-art::after { content: ''; position: absolute; right: 10%; bottom: -12%; width: 38%; height: 50%; border-radius: 100% 0 100% 0; background: var(--color-surface-alt); opacity: 0.85; }
+
+/* SECTIONS */
+.section { max-width: 70rem; margin: 0 auto; padding: 4rem 2rem; scroll-margin-top: 4.5rem; }
+.section h2 { font-size: clamp(1.6rem, 3vw + 0.8rem, 2.25rem); margin-bottom: 0.5rem; }
+.section-lead { color: var(--color-text-muted); max-width: 38rem; margin-bottom: 2rem; }
+.band { background: var(--color-surface-alt); }
+
+/* SERVICES: a name, how long it takes, what it costs */
+.price-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr)); gap: 1.5rem; }
+.price-group { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 1rem; padding: 1.5rem; }
+.price-group h3 { font-size: 1.25rem; color: var(--color-primary); padding-bottom: 0.75rem; margin-bottom: 0.25rem; border-bottom: 1px solid var(--color-border); }
+.price-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.75rem; padding: 0.7rem 0; border-bottom: 1px dashed var(--color-border); }
+.price-list li:last-child { border-bottom: none; padding-bottom: 0; }
+.price-name { flex: 1 1 9rem; font-weight: 600; }
+.price-time { color: var(--color-text-muted); font-size: 0.9rem; }
+.price-amount { font-weight: 700; min-width: 3.5rem; text-align: right; }
+
+/* TEAM: initials in a circle, where a portrait goes */
+.team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr)); gap: 1.5rem; }
+.member { text-align: center; padding: 1.75rem 1rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 1rem; }
+.avatar { display: flex; align-items: center; justify-content: center; width: 5.5rem; height: 5.5rem; margin: 0 auto 1rem; border-radius: 50%; background: var(--color-accent-soft); color: var(--color-primary); font-family: Georgia, 'Times New Roman', serif; font-size: 1.6rem; }
+.member h3 { font-size: 1.2rem; margin-bottom: 0.25rem; }
+.member p { color: var(--color-text-muted); }
+
+/* HOURS AND WHERE */
+.visit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr)); gap: 2rem 3rem; }
+.hours-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.15rem 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--color-border); }
+.hours-time { font-weight: 600; }
+.find p { margin-top: 0.6rem; }
+.find a { font-weight: 600; }
+.find-note { color: var(--color-text-muted); font-size: 0.95rem; }
+
+/* THE BOOKING BAND */
+.book-band { text-align: center; padding: 4rem 2rem; background: var(--color-primary); color: var(--color-on-primary); }
+.book-band h2 { color: var(--color-on-primary); font-size: clamp(1.6rem, 3vw + 0.8rem, 2.25rem); margin-bottom: 0.5rem; }
+.book-band p { max-width: 34rem; margin: 0 auto 1.75rem; opacity: 0.9; }
+.book-band .btn { background: var(--color-on-primary); color: var(--color-primary); border-color: var(--color-on-primary); }
+.book-band .btn:hover { background: var(--color-accent-soft); border-color: var(--color-accent-soft); }
+
+/* FOOTER */
+.site-footer { background: var(--color-footer-bg); color: var(--color-footer-text); padding: 2.5rem 2rem 1.25rem; }
+.footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1.5rem 2rem; max-width: 70rem; margin: 0 auto; }
+.footer-logo { font-family: Georgia, 'Times New Roman', serif; font-size: 1.2rem; }
+.footer-brand p { color: var(--color-footer-muted); font-size: 0.9rem; margin-top: 0.35rem; }
+.footer-note { max-width: 70rem; margin: 1.75rem auto 0; padding-top: 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.12); color: var(--color-footer-muted); font-size: 0.85rem; }
+
+/* LANGUAGE SWITCH (a site in several languages) */
+.footer-lang { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.lang-label { color: var(--color-footer-muted); font-size: 0.9rem; }
+.lang-switch { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.lang-btn { color: var(--color-footer-text); text-decoration: none; padding: 0.35rem 0.9rem; border-radius: 2rem; font-size: 0.85rem; border: 1px solid rgba(255, 255, 255, 0.25); }
+.lang-btn:hover { border-color: var(--color-footer-text); }
+
+/* THEME SWITCH (a site with a dark theme) */
+.theme-switch { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem; border-radius: 2rem; border: 1px solid var(--color-switch-border); background: transparent; color: var(--color-switch-text); font: inherit; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
+.theme-switch:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* LESS MOTION, for a visitor who asked their system for it */
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+}
+
+/* PHONE (a screen up to 40rem): the menu scrolls with the page and wraps, its links taking the room left; less room around the content */
+@media (max-width: 40rem) {
+    .site-nav { position: static; padding: 0.75rem 1rem; gap: 0.5rem 1rem; }
+    .nav-links { flex: 1 1 auto; margin-left: 0; gap: 0.25rem 1.25rem; }
+    .hero { padding: 2.5rem 1rem; }
+    .hero-art { min-height: 13rem; max-width: 16rem; }
+    .hero-actions .btn { flex: 1 1 100%; }
+    .section { padding: 2.5rem 1rem; scroll-margin-top: 1rem; }
+    .price-group { padding: 1.25rem 1rem; }
+    .book-band { padding: 2.5rem 1rem; }
+    .site-footer { padding: 2rem 1rem 1rem; }
+}
+:root {
+    --color-bg: #faf6f0;
+    --color-surface: #ffffff;
+    --color-surface-alt: #f1ebe1;
+    --color-text: #26302b;
+    --color-text-muted: #5f6b64;
+    --color-primary: #2f5d50;
+    --color-primary-strong: #234a3f;
+    --color-on-primary: #ffffff;
+    --color-accent: #a4553a;
+    --color-accent-soft: #ecd6c9;
+    --color-border: #e2d9cb;
+    --color-footer-bg: #22302a;
+    --color-footer-text: #f1ebe1;
+    --color-footer-muted: #a9b5ae;
+    --color-switch-border: #d3c8b7;
+    --color-switch-text: #5f6b64;
+}
+
+[data-theme="dark"] {
+    --color-bg: #151c19;
+    --color-surface: #1d2622;
+    --color-surface-alt: #232e29;
+    --color-text: #eee9df;
+    --color-text-muted: #a9b5ae;
+    --color-primary: #d9b676;
+    --color-primary-strong: #e6c88f;
+    --color-on-primary: #1b1408;
+    --color-accent: #d98f73;
+    --color-accent-soft: #3a2c26;
+    --color-border: #33403a;
+    --color-footer-bg: #0f1513;
+    --color-footer-text: #eee9df;
+    --color-footer-muted: #93a099;
+    --color-switch-border: #44534c;
+    --color-switch-text: #a9b5ae;
+}

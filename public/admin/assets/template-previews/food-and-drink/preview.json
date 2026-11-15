@@ -1,0 +1,29 @@
+{
+    "template": "5a26ba4f75264ccd33a28346e3734e554e54e26011a61439282f99c89f99b27a",
+    "engine": "86902e53dbfd660ec1eae200188f51b1d1f9a8dd26df254417e4ea396be94acf",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "menu"
+    ],
+    "scripts": true,
+    "files": [
+        "dark/en/home.html",
+        "dark/en/menu.html",
+        "dark/fr/home.html",
+        "dark/fr/menu.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/en/menu.html",
+        "light/fr/home.html",
+        "light/fr/menu.html",
+        "light/style/style.css"
+    ]
+}

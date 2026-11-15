@@ -334,6 +334,7 @@ a run names a template by its id.
     "title": "My template",
     "description": "One line under the name",
     "languages": ["en", "fr"],
+    "asks": ["businessName", "phone"],
     "steps": [
         { "command": "editStructure", "params": { "type": "menu", "structure": [
             { "tag": "nav", "children": [
@@ -359,6 +360,7 @@ a run names a template by its id.
 | `title`, `description` | The name and the line on the template's card, as written. `titleKey` and `descriptionKey` name a translation instead (the shipped templates use them). |
 | `icon` | Shown on the card when the template has no picture |
 | `languages` | The languages the template is written in. A run offers these and no other. |
+| `asks` | The optional fields the template asks a run for, by the row's parameter ids: `businessName`, `phone`, `email`, `address`, `bookingUrl`. The form shows a field only for a template that lists it. Left out, the template asks for none. |
 | `steps` | The template's commands, read as any workflow's steps (see *`steps`*): `condition`, `forEach`, `filter`, placeholders and `$if`. |
 | `data` | What the steps read, by key: `{{texts.fr}}`, `{{dark}}`. A template whose `data.dark` is not empty is offered with a dark mode. |
 
@@ -371,10 +373,25 @@ a run names a template by its id.
 | Languages | `param.languages` | The template's languages, at least two ticked |
 | Main language | `param.language` | The site's default language, one of the template's |
 | Include dark mode | `param.darkMode` | Runs *Theme Switch Button*; shown only for a template with dark colours |
+| Business name, Phone number, E-mail address, Address, Booking or ordering link | `param.businessName`, `param.phone`, `param.email`, `param.address`, `param.bookingUrl` | Nothing: the template's own steps read them. Each is shown only for a template whose `asks` lists it, and is empty when left empty |
 
 A run goes through *Fresh Start*, *Setup Languages*, *Update Language Switch* when the site has several
 languages, *Theme Switch Button* when it has a dark mode, then the template's steps. The languages are set
 before the template's steps, since a language's texts can only be sent once the language exists.
+
+**A field a template asks for is optional, and the template holds the sample that stands in for it.** The template always sends its
+sample texts; a step under a condition (`"condition": "param.multilingual !== true && param.phone"`) then sends what was typed over
+them, as a text of the site, the same in every language. A link is written in its two variants, each under `$if`: the field's value
+(`"$if": "param.phone"`, `"href": "tel:{{param.phone | tel}}"`) or the sample's (`"$if": "!param.phone"`). The `tel` filter keeps a
+number's digits and a leading `+`, which is what a `tel:` address takes. For one value to fill every place, a template keeps the
+business name out of its sentences: it is a text of its own (`site.name`), shown where a name stands alone.
+
+**What a shipped template shows.** A template by type of business holds what a person of that trade needs on one site, with sample
+content that cannot pass for real: every business and person name carries *Sample* (*Exemple* in French), every address is of
+`example.com` or of a street and a town that do not exist, every phone number is one that is never assigned, and a review says that
+it is a sample. Nothing it shows comes from outside: no photo and no file, only what its stylesheet draws, each drawing standing
+where an author puts a picture of their own. A way to book, call, order or ask for a quote is a link (`tel:`, `mailto:`, or the
+address of the service the author uses), not a form.
 
 **Adding a language to a template:** add its code to `languages` and its texts under `data.texts`. The
 shipped templates send each chosen language's texts with one step, `{{texts.{{$value}}}}`, so nothing else
@@ -939,7 +956,7 @@ That is how the prompt's `{{#if}}` reads a `param.` value and how a data require
 }
 ```
 
-Available filters: `uppercase`/`upper`, `lowercase`/`lower`, `ucfirst`/`capitalize`, `ucwords`/`title`, `trim`, `langname`/`language`
+Available filters: `uppercase`/`upper`, `lowercase`/`lower`, `ucfirst`/`capitalize`, `ucwords`/`title`, `trim`, `tel` (a phone number as a `tel:` address takes it: its digits and a leading `+`, a `(0)` written after a country code left out), `langname`/`language`
 
 ---
 

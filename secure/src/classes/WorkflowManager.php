@@ -247,7 +247,8 @@ class WorkflowManager {
 
     /**
      * What a template's file says of itself, for a picker: its id, icon, name and line (in the panel's language, from its
-     * keys, else as the file writes them), its languages, whether it holds a dark theme, and its file's hash.
+     * keys, else as the file writes them), its languages, whether it holds a dark theme, the fields it asks a run for
+     * (`asks`: ids of the workflow's parameters, which a field's condition reads to show itself), and its file's hash.
      */
     public function templateChoice(array $template): array {
         if (!function_exists('__workflow')) {
@@ -267,6 +268,10 @@ class WorkflowManager {
             'description' => $text('description'),
             'languages' => array_values($template['languages']),
             'dark' => is_array($template['data']['dark'] ?? null) && $template['data']['dark'] !== [],
+            'asks' => array_values(array_filter(
+                is_array($template['asks'] ?? null) ? $template['asks'] : [],
+                static fn($field) => is_string($field) && RegexPatterns::match('identifier_alphanum', $field)
+            )),
             'hash' => (string) ($template['_hash'] ?? ''),
             'picture' => $this->templatePicture($id),
             'preview' => $this->templatePreview($id, (string) ($template['_hash'] ?? '')),
@@ -1668,6 +1673,11 @@ class WorkflowManager {
             'ucfirst', 'capitalize' => ucfirst($value),
             'ucwords', 'title' => ucwords($value),
             'trim' => trim($value),
+            // A phone number as a `tel:` address takes it: its digits and a leading +, the spaces and dots a person types left
+            // out, and the "(0)" some write after a country code, which is not dialled with it.
+            'tel' => str_starts_with(ltrim($value), '+')
+                ? '+' . preg_replace('/\D+/', '', str_replace('(0)', '', $value))
+                : preg_replace('/\D+/', '', $value),
             'langname', 'language' => qs_language_label($value),
             default => $value
         };

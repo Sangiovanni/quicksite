@@ -2118,8 +2118,9 @@ window.PreviewAiTools = (function () {
         var shown = null;
         var close = document.createElement('button');
         close.type = 'button';
-        close.className = 'preview-contextual-ai-tools__template-close';
-        close.textContent = _commonWord('close');
+        close.className = 'preview-contextual-ai-tools__template-close admin-modal__close';
+        close.textContent = '×';
+        close.setAttribute('aria-label', _commonWord('close'));
         close.addEventListener('click', function () { if (shown) shown.close(); });
         head.appendChild(close);
         modal.appendChild(head);
@@ -3067,6 +3068,10 @@ window.PreviewAiTools = (function () {
         run.ok += res.ok;
         run.fail += res.fail;
         run.last = { name: phase.title, ok: res.ok, fail: res.fail, total: res.ok + res.fail };
+        // A phase that saved the project's theme mode: the editor's own theme controls (the toolbar's Theme, the CSS
+        // tool's scope) follow what was saved, as they do after the CSS tool's Save Settings.
+        var themed = res.fail === 0 && res.stoppedAt < 0 ? phase.steps.filter(function (s) { return s && s.command === 'setThemeMode'; }).pop() : null;
+        if (themed && window.PreviewStyleTheme && window.PreviewStyleTheme.themeModeSaved) window.PreviewStyleTheme.themeModeSaved(themed.params || {});
         // The preview shows what the phase changed before the next one is reviewed. The Edit list comes
         // first, so the reload never lands on a route the phase deleted: leaving it has loaded the preview.
         if (res.ok > 0 && window.PreviewManager) {

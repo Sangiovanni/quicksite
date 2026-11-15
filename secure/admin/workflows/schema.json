@@ -115,7 +115,7 @@
           "type": {
             "type": "string",
             "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "template", "hidden"],
-            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc. `template` is a picker of the site templates in templates/: one radio card per file, with its picture, its name and its line, and a Preview button when it has a built preview. Its value is the template's id. The engine lists the choices itself (no `options`): every valid file of the folder, so a file added there is offered with no other change. Another field's `condition` reads the template picked as `chosen.<this parameter's id>` (its `languages`, `dark`), and a field whose `optionsFrom.filterFrom` names this parameter is limited to the picked template's languages."
+            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc. `template` is a picker of the site templates in templates/: one radio card per file, with its picture, its name and its line, and a Preview button when it has a built preview. Its value is the template's id. The engine lists the choices itself (no `options`): every valid file of the folder, so a file added there is offered with no other change. Another field's `condition` reads the template picked as `chosen.<this parameter's id>` (its `languages`, `dark`, `asks`), and a field whose `optionsFrom.filterFrom` names this parameter is limited to the picked template's languages."
           },
           "searchable": {
             "type": "boolean",
@@ -212,7 +212,7 @@
           },
           "condition": {
             "type": "string",
-            "description": "Conditional expression to show/hide this parameter. Supports: ==, ===, !=, !==, >, <, >=, <=, &&, ||, ! (negation), and truthy checks. Example: 'multilingual === true', 'pages > 1 && multilingual !== false'. `chosen.<id>` is the template a parameter of type `template` holds, or null: 'chosen.template && chosen.template.dark === true'."
+            "description": "Conditional expression to show/hide this parameter. Supports: ==, ===, !=, !==, >, <, >=, <=, &&, ||, ! (negation), and truthy checks. Example: 'multilingual === true', 'pages > 1 && multilingual !== false'. `chosen.<id>` is the template a parameter of type `template` holds, or null: 'chosen.template && chosen.template.dark === true', or 'chosen.template && chosen.template.asks.indexOf(\"phone\") !== -1' for a field only a template that asks for it shows."
           },
           "structures": {
             "type": "array",
@@ -484,6 +484,11 @@
           "minItems": 1,
           "items": { "type": "string" },
           "description": "The language codes the template is written in, the first one first in its preview. A run offers these and no other; a language is added by adding its code here and its texts under data."
+        },
+        "asks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The optional fields this template asks a run for, by the ids of the workflow's parameters (the shipped row offers businessName, phone, email, address, bookingUrl). A field whose `condition` reads `chosen.<picker>.asks` is shown only for a template that lists it. The template's steps read each as param.<id>, and use its own sample when the field is left empty."
         },
         "steps": {
           "type": "array",

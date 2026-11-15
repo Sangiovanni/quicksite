@@ -62,6 +62,46 @@
             "helpKey": "workflows.specs.startFromTemplate.params.darkMode.help",
             "default": false,
             "condition": "chosen.template && chosen.template.dark === true"
+        },
+        {
+            "id": "businessName",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.businessName.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.businessName.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('businessName') !== -1",
+            "validation": { "maxLength": 80 }
+        },
+        {
+            "id": "phone",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.phone.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.phone.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('phone') !== -1",
+            "validation": { "pattern": "\\+?[0-9][0-9 .()/-]{4,24}" }
+        },
+        {
+            "id": "email",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.email.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.email.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('email') !== -1",
+            "validation": { "pattern": "[^\\s@]+@[^\\s@]+\\.[^\\s@]+", "maxLength": 120 }
+        },
+        {
+            "id": "address",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.address.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.address.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('address') !== -1",
+            "validation": { "maxLength": 160 }
+        },
+        {
+            "id": "bookingUrl",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.bookingUrl.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.bookingUrl.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('bookingUrl') !== -1",
+            "validation": { "pattern": "https?://[^\\s\"<>]+", "maxLength": 300 }
         }
     ],
     "dataRequirements": [

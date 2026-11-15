@@ -679,6 +679,28 @@
         // Toolbar theme toggle group
         const toolbarGroup = document.getElementById('preview-theme-toggle-group');
         if (toolbarGroup) toolbarGroup.style.display = enabled ? '' : 'none';
+
+        // The quick-add forms' "also add to the other scope" rows
+        document.querySelectorAll('[data-also-other-row]').forEach(row => { row.hidden = !enabled; });
+    }
+
+    /**
+     * The project's theme mode was saved from outside this panel (a workflow's step): the three controls take what
+     * was saved, and the editor offers dark mode, or stops offering it, as after Save Settings. The variables are
+     * read again when the panel next shows them.
+     */
+    function themeModeSaved(saved) {
+        if (!themeConfigEnabled || !saved) return;
+        const yes = v => v === true || v === 'true' || v === 1 || v === '1';
+        const enabled = yes(saved.enabled);
+        const dark = enabled && saved.default === 'dark';
+        themeConfigEnabled.checked = enabled;
+        if (themeConfigDefault) themeConfigDefault.value = dark ? 'dark' : 'light';
+        if (themeConfigToggleEl) themeConfigToggleEl.checked = enabled && yes(saved.userToggle);
+        syncThemeConfigDependents();
+        showSavedThemeMode();
+        switchScope(dark ? 'dark' : 'light');
+        invalidate();
     }
 
     if (themeConfigEnabled) {
@@ -933,6 +955,7 @@
         save: saveThemeVariables,
         reset: resetThemeVariables,
         invalidate,
+        themeModeSaved,
         switchScope,
         getScope: () => currentScope,
         isLoaded: () => themeVariablesLoaded,

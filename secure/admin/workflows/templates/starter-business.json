@@ -34,7 +34,7 @@
                 "home": {"hero":{"title":"Welcome to YourBusiness","subtitle":"We deliver exceptional solutions for your needs."},"features":{"title":"Why Choose Us","f1":{"title":"Quality","desc":"Top-tier quality in everything we do."},"f2":{"title":"Experience","desc":"Years of industry expertise."},"f3":{"title":"Support","desc":"24/7 customer support."}}},
                 "about": {"title":"About Us","subtitle":"Learn more about our story","story":{"title":"Our Story","content":"Founded with a vision to deliver excellence..."}},
                 "services": {"title":"Our Services","subtitle":"What we offer","s1":{"title":"Consulting","desc":"Expert advice for your business."},"s2":{"title":"Development","desc":"Custom solutions tailored to you."},"s3":{"title":"Support","desc":"Ongoing assistance when you need it."}},
-                "contact": {"title":"Contact Us","subtitle":"Get in touch","email":{"label":"Email","value":"contact@yourbusiness.com"},"phone":{"label":"Phone","value":"+1 (555) 123-4567"},"address":{"label":"Address","value":"123 Business St, City, Country"}}
+                "contact": {"title":"Contact Us","subtitle":"Get in touch","email":{"label":"Email","value":"hello@example.com"},"phone":{"label":"Phone","value":"+32 2 012 34 56"},"address":{"label":"Address","value":"Example Street 12, 0000 Sampletown, Belgium"}}
             },
             "fr": {
                 "404": {"pageNotFound":"Page introuvable","message":"La page que vous cherchez n'existe pas.","backHome":"Retour à l'accueil"},
@@ -46,7 +46,7 @@
                 "home": {"hero":{"title":"Bienvenue chez VotreEntreprise","subtitle":"Nous offrons des solutions exceptionnelles pour vos besoins."},"features":{"title":"Pourquoi nous choisir","f1":{"title":"Qualité","desc":"Une qualité supérieure dans tout ce que nous faisons."},"f2":{"title":"Expérience","desc":"Des années d'expertise dans le secteur."},"f3":{"title":"Support","desc":"Assistance client 24h/24 et 7j/7."}}},
                 "about": {"title":"À propos de nous","subtitle":"Découvrez notre histoire","story":{"title":"Notre histoire","content":"Fondée avec la vision d'offrir l'excellence..."}},
                 "services": {"title":"Nos Services","subtitle":"Ce que nous proposons","s1":{"title":"Conseil","desc":"Des conseils experts pour votre entreprise."},"s2":{"title":"Développement","desc":"Des solutions sur mesure adaptées à vos besoins."},"s3":{"title":"Support","desc":"Une assistance continue quand vous en avez besoin."}},
-                "contact": {"title":"Contactez-nous","subtitle":"Prenez contact","email":{"label":"Email","value":"contact@votreentreprise.com"},"phone":{"label":"Téléphone","value":"+33 (0)1 23 45 67 89"},"address":{"label":"Adresse","value":"123 Rue des Affaires, Ville, France"}}
+                "contact": {"title":"Contactez-nous","subtitle":"Prenez contact","email":{"label":"Email","value":"hello@example.com"},"phone":{"label":"Téléphone","value":"02 012 34 56"},"address":{"label":"Adresse","value":"Rue de l'Exemple 12, 0000 Exempleville, Belgique"}}
             }
         },
         "light": {

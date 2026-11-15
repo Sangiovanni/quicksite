@@ -516,6 +516,10 @@
     .qs-easing-picker__footer {
         flex-wrap: wrap;
     }
+    /* A template's preview: as tall as the screen at most, its border included (a long title on two lines reaches that height) */
+    .admin-modal-dialog.preview-contextual-ai-tools__template-dialog {
+        max-height: calc(100% - 2 * var(--space-md) - 2px);
+    }
     /* Add, Edit Params and the two Save forms fill the window, and their own Back, x or Cancel leaves them */
     .preview-workspace[data-mode="add"] .preview-sidebar,
     .preview-workspace--panel-fills .preview-sidebar {

@@ -1498,8 +1498,7 @@
 }
 
 .preview-contextual-ai-tools__template-preview,
-.preview-contextual-ai-tools__template-theme,
-.preview-contextual-ai-tools__template-close {
+.preview-contextual-ai-tools__template-theme {
     min-height: 2rem;
     padding: 4px 12px;
     background: transparent;
@@ -1517,8 +1516,7 @@
 }
 
 .preview-contextual-ai-tools__template-preview:hover,
-.preview-contextual-ai-tools__template-theme:hover,
-.preview-contextual-ai-tools__template-close:hover {
+.preview-contextual-ai-tools__template-theme:hover {
     border-color: var(--admin-accent);
     color: var(--admin-accent);
 }
@@ -1528,7 +1526,8 @@
     box-shadow: 0 0 0 2px var(--admin-accent-muted);
 }
 
-/* A template's built preview, in the panel's dialog: as wide and as tall as the screen allows, its buttons wrapping */
+/* A template's built preview, in the panel's dialog: as wide and as tall as the screen allows. Its head holds the title and, at its
+   top right at every width, the close; the theme buttons sit beside the title where there is room and under it where there is not */
 
 .admin-modal-dialog.preview-contextual-ai-tools__template-dialog {
     display: flex;
@@ -1542,10 +1541,30 @@
 }
 
 .preview-contextual-ai-tools__template-dialog-head {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
+    min-height: 2rem;
+    padding-right: 3rem;
+}
+
+/* The dialog's close: the panel's × (admin-modal__close), a finger's size, out of the row that wraps and centred on its first row */
+.preview-contextual-ai-tools__template-dialog-head .preview-contextual-ai-tools__template-close {
+    position: absolute;
+    top: -0.25rem;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
 }
 
 .preview-contextual-ai-tools__template-dialog-title {
