@@ -13,7 +13,9 @@
  * assets (template-previews/<template>/<theme>/). A page keeps its markup and its stylesheet;
  * its addresses are made relative, so the files work wherever the installation is mounted;
  * the files it loads as scripts are left out, and of its own scripts only the theme switch's
- * stay. The panel shows a preview in a frame that is given no access to the panel.
+ * stay. The project's own files it links (a template's photos) are kept once for both themes,
+ * beside them, byte for byte. The panel shows a preview in a frame that is given no access to
+ * the panel.
  *
  * WHY THIS IS A SCRIPT AND NOT A COMMAND. It rewrites files QuickSite itself ships, for
  * the whole installation: no project role can express that, as for the other tools here.
@@ -35,9 +37,10 @@
  *
  * WHEN A PREVIEW IS STALE. Each preview records the hash of the template it was built
  * from and a fingerprint of the engine's files that built it (the engine's source folder,
- * every command, the workflows a template's run goes through, and this tool). A preview
- * whose template changed is stale; so is one built by another engine, whatever the
- * version number says. --check is what a release runs.
+ * every command, the workflows a template's run goes through, and this tool), and the hash of
+ * each photo the template brings in. A preview whose template or one of its photos changed is
+ * stale; so is one built by another engine, whatever the version number says. --check is what
+ * a release runs.
  *
  * Exit codes: 0 = every preview is fresh (after building, or as checked); 1 = refused
  * to run, a build failed, --check found a stale preview, or a template breaks the rule
@@ -125,12 +128,31 @@ function qs_tp_engine(): string {
     return hash_final($h);
 }
 
+/**
+ * The photos a template's steps bring in (uploadAsset's templatePhoto), by name, each with the hash of the file shipped in
+ * the photos' folder ('' when it is missing): a photo that changes makes its template's preview stale.
+ */
+function qs_tp_photos(string $templateFile): array {
+    $t = json_decode((string) @file_get_contents($templateFile), true);
+    $photos = [];
+    foreach ((array) ($t['steps'] ?? []) as $step) {
+        if (!is_array($step) || ($step['command'] ?? null) !== 'uploadAsset') continue;
+        $name = $step['params']['templatePhoto'] ?? null;
+        if (!is_string($name) || !preg_match('/^[a-z0-9-]+\.[a-z]+$/', $name)) continue;
+        $file = QS_TP_SECURE . '/admin/workflows/templates/photos/' . $name;
+        $photos[$name] = is_file($file) ? hash_file('sha256', $file) : '';
+    }
+    ksort($photos);
+    return $photos;
+}
+
 /** Why a template's preview is stale, or null when it is fresh. */
 function qs_tp_stale(string $id, string $templateFile, string $previewsDir, string $engine): ?string {
     $manifest = json_decode((string) @file_get_contents("$previewsDir/$id/preview.json"), true);
     if (!is_array($manifest)) return 'it has no preview';
     if (($manifest['template'] ?? null) !== hash('sha256', qs_tp_text($templateFile))) return 'its template changed';
     if (($manifest['engine'] ?? null) !== $engine) return 'it was built by another engine';
+    if ((array) ($manifest['photos'] ?? []) !== qs_tp_photos($templateFile)) return 'a photo of it changed';
     foreach ((array) ($manifest['files'] ?? []) as $rel) {
         if (!is_string($rel) || !is_file("$previewsDir/$id/$rel")) return 'a file of it is missing';
     }
@@ -337,9 +359,10 @@ function qs_tp_relative(string $target, array $langs, array $pages, string $up, 
     if (($at = strpos($rest, '#')) !== false) { $hash = substr($rest, $at); $rest = substr($rest, 0, $at); }
     $rest = preg_replace('/\?.*$/', '', $rest);
     if (preg_match('/\.[A-Za-z0-9]{2,5}$/', $rest)) {
-        // A file the page links: kept beside the pages, at its own place.
+        // A file the page links: kept beside the pages, at its own place. A project's own file (a template's photo) is the
+        // same in every theme, so it is kept once, beside the themes.
         $assets[$rest] = true;
-        return $up . $rest . $hash;
+        return (strpos($rest, 'assets/') === 0 ? $up . '../' : $up) . $rest . $hash;
     }
     $parts = $rest === '' ? [] : explode('/', trim($rest, '/'));
     $lang = '';
@@ -502,9 +525,17 @@ PHP);
             foreach (array_keys($assets) as $rel) {
                 $from = "$buildPublic/" . QS_TP_SPACE . "/$rel";
                 if (strpos($rel, '..') !== false || !is_file($from)) continue;
-                if (!is_dir(dirname("$work/$theme/$rel"))) mkdir(dirname("$work/$theme/$rel"), 0755, true);
-                file_put_contents("$work/$theme/$rel", qs_tp_text($from));
-                $written[] = "$theme/$rel";
+                // A project's own file once for every theme, any other (the stylesheet) once per theme.
+                $to = strpos($rel, 'assets/') === 0 ? $rel : "$theme/$rel";
+                // Text with one kind of line ending; anything else (a photo) byte for byte, as a line ending's bytes may
+                // stand anywhere in a compressed image.
+                $bytes = preg_match('/\.(?:css|js|json|svg|txt|html?)$/i', $rel) ? qs_tp_text($from) : (string) file_get_contents($from);
+                if (is_file("$work/$to") && file_get_contents("$work/$to") !== $bytes) {
+                    throw new RuntimeException("$id: $rel is not the same in its two themes");
+                }
+                if (!is_dir(dirname("$work/$to"))) mkdir(dirname("$work/$to"), 0755, true);
+                file_put_contents("$work/$to", $bytes);
+                if (!in_array($to, $written, true)) $written[] = $to;
             }
             printf("  built      %s, %s: %d steps, %d pages%s\n", $id, $theme, $steps, $count, $langs !== [] ? ' in ' . implode(', ', $langs) : '');
         }
@@ -517,6 +548,7 @@ PHP);
             'pages' => $pages,
             // Whether a page kept a script (the theme switch's): the frame that shows the preview lets scripts run only then.
             'scripts' => $scripts,
+            'photos' => qs_tp_photos($t['file']),
             'files' => $written,
         ];
         file_put_contents("$work/preview.json", json_encode($preview, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");

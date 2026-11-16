@@ -1,6 +1,6 @@
 {
-    "template": "f9d35d9e608eb6b065dbccda2dd39781c1aa59e0a4a6738d8d0e6762a66660e4",
-    "engine": "86902e53dbfd660ec1eae200188f51b1d1f9a8dd26df254417e4ea396be94acf",
+    "template": "d6e3a61737c9b42cc08b1b3898d759b88e2b0da34f3f10e9aadf088aaf77fde9",
+    "engine": "33a88921209487d9902838a4a71c5c959ad95020766e5d187140634197b48641",
     "themes": [
         "light",
         "dark"
@@ -13,7 +13,13 @@
         "home"
     ],
     "scripts": true,
+    "photos": {
+        "appointments-salon.webp": "f7c9e01c562e687115f156075202b648719e1d158ee106bd404f8f0d9b3b5d2e",
+        "appointments-welcome.webp": "635280dded077e402e5d7b033465c773c12c1f88aa91a04a712c28f4bdcb751c"
+    },
     "files": [
+        "assets/images/appointments-salon.webp",
+        "assets/images/appointments-welcome.webp",
         "dark/en/home.html",
         "dark/fr/home.html",
         "dark/style/style.css",

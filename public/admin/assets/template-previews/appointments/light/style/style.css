@@ -20,15 +20,13 @@ ul { list-style: none; }
 .btn-ghost { background: transparent; color: var(--color-primary); }
 .btn-ghost:hover { background: var(--color-primary); color: var(--color-on-primary); }
 
-/* HERO: the words beside a drawn arch, where a photo of the place goes */
+/* HERO: the words beside a photo of the place, in an arch */
 .hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr)); gap: 2.5rem 3rem; align-items: center; max-width: 70rem; margin: 0 auto; padding: 4.5rem 2rem; }
 .hero-kicker { color: var(--color-accent); font-size: 0.85rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.75rem; }
 .hero h1 { font-size: clamp(2.1rem, 5vw + 1rem, 3.5rem); margin-bottom: 1rem; }
 .hero-lead { font-size: 1.15rem; color: var(--color-text-muted); max-width: 32rem; margin-bottom: 2rem; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
-.hero-art { position: relative; min-height: 20rem; max-width: 24rem; width: 100%; margin: 0 auto; border-radius: 12rem 12rem 1rem 1rem; background: radial-gradient(circle at 68% 26%, var(--color-accent-soft) 0 3.25rem, transparent 3.3rem), linear-gradient(165deg, var(--color-primary) 0%, var(--color-primary-strong) 100%); overflow: hidden; }
-.hero-art::before { content: ''; position: absolute; left: 12%; bottom: -8%; width: 46%; height: 62%; border-radius: 0 100% 0 100%; background: var(--color-accent); opacity: 0.9; }
-.hero-art::after { content: ''; position: absolute; right: 10%; bottom: -12%; width: 38%; height: 50%; border-radius: 100% 0 100% 0; background: var(--color-surface-alt); opacity: 0.85; }
+.hero-art { max-width: 24rem; width: 100%; aspect-ratio: 4 / 5; margin: 0 auto; border-radius: 12rem 12rem 1rem 1rem; overflow: hidden; background: var(--color-accent-soft); }
 
 /* SECTIONS */
 .section { max-width: 70rem; margin: 0 auto; padding: 4rem 2rem; scroll-margin-top: 4.5rem; }
@@ -68,6 +66,11 @@ ul { list-style: none; }
 .book-band .btn { background: var(--color-on-primary); color: var(--color-primary); border-color: var(--color-on-primary); }
 .book-band .btn:hover { background: var(--color-accent-soft); border-color: var(--color-accent-soft); }
 
+/* PHOTOS: the template's own, each an image an author swaps for theirs; a little dimmer in the dark theme */
+.photo { display: block; width: 100%; height: auto; object-fit: cover; filter: brightness(var(--photo-brightness)); }
+.hero-art .photo { height: 100%; }
+.visit-photo .photo { aspect-ratio: 4 / 3; border-radius: 1rem; }
+
 /* FOOTER */
 .site-footer { background: var(--color-footer-bg); color: var(--color-footer-text); padding: 2.5rem 2rem 1.25rem; }
 .footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1.5rem 2rem; max-width: 70rem; margin: 0 auto; }
@@ -97,7 +100,7 @@ ul { list-style: none; }
     .site-nav { position: static; padding: 0.75rem 1rem; gap: 0.5rem 1rem; }
     .nav-links { flex: 1 1 auto; margin-left: 0; gap: 0.25rem 1.25rem; }
     .hero { padding: 2.5rem 1rem; }
-    .hero-art { min-height: 13rem; max-width: 16rem; }
+    .hero-art { max-width: 16rem; }
     .hero-actions .btn { flex: 1 1 100%; }
     .section { padding: 2.5rem 1rem; scroll-margin-top: 1rem; }
     .price-group { padding: 1.25rem 1rem; }
@@ -110,8 +113,8 @@ ul { list-style: none; }
     --color-surface-alt: #f1ebe1;
     --color-text: #26302b;
     --color-text-muted: #5f6b64;
-    --color-primary: #2f5d50;
-    --color-primary-strong: #234a3f;
+    --color-primary: #3c5c45;
+    --color-primary-strong: #2e4936;
     --color-on-primary: #ffffff;
     --color-accent: #a4553a;
     --color-accent-soft: #ecd6c9;
@@ -121,6 +124,7 @@ ul { list-style: none; }
     --color-footer-muted: #a9b5ae;
     --color-switch-border: #d3c8b7;
     --color-switch-text: #5f6b64;
+    --photo-brightness: 1;
 }
 
 [data-theme="dark"] {
@@ -140,4 +144,5 @@ ul { list-style: none; }
     --color-footer-muted: #93a099;
     --color-switch-border: #44534c;
     --color-switch-text: #a9b5ae;
+    --photo-brightness: 0.9;
 }

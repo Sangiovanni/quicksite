@@ -389,9 +389,25 @@ business name out of its sentences: it is a text of its own (`site.name`), shown
 **What a shipped template shows.** A template by type of business holds what a person of that trade needs on one site, with sample
 content that cannot pass for real: every business and person name carries *Sample* (*Exemple* in French), every address is of
 `example.com` or of a street and a town that do not exist, every phone number is one that is never assigned, and a review says that
-it is a sample. Nothing it shows comes from outside: no photo and no file, only what its stylesheet draws, each drawing standing
-where an author puts a picture of their own. A way to book, call, order or ask for a quote is a link (`tel:`, `mailto:`, or the
-address of the service the author uses), not a form.
+it is a sample. Nothing it shows comes from outside: its pictures are its own photos (below) or what its stylesheet draws. A way
+to book, call, order or ask for a quote is a link (`tel:`, `mailto:`, or the address of the service the author uses), not a form.
+
+**Photos in a template.** A template's photos are QuickSite's own, shipped in `<secure>/admin/workflows/templates/photos/`
+beside `photos.json`, the record of how each was made (the model, the prompt, any edit, the terms; the photos are CC0). One
+folder holds every template's photos: a photo's name starts with its template's id, and is the asset's name in a project. A run
+brings each into the project's images with one `uploadAsset` step, before the pages that show it:
+
+```json
+{ "command": "uploadAsset", "params": { "templatePhoto": "trades-job.webp" } }
+```
+
+`templatePhoto` reads that folder alone and fetches nothing, so a run brings its photos the same way on a server and on a local
+install; the photo then goes through every check of an upload. A second run on the same project finds the same photo there and
+adds no copy. A page shows a photo as an image (`"tag": "img"`, `"src": "/assets/images/trades-job.webp"`), never as a stylesheet
+background, so an author swaps it in the editor like any image; its `alt` is a key of the template's texts, so it follows the
+language. No text is laid on a photo: words sit beside or under it, so their contrast is the palette's whatever photo an author
+puts in its place. The previews' tool keeps a template's photos once for both themes, and a photo that changes makes its
+template's preview stale.
 
 **Adding a language to a template:** add its code to `languages` and its texts under `data.texts`. The
 shipped templates send each chosen language's texts with one step, `{{texts.{{$value}}}}`, so nothing else

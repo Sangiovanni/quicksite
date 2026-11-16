@@ -20,7 +20,7 @@ ul { list-style: none; }
 .btn-ghost:hover { background: var(--color-primary); color: var(--color-on-primary); }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; }
 
-/* HERO: a drawn awning over the name, where a photo of the room or a dish goes */
+/* HERO: a drawn awning over the name, the room's photo under the words */
 .awning { height: 2.75rem; background: repeating-linear-gradient(90deg, var(--color-primary) 0 2.5rem, var(--color-surface) 2.5rem 5rem); border-bottom: 0.4rem solid var(--color-primary-strong); border-radius: 0 0 1rem 1rem; }
 .hero { text-align: center; padding: 3.5rem 2rem 4rem; background: var(--color-surface-alt); }
 .hero-inner { max-width: 44rem; margin: 0 auto; }
@@ -35,15 +35,13 @@ ul { list-style: none; }
 .section-lead { color: var(--color-text-muted); margin-bottom: 2rem; max-width: 38rem; }
 .section-more { margin-top: 2rem; text-align: center; }
 
-/* HOUSE FAVOURITES: a drawn plate, where a photo of the dish goes */
+/* HOUSE FAVOURITES: each dish's photo at the top of its card */
 .fav-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr)); gap: 1.25rem; }
-.fav { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.25rem 1rem; padding: 1.25rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 1rem; }
-.fav-art { grid-row: 1 / span 3; width: 4.5rem; height: 4.5rem; border-radius: 50%; background: radial-gradient(circle, var(--color-primary) 0 30%, var(--color-surface) 31% 56%, var(--color-border) 57% 62%, var(--color-surface-alt) 63%); }
-.fav:nth-child(2) .fav-art { background: radial-gradient(circle, var(--color-accent) 0 30%, var(--color-surface) 31% 56%, var(--color-border) 57% 62%, var(--color-surface-alt) 63%); }
-.fav:nth-child(3) .fav-art { background: radial-gradient(circle, var(--color-primary-strong) 0 18%, var(--color-accent-soft) 19% 30%, var(--color-surface) 31% 56%, var(--color-border) 57% 62%, var(--color-surface-alt) 63%); }
+.fav { display: flex; flex-direction: column; gap: 0.3rem; padding-bottom: 1.25rem; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 1rem; overflow: hidden; }
 .fav h3 { font-size: 1.15rem; }
 .fav p { color: var(--color-text-muted); font-size: 0.95rem; }
 .fav-price { font-weight: 800; color: var(--color-primary); }
+.fav h3, .fav p, .fav-price { margin: 0 1.25rem; }
 
 /* HOURS AND WHERE */
 .band { background: var(--color-surface-alt); }
@@ -67,6 +65,12 @@ ul { list-style: none; }
 .dish-price { white-space: nowrap; }
 .dish-desc { color: var(--color-text-muted); font-size: 0.95rem; }
 .menu-note { margin: 2.5rem auto 2rem; padding: 1rem 1.25rem; max-width: 44rem; background: var(--color-accent-soft); border-radius: 0.75rem; font-size: 0.95rem; text-align: center; }
+
+/* PHOTOS: the template's own, each an image an author swaps for theirs; a little dimmer in the dark theme */
+.photo { display: block; width: 100%; height: auto; object-fit: cover; filter: brightness(var(--photo-brightness)); }
+.hero-photo { max-width: 64rem; margin: 2.5rem auto 0; }
+.hero-photo .photo { aspect-ratio: 16 / 9; border-radius: 1rem; }
+.fav-photo { aspect-ratio: 4 / 3; margin-bottom: 0.6rem; }
 
 /* FOOTER */
 .site-footer { background: var(--color-footer-bg); color: var(--color-footer-text); padding: 2.5rem 2rem 1.25rem; }
@@ -119,6 +123,7 @@ ul { list-style: none; }
     --color-footer-muted: #c2ae9c;
     --color-switch-border: #d9c3a3;
     --color-switch-text: #6b5a4e;
+    --photo-brightness: 1;
 }
 
 [data-theme="dark"] {
@@ -138,4 +143,5 @@ ul { list-style: none; }
     --color-footer-muted: #a8957f;
     --color-switch-border: #5a4737;
     --color-switch-text: #c2ae9c;
+    --photo-brightness: 0.9;
 }

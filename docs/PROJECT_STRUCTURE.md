@@ -61,7 +61,9 @@ quicksite/
 │   │   └── workflows/            # Workflow specs, prompt templates and their schema — the
 │   │       │                     #   manual and AI-assisted runs offered on /admin/workflows
 │   │       └── templates/        # Site templates, one JSON file each: what Start from a
-│   │                             #   template's picker lists
+│   │           │                 #   template's picker lists
+│   │           └── photos/       # Their photos, brought into a project by uploadAsset's
+│   │                             #   templatePhoto, and photos.json: how each was made
 │   ├── src/                      # Shared engine code
 │   │   ├── classes/              # Core classes (ApiResponse, JsonToHtmlRenderer,
 │   │   │                         #   JsonToPhpCompiler, CssParser, Translator, etc.)

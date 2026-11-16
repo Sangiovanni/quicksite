@@ -1,6 +1,6 @@
 {
     "template": "bdacf574631fb4325fd8e8c2945b4f34ee82a887f82a8f2fccec74e526b86121",
-    "engine": "86902e53dbfd660ec1eae200188f51b1d1f9a8dd26df254417e4ea396be94acf",
+    "engine": "33a88921209487d9902838a4a71c5c959ad95020766e5d187140634197b48641",
     "themes": [
         "light",
         "dark"
@@ -13,6 +13,7 @@
         "home"
     ],
     "scripts": true,
+    "photos": [],
     "files": [
         "dark/en/home.html",
         "dark/fr/home.html",

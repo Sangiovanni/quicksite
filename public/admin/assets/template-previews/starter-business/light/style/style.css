@@ -52,10 +52,16 @@ a:hover { color: var(--color-primary-dark); }
 .about-content h2 { color: var(--color-primary); margin-bottom: 1rem; }
 .about-content p { color: var(--color-text-muted); line-height: 1.8; }
 
+/* PHOTOS: the template's own, each an image an author swaps for theirs; a little dimmer in the dark theme */
+.photo { display: block; width: 100%; height: auto; object-fit: cover; filter: brightness(var(--photo-brightness)); }
+.hero-photo { max-width: 60rem; margin: 3rem auto 0; }
+.hero-photo .photo { aspect-ratio: 16 / 9; border-radius: 1rem; box-shadow: 0 4px 20px var(--shadow-color); }
+.about-photo { aspect-ratio: 3 / 2; border-radius: 1rem; margin-bottom: 2rem; }
+
 /* FOOTER */
 .main-footer { background: var(--color-bg-footer); color: var(--color-text-light); padding: 3rem 2rem 1rem; }
 .footer-content { display: flex; justify-content: space-between; align-items: flex-start; max-width: 1200px; margin: 0 auto; flex-wrap: wrap; gap: 2rem; }
-.footer-logo { font-size: 1.25rem; font-weight: 700; color: var(--color-primary); }
+.footer-logo { font-size: 1.25rem; font-weight: 700; color: var(--color-primary-light); }
 .footer-brand p { color: var(--color-footer-muted); margin-top: 0.5rem; font-size: 0.9rem; }
 .footer-nav { display: flex; gap: 1.5rem; }
 .footer-nav a { color: var(--color-footer-muted); font-size: 0.9rem; }
@@ -84,9 +90,9 @@ a:hover { color: var(--color-primary-dark); }
     .main-footer { padding: 2rem 1rem 1rem; }
 }
 :root {
-    --color-primary: #0d9488;
-    --color-primary-light: #14b8a6;
-    --color-primary-dark: #0f766e;
+    --color-primary: #007981;
+    --color-primary-light: #2c99a2;
+    --color-primary-dark: #006169;
     --color-secondary: #f59e0b;
     --color-bg: #f8fafc;
     --color-bg-card: #ffffff;
@@ -100,12 +106,13 @@ a:hover { color: var(--color-primary-dark); }
     --color-footer-muted: #94a3b8;
     --color-switch-border: #e2e8f0;
     --color-switch-text: #64748b;
+    --photo-brightness: 1;
 }
 
 [data-theme="dark"] {
-    --color-primary: #f59e0b;
-    --color-primary-light: #fbbf24;
-    --color-primary-dark: #d97706;
+    --color-primary: #f99131;
+    --color-primary-light: #ffac52;
+    --color-primary-dark: #dc751e;
     --color-secondary: #10b981;
     --color-bg: #0f172a;
     --color-bg-card: #1e293b;
@@ -119,4 +126,5 @@ a:hover { color: var(--color-primary-dark); }
     --color-footer-muted: #94a3b8;
     --color-switch-border: rgba(248, 250, 252, 0.2);
     --color-switch-text: #94a3b8;
+    --photo-brightness: 0.9;
 }

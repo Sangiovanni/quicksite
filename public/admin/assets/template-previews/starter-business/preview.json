@@ -1,6 +1,6 @@
 {
-    "template": "5080c25992c70539a45668c487fc1b8f220abb21eb1267176722c8256f015c2a",
-    "engine": "86902e53dbfd660ec1eae200188f51b1d1f9a8dd26df254417e4ea396be94acf",
+    "template": "98575ebded35f8959a4f936c908bb2b4b0dca172dbdbecd5789651a30a0fab5c",
+    "engine": "33a88921209487d9902838a4a71c5c959ad95020766e5d187140634197b48641",
     "themes": [
         "light",
         "dark"
@@ -16,7 +16,13 @@
         "contact"
     ],
     "scripts": true,
+    "photos": {
+        "starter-business-meeting.webp": "3af857990f09222885d0cbdf632634b904eb0e60554a58211e0911608cb16243",
+        "starter-business-office.webp": "b2ef48dab08b41e0c789b9dec275550b0abd1b4d7acd3f1729d2e425c44d376e"
+    },
     "files": [
+        "assets/images/starter-business-meeting.webp",
+        "assets/images/starter-business-office.webp",
         "dark/en/about.html",
         "dark/en/contact.html",
         "dark/en/home.html",

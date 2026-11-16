@@ -1,6 +1,6 @@
 {
-    "template": "83f0c025772a3bd4dfa08c4f661bee66e6525d26155fe027a349cbaefb87166f",
-    "engine": "86902e53dbfd660ec1eae200188f51b1d1f9a8dd26df254417e4ea396be94acf",
+    "template": "908ee4eeac856ca4641254781af09c4afd2d1d8dbe2336650b282772b6f4d423",
+    "engine": "33a88921209487d9902838a4a71c5c959ad95020766e5d187140634197b48641",
     "themes": [
         "light",
         "dark"
@@ -14,7 +14,13 @@
         "quote"
     ],
     "scripts": true,
+    "photos": {
+        "trades-job.webp": "b894eb27a6172284edd56883416bfc396a223decc0f12f466e62acc56b18bdee",
+        "trades-workshop.webp": "b42c4376b7619d9bce0a630f4529cbcd81857f1ac73f7dd45f4961440af0d0f1"
+    },
     "files": [
+        "assets/images/trades-job.webp",
+        "assets/images/trades-workshop.webp",
         "dark/en/home.html",
         "dark/en/quote.html",
         "dark/fr/home.html",

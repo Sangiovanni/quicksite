@@ -22,10 +22,10 @@ ul, ol { list-style: none; }
 .btn-ghost:hover { background: var(--color-hero-text); color: var(--color-hero-bg); }
 .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 
-/* HERO: a drawn warning stripe over a dark band, where a photo of a job goes */
+/* HERO: a drawn warning stripe over a dark band; the words beside a photo of a job, over it where the screen is narrow */
 .stripe { height: 0.9rem; background: repeating-linear-gradient(-45deg, var(--color-accent) 0 1rem, var(--color-stripe) 1rem 2rem); }
 .hero { background: var(--color-hero-bg); color: var(--color-hero-text); padding: 4.5rem 2rem; }
-.hero-inner { max-width: 68rem; margin: 0 auto; }
+.hero-inner { max-width: 68rem; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr)); gap: 2.5rem 3rem; align-items: center; }
 .hero-kicker { color: var(--color-accent); font-size: 0.9rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.75rem; }
 .hero h1 { color: var(--color-hero-text); font-size: clamp(2.1rem, 5.5vw + 0.9rem, 3.75rem); letter-spacing: -0.02em; max-width: 46rem; margin-bottom: 1rem; }
 .hero-lead { font-size: 1.2rem; max-width: 40rem; margin-bottom: 2rem; opacity: 0.9; }
@@ -90,6 +90,12 @@ ul, ol { list-style: none; }
 .find p { margin-top: 0.5rem; }
 .find-note { color: var(--color-text-muted); }
 
+/* PHOTOS: the template's own, each an image an author swaps for theirs; a little dimmer in the dark theme */
+.photo { display: block; width: 100%; height: auto; object-fit: cover; filter: brightness(var(--photo-brightness)); }
+.hero-photo .photo { aspect-ratio: 4 / 3; border-radius: 0.4rem; }
+.find-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr)); gap: 2rem 3rem; align-items: center; }
+.find-photo .photo { aspect-ratio: 4 / 3; border-radius: 0.4rem; }
+
 /* FOOTER */
 .site-footer { background: var(--color-footer-bg); color: var(--color-footer-text); padding: 2.5rem 2rem 1.25rem; }
 .footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1.5rem 2rem; max-width: 68rem; margin: 0 auto; }
@@ -146,6 +152,7 @@ ul, ol { list-style: none; }
     --color-footer-muted: #9db0c6;
     --color-switch-border: #c3cedb;
     --color-switch-text: #4f6076;
+    --photo-brightness: 1;
 }
 
 [data-theme="dark"] {
@@ -167,4 +174,5 @@ ul, ol { list-style: none; }
     --color-footer-muted: #8497ad;
     --color-switch-border: #33496a;
     --color-switch-text: #9db0c6;
+    --photo-brightness: 0.9;
 }

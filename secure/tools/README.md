@@ -97,7 +97,8 @@ Exit code: `0` when it swept, had nothing to do, or found another sweep running;
 with a **Preview** button. What that button shows is built by this tool: for each
 template, the pages QuickSite's own build answers for it, in every language the
 template is written in, in its light theme and in its dark theme when it has one.
-They are kept as static files under `public/admin/assets/template-previews/`.
+They are kept as static files under `public/admin/assets/template-previews/`. A
+template's photos are kept once for its two themes, byte for byte.
 
 It touches no account and no project of the installation. It copies QuickSite's own
 files to a temporary folder, serves that copy with PHP's built-in server on a free
@@ -108,6 +109,8 @@ page, and removes the copy.
 
 - you changed a template's file, or added one: its card shows no **Preview** button
   until its preview is built again;
+- you replaced one of a template's photos (`secure/admin/workflows/templates/photos/`):
+  a preview records each photo it shows, and one whose photo changed is stale;
 - you are releasing a version: a preview records which engine built it, and one built
   by another engine is stale even when no template changed. The engine, here, is the
   engine's source folder, every command file, the workflows a template's run goes
