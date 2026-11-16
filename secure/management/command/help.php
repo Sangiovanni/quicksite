@@ -4194,7 +4194,7 @@ $GLOBALS['__help_commands'] = [
             '507.quota.storage_exceeded' => 'A storage quota is configured and the clone would put the caller over it. A clone is a new project owned by the caller, so it is charged to the caller - as an import is - for everything it copies (the source without its backups). Checked before the clone exists; nothing was written.',
             '400.validation.unsafe_param' => 'A structure file of the source holds an attribute the write gate refuses (see editStructure). errors[0] names the file, the node and the attribute. Nothing is copied.'
         ],
-        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder, the build (qs_build/) and the saved exports (exports/) are skipped: they belong to the source, so a clone starts with no backup history, no build and no saved export. The project\'s OAuth keys (data/oauth-secrets.json, both sets) are never copied either: the clone\'s callback addresses differ from the source\'s, so its sign-in needs keys registered for them, entered on its OAuth providers page; data.oauth_keys_not_copied lists the providers the source had keys for ([] when none), and the message says so when there are any. Everything else, including config, templates, translations, the rest of data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone always gets a new id, drawn like createProject\'s (data.project); its name is stored in its config/project.json. The site itself is copied as it is: its translations, site.name included, are the source\'s. data.files_copied counts the files present in the clone after the copy.'
+        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder, the build (qs_build/) and the saved exports (exports/) are skipped: they belong to the source, so a clone starts with no backup history, no build and no saved export. The project\'s OAuth keys (data/oauth-secrets.json, both sets) are never copied either: the clone\'s callback addresses differ from the source\'s, so its sign-in needs keys registered for them, entered on its OAuth providers page; data.oauth_keys_not_copied lists the providers the source had keys for ([] when none), and the message says so when there are any. Everything else, including config, templates, translations, the rest of data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone always gets a new id, drawn like createProject\'s (data.project); its name is stored in its config/project.json. The site itself is copied as it is: its translations, site.name included, are the source\'s. data.files_copied counts the files present in the clone after the copy.'
     ],
     
     'renameProject' => [
@@ -4279,7 +4279,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.',
             '400.validation.invalid_format' => 'Invalid project name.'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the notice keeps the project\'s name (its id for a self-requester on a private project, who never saw the name); the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat. The project\'s cached space measurement goes with it, so no later project inherits it.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the notice keeps the project\'s name (its id for a self-requester, who never saw the name); the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat. The project\'s cached space measurement goes with it, so no later project inherits it.'
     ],
 
     'listMembers' => [
@@ -4294,7 +4294,6 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'project' => 'h4w8tn3ra',
                 'owner_user_id' => 'usr_...',
-                'visibility' => 'private',
                 'members' => [
                     ['user_id' => 'usr_...', 'name' => 'Dana', 'role' => 'owner', 'rank' => 6, 'is_owner' => true],
                     ['user_id' => 'usr_...', 'name' => 'Alice', 'role' => 'editor', 'rank' => 2, 'is_owner' => false]
@@ -4667,7 +4666,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'The refused notice inherits the privacy-correct display name (a private project\'s notice shows the project id, not the site name). The sponsor of a denied proposal gets no automatic notice (structural: their cache slot holds their membership) - the reason lives in this response and the command history.'
+        'notes' => 'The refused notice shows the project id, never the site\'s name: the requester is not a member. The sponsor of a denied proposal gets no automatic notice (structural: their cache slot holds their membership) - the reason lives in this response and the command history.'
     ],
 
     'setJoinPolicy' => [
@@ -4691,7 +4690,7 @@ $GLOBALS['__help_commands'] = [
                 'join_policy' => 'open',
                 'previous' => 'closed',
                 'changed' => true,
-                'note' => '(a private project with an open policy only) the advisory the notes describe'
+                'note' => '(an open policy only) the advisory the notes describe'
             ]
         ],
         'error_responses' => [
@@ -4705,39 +4704,7 @@ $GLOBALS['__help_commands'] = [
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.',
             '400.validation.unencodable' => 'A value could not be stored: the roster would not encode as JSON. The roster on disk is intact.'
         ],
-        'notes' => 'Same-value calls are a no-op (200, changed=false). PRIVACY TRADE, stated plainly: a PRIVATE project with an open policy is knockable-by-id - any authenticated account that guesses/knows the id can send a request and thereby confirm the project exists (the response carries an advisory note when this combination becomes active). Closed private projects stay indistinguishable from nonexistent ones on the request lane.'
-    ],
-
-    'setProjectVisibility' => [
-        'description' => 'Sets the TARGET project visibility (private|public) in members.json - which decides whether the site is served to the PUBLIC internet or only to authenticated members. Default is private. OWNER-ONLY (project.visibility category): public exposure is the gravest decision a project carries, held at the delete/transfer tier, not the admin-tier project.settings that setJoinPolicy uses.',
-        'method' => 'POST',
-        'parameters' => [
-            'visibility' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => "'private' or 'public'",
-                'example' => 'public'
-            ]
-        ],
-        'example_post' => 'POST /management/p/<projectId>/setProjectVisibility with body: {"visibility": "public"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => "Visibility set to 'public'",
-            'data' => ['project' => 'h4w8tn3ra', 'visibility' => 'public', 'previous' => 'private', 'changed' => true]
-        ],
-        'error_responses' => [
-            '400.project.required' => 'No project targeted',
-            '400.validation.missing_field' => 'visibility is required',
-            '400.validation.invalid_format' => "visibility must be 'private' or 'public'",
-            '403.auth.forbidden' => 'Caller is not the owner of this project (project.visibility category)',
-            '403.authz.insufficient_rank' => 'Caller is no longer the owner between dispatch and the write (re-checked in-lock)',
-            '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the visibility',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.',
-            '400.validation.unencodable' => 'A value could not be stored: the roster would not encode as JSON. The roster on disk is intact.'
-        ],
-        'notes' => 'Same-value calls are a no-op (200, changed=false). Owner-only. Making a project PRIVATE while its join_policy is open re-creates the knockable-by-id state (the response carries the same advisory note setJoinPolicy uses). Flipping to public dissolves that concern (existence is public by design). A visibility change never purges the pending request queue.'
+        'notes' => 'Same-value calls are a no-op (200, changed=false). PRIVACY TRADE, stated plainly: a project with an open policy is knockable-by-id - any authenticated account that guesses/knows the id can send a request and thereby confirm the project exists (the response carries an advisory note whenever the policy it sets is open). A closed project stays indistinguishable from a nonexistent one on the request lane.'
     ],
 
     'reconcileMemberships' => [
@@ -4789,7 +4756,7 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/getProjectRoster',
             '403.auth.forbidden' => 'Caller is not a member of this project (project.roster category)'
         ],
-        'notes' => 'Project-scoped on the URL marker. Same member-row shape as listMembers, minus the queue: no invitations, no visibility/owner metadata. Admin/owner surfaces use listMembers instead. Users are {user_id, name} public references - the PRIVATE username never appears.'
+        'notes' => 'Project-scoped on the URL marker. Same member-row shape as listMembers, minus the queue: no invitations, no owner metadata. Admin/owner surfaces use listMembers instead. Users are {user_id, name} public references - the PRIVATE username never appears.'
     ],
 
 
@@ -7683,7 +7650,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                     'designer' => 'Adds styles, CSS variables, animations and theme',
                     'developer' => 'Adds builds and server-side route resolvers',
                     'admin' => 'Adds API config, the project\'s OAuth keys, backups and exports, command history, and managing members below admin (invitations, join requests, join policy)',
-                    'owner' => 'Adds the project\'s visibility, renaming it, deleting it, managing admins and transferring ownership; the single top of the project, who cannot be removed by others'
+                    'owner' => 'Adds renaming the project, deleting it, managing admins and transferring ownership; the single top of the project, who cannot be removed by others'
                 ],
                 'introspection' => 'Your role on each of your projects is my_role in listProjects. The role catalogue is read from the admin panel, not from a command. This response documents every command, whatever your role: one your role on that project does not carry answers 403.',
                 'config_file' => '<secure>/management/config/auth.php (session TTLs, self-registration gate, CORS)',

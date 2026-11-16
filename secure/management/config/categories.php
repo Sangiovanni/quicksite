@@ -181,15 +181,6 @@ return [
         'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'approveJoinRequest', 'denyJoinRequest', 'reconcileMemberships'],
     ],
 
-    // Owner-only project exposure. setProjectVisibility flips surface-B
-    // public/private serving — the gravest exposure a project carries (public =
-    // anyone on the internet reads the site), so it sits at the delete/transfer
-    // tier, NOT the admin-tier project.settings that setJoinPolicy uses.
-    'project.visibility' => [
-        'scope' => 'project',
-        'commands' => ['setProjectVisibility'],
-    ],
-
     // Reduced roster for EVERY member rank: active members only —
     // {user_id, name, role} rows, NO pending queue (adjudication data stays
     // admin+ via project.members/listMembers). Exists so any member can see

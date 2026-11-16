@@ -98,7 +98,7 @@
     # SetEnv QS_ERROR_PAGE_403  "/403.html"
 
     # Nothing else is needed. Every project is reachable at /p/<projectId>/
-    # (visibility-gated), links compose against the request-derived
+    # (membership-gated), links compose against the request-derived
     # /p/<projectId>/ base, the visual editor works because its preview iframe
     # is exactly that URL, and the ROOT STAYS FREE for your own site.
     #

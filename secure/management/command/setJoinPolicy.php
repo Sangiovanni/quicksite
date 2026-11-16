@@ -13,12 +13,11 @@
  * the request queue (approve/deny — which can materialize membership) hold
  * the strictly weaker authority of opening/closing that queue.
  *
- * Posture note: on a PRIVATE project, 'open' means any authenticated account
- * that knows the project id can send a request — and thereby confirm the
- * project exists. That is an explicit owner/admin choice (the "knockable
- * private team" trade); the response carries an advisory note when this
- * combination becomes active. 'closed' private projects stay indistinguishable
- * from nonexistent ones on the request lane.
+ * Posture note: 'open' means any authenticated account that knows the project
+ * id can send a request — and thereby confirm the project exists. That is an
+ * explicit owner/admin choice (the "knockable team" trade); the response
+ * carries an advisory note whenever the policy it sets is open. A 'closed'
+ * project stays indistinguishable from a nonexistent one on the request lane.
  *
  * @method POST
  * @route /management/p/<projectId>/setJoinPolicy
@@ -69,10 +68,8 @@ function __command_setJoinPolicy(array $params = [], array $urlParams = []): Api
     $error = null;
     $failure = null;
     $previous = 'closed';
-    $visibility = 'private';
-    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $policy, &$error, &$previous, &$visibility) {
-        $previous   = $m['join_policy'] ?? 'closed';
-        $visibility = $m['visibility'] ?? 'private';
+    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $policy, &$error, &$previous) {
+        $previous = $m['join_policy'] ?? 'closed';
         // This command writes the trust file — re-verify the actor's authority
         // against the fresh in-lock state (the membership-command discipline):
         // still a member, and the role still grants project.settings.
@@ -102,8 +99,8 @@ function __command_setJoinPolicy(array $params = [], array $urlParams = []): Api
         'previous'    => $previous,
         'changed'     => ($error !== 'no_change'),
     ];
-    if ($policy === 'open' && $visibility === 'private') {
-        $data['note'] = 'This project is private: an open join policy lets any authenticated account that knows the project id send a request — and thereby learn the project exists.';
+    if ($policy === 'open') {
+        $data['note'] = 'An open join policy lets any authenticated account that knows the project id send a request — and thereby learn the project exists.';
     }
 
     if ($error === 'no_change') {

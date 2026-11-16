@@ -5168,7 +5168,7 @@ import (rejected — the archive still discloses the roster to whoever holds it)
 `secure/management/command/exportProject.php`. Behaviour:
 [COMMAND_API.md](COMMAND_API.md).
 
-### Making a project world-visible is owner-only (locked 2026-07-18)
+### Making a project world-visible is owner-only (locked 2026-07-18) (superseded 2026-11-16)
 
 **Decision**: `setProjectVisibility` is owner-only, in its own category. The
 adjacent join-policy setter stays with admins and owners.
@@ -6610,7 +6610,7 @@ same panel without one is an inconsistency that will not survive the next reader
 `secure/admin/templates/layout.php`. Behaviour:
 [ADMIN_PANEL.md §6](ADMIN_PANEL.md), [ARCHITECTURE.md §8](ARCHITECTURE.md).
 
-### Project visibility lives on the members page, shaped deliberately unlike the join policy (locked 2026-08-11)
+### Project visibility lives on the members page, shaped deliberately unlike the join policy (locked 2026-08-11) (superseded 2026-11-16)
 
 **Decision**: `setProjectVisibility` is surfaced on `/admin/members`, above the
 join-policy control, rendered as a framed block with a coloured state badge, the
@@ -16047,3 +16047,34 @@ page, language and territory (no address serves a territory, so no card would sh
 **Source**: Sangio's UX run and his answers to the worker's questions of 2026-11-16; beta.12.
 `secure/src/functions/socialPreview.php` (`QS_SOCIAL_LANGUAGE_TERRITORIES`, `qs_social_language_territories()`,
 `qs_social_usual_territory()`), `socialPreviewHelpers.php` (`territories`).
+
+### A project's site is its members' alone: the choice to make it public leaves (locked 2026-11-16)
+
+**Supersedes**: *Making a project world-visible is owner-only* (locked 2026-07-18) and *Project visibility lives on the members page, shaped deliberately unlike the join policy* (locked 2026-08-11): the command and the section they decided are gone.
+
+**Supersedes** (in part), each keeping its title because what it held for a private project stands and now holds for every project: *The join-request posture matrix, including one deliberate knock-oracle* (locked 2026-07-17), its two public rows (an honest `403` on a public project's closed lane, the name shown on a public project's open one); *A private project's assets are Cache-Control private, not no-store* (locked 2026-08-15), its `public` header for a public project and the flag the gate kept to choose it.
+
+**Decision**: `setProjectVisibility` and its owner-only category `project.visibility` are gone (149 commands in 25 categories), and so is the members page's *Who can see this site* section. Every project's `/p/<projectId>/` view admits its members and nobody else: an anonymous visitor and a signed-in non-member get the `404` an id naming no project gets, whatever its `members.json` says. A project public before the upgrade is members-only after it, with no migration. A roster that still holds `visibility` is read by nothing; the roster check still holds the field to `private` or `public`, so an old file stays valid, and nothing writes it: a new roster has none, and a roster writer carries an old one on as it is. `listMembers` answers no `visibility`.
+
+Private is the only state: every project is what a private project was.
+
+- **The join-request posture follows the join policy alone.** A closed lane answers a request as an id naming no project does (`404 join.unavailable`, the same bytes). An open one records it, and so confirms to anyone who knows or guesses the id that the project exists: the owner's or an admin's choice, and `setJoinPolicy` says so whenever the policy it sets is open. A requester sees the project's id and never its name, on My memberships, in a refused notice and in a deletion notice, until they are a member.
+- **Every asset `/p/` serves is `Cache-Control: private, max-age=300`.** A member's own browser keeps its copy and revalidates it, and no shared cache holds one. `private` and not `no-store`, for the reason the entry on the assets' cache header gives: refusing a member a stored copy would also throw away revalidation, to prevent something `private` already prevents.
+
+A local `roles.php` that still names `project.visibility` needs no edit: a category that does not exist grants nothing and warns of nothing.
+
+**Reasoning**: Sangio, 2026-11-14: "we have the viewer role, and also a private/public 'Who can see this site' section ... might lead some user to misunderstanding and they might want to share the developed link while making it public rather than building it and deploy it. I would just get rid of the public/private feature." And on 2026-11-16: "public/private has been removed and replace by private only. If someone wants to share something publicly, he need to have the user as a member of its project under the viewer role." `/p/` is a development preview served from the panel's own origin, and a public one put anonymous visitors on that origin. A client sees a site as a member with the viewer role, or on a deployed build: showing someone a site before it is built was the public view's use, and it is the use it should not have had. With nothing left to make public, the owner-only category, the members page's framed section and its confirmation, and the posture's public rows had nothing left to guard. Once `/p/` admits members only, no platform can fetch a page in development to draw its card: the social previews page's look-alike cards are the preview before a deploy.
+
+**Alternatives considered**: keeping the choice, with its warnings (rejected — the warnings did not stop the misreading Sangio describes; the control itself invites sharing a development address); a separate "share a preview" link with a token or an expiry (rejected — a second way into `/p/` to secure, for a need a viewer account or a build already meets); a public view for a built site only (rejected — a build is served by its own server, never by `/p/`, so there is nothing to allow); a migration that rewrites old rosters (rejected — the field is read by nothing, and an installation before v1.0.0 holds development data only).
+
+**Source**: Sangio, 2026-11-14, and his rulings of 2026-11-16 on the stored field, `listMembers`, a project's name and an old `roles.php`; beta.12. `secure/src/functions/surfaceB.php` (`qs_surface_b_gate()`, `qs_sb_send_file()`), `secure/src/functions/AuthManagement.php` (`qs_project_birth_write_members()`), `secure/admin/functions/membershipSelf.php`, `secure/management/command/setJoinPolicy.php`, `denyJoinRequest.php`, `deleteProject.php`, `listMembers.php`, `secure/admin/templates/pages/members.php`, `public/admin/assets/js/pages/members.js`. Behaviour: [ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### The request's origin takes the one scheme test (locked 2026-11-16)
+
+**Decision**: `qs_request_origin()` takes its scheme from `qs_request_is_https()`, the test every full address a served page carries already uses: `HTTPS` set to anything but "off", in any letter case, port 443, or a proxy's `X-Forwarded-Proto: https`, which can only upgrade. Its four callers follow: the installation's own base address (the panel's and the management API's), `/p/<projectId>/`'s absolute base, a sitemap's default base and the completion of a declared path, and the origin the CORS check compares a browser's `Origin` with. Behind a proxy that ends HTTPS they read `https`. Without one they read as they did, but for an `HTTPS` value written `OFF`, which now reads as off, as the one test reads it.
+
+**Reasoning**: Two scheme tests answered differently behind such a proxy. A page's link-preview tags said `https` while the installation's base said `http`, and the CORS check compared a browser's `Origin: https://<host>` with `http://<host>`: a same-origin request, the panel's own calls to the management API among them, fell to the allowlist and was refused unless the deployer had listed the installation as another origin. One test answers the same everywhere. Trusting the header here is as safe as it is for the tags: it only ever upgrades, and it changes only the scheme of the installation's own origin, so a foreign `Origin` never matches it whatever the header says; a client outside a browser has no CORS to evade.
+
+**Alternatives considered**: keeping the origin's own test (rejected — the two tests disagree behind every proxy that ends HTTPS, and the CORS check refuses the installation's own calls there); a variable for the deployer to declare the scheme (rejected — `QS_PUBLIC_BASE_URL` already declares a site's address, and the header is how a proxy says what it ended); trusting `X-Forwarded-Host` as well (rejected — the host stays the validated one, which `QS_TRUSTED_HOSTS` pins).
+
+**Source**: a flag raised while the link-preview tags were built, accepted by Sangio on 2026-11-15; beta.12. `secure/src/functions/requestRuntime.php` (`qs_request_origin()`, `qs_request_is_https()`). Behaviour: [ARCHITECTURE.md §7](ARCHITECTURE.md).

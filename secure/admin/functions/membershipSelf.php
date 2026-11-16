@@ -173,12 +173,11 @@ function qs_membership_list_invitations(): ApiResponse {
             } else {
                 // 'pending_request': my own join request (a sponsored proposal,
                 // by != me, was never mine to see: the rule pruned it above).
-                // Name privacy: the project's name only when it is public; a
-                // private project shows the id the requester typed.
+                // Name privacy: the id the requester typed, never the project's
+                // name — a requester is not a member.
                 $row = [
                     'project'      => $projectId,
-                    'project_name' => (($authority['visibility'] ?? 'private') === 'public')
-                        ? qs_project_display_name($projectId) : $projectId,
+                    'project_name' => $projectId,
                     'role'         => $inv['role'] ?? null,
                     'at'           => $inv['at'] ?? ($entry['at'] ?? null),
                 ];
@@ -613,17 +612,13 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
  * don't set terms — the note says what they want, approval materializes viewer,
  * and changeMemberRole handles upgrades.
  *
- * Enumeration posture (visibility × join_policy):
- *   private+closed  → 404 join.unavailable, IDENTICAL to a nonexistent project
- *                     (no existence oracle).
- *   private+open    → 201; the owner OPTED into knockability-by-id. The
- *                     caller's inbox shows the PROJECT ID, never the
- *                     project's name — a knock may confirm existence, not the
- *                     name.
- *   public+closed   → honest 403 join.requests_closed (existence is already
- *                     public via /p/<id>/ serving; a uniform 404 would be
- *                     theater).
- *   public+open     → 201; the inbox shows the project's name (public anyway).
+ * Enumeration posture (by join_policy):
+ *   closed  → 404 join.unavailable, IDENTICAL to a nonexistent project
+ *             (no existence oracle).
+ *   open    → 201; the owner OPTED into knockability-by-id. The
+ *             caller's inbox shows the PROJECT ID, never the
+ *             project's name — a knock may confirm existence, not the
+ *             name.
  * The project is the id as typed, with or without a leading `#`.
  * Self-knowledge is never an oracle: already-member → 409; my own pending
  * invite/request → 409. A SPONSORED proposal about the caller is NOT
@@ -683,10 +678,7 @@ function qs_membership_request_join(array $params): ApiResponse {
     $today = date('Y-m-d');
     $error = null;
     $failure = null;
-    $visibility = 'private';
-    $written = qs_members_mutate($project, function (array &$m) use ($userId, $note, $today, &$error, &$visibility) {
-        $visibility = $m['visibility'] ?? 'private';
-
+    $written = qs_members_mutate($project, function (array &$m) use ($userId, $note, $today, &$error) {
         // Self-knowledge branches (each reveals only what the caller's own
         // membership/inbox already shows).
         if (isset($m['members'][$userId])) {
@@ -712,7 +704,7 @@ function qs_membership_request_join(array $params): ApiResponse {
         // The lane gate (in-lock — a concurrent setJoinPolicy cannot be outrun).
         $policy = $m['join_policy'] ?? 'closed';
         if ($policy !== 'open') {
-            $error = ($visibility === 'public') ? 'requests_closed' : 'unavailable';
+            $error = 'unavailable';
             return false;
         }
 
@@ -729,15 +721,11 @@ function qs_membership_request_join(array $params): ApiResponse {
         return true;
     }, $failure);
 
-    // Uniform not-found: a nonexistent project answers EXACTLY like a private
+    // Uniform not-found: a nonexistent project answers EXACTLY like a
     // project whose request lane is closed — no existence oracle.
     if ($failure === 'missing' || $failure === 'invalid_project' || $error === 'unavailable') {
         return ApiResponse::create(404, 'join.unavailable')
             ->withMessage('This project does not accept join requests');
-    }
-    if ($error === 'requests_closed') {
-        return ApiResponse::create(403, 'join.requests_closed')
-            ->withMessage('This project does not currently accept join requests');
     }
     if ($error === 'member.already_exists') {
         return ApiResponse::create(409, 'member.already_exists')
@@ -757,7 +745,7 @@ function qs_membership_request_join(array $params): ApiResponse {
     }
 
     // Status mirror (secondary write, silent-failure by ruling). No name: the
-    // inbox reads it when it lists, and only for a public project.
+    // inbox shows the id the requester typed.
     $mirror = qs_membership_mirror_entry('pending_request', $today);
     if (!qs_membership_cache_set($userId, $project, $mirror)) {
         error_log("membership request: cache mirror write failed for '{$userId}' on '{$project}'");

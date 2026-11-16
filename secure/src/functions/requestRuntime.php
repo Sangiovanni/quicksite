@@ -87,17 +87,15 @@ if (!function_exists('qs_request_origin')) {
     /**
      * The request's scheme + validated host, with no trailing slash.
      *
-     * Split from qs_request_host() for one caller: OAuthHandler decides its own
-     * scheme with a test that also honours X-Forwarded-Proto, so handing it a
-     * whole origin would silently regress every reverse-proxy deployment from
-     * https to http. One validator, two accessors.
+     * The scheme is qs_request_is_https()'s, the one scheme test, so behind a proxy
+     * ending HTTPS (`X-Forwarded-Proto: https`) the origin reads https, as every full
+     * address a served page carries does. Its callers: the panel's BASE_URL
+     * (init.php), `/p/`'s absolute base (surfaceB.php), a sitemap's default base
+     * (renderBootstrap.php) and the CORS same-origin test (handleCors()).
      */
     function qs_request_origin(): string
     {
-        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            || ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443);
-
-        return ($https ? 'https://' : 'http://') . qs_request_host();
+        return (qs_request_is_https() ? 'https://' : 'http://') . qs_request_host();
     }
 }
 
@@ -108,8 +106,8 @@ if (!function_exists('qs_request_is_https')) {
      *
      * The forwarded scheme can only UPGRADE: any other value of the header changes nothing, so a
      * request cannot make a page served over HTTPS name itself `http://`. The one scheme test of a
-     * served page: `_oauthIsHttps()` answers with it, and every full address the page carries is
-     * composed with it (qs_full_address()).
+     * served page: `_oauthIsHttps()` answers with it, qs_request_origin() takes its scheme from it,
+     * and every full address the page carries is composed with it (qs_full_address()).
      *
      * PRE-INIT SAFE: touches no constants.
      */

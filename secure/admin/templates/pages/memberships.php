@@ -102,7 +102,6 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'requestSentMsg'     => __admin('memberships.request.sentMsg', 'Join request sent'),
     'noteRequired'       => __admin('memberships.request.noteRequired', 'The note is required — say why you want to join.'),
     'errUnavailable'     => __admin('memberships.request.errUnavailable', 'This project does not accept join requests (or does not exist).'),
-    'errClosed'          => __admin('memberships.request.errClosed', 'This project\'s join requests are closed.'),
     'errAlreadyMember'   => __admin('memberships.request.errAlreadyMember', 'You are already a member of this project.'),
     'errAlreadyInvited'  => __admin('memberships.request.errAlreadyInvited', 'You already have a pending invitation here — accept or decline it above.'),
     'errAlreadyRequested'=> __admin('memberships.request.errAlreadyRequested', 'You already asked — withdraw the request above to re-ask.'),

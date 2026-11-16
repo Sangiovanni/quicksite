@@ -1,11 +1,11 @@
 /**
  * Project Members page — roster / queue / invite / propose /
- * visibility / join-policy / transfer for the EDITED project.
+ * join-policy / transfer for the EDITED project.
  *
  * Reads: getProjectRoster (every member rank) + listMembers (admin/owner —
  * the pending queue). Writes: inviteMember / cancelInvitation /
  * changeMemberRole / removeMember / approveJoinRequest / denyJoinRequest /
- * proposeMember / setProjectVisibility / setJoinPolicy / transferOwnership via
+ * proposeMember / setJoinPolicy / transferOwnership via
  * QuickSiteAdmin.apiRequest (project-marker transport). Client-side rank
  * gating mirrors canManageRole (strictly-below) for honest buttons only —
  * the server re-checks every rule in-lock.
@@ -33,7 +33,6 @@
         queue: [],
         contacts: [],                           // this account's own, /admin/self/contacts
         joinPolicy: CFG.joinPolicy || null,     // emitted server-side for admin+
-        visibility: CFG.visibility || null,
     };
 
     // Every setupFindUser instance registers a redraw here, so one contacts
@@ -749,121 +748,6 @@
     }
 
     // ============================================================
-    // Visibility (OWNER only) — who can READ the site.
-    //
-    // Kept deliberately unlike the join-policy toggle below: a named state, the
-    // consequence spelled out, the URL it exposes, and a button named after the
-    // state it moves to. The two settings were confused in testing, and two
-    // lookalike toggles side by side is what caused it.
-    // ============================================================
-
-    function renderVisibility() {
-        var badge = document.getElementById('members-visibility-badge');
-        var meaning = document.getElementById('members-visibility-meaning');
-        var urlEl = document.getElementById('members-visibility-url');
-        var block = document.getElementById('members-visibility-block');
-        var btn = document.getElementById('btn-toggle-visibility');
-        if (!badge || !btn || !block) return;
-
-        var isPublic = state.visibility === 'public';
-
-        badge.textContent = isPublic ? (T.visPublic || 'PUBLIC') : (T.visPrivate || 'PRIVATE');
-        badge.className = 'members-visibility__badge members-visibility__badge--' + (isPublic ? 'public' : 'private');
-        block.className = 'members-visibility members-visibility--' + (isPublic ? 'public' : 'private');
-        if (meaning) {
-            meaning.textContent = isPublic ? (T.visMeaningPublic || '') : (T.visMeaningPrivate || '');
-        }
-
-        // The address is only meaningful while it is actually reachable.
-        if (urlEl) {
-            clearNode(urlEl);
-            if (isPublic && CFG.siteUrl) {
-                urlEl.appendChild(el('span', { class: 'admin-hint', text: (T.visUrlLabel || 'Reachable at') + ' ' }));
-                urlEl.appendChild(el('a', { href: CFG.siteUrl, target: '_blank', rel: 'noopener', text: CFG.siteUrl }));
-                urlEl.hidden = false;
-            } else {
-                urlEl.hidden = true;
-            }
-        }
-
-        btn.textContent = isPublic ? (T.visGoPrivate || 'Make it members-only') : (T.visGoPublic || 'Make it public to everyone');
-        btn.className = 'admin-btn ' + (isPublic ? 'admin-btn--primary' : 'admin-btn--danger');
-        btn.disabled = false;
-    }
-
-    function applyVisibility(target) {
-        var btn = document.getElementById('btn-toggle-visibility');
-        if (btn) btn.disabled = true;
-        api('setProjectVisibility', 'POST', { visibility: target }).then(function (res) {
-            if (res && res.ok) {
-                state.visibility = (res.data && res.data.data && res.data.data.visibility) || target;
-                toast(target === 'public' ? (T.visSavedPublic || 'This site is now PUBLIC')
-                                          : (T.visSavedPrivate || 'This site is now members-only'),
-                      target === 'public' ? 'warning' : 'success');
-                // Going private while the join policy is open re-creates the
-                // knockable-by-id posture; the server says so in its own words.
-                var note = res.data && res.data.data && res.data.data.note;
-                if (note) toast(note, 'warning');
-            } else {
-                toast(serverMessage(res), 'error');
-            }
-            renderVisibility();
-            // The join-policy advisory depends on visibility — re-render it too.
-            renderPolicy();
-        });
-    }
-
-    function setupVisibilityToggle() {
-        var btn = document.getElementById('btn-toggle-visibility');
-        if (!btn) return;
-        btn.addEventListener('click', function () {
-            var target = state.visibility === 'public' ? 'private' : 'public';
-
-            if (target === 'private') {
-                _renderModal(
-                    T.visConfirmPrivateTitle || 'Make this site members-only?',
-                    [el('p', { text: T.visConfirmPrivateBody || '' })],
-                    T.visGoPrivate || 'Make it members-only', false,
-                    function (close) { close(); applyVisibility(target); }
-                );
-                return;
-            }
-
-            // Opening the site up carries an extra deliberate act. Same shape
-            // as the ownership transfer: read the consequence, then tick it.
-            // The wording never says "publish" — nothing is deployed here, and
-            // a control that implies a domain and an SEO step would be lying.
-            var check = el('input', { type: 'checkbox', class: 'admin-checkbox', id: 'visibility-confirm' });
-            var body = [
-                el('p', { text: T.visConfirmPublicBody || '' }),
-                CFG.siteUrl ? el('p', {}, [
-                    el('span', { class: 'admin-hint', text: (T.visUrlLabel || 'Reachable at') + ' ' }),
-                    el('code', { text: CFG.siteUrl }),
-                ]) : null,
-                el('label', { class: 'admin-checkbox-group members-transfer-confirm' }, [
-                    check,
-                    el('span', { class: 'admin-checkbox-label', text: T.visConfirmPublicCheck || '' }),
-                ]),
-            ];
-            _renderModal(
-                T.visConfirmPublicTitle || 'Make this site public to everyone?',
-                body,
-                T.visGoPublic || 'Make it public to everyone', true,
-                function (close, confirmBtn) {
-                    if (!check.checked) {
-                        toast(T.visCheckRequired || 'Tick the confirmation first.', 'warning');
-                        confirmBtn.disabled = false; // _renderModal disables on click
-                        return;
-                    }
-                    close();
-                    applyVisibility(target);
-                }
-            );
-        });
-        renderVisibility();
-    }
-
-    // ============================================================
     // Join policy (admin/owner)
     // ============================================================
 
@@ -880,7 +764,7 @@
         toggleBtn.disabled = false;
 
         if (advisory && advisoryText) {
-            var showAdvisory = policy === 'open' && state.visibility === 'private';
+            var showAdvisory = policy === 'open';
             advisory.hidden = !showAdvisory;
             if (showAdvisory) advisoryText.textContent = T.policyAdvisory || '';
         }
@@ -893,8 +777,8 @@
             if (res && res.ok) {
                 state.joinPolicy = (res.data && res.data.data && res.data.data.join_policy) || target;
                 toast(T.policySavedMsg || 'Join policy updated', 'success');
-                // The server attaches an advisory note when private+open became
-                // active — surface its exact wording too.
+                // The server attaches an advisory note when the policy it set is
+                // open — surface its exact wording too.
                 var note = res.data && res.data.data && res.data.data.note;
                 if (note) toast(note, 'warning');
             } else {
@@ -909,10 +793,10 @@
         if (!toggleBtn) return;
         toggleBtn.addEventListener('click', function () {
             var target = (state.joinPolicy || 'closed') === 'open' ? 'closed' : 'open';
-            if (target === 'open' && state.visibility === 'private') {
+            if (target === 'open') {
                 _renderModal(
                     T.policyTitle || (T.policyOpen || 'open'),
-                    [el('p', { text: T.policyConfirmOpenPrivate || 'Open the join policy on a private project?' })],
+                    [el('p', { text: T.policyConfirmOpenPrivate || 'Open the join policy?' })],
                     T.policyOpen || 'open', true,
                     function (close) {
                         close();
@@ -1056,10 +940,8 @@
             api('listMembers', 'GET').then(function (res) {
                 var d = (res && res.ok && res.data && res.data.data) || {};
                 state.queue = d.invitations || [];
-                if (d.visibility) state.visibility = d.visibility;
                 renderQueue();
                 renderPolicy();
-                renderVisibility();
             });
         }
     }
@@ -1067,7 +949,6 @@
     document.addEventListener('DOMContentLoaded', function () {
         setupInviteForm();
         setupProposeForm();
-        setupVisibilityToggle();
         setupPolicyToggle();
         setupTransfer();
         refreshLists();

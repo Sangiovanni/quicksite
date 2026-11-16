@@ -281,7 +281,6 @@
             "sentMsg": "Join request sent",
             "noteRequired": "The note is required — say why you want to join.",
             "errUnavailable": "This project does not accept join requests (or does not exist).",
-            "errClosed": "This project's join requests are closed.",
             "errAlreadyMember": "You are already a member of this project.",
             "errAlreadyInvited": "You already have a pending invitation here — accept or decline it above.",
             "errAlreadyRequested": "You already asked — withdraw the request above to re-ask.",
@@ -370,36 +369,17 @@
             "sentMsg": "Proposal recorded — an admin or the owner must validate it",
             "vouchRequired": "The vouch note is required."
         },
-        "visibility": {
-            "title": "Who can see this site",
-            "public": "PUBLIC",
-            "private": "PRIVATE",
-            "meaningPublic": "Anyone with the address can view this site — no account, no invitation, no login.",
-            "meaningPrivate": "Only signed-in members of this project can reach the site. To everyone else it answers as if it did not exist.",
-            "urlLabel": "Reachable at",
-            "goPublic": "Make it public to everyone",
-            "goPrivate": "Make it members-only",
-            "confirmPublicTitle": "Make this site public to everyone?",
-            "confirmPublicBody": "Everything this project serves becomes viewable by anyone who has the address, with no account and no login. This does not deploy the site: no domain is set up, nothing is submitted to a search engine, and the address does not change — it simply stops requiring membership. A public address can still be found and indexed like any other. You can make it members-only again, but anything already read cannot be unread.",
-            "confirmPublicCheck": "I understand anyone with the address can view this site.",
-            "confirmPrivateTitle": "Make this site members-only?",
-            "confirmPrivateBody": "The site stops being served to the public. Visitors without a membership get the same answer as for a project that does not exist. Existing links stop working for them.",
-            "checkRequired": "Tick the confirmation first.",
-            "savedPublicMsg": "This site is now PUBLIC",
-            "savedPrivateMsg": "This site is now members-only",
-            "notPolicy": "This is not the same as the join policy below. Visibility decides who can VIEW the site; the join policy decides who can ASK to become a member."
-        },
         "policy": {
             "title": "Who can ask to join",
             "hint": "Open = anyone authenticated may send a join request (the self-service front door). Closed = requests bounce; invitations and member proposals always work. Closing never discards requests already pending.",
-            "notVisibility": "This does NOT make the site public. A project with an open join policy is still visible to members only — the visibility setting above is what opens the site to everyone.",
+            "notVisibility": "This does not open the site to anyone: only members of this project can view it. The join policy decides who can ASK to become one.",
             "label": "Self-service join requests",
             "toggle": "Toggle",
             "open": "open",
             "closed": "closed",
             "savedMsg": "Join policy updated",
-            "advisory": "Privacy note: this project is PRIVATE with an OPEN join policy — any authenticated account that knows or guesses its id can send a request and thereby learn the project exists.",
-            "confirmOpenPrivate": "This project is PRIVATE. Opening the join policy makes it knockable by id: anyone authenticated who knows or guesses the id can send a request and learn the project exists. Open anyway?"
+            "advisory": "Privacy note: this project has an OPEN join policy — any authenticated account that knows or guesses its id can send a request and thereby learn the project exists.",
+            "confirmOpenPrivate": "Opening the join policy makes this project knockable by id: anyone authenticated who knows or guesses the id can send a request and learn the project exists. Open anyway?"
         },
         "transfer": {
             "title": "Transfer ownership",

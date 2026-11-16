@@ -14,7 +14,7 @@
  * @route /management/p/<projectId>/listMembers
  * @auth required (project.members — admin, owner)
  *
- * @return ApiResponse owner, visibility, members[], invitations[]
+ * @return ApiResponse owner, members[], invitations[]
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -89,7 +89,6 @@ function __command_listMembers(array $params = [], array $urlParams = []): ApiRe
         ->withData([
             'project'          => $project,
             'owner_user_id'    => $data['owner'] ?? null,
-            'visibility'       => $data['visibility'] ?? 'private',
             'members'          => $members,
             'invitations'      => $invitations,
             'member_count'     => count($members),

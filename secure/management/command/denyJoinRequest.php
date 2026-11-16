@@ -13,9 +13,7 @@
  * Tombstones follow the other-initiated-termination principle:
  *   - SELF-REQUEST: the requester asked and gets answered — a dismissable
  *     `refused` notice (with the reason) lands in THEIR cache. Its display
- *     name is the privacy-correct one: the project's name when it is public,
- *     its id when it is private (a requester never learns a private project's
- *     name).
+ *     name is the project's id: a requester never learns a project's name.
  *   - SPONSORED PROPOSAL: the target was NEVER ENGAGED (no mirror, no inbox
  *     row) — denying it must not notify them of anything, a fortiori "must
  *     never read as refusal": they never read anything at all. The entry is
@@ -79,9 +77,7 @@ function __command_denyJoinRequest(array $params = [], array $urlParams = []): A
     $error = null;
     $failure = null;
     $wasSelf = false;
-    $visibility = 'private';
-    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, &$error, &$wasSelf, &$visibility) {
-        $visibility = $m['visibility'] ?? 'private';
+    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, &$error, &$wasSelf) {
         $inv = $m['invitations'][$targetId] ?? null;
         if (!is_array($inv) || (($inv['direction'] ?? 'invite') !== 'request')) {
             $error = 'request.not_found';
@@ -112,10 +108,9 @@ function __command_denyJoinRequest(array $params = [], array $urlParams = []): A
 
     if ($wasSelf) {
         // Refused tombstone in the requester's cache (dismissable; blocks
-        // re-requesting until acknowledged). Name privacy: the project's name
-        // only when it is public, else its id.
-        $name = ($visibility === 'public') ? qs_project_display_name($project) : $project;
-        $tombstone = ['name' => $name, 'status' => 'refused', 'at' => $today, 'note' => $note];
+        // re-requesting until acknowledged). Name privacy: the project's id,
+        // never its name — the requester is not a member.
+        $tombstone = ['name' => $project, 'status' => 'refused', 'at' => $today, 'note' => $note];
         if (!qs_membership_cache_set($targetId, $project, $tombstone)) {
             error_log("denyJoinRequest: refused-tombstone write failed for '{$targetId}' on '{$project}'");
         }

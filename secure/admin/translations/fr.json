@@ -235,7 +235,6 @@
             "sentMsg": "Demande envoyée",
             "noteRequired": "La note est obligatoire — dites pourquoi vous voulez rejoindre.",
             "errUnavailable": "Ce projet n'accepte pas les demandes d'adhésion (ou n'existe pas).",
-            "errClosed": "Les demandes d'adhésion de ce projet sont fermées.",
             "errAlreadyMember": "Vous êtes déjà membre de ce projet.",
             "errAlreadyInvited": "Vous avez déjà une invitation en attente ici — acceptez-la ou refusez-la ci-dessus.",
             "errAlreadyRequested": "Vous avez déjà demandé — retirez la demande ci-dessus pour redemander.",
@@ -315,36 +314,17 @@
             "sentMsg": "Proposition enregistrée — un admin ou le propriétaire doit la valider",
             "vouchRequired": "La note de recommandation est obligatoire."
         },
-        "visibility": {
-            "title": "Qui peut voir ce site",
-            "public": "PUBLIC",
-            "private": "PRIVÉ",
-            "meaningPublic": "Toute personne disposant de l'adresse peut consulter ce site — sans compte, sans invitation, sans connexion.",
-            "meaningPrivate": "Seuls les membres connectés de ce projet peuvent atteindre le site. Pour tous les autres, il répond comme s'il n'existait pas.",
-            "urlLabel": "Accessible à",
-            "goPublic": "Rendre visible par tout le monde",
-            "goPrivate": "Réserver aux membres",
-            "confirmPublicTitle": "Rendre ce site visible par tout le monde ?",
-            "confirmPublicBody": "Tout ce que ce projet sert devient consultable par quiconque dispose de l'adresse, sans compte et sans connexion. Ceci ne déploie pas le site : aucun nom de domaine n'est configuré, rien n'est soumis à un moteur de recherche et l'adresse ne change pas — elle cesse simplement d'exiger une adhésion. Une adresse publique peut malgré tout être trouvée et indexée comme n'importe quelle autre. Vous pouvez repasser en accès réservé aux membres, mais ce qui a déjà été lu ne peut pas être délu.",
-            "confirmPublicCheck": "Je comprends que toute personne disposant de l'adresse peut consulter ce site.",
-            "confirmPrivateTitle": "Réserver ce site aux membres ?",
-            "confirmPrivateBody": "Le site cesse d'être servi au public. Les visiteurs sans adhésion obtiennent la même réponse que pour un projet inexistant. Les liens existants cessent de fonctionner pour eux.",
-            "checkRequired": "Cochez d'abord la confirmation.",
-            "savedPublicMsg": "Ce site est désormais PUBLIC",
-            "savedPrivateMsg": "Ce site est désormais réservé aux membres",
-            "notPolicy": "Ce n'est pas la même chose que la politique d'adhésion ci-dessous. La visibilité décide qui peut CONSULTER le site ; la politique d'adhésion décide qui peut DEMANDER à devenir membre."
-        },
         "policy": {
             "title": "Qui peut demander à rejoindre",
             "hint": "Ouverte = toute personne authentifiée peut envoyer une demande (la porte d'entrée libre-service). Fermée = les demandes sont refusées ; invitations et propositions de membres fonctionnent toujours. Fermer ne supprime jamais les demandes déjà en attente.",
-            "notVisibility": "Ceci ne rend PAS le site public. Un projet dont la politique d'adhésion est ouverte reste visible par les seuls membres — c'est le réglage de visibilité ci-dessus qui ouvre le site à tout le monde.",
+            "notVisibility": "Ceci n'ouvre le site à personne : seuls les membres de ce projet peuvent le consulter. La politique d'adhésion décide qui peut DEMANDER à en devenir membre.",
             "label": "Demandes d'adhésion libre-service",
             "toggle": "Basculer",
             "open": "ouverte",
             "closed": "fermée",
             "savedMsg": "Politique d'adhésion mise à jour",
-            "advisory": "Note de confidentialité : ce projet est PRIVÉ avec une politique d'adhésion OUVERTE — tout compte authentifié qui connaît ou devine son identifiant peut envoyer une demande et apprendre ainsi que le projet existe.",
-            "confirmOpenPrivate": "Ce projet est PRIVÉ. Ouvrir la politique d'adhésion le rend accessible par identifiant : toute personne authentifiée qui connaît ou devine l'identifiant peut envoyer une demande et apprendre que le projet existe. Ouvrir quand même ?"
+            "advisory": "Note de confidentialité : ce projet a une politique d'adhésion OUVERTE — tout compte authentifié qui connaît ou devine son identifiant peut envoyer une demande et apprendre ainsi que le projet existe.",
+            "confirmOpenPrivate": "Ouvrir la politique d'adhésion rend ce projet accessible par identifiant : toute personne authentifiée qui connaît ou devine l'identifiant peut envoyer une demande et apprendre que le projet existe. Ouvrir quand même ?"
         },
         "transfer": {
             "title": "Transférer la propriété",

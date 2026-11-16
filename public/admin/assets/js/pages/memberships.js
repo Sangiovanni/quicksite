@@ -578,7 +578,6 @@
 
     var REQUEST_ERROR_KEYS = {
         'join.unavailable': 'errUnavailable',
-        'join.requests_closed': 'errClosed',
         'member.already_exists': 'errAlreadyMember',
         'invitation.already_pending': 'errAlreadyInvited',
         'request.already_pending': 'errAlreadyRequested',

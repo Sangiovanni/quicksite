@@ -70,7 +70,7 @@ quicksite/
 │   │       │                     #   it came: no roster, so it is served to nobody
 │   │       ├── config.php        # Project config (languages, settings)
 │   │       ├── config/           # Per-project settings that are not page content:
-│   │       │                     #   members.json (owner, visibility, join_policy, members
+│   │       │                     #   members.json (owner, join_policy, members
 │   │       │                     #   {userId → role} + pending invitations/requests — gitignored),
 │   │       │                     #   project.json (the project's name: {"name": "…"}; a project
 │   │       │                     #   without one is shown by its id),

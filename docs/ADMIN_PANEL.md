@@ -265,7 +265,7 @@ whose click it holds is followed afterwards, a mode or tab switch happens afterw
 | `pages/dashboard.js` | Stats cards, command activity, recent history. |
 | `pages/dashboard-memberships.js` | Fills the dashboard memberships card from the `quicksite:membership-counts-updated` event (computed by `core/members-badge.js`). |
 | `pages/memberships.js` | My Memberships page: my projects / invitation inbox / my join requests / my proposals / notices / request-to-join. Global self-service commands only. |
-| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (user-lookup flows), visibility control, join-policy toggle, ownership transfer for the edited project. |
+| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (user-lookup flows), join-policy toggle, ownership transfer for the edited project. |
 | `pages/account.js` | My Account page: change password, sign out everywhere, delete account (§9.13). |
 | `pages/command.js` | Command index list, permission-aware filter. |
 | `pages/command-form.js` | Dynamic per-command form, helper widgets, execution. |
@@ -416,7 +416,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/ai-connections.php` | `window.QSAC_ASSET_BASE` + `window.QS_AI_CONNECTIONS_I18N` | the asset base the provider logos load from, so they resolve when the panel is not served from the domain root; the `aiConnections` and `common` sub-trees, verbatim |
 | `templates/pages/optimize.php` | `data-lib-ready` on `.optimize-page` + `window.CSSRefiner.t` + `window.QS_OPTIMIZE_I18N` | `data-lib-ready` is `"true"` only when the CSS Refiner library is installed, and `optimize.js` does nothing otherwise; `CSSRefiner.t` is a passthrough that returns its key unchanged; the `optimize` and `common` sub-trees, verbatim |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
-| `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`), `isOwner` + `siteUrl` (the address a public visibility exposes); JS-facing strings |
+| `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` (admin/owner only, read server-side from `members.json`); JS-facing strings |
 | `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings. Never the username — the deletion's typed confirmation is checked by the server (§9.13) |
 | `templates/pages/command-form.php` | `window.QS_COMMAND_FORM_I18N` | the `commandForm`, `commands` and `common` translation sub-trees, emitted **verbatim under their own dot paths** (`AdminTranslation::getRaw()`) rather than copied field by field — the page's JS asks for the same path PHP would. `JSON_HEX_TAG` keeps a translation value from closing the script element. |
 
@@ -446,7 +446,7 @@ This pointer is **not** a command. Which project a person has open is a fact abo
 
 An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
 
-The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §8), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" resolves to that same view. Private projects authenticate on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a private project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
+The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §8), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" resolves to that same view. Every project authenticates on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
 
@@ -3589,7 +3589,7 @@ six-stat **Memberships** card with links to both pages.
 **My Memberships** (`/admin/memberships`) is the caller's own surface and works for
 every authenticated account — a freshly-registered, 0-membership user lands here to
 accept their first invitation, and the page fires only global self-service
-commands (zero 403 noise). Every project is named "Name #id"; a private project you
+commands (zero 403 noise). Every project is named "Name #id"; a project you
 have only asked to join shows its id alone, its name not being yours to see.
 Sections: **My projects** (`listProjects` — your starred projects first, then
 the others by name, each row starting with its ☆ / ★ toggle (§8.0); role chip,
@@ -3636,10 +3636,10 @@ role + mandatory vouch). Admin/owner additionally get the **Pending queue**
 attribution; cancel for invites, approve / deny with mandatory reason for
 requests — approve of a proposal reports the conversion to an invitation), the
 **Invite** form (role picker limited to strictly below the caller's rank), and
-the **Who can ask to join** toggle (open/closed; flipping a *private* project to
+the **Who can ask to join** toggle (open/closed; flipping it to
 open first shows the knockable-by-id privacy advisory, and the warning stays
-visible while the combination is active). The owner alone gets **Who can see this
-site** (below) and **Transfer ownership** (member picker + departing-owner role +
+visible while the policy is open; the section says it opens no site: only members
+ever view a project's site). The owner alone gets **Transfer ownership** (member picker + departing-owner role +
 checkbox + final confirm modal; the page reloads after transfer since the
 caller's role changed).
 
@@ -3669,31 +3669,6 @@ keeps someone who no longer exists. An id no account has, still on a list (one
 written by hand, or kept from before an account's deletion took it out), is
 forgotten when an invitation or a proposal to it answers that no account has it,
 and the toast says so.
-
-**Who can see this site** is `setProjectVisibility`, and it is **owner-only** —
-the `project.visibility` category sits at the delete/transfer tier, so an admin
-who runs the project day to day cannot unilaterally expose it. Non-owners are not
-shown the control at all (the section is branched server-side on the caller's
-role; the command re-checks ownership in-lock regardless).
-
-It is deliberately shaped **unlike** the join-policy toggle beneath it. The two
-settings sound alike and are routinely confused — an open join policy reads as
-"the site is public", which it is not — so visibility renders as a framed block
-with a coloured state badge (PUBLIC / PRIVATE), the consequence written out
-(*"anyone with the address can view this site"* versus *"to everyone else it
-answers as if it did not exist"*), the address a public setting exposes, and a
-button named after the state it moves to rather than a generic *Toggle*. Each
-section also states what it is **not**.
-
-The wording avoids "publish" throughout, and the confirmation says so explicitly:
-making a project public **does not deploy it**. No domain is configured, nothing
-is submitted to a search engine, and the address does not change — the project's
-existing `/p/<id>/` view simply stops requiring membership (a public address can
-still be found and indexed like any other). Going public asks for a tick inside
-its confirm modal — the same friction as an ownership transfer; going back to
-members-only is a plain confirm. A visibility change never touches the pending
-request queue, and when the result is private + open the server's own advisory
-note is surfaced verbatim.
 
 Both pages render all dynamic rows via `QSDom` helpers (createElement +
 textContent); static structure and all labels live in the PHP templates

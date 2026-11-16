@@ -41,21 +41,33 @@ function loadAuthConfig(): array {
 }
 
 /**
- * Load roles configuration
- * 
+ * Load the roles configuration (roles.php: each role's rank and the categories it holds).
+ *
+ * Read once per request and kept for the rest of it, as loadCategoriesConfig() is: the
+ * permission check, isValidRole() and the role lists ask for it many times in one
+ * request, and it is the same file throughout. Each request reads it afresh, past
+ * OPcache, so an edit to roles.php is seen by the next request. A missing file is not
+ * kept: init.php makes it from its .example on a first request, after a `/p/` request's
+ * gate may already have run.
+ *
  * @return array Role definitions
  */
 function loadRolesConfig(): array {
+    static $roles = null;
+    if ($roles !== null) {
+        return $roles;
+    }
     $configPath = SECURE_FOLDER_PATH . '/management/config/roles.php';
-    
+
     if (!file_exists($configPath)) {
         return [];
     }
-    
-    // Invalidate opcode cache if available (needed for dynamic config changes)
+
+    // Past the opcode cache, so the request reads the file as it is now.
     qs_opcache_invalidate($configPath);
-    
-    return require $configPath;
+
+    $roles = require $configPath;
+    return $roles;
 }
 
 /**
@@ -134,7 +146,7 @@ function loadUsersConfig(): array {
  * Load a project's members.json (AUTHORITATIVE for access).
  * Defensive single-segment guard on $project; empty on anything unsafe.
  *
- * @return array ['owner'=>?string,'visibility'=>string,'members'=>[uid=>['role'=>..]]]
+ * @return array ['owner'=>?string,'members'=>[uid=>['role'=>..]]]
  */
 function loadProjectMembers(string $project): array {
     if ($project === '' || strpbrk($project, "/\\") !== false || strpos($project, '..') !== false) {
@@ -178,7 +190,7 @@ require_once __DIR__ . '/projectIdentity.php';
 /**
  * THE canonical members.json birth-write — mint a fresh trust file for a
  * just-created project directory with $ownerId as the SOLE owner: no other
- * members, no pending invitations, visibility 'private', join_policy closed (via
+ * members, no pending invitations, join_policy closed (via
  * reader default). This is the SINGLE birth-write path shared by createProject,
  * cloneProject and importProject, so a cloned/imported project can NEVER inherit
  * or accept a foreign members.json (a clone hijack): whatever roster
@@ -204,9 +216,8 @@ function qs_project_birth_write_members(string $projectPath, ?string $ownerId): 
         return false;
     }
     $membersData = [
-        'owner'      => $ownerId,
-        'visibility' => 'private',
-        'members'    => [$ownerId => ['role' => 'owner']],
+        'owner'   => $ownerId,
+        'members' => [$ownerId => ['role' => 'owner']],
     ];
     // Encode checked before the write, same rule as qs_members_mutate. The
     // owner id is session-derived here, so nothing unrepresentable can reach
@@ -328,6 +339,7 @@ function qs_members_invariant_violation(array $data): ?string {
     if ($ownerCount !== 1) {
         return "exactly one member must hold role 'owner' (found {$ownerCount})";
     }
+    // Nothing reads `visibility`: a roster that holds one is still held to its two values.
     $visibility = $data['visibility'] ?? 'private';
     if (!in_array($visibility, ['private', 'public'], true)) {
         return 'visibility must be private|public';
@@ -1930,7 +1942,9 @@ function handleCors(?string $origin): bool {
     // browser sets Host from the URL it navigated to, so only a non-browser
     // client controls both, and such a client has no CORS to evade. It is
     // repaired because two request-controlled values should never be compared
-    // against each other, not because an exploit was demonstrated.
+    // against each other, not because an exploit was demonstrated. Its scheme is
+    // qs_request_is_https()'s, so behind a proxy ending HTTPS the browser's
+    // `Origin: https://<host>` matches it.
     require_once __DIR__ . '/projectContext.php';
     $selfOrigin = qs_request_origin();
     if (strcasecmp($origin, $selfOrigin) === 0) {

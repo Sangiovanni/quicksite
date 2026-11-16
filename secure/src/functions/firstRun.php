@@ -16,7 +16,7 @@
  *      account as owner. QuickSite ships a starter project, and
  *      `qs_project_birth_write_members()` only runs at project CREATION — a
  *      project that came with the download never passes through it. Without a
- *      roster `loadProjectMembers()` reads it as private-with-no-members, so it is
+ *      roster `loadProjectMembers()` reads it as a project with no members, so it is
  *      invisible and uneditable to everyone, including the person who just
  *      installed it. This is what makes the starter project actually usable. The
  *      shipped folder itself is left as it came (qs_first_run_adopt_projects()).
