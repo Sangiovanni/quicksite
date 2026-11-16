@@ -14,8 +14,9 @@
  *   - the description: the translation key `page.descriptions.<route>` in the page's language, read quietly
  *     (Translator::lookup()), with the title's placeholders; none, no tag;
  *   - the site's name: the translation key `site.name`; none, no tag;
- *   - the language: `<code>_<TERRITORY>`, only for a language the author gave a territory, and each other
- *     language of a multilingual site that has one as an alternate;
+ *   - the language: `<code>_<TERRITORY>`, the territory the author gave the language, else its usual one
+ *     (QS_SOCIAL_LANGUAGE_TERRITORIES), and each other language of a multilingual site as an alternate; a
+ *     language with neither, none;
  *   - the picture, the card type: the project's social values (`data/social-preview.json`), the picture a
  *     Media file whose size, type and description Media's metadata holds (a build: its own copy);
  *   - the X account and the theme colour: the site's values.
@@ -45,6 +46,340 @@ if (!defined('QS_SOCIAL_PAGE_FIELDS')) {
     define('QS_SOCIAL_PAGE_FIELDS', ['picture', 'cardType']);
 }
 
+/**
+ * Each language's territories (`og:locale` is the language, `_`, a territory), its usual one first, then the others in
+ * order. From Unicode CLDR 49 (https://github.com/unicode-org/cldr-json, cldr-core 49.0.0, read on 2026-11-16): a
+ * language's territories are the regions of its locales (availableLocales.json, its full list, and defaultContent.json:
+ * fr_BE, fr_CA, fr_FR...) and its likely one (likelySubtags.json), which is its usual one; a region that is not an
+ * officially assigned ISO 3166-1 alpha-2 code (the world 001, Europe 150, Latin America 419, Kosovo XK, the Canary
+ * Islands IC, Ceuta and Melilla EA, Diego Garcia DG) is left out. The languages: every language of a CLDR locale, and
+ * every language of the shipped language list (languages.json.example), those with no CLDR locale holding their likely
+ * territory alone (Haitian: HT; Twi, which CLDR names Akan: GH). A language whose likely region is the world
+ * (Esperanto, Interlingua, Ido, Volapuk, Toki Pona) has no entry, so no territory.
+ *
+ * The one list: the shape check below refuses any other territory for a language, getSocialPreview answers each
+ * project language's, and a page's address announces the usual one when the author chose none. A language added to
+ * the list of languages is added here too, from CLDR. Names are not held here: the panel's browser names each territory
+ * in the panel's language.
+ */
+if (!defined('QS_SOCIAL_LANGUAGE_TERRITORIES')) {
+    define('QS_SOCIAL_LANGUAGE_TERRITORIES', [
+    'aa' => 'ET',
+    'ab' => 'GE',
+    'ady' => 'RU JO TR',
+    'ae' => 'IR',
+    'af' => 'ZA NA',
+    'agq' => 'CM',
+    'ak' => 'GH',
+    'am' => 'ET',
+    'an' => 'ES',
+    'ar' => 'EG AE BH DJ DZ EH ER IL IQ JO KM KW LB LY MA MR OM PS QA SA SD SO SS SY TD TN YE',
+    'as' => 'IN',
+    'asa' => 'TZ',
+    'ast' => 'ES',
+    'av' => 'RU',
+    'ay' => 'BO',
+    'az' => 'AZ',
+    'ba' => 'RU',
+    'bal' => 'PK',
+    'bas' => 'CM',
+    'be' => 'BY',
+    'bem' => 'ZM',
+    'bez' => 'TZ',
+    'bg' => 'BG',
+    'bgc' => 'IN',
+    'bho' => 'IN',
+    'bi' => 'VU',
+    'blo' => 'BJ',
+    'bm' => 'ML',
+    'bn' => 'BD IN',
+    'bo' => 'CN IN',
+    'br' => 'FR',
+    'brx' => 'IN',
+    'bs' => 'BA',
+    'bua' => 'RU',
+    'ca' => 'ES AD FR IT',
+    'ccp' => 'BD IN',
+    'ce' => 'RU',
+    'ceb' => 'PH',
+    'cgg' => 'UG',
+    'ch' => 'GU',
+    'chr' => 'US',
+    'ckb' => 'IQ IR',
+    'co' => 'FR',
+    'cop' => 'EG',
+    'cr' => 'CA',
+    'cs' => 'CZ',
+    'csw' => 'CA',
+    'cu' => 'RU',
+    'cv' => 'RU',
+    'cy' => 'GB',
+    'da' => 'DK GL',
+    'dav' => 'KE',
+    'de' => 'DE AT BE CH IT LI LU',
+    'dje' => 'NE',
+    'doi' => 'IN',
+    'dsb' => 'DE',
+    'dua' => 'CM',
+    'dv' => 'MV',
+    'dyo' => 'SN',
+    'dz' => 'BT',
+    'ebu' => 'KE',
+    'ee' => 'GH TG',
+    'el' => 'GR CY',
+    'en' => 'US AE AG AI AS AT AU BB BE BI BM BS BW BZ CA CC CH CK CM CX CY CZ DE DK DM EE ER ES FI FJ'
+        . ' FK FM FR GB GD GE GG GH GI GM GS GU GY HK HU ID IE IL IM IN IO IT JE JM JP KE KI KN KY LC'
+        . ' LR LS LT LV MG MH MO MP MS MT MU MV MW MY NA NF NG NL NO NR NU NZ PG PH PK PL PN PR PT PW'
+        . ' RO RW SB SC SD SE SG SH SI SK SL SS SX SZ TC TK TO TT TV TZ UA UG UM VC VG VI VU WS ZA ZM'
+        . ' ZW',
+    'es' => 'ES AR BO BR BZ CL CO CR CU DO EC GQ GT HN MX NI PA PE PH PR PY SV US UY VE',
+    'et' => 'EE',
+    'eu' => 'ES',
+    'ewo' => 'CM',
+    'fa' => 'IR AF',
+    'ff' => 'SN BF CM GH GM GN GW LR MR NE NG SL',
+    'fi' => 'FI',
+    'fil' => 'PH',
+    'fj' => 'FJ',
+    'fo' => 'FO DK',
+    'fr' => 'FR BE BF BI BJ BL CA CD CF CG CH CI CM DJ DZ GA GF GN GP GQ HT KM LU MA MC MF MG ML MQ MR'
+        . ' MU NC NE PF PM RE RW SC SN SY TD TG TN VU WF YT',
+    'fur' => 'IT',
+    'fy' => 'NL',
+    'ga' => 'IE GB',
+    'gaa' => 'GH',
+    'gd' => 'GB',
+    'gl' => 'ES',
+    'gn' => 'PY',
+    'gsw' => 'CH FR LI',
+    'gu' => 'IN',
+    'guz' => 'KE',
+    'gv' => 'IM',
+    'ha' => 'NG GH NE',
+    'haw' => 'US',
+    'he' => 'IL',
+    'hi' => 'IN',
+    'ho' => 'PG',
+    'hr' => 'HR BA',
+    'hsb' => 'DE',
+    'ht' => 'HT',
+    'hu' => 'HU',
+    'hy' => 'AM',
+    'hz' => 'NA',
+    'id' => 'ID',
+    'ie' => 'EE',
+    'ig' => 'NG',
+    'ii' => 'CN',
+    'ik' => 'US',
+    'is' => 'IS',
+    'it' => 'IT CH SM VA',
+    'iu' => 'CA',
+    'ja' => 'JP',
+    'jgo' => 'CM',
+    'jmc' => 'TZ',
+    'jv' => 'ID',
+    'ka' => 'GE',
+    'kab' => 'DZ',
+    'kam' => 'KE',
+    'kbd' => 'RU TR',
+    'kde' => 'TZ',
+    'kea' => 'CV',
+    'kek' => 'GT',
+    'kg' => 'CD',
+    'kgp' => 'BR',
+    'khq' => 'ML',
+    'ki' => 'KE',
+    'kj' => 'NA',
+    'kk' => 'KZ CN',
+    'kkj' => 'CM',
+    'kl' => 'GL',
+    'kln' => 'KE',
+    'km' => 'KH',
+    'kn' => 'IN',
+    'ko' => 'KR CN KP',
+    'kok' => 'IN',
+    'kr' => 'NG',
+    'ks' => 'IN',
+    'ksb' => 'TZ',
+    'ksf' => 'CM',
+    'ksh' => 'DE',
+    'ku' => 'TR IQ SY',
+    'kv' => 'RU',
+    'kw' => 'GB',
+    'kxv' => 'IN',
+    'ky' => 'KG',
+    'la' => 'VA',
+    'lag' => 'TZ',
+    'lb' => 'LU',
+    'lg' => 'UG',
+    'li' => 'NL',
+    'lij' => 'IT',
+    'lkt' => 'US',
+    'lld' => 'IT',
+    'lmo' => 'IT',
+    'ln' => 'CD AO CF CG',
+    'lo' => 'LA',
+    'lrc' => 'IR IQ',
+    'lt' => 'LT',
+    'lu' => 'CD',
+    'luo' => 'KE',
+    'luy' => 'KE',
+    'lv' => 'LV',
+    'mai' => 'IN',
+    'mas' => 'KE TZ',
+    'mer' => 'KE',
+    'mfe' => 'MU',
+    'mg' => 'MG',
+    'mgh' => 'MZ',
+    'mgo' => 'CM',
+    'mh' => 'MH',
+    'mi' => 'NZ',
+    'mk' => 'MK',
+    'ml' => 'IN',
+    'mn' => 'MN',
+    'mni' => 'IN',
+    'mr' => 'IN',
+    'ms' => 'MY BN ID SG',
+    'mt' => 'MT',
+    'mua' => 'CM',
+    'my' => 'MM',
+    'mzn' => 'IR',
+    'na' => 'NR',
+    'naq' => 'NA',
+    'nb' => 'NO SJ',
+    'nd' => 'ZW',
+    'nds' => 'DE NL',
+    'ne' => 'NP IN',
+    'ng' => 'NA',
+    'nl' => 'NL AW BE BQ CW SR SX',
+    'nmg' => 'CM',
+    'nn' => 'NO',
+    'nnh' => 'CM',
+    'no' => 'NO',
+    'nqo' => 'GN',
+    'nr' => 'ZA',
+    'nso' => 'ZA',
+    'nus' => 'SS',
+    'nv' => 'US',
+    'ny' => 'MW',
+    'nyn' => 'UG',
+    'oc' => 'FR ES',
+    'oj' => 'CA',
+    'om' => 'ET KE',
+    'or' => 'IN',
+    'os' => 'GE RU',
+    'pa' => 'IN PK',
+    'pcm' => 'NG',
+    'pi' => 'GB',
+    'pl' => 'PL',
+    'pms' => 'IT',
+    'prg' => 'PL',
+    'ps' => 'AF PK',
+    'pt' => 'BR AO CH CV GQ GW LU MO MZ PT ST TL',
+    'qu' => 'PE BO EC',
+    'quc' => 'GT',
+    'raj' => 'IN',
+    'rm' => 'CH',
+    'rn' => 'BI',
+    'ro' => 'RO MD',
+    'rof' => 'TZ',
+    'ru' => 'RU BY KG KZ MD UA',
+    'rw' => 'RW',
+    'rwk' => 'TZ',
+    'sa' => 'IN',
+    'sah' => 'RU',
+    'saq' => 'KE',
+    'sat' => 'IN',
+    'sbp' => 'TZ',
+    'sc' => 'IT',
+    'scn' => 'IT',
+    'sd' => 'PK IN',
+    'se' => 'NO FI SE',
+    'seh' => 'MZ',
+    'ses' => 'ML',
+    'sg' => 'CF',
+    'shi' => 'MA',
+    'shn' => 'MM TH',
+    'si' => 'LK',
+    'sk' => 'SK',
+    'sl' => 'SI',
+    'sm' => 'WS',
+    'smn' => 'FI',
+    'sn' => 'ZW',
+    'so' => 'SO DJ ET KE',
+    'sq' => 'AL MK',
+    'sr' => 'RS BA ME',
+    'ss' => 'ZA',
+    'st' => 'ZA LS',
+    'su' => 'ID',
+    'suz' => 'NP',
+    'sv' => 'SE AX FI',
+    'sw' => 'TZ CD KE UG',
+    'syr' => 'IQ SY',
+    'szl' => 'PL',
+    'ta' => 'IN LK MY SG',
+    'te' => 'IN',
+    'teo' => 'UG KE',
+    'tg' => 'TJ',
+    'th' => 'TH',
+    'ti' => 'ET ER',
+    'tk' => 'TM',
+    'tl' => 'PH',
+    'tn' => 'ZA BW',
+    'to' => 'TO',
+    'tr' => 'TR CY',
+    'ts' => 'ZA',
+    'tt' => 'RU',
+    'tw' => 'GH',
+    'twq' => 'NE',
+    'ty' => 'PF',
+    'tyv' => 'RU',
+    'tzm' => 'MA',
+    'ug' => 'CN',
+    'uk' => 'UA',
+    'ur' => 'PK IN',
+    'uz' => 'UZ AF',
+    'vai' => 'LR',
+    've' => 'ZA',
+    'vec' => 'IT',
+    'vi' => 'VN',
+    'vmw' => 'MZ',
+    'vun' => 'TZ',
+    'wa' => 'BE',
+    'wae' => 'CH',
+    'wo' => 'SN',
+    'xh' => 'ZA',
+    'xnr' => 'IN',
+    'xog' => 'UG',
+    'yav' => 'CM',
+    'yi' => 'UA',
+    'yo' => 'NG BJ',
+    'yrl' => 'BR CO VE',
+    'yue' => 'HK CN MO',
+    'za' => 'CN',
+    'zgh' => 'MA',
+    'zh' => 'CN HK MO MY SG TW',
+    'zu' => 'ZA',
+    ]);
+}
+
+if (!function_exists('qs_social_language_territories')) {
+    /** A language's territories, its usual one first; none for a language CLDR gives none. @return list<string> */
+    function qs_social_language_territories(string $lang): array
+    {
+        $codes = QS_SOCIAL_LANGUAGE_TERRITORIES[$lang] ?? '';
+        return $codes === '' ? [] : explode(' ', $codes);
+    }
+}
+
+if (!function_exists('qs_social_usual_territory')) {
+    /** The territory a language's address announces when the author chose none, or null for a language with none. */
+    function qs_social_usual_territory(string $lang): ?string
+    {
+        return qs_social_language_territories($lang)[0] ?? null;
+    }
+}
+
 if (!function_exists('qs_social_value_problem')) {
     /**
      * Why a stored social value is not one the writer could have written, or null when it is one. The one
@@ -56,7 +391,8 @@ if (!function_exists('qs_social_value_problem')) {
      *   cardType    `large` or `small`
      *   xAccount    `@` and 1 to 15 letters, digits or `_`
      *   themeColor  `#` and 6 hexadecimal digits (the writer doubles a 3-digit one: Discord reads 6 or 8 alone)
-     *   locales     a map of a language code (2 or 3 small letters) to its territory (2 capital letters)
+     *   locales     a map of a language code (2 or 3 small letters) to one of its territories
+     *               (QS_SOCIAL_LANGUAGE_TERRITORIES)
      *
      * @param mixed $value
      */
@@ -92,8 +428,14 @@ if (!function_exists('qs_social_value_problem')) {
                     if (preg_match('/^[a-z]{2,3}$/D', (string) $code) !== 1) {
                         return "'" . $code . "' is not a language code";
                     }
-                    if (!is_string($territory) || preg_match('/^[A-Z]{2}$/D', $territory) !== 1) {
-                        return "the territory of '" . $code . "' is two capital letters (FR, BE, CA)";
+                    $codes = qs_social_language_territories((string) $code);
+                    if (!$codes) {
+                        return "'" . $code . "' has no territory: CLDR gives that language none";
+                    }
+                    if (!is_string($territory) || !in_array($territory, $codes, true)) {
+                        return "the territory of '" . $code . "' is one of the " . count($codes) . ' CLDR gives that language, in capitals ('
+                            . implode(', ', array_slice($codes, 0, 3)) . (count($codes) > 3 ? ', ...' : '')
+                            . "; getSocialPreview's territories lists them)";
                     }
                 }
                 return null;
@@ -253,12 +595,14 @@ if (!function_exists('qs_social_tag_list')) {
             $add('property', 'og:url', qs_full_address((string) $in['sitePath'], $derivedBase));
             $add('property', 'og:site_name', $in['siteName'] ?? null);
 
+            // Each language's territory: the author's, else the language's usual one.
             $locales = $site['locales'] ?? [];
-            if (isset($locales[$lang])) {
-                $add('property', 'og:locale', $lang . '_' . $locales[$lang]);
+            $territory = static fn(string $code): ?string => $locales[$code] ?? qs_social_usual_territory($code);
+            if (($own = $territory($lang)) !== null) {
+                $add('property', 'og:locale', $lang . '_' . $own);
                 foreach ((array) ($in['languages'] ?? []) as $other) {
-                    if ($other !== $lang && isset($locales[$other])) {
-                        $add('property', 'og:locale:alternate', $other . '_' . $locales[$other]);
+                    if ($other !== $lang && ($theirs = $territory((string) $other)) !== null) {
+                        $add('property', 'og:locale:alternate', $other . '_' . $theirs);
                     }
                 }
             }

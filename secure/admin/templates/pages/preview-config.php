@@ -167,6 +167,7 @@ window.PreviewConfig = {
     // Panel-specific keys are in i18nPanels below and merged on first tab activation.
     i18n: {
         // ── Common ──
+        cancel: <?= json_encode(__admin('common.cancel', 'Cancel')) ?>,
         delete: <?= json_encode(__admin('common.delete', 'Delete')) ?>,
         edit: <?= json_encode(__admin('common.edit', 'Edit')) ?>,
         error: <?= json_encode(__admin('common.error', 'Error')) ?>,
@@ -237,6 +238,18 @@ window.PreviewConfig = {
         switchToPageConfirm: <?= qs_inline_script_json(__admin('preview.switchToPageConfirm')) ?>,
         pageTitleSaved: <?= qs_inline_script_json(__admin('preview.pageTitleSaved')) ?>,
         pageTitleSaveFailed: <?= qs_inline_script_json(__admin('preview.pageTitleSaveFailed')) ?>,
+        pageDescriptionSaved: <?= qs_inline_script_json(__admin('preview.pageDescriptionSaved')) ?>,
+        pageDescriptionRemoved: <?= qs_inline_script_json(__admin('preview.pageDescriptionRemoved')) ?>,
+        pageDescriptionSaveFailed: <?= qs_inline_script_json(__admin('preview.pageDescriptionSaveFailed')) ?>,
+        pageDescriptionDialog: <?= qs_inline_script_json(__admin('preview.pageDescriptionDialog')) ?>,
+        pageDescriptionDialogHint: <?= qs_inline_script_json(__admin('preview.pageDescriptionDialogHint')) ?>,
+        pageDescriptionCount: <?= qs_inline_script_json(__admin('preview.pageDescriptionCount')) ?>,
+        // The description's length mark, in the Social previews page's words (one wording for both).
+        socialCutBy: <?= qs_inline_script_json(__admin('socialPreviews.cutBy')) ?>,
+        socialCutItem: <?= qs_inline_script_json(__admin('socialPreviews.cutItem')) ?>,
+        socialUnitCharacters: <?= qs_inline_script_json(__admin('socialPreviews.unitCharacters')) ?>,
+        socialUnitBytes: <?= qs_inline_script_json(__admin('socialPreviews.unitBytes')) ?>,
+        socialPlatformNames: <?= qs_inline_script_json(['x-large' => __admin('socialPreviews.platformName.x-large'), 'x-small' => __admin('socialPreviews.platformName.x-small')]) ?>,
         editTargetGone: <?= qs_inline_script_json(__admin('preview.editTargetGone')) ?>,
         positionInside: <?= qs_inline_script_json(__admin('preview.positionInside')) ?>,
         positionInsideEnd: <?= qs_inline_script_json(__admin('preview.positionInsideEnd')) ?>,

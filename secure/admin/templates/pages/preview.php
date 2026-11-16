@@ -149,4 +149,6 @@ if (is_dir($componentsDir)) {
 <?php include __DIR__ . '/preview/modals/translate-csv.php'; ?>
 
 <script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/components/colorpicker.js') ?>"></script>
+<!-- The description field's length mark judges by the platform table, as the Social previews page does -->
+<script src="<?= $baseUrl ?>/admin/assets/js/core/social-figures.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/social-figures.js') ?>"></script>
 <?php include __DIR__ . '/preview-config.php'; ?>

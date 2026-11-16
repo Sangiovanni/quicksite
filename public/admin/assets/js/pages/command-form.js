@@ -1063,27 +1063,18 @@ async function _initArmSelect(form, cfg) {
 }
 
 /**
- * A picture from Media: a searchable dropdown of Media's images, each written as
- * Media names it (`images/<file>`), SVG left out (no platform draws one, and
- * setSocialPreview refuses it). The panel's assets arm answers file names; a read
- * that fails leaves the field a text box, still submittable.
+ * A picture from Media: a searchable dropdown of the pictures a card can show
+ * (QSMediaPictures, js/core/media-pictures.js, the list the Social previews page
+ * offers too). A read that fails leaves the field a text box, still submittable.
  *
  * @param {HTMLFormElement} form
  * @param {Object} cfg  a FIELD_PICKERS row: param, placeholder (a word's key)
  */
 async function _initMediaPicturePicker(form, cfg) {
     const input = form.querySelector('[name="' + cfg.param + '"]');
-    if (!input || input.tagName === 'SELECT') return;
-    let rows;
-    try {
-        rows = await QuickSiteAdmin.fetchHelperData('assets', ['images']);
-    } catch (e) {
-        return;
-    }
-    if (!Array.isArray(rows)) return;
-    const pictures = rows
-        .filter(row => !/\.svgz?$/i.test(String(row.value)))
-        .map(row => ({ value: 'images/' + row.value, label: row.label }));
+    if (!input || input.tagName === 'SELECT' || !window.QSMediaPictures) return;
+    const pictures = await window.QSMediaPictures.list();
+    if (!pictures) return;
     const select = _swapForSelect(form, cfg.param);
     if (!select) return;
     const placeholder = t(cfg.placeholder);

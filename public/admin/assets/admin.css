@@ -4393,6 +4393,74 @@ kbd {
     box-shadow: 0 0 0 3px #d9770633;
 }
 
+/* The page description's length mark: how many platforms would cut it (its title names them) */
+.preview-toolbar__cut {
+    font-size: var(--font-size-xs);
+    color: var(--admin-warning);
+    white-space: nowrap;
+}
+
+/* The description's expand button, at the field's end */
+.preview-toolbar__expand {
+    flex-shrink: 0;
+}
+
+/* The description's dialog, in the one modal: wider than a question, its text area as wide as it, its title and its x on
+   one line at every width, its body scrolling inside the screen's height and its buttons wrapping */
+.preview-description-dialog {
+    display: flex;
+    flex-direction: column;
+    max-width: 40rem;
+    width: calc(100% - 2 * var(--space-md));
+    max-height: 90vh;
+    box-sizing: border-box;
+    padding: var(--space-lg);
+    text-align: left;
+}
+.preview-description-dialog__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+.preview-description-dialog__header .admin-modal-dialog__title {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.preview-description-dialog__header .admin-modal__close {
+    flex-shrink: 0;
+    font-size: var(--font-size-xl);
+    line-height: 1;
+}
+.preview-description-dialog__body {
+    min-height: 0;
+    overflow-y: auto;
+    margin: var(--space-md) 0;
+}
+.preview-description-dialog__text {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 8em;
+    resize: vertical;
+    font-family: inherit;
+}
+.preview-description-dialog__count,
+.preview-description-dialog__cut {
+    margin: var(--space-xs) 0 0;
+    font-size: var(--font-size-xs);
+}
+.preview-description-dialog__count {
+    color: var(--admin-text-muted);
+}
+.preview-description-dialog__cut {
+    color: var(--admin-warning);
+}
+.preview-description-dialog__actions {
+    justify-content: flex-end;
+}
+
 /* Create Component Button (+ next to dropdown) */
 .preview-toolbar__add-btn {
     display: flex;

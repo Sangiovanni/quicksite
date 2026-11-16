@@ -2,7 +2,7 @@
 /**
  * The visual editor's controls: ONE definition of what each tool and each of Select's buttons needs, and of
  * what the simple view leaves out. Read by the tool row (templates/pages/preview/tools.php), Select's panel
- * (contextual-select.php) and CSS's panel (contextual-style.php).
+ * (contextual-select.php), CSS's panel (contextual-style.php) and the toolbar's page fields (toolbar.php).
  *
  * `requires`: the commands a role must hold for the editor to offer the control. They are the commands the
  *   control itself sends, so a role without them would only meet the server's refusal. Drawn as
@@ -57,6 +57,10 @@ if (!function_exists('qs_editor_controls')) {
             'select.translate-csv'  => ['requires' => ['importStructureTranslations']],
             // Emulation only fills the preview with sample values, kept in this browser: it writes nothing.
             'select.emulation'      => [],
+
+            // The toolbar's page fields: each saves when it is left, so a role that cannot save it is not shown it.
+            'toolbar.title'         => ['requires' => ['editTitle']],
+            'toolbar.description'   => ['requires' => ['setSocialPreview']],
         ];
     }
 

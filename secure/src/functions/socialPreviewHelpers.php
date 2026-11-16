@@ -32,12 +32,21 @@ if (!defined('QS_SOCIAL_FILE_KEYS')) {
  * and the value is null, so nothing is judged by it) and `source` (where it was read, or looked for). A `height`
  * of null means the platform states a width alone. Sizes in pixels, files in bytes (a platform's "5 MB" read as
  * 5,000,000, the stricter reading), texts in `unit` (characters, or bytes where the platform counts bytes).
+ * `picture.thumbnail` names the figures of `picture` (`min`, `maxBytes`, `shape`) a picture may miss and still be
+ * drawn, as a small picture beside the text; a picture that misses any other is not drawn.
+ * `lines` is how many lines of the title and of the description the card shows on a `computer` and on a `phone`
+ * (0: not shown on that device); the platform's length is cut first, then its lines.
  * X's card documentation left its live site in 2026: its figures are read from the last copies of X's own pages
  * (the Internet Archive's, dated in the source address), which nothing has replaced.
  */
 if (!defined('QS_SOCIAL_PLATFORMS')) {
     define('QS_SOCIAL_PLATFORMS', (static function (): array {
         $none = static fn(string $source): array => ['value' => null, 'published' => false, 'source' => $source];
+        // A count of lines per device, or none published.
+        $lines = static fn(?int $computer, ?int $phone, bool $published, string $source): array
+            => ['computer' => $computer, 'phone' => $phone, 'published' => $published, 'source' => $source];
+        $noLines = static fn(string $source): array => [
+            'title' => $lines(null, null, false, $source), 'description' => $lines(null, null, false, $source)];
         $fb = 'https://developers.facebook.com/documentation/sharing/webmasters/images';
         $fbTags = 'https://developers.facebook.com/docs/sharing/webmasters/';
         $xLarge = 'https://web.archive.org/web/20260204074639/https://developer.x.com/en/docs/x-for-websites/cards/overview/summary-card-with-large-image';
@@ -51,7 +60,7 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
         $tg = 'https://core.telegram.org/constructor/webPage';
         $ap = 'https://developer.apple.com/documentation/technotes/tn3156-create-rich-previews-for-messages';
         $ig = 'https://about.instagram.com/blog/announcements/expanding-sharing-links-in-stories-to-everyone';
-        $x = static function (string $card, string $source, int $minW, int $minH, float $shape) use ($xFormats, $xMarkup): array {
+        $x = static function (string $card, string $source, int $minW, int $minH, float $shape) use ($xFormats, $xMarkup, $none, $lines): array {
             return [
                 'name'    => $card === 'large' ? 'X (large card)' : 'X (small card)',
                 'card'    => $card,
@@ -65,9 +74,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => ['value' => $shape, 'published' => true, 'source' => $source],
                     'maxBytes'    => ['value' => 5000000, 'published' => true, 'source' => $source],
                     'formats'     => ['value' => $xFormats, 'published' => true, 'source' => $source],
+                    'thumbnail'   => $none($source),
                 ],
                 'title'       => ['value' => 70, 'unit' => 'characters', 'published' => true, 'source' => $xMarkup],
                 'description' => ['value' => 200, 'unit' => 'characters', 'published' => true, 'source' => $xMarkup],
+                'lines'       => ['title' => $lines(1, 2, true, $source), 'description' => $lines(3, 0, true, $source)],
                 'notes'   => 'The title shows on 1 line on a computer and 2 on a phone; the description shows on 3 lines on a computer and not at all on a phone (X\'s last published rule). An animated GIF shows its first frame. X has no checker since 2022: it reads a card again about every 7 days, sooner for a new address.',
             ];
         };
@@ -84,9 +95,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => ['value' => 1.91, 'published' => true, 'source' => $fb],
                     'maxBytes'    => ['value' => 8000000, 'published' => true, 'source' => $fb],
                     'formats'     => $none($fb),
+                    'thumbnail'   => ['value' => [], 'published' => true, 'source' => $fb],
                 ],
                 'title'       => $none($fbTags) + ['unit' => 'characters'],
                 'description' => $none($fbTags) + ['unit' => 'characters'],
+                'lines'       => $noLines($fbTags),
                 'notes'   => 'Under 600 × 315 the picture is drawn much smaller. A picture is cached by its address: a new picture needs a new address, and a share already made keeps its card.',
             ],
             'x-large' => $x('large', $xLarge, 300, 157, 2.0),
@@ -103,9 +116,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => ['value' => 1.91, 'published' => true, 'source' => $li],
                     'maxBytes'    => ['value' => 5000000, 'published' => true, 'source' => $li],
                     'formats'     => $none($li),
+                    'thumbnail'   => ['value' => ['min'], 'published' => true, 'source' => $li],
                 ],
                 'title'       => $none($li) + ['unit' => 'characters'],
                 'description' => $none($li) + ['unit' => 'characters'],
+                'lines'       => $noLines($li),
                 'notes'   => 'LinkedIn names 1200 × 627 its minimum; a picture under 401 pixels wide shows as a thumbnail (a note its help page places after the advertising figures). A refreshed card shows on new posts only.',
             ],
             'whatsapp' => [
@@ -120,9 +135,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => ['value' => null, 'maxRatio' => 4.0, 'published' => true, 'source' => $wa],
                     'maxBytes'    => ['value' => 600000, 'published' => true, 'source' => $wa],
                     'formats'     => $none($wa),
+                    'thumbnail'   => ['value' => ['min', 'maxBytes', 'shape'], 'published' => true, 'source' => $wa],
                 ],
                 'title'       => $none($wa) + ['unit' => 'characters'],
                 'description' => ['value' => 80, 'unit' => 'characters', 'published' => true, 'source' => $wa],
+                'lines'       => ['title' => $lines(2, 2, true, $wa), 'description' => $lines(2, 2, true, $wa)],
                 'notes'   => 'A picture under 600 KB, at least 300 pixels wide and no wider than 4 times its height gets the large preview; any other, the small one. The title shows in bold on up to 2 lines, the description on 1 or 2 (about 80 characters). No checker: type the link in a message without sending it.',
             ],
             'discord' => [
@@ -137,9 +154,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => $none($dc),
                     'maxBytes'    => $none($dc),
                     'formats'     => ['value' => ['image/png', 'image/gif', 'image/jpeg', 'image/webp', 'image/avif'], 'published' => true, 'source' => $dc],
+                    'thumbnail'   => $none($dc),
                 ],
                 'title'       => ['value' => 70, 'unit' => 'bytes', 'published' => true, 'source' => $dc],
                 'description' => ['value' => 350, 'unit' => 'bytes', 'published' => true, 'source' => $dc],
+                'lines'       => ['title' => $lines(3, 3, true, $dc), 'description' => $lines(20, 20, true, $dc)],
                 'notes'   => 'Lengths are in bytes: an accented letter takes two or more, so a French title is cut sooner. The title shows on up to 3 lines, the description on up to 20. A card is cached about 30 minutes; a new query string on the address shows a change at once.',
             ],
             'slack' => [
@@ -154,9 +173,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => $none($sl),
                     'maxBytes'    => $none($sl),
                     'formats'     => $none($sl),
+                    'thumbnail'   => $none($sl),
                 ],
                 'title'       => $none($sl) + ['unit' => 'characters'],
                 'description' => $none($sl) + ['unit' => 'characters'],
+                'lines'       => $noLines($sl),
                 'notes'   => 'Slack publishes no picture or text figure. A card is cached about 30 minutes.',
             ],
             'telegram' => [
@@ -171,9 +192,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => $none($tg),
                     'maxBytes'    => $none($tg),
                     'formats'     => $none($tg),
+                    'thumbnail'   => $none($tg),
                 ],
                 'title'       => $none($tg) + ['unit' => 'characters'],
                 'description' => $none($tg) + ['unit' => 'characters'],
+                'lines'       => $noLines($tg),
                 'notes'   => 'The person sending the link chooses a large or a small picture. Telegram publishes no figure; its preview bot, which reads a link again, is not in its documentation.',
             ],
             'imessage' => [
@@ -188,9 +211,11 @@ if (!defined('QS_SOCIAL_PLATFORMS')) {
                     'shape'       => $none($ap),
                     'maxBytes'    => ['value' => 10000000, 'published' => true, 'source' => $ap],
                     'formats'     => $none($ap),
+                    'thumbnail'   => $none($ap),
                 ],
                 'title'       => $none($ap) + ['unit' => 'characters'],
                 'description' => $none($ap) + ['unit' => 'characters'],
+                'lines'       => $noLines($ap),
                 'notes'   => 'A picture under 150 pixels wide may be left out or drawn as an icon. The 10 MB is every picture, icon and video of the page together; the page itself at most 1 MB. No checker: send the link in Messages.',
             ],
             'instagram' => [
@@ -547,7 +572,12 @@ function qs_social_warnings(?array $picture, string $title, ?string $description
             $bytes = is_int($picture['size'] ?? null) ? $picture['size'] : null;
             $max = $p['picture']['maxBytes']['value'] ?? null;
             if ($bytes !== null && is_int($max) && $bytes > $max) {
-                $warn('picture.too_large', $max, $bytes, "{$p['name']} does not show a picture file over " . qs_format_size($max));
+                // A platform whose small-picture rule names the file size (picture.thumbnail: WhatsApp) shows such a
+                // file small, beside the text; the others show none.
+                $small = in_array('maxBytes', (array) ($p['picture']['thumbnail']['value'] ?? []), true);
+                $warn('picture.too_large', $max, $bytes, $small
+                    ? "{$p['name']} shows a picture file over " . qs_format_size($max) . ' small, beside the text'
+                    : "{$p['name']} does not show a picture file over " . qs_format_size($max));
             }
             $mime = is_string($picture['mime_type'] ?? null) ? strtolower($picture['mime_type']) : null;
             $formats = $p['picture']['formats']['value'] ?? null;
@@ -651,5 +681,11 @@ function qs_social_report(string $projectPath, ?string $onlyRoute): array
         'site'         => (object) $values['site'],
         'pages'        => (object) $pages,
         'platforms'    => qs_social_platforms(),
+        // Each language's territories, from the one table the shape check reads: the usual one (announced when none
+        // is chosen), and every one it may be given, the usual one first. A language CLDR gives none: null and [].
+        'territories'  => (object) array_combine($languages, array_map(static fn(string $lang): array => [
+            'usual' => qs_social_usual_territory($lang),
+            'codes' => qs_social_language_territories($lang),
+        ], $languages)),
     ];
 }

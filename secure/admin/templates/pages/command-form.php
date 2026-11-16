@@ -170,6 +170,8 @@ foreach (getCommandCategories() as $qsCategory) {
     window.QS_SNIPPET_CATEGORIES = <?= json_encode($qsSnippetCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
     window.QS_TAG_GROUPS = <?= qs_inline_script_json(array_values($qsTagGroups)) ?>;
 </script>
+<!-- The pictures a card can show (setSocialPreview's picture field), the list the Social previews page offers too -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/core/media-pictures.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/media-pictures.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/command-form.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/command-form.js') ?>"></script>
 
 </div> <!-- .admin-command-form-page -->

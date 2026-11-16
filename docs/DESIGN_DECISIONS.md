@@ -15892,7 +15892,7 @@ rows and adding a search box over them; *Forget* on the *Selected* row under the
 `public/admin/assets/js/pages/members.js` (`forgetGoneContact()`, the contacts dropdown),
 `secure/admin/templates/pages/members.php`.
 
-### Every page carries its link-preview tags, their addresses composed when it is served (locked 2026-11-14)
+### Every page carries its link-preview tags, their addresses composed when it is served (locked 2026-11-14) (superseded 2026-11-16)
 
 **Decision**: Every page writes, right after its `<title>`, the description, Open Graph and X tags a platform draws a
 shared link's card from, in the HTML the server sends (the platforms' crawlers run no script). One function produces
@@ -15939,3 +15939,111 @@ worker's questions the same day; beta.12. `secure/src/functions/socialPreview.ph
 `requestRuntime.php` (`qs_request_is_https()`, `qs_declared_public_base()`, `qs_full_address()`),
 `secure/src/classes/Page.php`, `PageManagement.php`, `secure/management/command/getSocialPreview.php`,
 `setSocialPreview.php`, `build.php`.
+
+### The social previews page draws each platform's card from the engine's table, one device at a time (locked 2026-11-15)
+
+**Decision**: An Advanced-menu page, in a **Site** group after Sitemap, shows the card a shared link of the site gets on
+Facebook, X (the
+large or the small card, as the page asks), LinkedIn, WhatsApp, Discord, Slack, Telegram and iMessage, for one page and
+one language at a time, and sets the values the cards are drawn from. One list at its top names the whole site or one
+page, and drives both the one form below and the cards: the site's values (a picture from Media, the card type, an X
+account, a theme colour, and the territory of the language shown, from that language's territories in the engine:
+see entry below), with the home page's cards; or a page's (a picture and a card type, each the site's unless the page
+sets one, its description in the language shown), with its own cards. On a multilingual site the form shows the
+language at the top's own fields (the territory, a page's title and description) and says which fields every
+language shares; switching the language keeps what was typed in those. A **Computer** / **Phone** switch draws every card for one device; the choice is kept per browser.
+Each card names its platform in words, with no logo, and is a look-alike: the page says so, dates each platform's
+figures and links its checker; Instagram is a line, as it draws no card for a link. Every figure a card uses is read
+from `getSocialPreview`'s platform table, never written in the page: the picture's crop from the platform's shape (the
+picture whole where none is published), whether it is drawn large, small beside the text or not at all from the
+platform's minimum, file size, widest shape and formats and from the rules it publishes a small picture for, the
+texts' cut from its lengths (in characters, or bytes where it counts bytes), and the lines a computer and a phone show,
+which the table gained for this. A figure the platform does not publish draws nothing and the card says so. The width
+of a card is the look-alike's own, one per device. Every role opens the page; the forms are drawn only for a role that
+can run `setSocialPreview`, and a viewer reads the same values as text. A field emptied is sent empty, which removes
+its value. In the visual editor, a **Description** field sits beside the title, behaving as the title does except that
+an emptied description is removed, and marks the platforms that would cut it as it is typed, by the same table; a button
+at its end opens the whole description in a dialog (a text area, its length, those platforms in a sentence, Save and
+Cancel), so a long one can be read and written without the toolbar growing; both fields are in the editor's one
+definition of what a role is shown, so a viewer sees neither.
+
+**Reasoning**: Sangio asked for "a preview for each social media" that ensures "the preview fit the social media", and
+for each platform's row "a last update ... in case they change", so the author "will see the render directly and adapt
+manually if needed": a card that crops and cuts by the platform's own published figures is that render, and a page
+that held a copy of the figures would go stale apart from the engine's warnings. One device at a time keeps sixteen
+cards to eight, and the difference between the two is mostly what the table now says (X shows a title on one line on
+a computer and two on a phone, and no description on a phone). A logo is brand artwork the tree would have to carry, or
+fetch; the platform's name says whose card it is. The page is for an author who looks further than the title and the
+description, which a beginner sets in the editor and which the cards are drawn from, so it is Advanced only. It sits in
+a **Site** group with Sitemap, whose word opens Sitemap, rather than as a link of its own: one more link wrapped the
+Advanced menu onto a second row on every page at laptop widths (from 1280 to 1439 pixels in English, 1366 to 1599 in
+French, measured), while the group leaves the header as it was at every width in both languages; in simple the group
+holds Sitemap alone and is drawn as its link, so the simple menu does not change. Both pages decide what the world
+sees of the site, as their two write commands share a category for that reason. One list at the top replaced two
+stacked sections, the site's then a page's, in Sangio's UX run: one choice says both what is set and what is drawn, and
+the inheritance shows in each field's first choice. A territory is a list, not two typed letters, and the list is the
+language's (see entry below): the browser names each code in any language, so the engine holds the codes alone. The
+territory is one field, for the language at the top, as a page's description is: Sangio asked for "the territory of
+only the language selected", and for the fields every language shares to say so, so that changing the language does
+not look like it changes them. Every first choice of the page's lists (no picture, the site's, none, the whole site)
+can be chosen again after another, which the panel's searchable list did not allow for an option of empty value.
+
+**Alternatives considered**: both devices side by side (twice the cards, with most of them alike); each platform's logo
+(artwork in the tree, or a fetch to a third party); the figures written in the page's code (a second copy that would
+drift from the engine's table and its warnings); the line counts read from the table's notes (prose, not figures); a
+width per platform (no platform publishes the width of its card); the page in the simple menu (a beginner has the
+title and the description in the editor); a link of its own after Sitemap (the Advanced menu on two rows at laptop
+widths, on every page); a group named Sitemap (its arrow still wrapped the French menu from 1366 to 1439 pixels);
+the site's values and a page's in two sections one above the other (the first build, which Sangio's run found
+harder to read than one choice); a toolbar Description field that grows as it is typed (the toolbar and the page
+under it would move with every line); a territory typed as two letters (any two capital letters were taken); a table of
+territory names in the engine (the browser names each one in the panel's language); a territory list per language, all
+at once (the first build: the language at the top already says which language is set); an X account per language
+(X documents `twitter:site` only as its card's attribution, and whether a card shows it is X's choice: a change of the
+stored values for an effect no one can see; the other platforms read Open Graph, which names no account).
+
+**Source**: the design round of 2026-11-14 and the worker's questions of 2026-11-15 (Sangio's rulings, each asked with
+a recommendation; his answers: "As recommended", "A Site group" on the menu's place, and his choices on the page's layout and the
+territory in his UX run of 2026-11-16); beta.12. `secure/admin/templates/pages/social-previews.php`,
+`public/admin/assets/js/pages/social-previews.js`, `public/admin/assets/js/core/social-figures.js`,
+`public/admin/assets/js/core/media-pictures.js`, `public/admin/assets/css/social-previews.css`,
+`secure/src/functions/socialPreviewHelpers.php` (`lines`, `picture.thumbnail`), `secure/admin/functions/editorTools.php`
+(`toolbar.title`, `toolbar.description`), `secure/admin/functions/panelMenu.php` (the Site group),
+`public/admin/assets/js/core/searchable-select.js` (`emptyChoice`).
+
+### A language's territories come from Unicode CLDR, its usual one announced when none is chosen (locked 2026-11-16)
+
+**Supersedes**: the territories portion of the ["Every page carries its link-preview tags
+…"](#every-page-carries-its-link-preview-tags-their-addresses-composed-when-it-is-served-locked-2026-11-14-superseded-2026-11-16)
+entry above: no table of territories in the engine, and `og:locale` written only for a language the author gave a
+territory.
+
+**Decision**: A language may be given only the territories where Unicode CLDR has it: the regions of its CLDR locales
+and its likely one, each an officially assigned ISO 3166-1 alpha-2 code (French: Belgium, Canada, Switzerland, Senegal
+and 42 more, never Argentina), held in one table in `socialPreview.php`, which a build carries, with its source and
+the date it was read. The likely one is the language's usual territory: a page announces the territory the author
+chose for its language, else the usual one (`fr_FR` for a French page with none chosen), and each other language as an
+alternate by the same rule; a language CLDR gives none (Esperanto) announces none. The table holds every language of a
+CLDR locale and every language of the shipped language list, one CLDR has no locale for with its likely territory
+alone, and a language added to the list is checked there in the same change. The one shape check refuses any other
+pair (French with AR), so the import, a served page and the panel agree with `setSocialPreview`; `getSocialPreview`
+answers each project language's usual territory and its list. A language has one territory, its default one: a
+QuickSite address is a language's (`/fr/about`), never a territory's.
+
+**Reasoning**: Sangio's UX run found a list of every code odd for a language ("it feel ok to have FR_be, but FR_ar ?")
+and asked for the language's own list, in the engine, open to the languages QuickSite will add, with a note that
+adding a language means checking the table. With no territory a page wrote no `og:locale`, and Facebook then takes it
+for American English (`en_US`), a French page included: the language's usual territory is the better default. A
+platform draws the card of an address, and QuickSite has one address per language, so several territories of one
+language could not get cards of their own: that needs languages with a region, each with its address, which the engine
+does not have. Sangio kept one territory per language, the language's default one, and takes regional languages to the
+version's manager.
+
+**Alternatives considered**: every officially assigned code for every language (French offering Argentina); the
+browser's own locale data (no table, but Chromium carries locales for part of the languages only, and the list would
+differ between browsers); no `og:locale` when none is chosen (the platforms then assume American English); a card per
+page, language and territory (no address serves a territory, so no card would show those values).
+
+**Source**: Sangio's UX run and his answers to the worker's questions of 2026-11-16; beta.12.
+`secure/src/functions/socialPreview.php` (`QS_SOCIAL_LANGUAGE_TERRITORIES`, `qs_social_language_territories()`,
+`qs_social_usual_territory()`), `socialPreviewHelpers.php` (`territories`).

@@ -74,6 +74,11 @@ window.QuickSiteStorageKeys = Object.freeze({
     tagShowHtmlCode:     'tagSelector_showHtmlCode',
     addFavoriteTags:     'qs-add-favorite-tags',
 
+    // Social previews — the device the cards are drawn for: 'phone', or
+    // anything else (or nothing) for a computer. One per browser, for every
+    // project: a way of looking, not the project's.
+    socialPreviewDevice: 'qs_social_preview_device',
+
     // Operator update notice. Written only in a browser signed in as an account
     // named in operator.php — nobody else runs update-notice.js at all.
     //   updateCheckAt      epoch ms of the last update check, so a panel

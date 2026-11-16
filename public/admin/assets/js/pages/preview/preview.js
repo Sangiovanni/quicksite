@@ -41,6 +41,10 @@
     // The page title field (the top bar): the page's title in the language shown
     const pageTitleGroup = document.getElementById('preview-page-title-group');
     const pageTitleInput = document.getElementById('preview-page-title');
+    const pageDescriptionGroup = document.getElementById('preview-page-description-group');
+    const pageDescriptionInput = document.getElementById('preview-page-description');
+    const pageDescriptionCut = document.getElementById('preview-page-description-cut');
+    const pageDescriptionExpand = document.getElementById('preview-page-description-expand');
     const reloadBtn = document.getElementById('preview-reload');
     const deviceBtns = document.querySelectorAll('.preview-device-btn');
     const modeBtns = document.querySelectorAll('.preview-tool[data-mode]');
@@ -1640,8 +1644,9 @@
         
         // Update layout toggles visibility (show only for pages)
         updateLayoutToggles(editType, editName);
-        // The page title field follows the page and the language shown
+        // The page title and description fields follow the page and the language shown
         updatePageTitleField(editType, editName);
+        updatePageDescriptionField(editType, editName);
         
         // A menu or a footer is brought into view once the iframe has loaded, as it can be below the
         // fold. Nothing is selected, as on a page: the tool's panel waits for a click.
@@ -1721,6 +1726,10 @@
         if (pageTitleInput) {
             pageTitleInput.value = pageTitleSaved;
             pageTitleInput.blur();
+        }
+        if (pageDescriptionInput) {
+            pageDescriptionInput.value = pageDescriptionSaved;
+            pageDescriptionInput.blur();
         }
         navigateToFirstPage({ keepMode: currentMode === 'ai-tools' });
         const shown = targetSelect.options[targetSelect.selectedIndex];
@@ -2145,6 +2154,210 @@
         } else {
             const error = (result.data && result.data.message) || String(result.status);
             showToast(PreviewConfig.i18n.pageTitleSaveFailed.replace('{error}', error), 'error');
+        }
+    }
+
+    // ==================== Page Description Field ====================
+
+    // As the title's: the description as saved (what Escape puts back), and a number that drops a read answering
+    // after a newer one. The platform table and the page's card type come with the read (getSocialPreview), for the
+    // length mark.
+    let pageDescriptionSaved = '';
+    let pageDescriptionSeq = 0;
+    let pageDescriptionPlatforms = null;
+    let pageDescriptionCardType = null;
+
+    /**
+     * The description field shows beside the title while a page of the site is the edit target (a special page
+     * carries no link-preview tag), holding its description in the language shown, read through getSocialPreview as
+     * the page reads it. Hidden for the menu, the footer and a component; a role that cannot save it never sees it
+     * (editorTools.php, toolbar.description).
+     */
+    async function updatePageDescriptionField(editType, editName) {
+        if (!pageDescriptionGroup || !pageDescriptionInput) return;
+        const seq = ++pageDescriptionSeq;
+        const special = (PreviewConfig.specialPages || []).indexOf(editName) >= 0;
+        if (editType !== 'page' || !editName || special) {
+            pageDescriptionGroup.style.display = 'none';
+            return;
+        }
+        pageDescriptionGroup.style.display = '';
+        pageDescriptionSaved = '';
+        pageDescriptionInput.value = '';
+        pageDescriptionPlatforms = null;
+        syncPageDescriptionCut();
+        const lang = getCurrentLang();
+        const result = await QuickSiteAdmin.apiRequest('getSocialPreview', 'GET', null, [], { route: editName });
+        if (seq !== pageDescriptionSeq) return;
+        const report = result.ok && result.data && result.data.data;
+        const page = report && report.pages ? report.pages[editName] : null;
+        const shown = page && page.languages ? page.languages[lang] : null;
+        pageDescriptionPlatforms = report ? report.platforms : null;
+        pageDescriptionCardType = page && page.cardType ? page.cardType.value : null;
+        pageDescriptionSaved = shown && typeof shown.description === 'string' ? shown.description : '';
+        // A description typed while the read was answering is kept.
+        if (document.activeElement !== pageDescriptionInput) pageDescriptionInput.value = pageDescriptionSaved;
+        syncPageDescriptionCut();
+    }
+
+    /**
+     * The length mark: the platforms that would cut the description as it stands, judged as it is typed by the
+     * table's figures (QSSocialFigures, the judge the Social previews page cuts its cards with): a count, and the
+     * platforms with their lengths in its title.
+     */
+    function syncPageDescriptionCut() {
+        if (!pageDescriptionCut || !pageDescriptionInput) return;
+        const warnings = descriptionWarnings(pageDescriptionInput.value.trim());
+        pageDescriptionCut.hidden = warnings.length === 0;
+        pageDescriptionCut.textContent = warnings.length ? '⚠ ' + warnings.length : '';
+        if (!warnings.length) {
+            pageDescriptionCut.removeAttribute('title');
+            return;
+        }
+        pageDescriptionCut.title = descriptionCutSentence(warnings);
+    }
+
+    /** The platforms a description would be cut by, by the table's figures (none until the table is read). */
+    function descriptionWarnings(text) {
+        const figures = window.QSSocialFigures;
+        return figures && pageDescriptionPlatforms
+            ? figures.textWarnings(text, 'description', pageDescriptionPlatforms, pageDescriptionCardType)
+            : [];
+    }
+
+    /** Those platforms in one sentence, each with where it cuts (the Social previews page's words). */
+    function descriptionCutSentence(warnings) {
+        const i18n = PreviewConfig.i18n;
+        const names = i18n.socialPlatformNames || {};
+        const items = warnings.map((w) => i18n.socialCutItem
+            .replace('{platform}', names[w.platform] || w.name)
+            .replace('{limit}', String(w.limit))
+            .replace('{unit}', w.unit === 'bytes' ? i18n.socialUnitBytes : i18n.socialUnitCharacters));
+        let list;
+        try {
+            list = new Intl.ListFormat(document.documentElement.lang || 'en', { style: 'long', type: 'conjunction' }).format(items);
+        } catch (e) {
+            list = items.join(', ');
+        }
+        return i18n.socialCutBy.replace('{list}', list);
+    }
+
+    /**
+     * The whole description in a dialog (the field's expand button): a text area holding the field's text, its length,
+     * and the platforms that would cut it named as it is typed. Save (or Enter) puts it in the field and saves it as the
+     * field does; ×, Cancel, Escape and the backdrop leave the field as it was. The panel's one modal
+     * (QuickSiteUtils.openModal): the focus stays in it, and no key reaches the editor behind it. A line break typed or
+     * pasted becomes a space, as the field holds one line.
+     */
+    function openPageDescriptionDialog() {
+        if (!pageDescriptionInput || currentEditType !== 'page' || !currentEditName || !controlOffered(pageDescriptionGroup)) return;
+        const i18n = PreviewConfig.i18n;
+        const modal = _renderDescriptionDialog(pageDescriptionInput.value);
+        const area = modal.querySelector('.preview-description-dialog__text');
+        const count = modal.querySelector('.preview-description-dialog__count');
+        const cut = modal.querySelector('.preview-description-dialog__cut');
+        const closeBtn = modal.querySelector('[data-dialog="close"]');
+        const cancelBtn = modal.querySelector('[data-dialog="cancel"]');
+        const saveBtn = modal.querySelector('[data-dialog="save"]');
+        const sync = () => {
+            const warnings = descriptionWarnings(area.value.trim());
+            cut.hidden = warnings.length === 0;
+            cut.textContent = warnings.length ? '⚠ ' + descriptionCutSentence(warnings) : '';
+            count.textContent = i18n.pageDescriptionCount.replace('{count}', String(area.value.length)).replace('{max}', String(area.maxLength));
+        };
+        let shown = null;
+        const close = () => {
+            if (!shown) return;
+            const s = shown;
+            shown = null;
+            s.close();
+        };
+        const save = () => {
+            pageDescriptionInput.value = area.value.replace(/\s*[\r\n]+\s*/g, ' ').trim();
+            close();
+            syncPageDescriptionCut();
+            savePageDescription();
+        };
+        area.addEventListener('input', sync);
+        closeBtn.addEventListener('click', close);
+        cancelBtn.addEventListener('click', close);
+        saveBtn.addEventListener('click', save);
+        shown = QuickSiteUtils.openModal(modal, {
+            focusable: () => [closeBtn, area, cancelBtn, saveBtn],
+            first: area,
+            dismiss: close,
+            onKey: (e) => {
+                if (e.key === 'Enter' && e.target === area) {
+                    e.preventDefault();
+                    save();
+                    return true;
+                }
+                return false;
+            }
+        });
+        sync();
+        area.setSelectionRange(area.value.length, area.value.length);
+    }
+
+    /** The description's dialog: its title (the page, and the language when there are several) with ×, its text, its line, its buttons. */
+    function _renderDescriptionDialog(text) {
+        const i18n = PreviewConfig.i18n;
+        const id = 'preview-description-dialog';
+        const langGroup = langSelect ? langSelect.closest('.preview-toolbar__group') : null;
+        const several = !!langGroup && langGroup.style.display !== 'none';
+        const title = i18n.pageDescriptionDialog.replace('{page}', currentEditName) + (several ? ' (' + getCurrentLang().toUpperCase() + ')' : '');
+        const area = QSDom.el('textarea', {
+            id: id + '-text', class: 'admin-input preview-description-dialog__text', rows: '6',
+            'aria-labelledby': id + '-title', 'aria-describedby': id + '-hint'
+        });
+        area.maxLength = pageDescriptionInput.maxLength;
+        area.value = text;
+        return QSDom.el('div', {
+            class: 'admin-modal-dialog preview-description-dialog', id: id, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id + '-title'
+        }, [
+            QSDom.el('div', { class: 'preview-description-dialog__header' }, [
+                QSDom.el('h3', { class: 'admin-modal-dialog__title', id: id + '-title', text: title }),
+                QSDom.el('button', { type: 'button', class: 'admin-modal__close', 'data-dialog': 'close', 'aria-label': i18n.cancel, text: '×' })
+            ]),
+            QSDom.el('div', { class: 'preview-description-dialog__body' }, [
+                QSDom.el('p', { class: 'admin-hint', id: id + '-hint', text: i18n.pageDescriptionDialogHint }),
+                area,
+                QSDom.el('p', { class: 'preview-description-dialog__count' }),
+                QSDom.el('p', { class: 'preview-description-dialog__cut', hidden: '' })
+            ]),
+            QSDom.el('div', { class: 'admin-modal-dialog__actions preview-description-dialog__actions' }, [
+                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', 'data-dialog': 'cancel', text: i18n.cancel }),
+                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary', 'data-dialog': 'save', text: i18n.save })
+            ])
+        ]);
+    }
+
+    /**
+     * Save the field through setSocialPreview when it differs from the saved description, in the language shown
+     * (the default language on a one-language site: the writer keeps default.json in step, as editTitle does). Unlike
+     * the title, an emptied description is sent empty, which removes it.
+     */
+    async function savePageDescription() {
+        if (!pageDescriptionInput || currentEditType !== 'page' || !currentEditName || !controlOffered(pageDescriptionGroup)) return;
+        const value = pageDescriptionInput.value.trim();
+        if (value === pageDescriptionSaved) {
+            pageDescriptionInput.value = pageDescriptionSaved;
+            syncPageDescriptionCut();
+            return;
+        }
+        const route = currentEditName;
+        const lang = getCurrentLang();
+        const result = await QuickSiteAdmin.apiRequest('setSocialPreview', 'POST', {
+            route: route,
+            lang: lang,
+            description: value
+        });
+        if (result.ok) {
+            if (route === currentEditName && lang === getCurrentLang()) pageDescriptionSaved = value;
+            showToast(value === '' ? PreviewConfig.i18n.pageDescriptionRemoved : PreviewConfig.i18n.pageDescriptionSaved, 'success');
+        } else {
+            const error = (result.data && result.data.message) || String(result.status);
+            showToast(PreviewConfig.i18n.pageDescriptionSaveFailed.replace('{error}', error), 'error');
         }
     }
 
@@ -4342,6 +4555,23 @@
                 }
             });
             pageTitleInput.addEventListener('blur', savePageTitle);
+        }
+
+        if (pageDescriptionInput) {
+            // As the title: Enter saves by leaving the field, Escape puts the saved description back, then leaves it
+            pageDescriptionInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    pageDescriptionInput.blur();
+                } else if (e.key === 'Escape') {
+                    pageDescriptionInput.value = pageDescriptionSaved;
+                    syncPageDescriptionCut();
+                    pageDescriptionInput.blur();
+                }
+            });
+            pageDescriptionInput.addEventListener('input', syncPageDescriptionCut);
+            pageDescriptionInput.addEventListener('blur', savePageDescription);
+            if (pageDescriptionExpand) pageDescriptionExpand.addEventListener('click', openPageDescriptionDialog);
         }
         
         reloadBtn.addEventListener('click', reloadPreview);
@@ -11246,9 +11476,13 @@
         // The title field reads through the panel's API client, which a later script of the
         // page defines (admin.js): the first read waits for the page's scripts.
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => updatePageTitleField(currentEditType, currentEditName));
+            document.addEventListener('DOMContentLoaded', () => {
+                updatePageTitleField(currentEditType, currentEditName);
+                updatePageDescriptionField(currentEditType, currentEditName);
+            });
         } else {
             updatePageTitleField(currentEditType, currentEditName);
+            updatePageDescriptionField(currentEditType, currentEditName);
         }
     }
     

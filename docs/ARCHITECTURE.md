@@ -770,7 +770,7 @@ or another control character becomes a space):
 | `og:type` | `website` |
 | `og:url` | the address the page was served at, without its query string, each segment encoded, written as the site links its pages: no trailing slash but on a language's home (`fr/`) |
 | `og:site_name` | the translation key `site.name` |
-| `og:locale`, `og:locale:alternate` | the page's language and the territory the author gave it (`fr_FR`); a language with no territory writes none. On a multilingual site, each other language that has one is an alternate |
+| `og:locale`, `og:locale:alternate` | the page's language and its territory (`fr_BE`): the one the author gave the language, else the language's usual one (`fr_FR`). A language's territories are the regions where Unicode CLDR has it, each an officially assigned ISO 3166-1 alpha-2 code, its usual one CLDR's likely one, in one table in `socialPreview.php`; a language CLDR gives none (Esperanto) writes none. On a multilingual site, each other language is an alternate, by the same rule |
 | `og:image`, `og:image:width`, `og:image:height`, `og:image:type`, `og:image:alt` | the page's picture, else the site's: a file of Media's images, with the size, the type and the description Media's metadata holds; a picture no longer in Media writes none |
 | `twitter:card` | the page's card type, else the site's, else `summary_large_image` for a page with a picture and `summary` without |
 | `twitter:site` | the site's X account |
@@ -778,8 +778,13 @@ or another control character becomes a space):
 
 The values are the project's `data/social-preview.json`: the site's picture, card type, X account,
 theme colour and territories, and each page's picture and card type. `setSocialPreview` writes them
-and a page's description; `getSocialPreview` answers them with what each page's tags say, the
-warnings per platform and the platform table they come from. A response that is not a page of the
+and a page's description; `getSocialPreview` answers them with what each page's tags say, each
+language's territories, the warnings per platform and the platform table they come from (for each
+platform: the picture's sizes, shape, file size and formats and whether a picture missing one is
+still shown small, the texts' lengths, and the lines a computer and a phone show, each figure with
+its source and the date it was read). The panel's Social previews page draws each platform's card
+from that table
+([ADMIN_PANEL.md](ADMIN_PANEL.md) §9.19). A response that is not a page of the
 site (a 404) carries the theme colour alone.
 
 **Every address in these tags is a full one**, composed when the page is served by one function,
