@@ -755,7 +755,8 @@ class JsonToHtmlRenderer {
                     continue;
                 }
                 $html .= $this->renderAttribute($attrName, $attrValue,
-                    $refreshContentKey !== null && (string) $attrName === $refreshContentKey);
+                    $refreshContentKey !== null && (string) $attrName === $refreshContentKey,
+                    is_string($attrValue) && CallTransformer::submitKeepsPage($tag, (string) $attrName, $attrValue, $params));
             }
         }
 
@@ -903,9 +904,11 @@ class JsonToHtmlRenderer {
      * @param mixed $value Attribute value
      * @param bool $refreshContent the content of a meta refresh (refreshContentKey()):
      *                             its address is drawn safe
+     * @param bool $keepPage a submit handler that keeps the page
+     *                       (CallTransformer::submitKeepsPage())
      * @return string Rendered attribute (e.g., ' class="value"')
      */
-    private function renderAttribute(string $name, $value, bool $refreshContent = false): string {
+    private function renderAttribute(string $name, $value, bool $refreshContent = false, bool $keepPage = false): string {
         // Sanitize attribute name. The charset rule is shared with the compiler
         // and the write-side param check so all three make the same decision
         // about the same name (TagRegistry::isRenderableAttributeName).
@@ -920,7 +923,7 @@ class JsonToHtmlRenderer {
             if (is_string($value) && strpos($value, '{{call:') !== false) {
                 // Transform {{call:...}} to QS.* function calls (the shared helper); a target
                 // on this site is composed as a link to it is
-                $transformedValue = CallTransformer::transform($value, fn(string $url, string $kind) => $this->composeCallTarget($url, $kind));
+                $transformedValue = CallTransformer::transform($value, fn(string $url, string $kind) => $this->composeCallTarget($url, $kind), $keepPage);
                 // Double-check the result doesn't contain suspicious patterns
                 if (CallTransformer::isValidHandler($transformedValue)) {
                     $escapedValue = htmlspecialchars($transformedValue, ENT_QUOTES | ENT_HTML5, 'UTF-8');

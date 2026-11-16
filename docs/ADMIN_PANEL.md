@@ -1743,9 +1743,10 @@ surfaces the placeholders as configurable inputs.
 
 **Body source**
 
-Hidden when the effective method is GET or DELETE (the browser
-forbids a body on those; qs.js already flattens such bodies to
-query-string args). Otherwise free-text — typically `#form-id`.
+Hidden when the effective method is GET or DELETE. qs.js puts a GET's
+(or a HEAD's) fields in the query string, so a GET whose body source
+holds a password field is not sent at all: the console says why.
+Otherwise free-text — typically `#form-id`.
 
 **Toast messages** (Advanced fold)
 
@@ -3010,7 +3011,7 @@ locked render order (most-authored first):
 | `form` | Forms | validate |
 | `fetch` | Fetch / network | fetch |
 | `auth` | Auth | saveToken, clearToken, refresh, exchangeMagicLink, requestMagicLink, logoutServer |
-| `nav` | Navigation | redirect, scrollTo |
+| `nav` | Navigation | redirect, scrollTo, prevent |
 | `state-store` | State stores | store, setState, fetchState, onScrollFetchState |
 | `focus` | DOM focus | focus, blur |
 | `display` | Rendering / display | filter, renderList |
@@ -3093,6 +3094,9 @@ picker filters the verb dropdown by the currently-edited event:
 - `exchangeMagicLink` declares `events: ['onload']` → page-event only.
 - `redirect` declares `events: ['onclick', 'ondblclick', 'oncontextmenu',
   'onkeydown', 'onkeyup']` → element-interaction events.
+- `prevent` declares `events: ['onclick']` → a link. A form's submit
+  needs none: the page keeps a form whose chain sends something, or that
+  has no action of its own ([ARCHITECTURE.md §9.0.1](ARCHITECTURE.md)).
 
 A **Show all** checkbox above the verb picker overrides the filter for
 the unusual cases (e.g. authoring a custom event chain). The filter

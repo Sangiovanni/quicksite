@@ -472,6 +472,24 @@
         window.location.href = url;
     };
 
+    /**
+     * Stop what the event would do by itself: a link's jump to its address, so the
+     * rest of the chain runs on this page. `{{call:prevent:event}}` runs in the
+     * chain's sync prelude (CallTransformer), the event's own tick, where stopping
+     * it still counts. The renderers write `QS.prevent(event)` themselves at the
+     * head of a form's submit chain that keeps the page.
+     * @param {Event} evt - the event (the word `event` in the chain)
+     * @returns {boolean} whether there was an event to stop
+     */
+    QS.prevent = function(evt) {
+        if (evt && typeof evt.preventDefault === 'function') {
+            evt.preventDefault();
+            return true;
+        }
+        console.warn('[QS] prevent: no event to stop. Write {{call:prevent:event}}, with the word event.');
+        return false;
+    };
+
     // ---- QS.filter: highlight helpers (DOM-walk, XSS-safe) ----
     // Snapshot/restore an element's original child nodes around <mark> wrapping.
     var _qsHighlightPerfWarned = false;
@@ -896,6 +914,17 @@
         // users expect for "submit a search form" / "filter list" flows.
         const isBodyless = (method === 'GET' || method === 'HEAD');
         const queryParts = [];
+
+        // A password never goes in an address: there it lands in the browser's
+        // history and the servers' logs. A GET or HEAD whose body holds a password
+        // field is not sent at all, and the console says why. It is the author's
+        // mistake, so the visitor gets no toast, as with the errors above.
+        if (opts.body && isBodyless && _qsBodyHoldsPassword(opts.body)) {
+            const msg = '[QS] fetch: not sent. A ' + method + ' request puts the fields of ' + opts.body
+                + ' in the address, and it holds a password field. Send it with POST.';
+            console.error(msg);
+            return Promise.reject(new Error(msg));
+        }
 
         if (opts.body) {
             const bodyData = collectBody(opts.body);
@@ -1596,8 +1625,15 @@
         }
         var maxAge = 180 * 24 * 60 * 60; // 180 days
         var secure = (location.protocol === 'https:') ? '; Secure' : '';
-        document.cookie = _cookieName(QS_CONSENT_COOKIE) + '=' + encodeURIComponent(JSON.stringify(payload)) +
-            '; Max-Age=' + maxAge + '; Path=/; SameSite=Lax' + secure;
+        // In a try, as the cookie's reads are: a page without an origin of its own
+        // (a sandboxed frame) refuses every cookie with an error. The choice then holds
+        // for this page alone, and the banner still closes.
+        try {
+            document.cookie = _cookieName(QS_CONSENT_COOKIE) + '=' + encodeURIComponent(JSON.stringify(payload)) +
+                '; Max-Age=' + maxAge + '; Path=/; SameSite=Lax' + secure;
+        } catch (e) {
+            console.warn('[QS] consent: this page cannot keep a cookie, so the choice holds for this page only.');
+        }
         _consentRemoveRefused();
         document.dispatchEvent(new CustomEvent('qs:consent:changed', { detail: payload }));
         return payload;
@@ -1670,9 +1706,15 @@
         var cfg = _consentConfig();
         if (!cfg || cfg.asks !== false) return;
         var name = _cookieName(QS_CONSENT_COOKIE);
-        if (_readCookie(name) === null) return;
         var secure = (location.protocol === 'https:') ? '; Secure' : '';
-        document.cookie = name + '=; Max-Age=0; Path=/; SameSite=Lax' + secure;
+        // In a try, as QS.setConsent()'s write: a page without an origin of its own
+        // has no cookie to remove, and must still finish loading.
+        try {
+            if (_readCookie(name) === null) return;
+            document.cookie = name + '=; Max-Age=0; Path=/; SameSite=Lax' + secure;
+        } catch (e) {
+            // Nothing is kept there, so there is nothing to remove.
+        }
     }
 
     function _consentBlocked(key, category) {
@@ -1963,6 +2005,29 @@
     }
 
     /**
+     * Whether a body source holds a password field, whatever its name or value: the
+     * source itself, a field inside it, or for a form any field the form owns (a field
+     * outside it that names it with form="…" is sent with it too). An invalid selector
+     * finds nothing here; collectBody() says so.
+     * @param {string} selector - the body source (`body=#form`)
+     * @returns {boolean}
+     */
+    function _qsBodyHoldsPassword(selector) {
+        let el = null;
+        try {
+            el = document.querySelector(selector);
+        } catch (e) {
+            return false;
+        }
+        if (!el) return false;
+        const isPassword = (f) => f && f.tagName === 'INPUT'
+            && String(f.type || f.getAttribute('type') || '').toLowerCase() === 'password';
+        if (isPassword(el)) return true;
+        const fields = (el.tagName === 'FORM' && el.elements) ? el.elements : el.querySelectorAll('input');
+        return Array.prototype.some.call(fields, isPassword);
+    }
+
+    /**
      * Collect body data from a form or input elements
      * @param {string} selector - Form selector (#form) or inputs selector
      * @returns {object|null} JSON data
@@ -2031,11 +2096,20 @@
             const value = getNestedValue(data, field);
             if (value === undefined) return;
 
-            // List rendering mode (simple — items applied directly via data-bind)
+            // List rendering mode (simple — items applied directly via data-bind).
+            // Every element the container selector matches is filled, as every block
+            // of a stored list is. The first goes through the selector, whose
+            // template QS.renderList keeps under that selector too; every further
+            // match keeps its own template, read from its own first child.
             if (binding.renderMode === 'list') {
                 const container = binding.container;
                 if (!container) return;
+                // Read before the first is filled, so nothing its rows add is taken for a block.
+                const matches = Array.prototype.slice.call(getElements(container));
                 renderList(container, value, binding.emptyText);
+                for (let i = 1; i < matches.length; i++) {
+                    renderList(matches[i], value, binding.emptyText);
+                }
                 return;
             }
 
@@ -2983,22 +3057,22 @@
      *     form with that attribute).
      *   - If valid, clears the matching [data-error-for] container.
      *
-     * When called with an event (e.g. `{{call:validate:event,#form}}` on
-     * onsubmit), `event.preventDefault()` fires UPFRONT — regardless of
-     * the validation outcome. Reasoning: handing us the event signals
-     * "I'm handling this submission programmatically, don't let HTML
-     * also submit the form natively". Without this, the form's native
-     * submission races with any subsequent {{call:fetch:...}} in the
-     * chain — page navigates before the fetch completes, leaving an
-     * "NetworkError when attempting to fetch resource" in the console.
+     * With an event (`{{call:validate:event,#form}}` on onsubmit), an
+     * invalid form is not sent: `event.preventDefault()` is called on it.
+     * A valid one goes on. When nothing in the chain sends it, the form
+     * posts to its own action, as written; when something does, the
+     * renderers have already stopped the native submit at the head of
+     * the chain (`QS.prevent(event)`, CallTransformer::submitKeepsPage()),
+     * so the page stays while the chain sends it.
      *
-     * If you want native submission to still happen on valid forms, do
-     * NOT pass the event — call validate with just the selector:
-     * `{{call:validate:#form}}`.
+     * A check that cannot run fails, as an invalid form does: no form
+     * selector, a form the selector does not find, or an error part way.
+     * A form must never be sent unchecked because its check went wrong.
      *
-     * On any invalid field:
-     *   - Throws QSValidationError, aborting the rest of the
-     *     {{call:...}} chain. (preventDefault already done.)
+     * On failure:
+     *   - the event's default action is stopped, so the form is not sent;
+     *   - throws QSValidationError, aborting the rest of the
+     *     {{call:...}} chain.
      *
      * Usage in JSON:
      *   "onsubmit": "{{call:validate:event,#contact-form}};{{call:fetch:POST,/api/contact,body=#contact-form}}"
@@ -3018,23 +3092,42 @@
             formSelector = formSelectorIfEvent;
         }
 
-        // Take over the submit upfront — see jsdoc above for the why.
-        // Must happen BEFORE the misconfig early-return paths, otherwise
-        // a typo in formSelector would silently let the form submit
-        // natively while we returned true.
-        if (evt) {
-            evt.preventDefault();
+        let valid = false;
+        try {
+            valid = _qsFormIsValid(formSelector);
+        } finally {
+            // Whatever ended the check, a form that did not pass is not sent.
+            if (!valid && evt) {
+                evt.preventDefault();
+            }
         }
+        if (!valid) {
+            throw QSValidationError();
+        }
+        return true;
+    };
 
+    /**
+     * QS.validate's check: whether the form passes its own HTML5 rules, its error
+     * boxes written on the way. False, with a console line, when it cannot be checked.
+     * @param {string} formSelector
+     * @returns {boolean}
+     */
+    function _qsFormIsValid(formSelector) {
         if (!formSelector || typeof formSelector !== 'string') {
-            console.warn('[QS] validate: formSelector required');
-            return true; // No-op rather than abort if misconfigured.
+            console.warn('[QS] validate: formSelector required; the form is held as invalid.');
+            return false;
         }
 
-        const form = document.querySelector(formSelector);
+        let form = null;
+        try {
+            form = document.querySelector(formSelector);
+        } catch (e) {
+            form = null;
+        }
         if (!form) {
-            console.warn('[QS] validate: form not found:', formSelector);
-            return true;
+            console.warn('[QS] validate: form not found, so it is held as invalid:', formSelector);
+            return false;
         }
 
         const fields = form.querySelectorAll('input, textarea, select');
@@ -3063,12 +3156,8 @@
             }
         });
 
-        if (!allValid) {
-            throw QSValidationError();
-        }
-
-        return true;
-    };
+        return allValid;
+    }
 
     // =========================================================================
     // AUTH STATE (UI helpers)

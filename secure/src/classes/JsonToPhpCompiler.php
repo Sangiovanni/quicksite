@@ -665,7 +665,9 @@ class JsonToPhpCompiler {
                 // Handle event handler attributes (on*) - only allow {{call:...}} syntax
                 if (preg_match('/^on[a-z]+$/i', $attrName)) {
                     if (is_string($attrValue) && strpos($attrValue, '{{call:') !== false) {
-                        $segments = CallTransformer::transformSegments($attrValue);
+                        // A submit handler that keeps the page: the renderer's rule, decided in one place.
+                        $segments = CallTransformer::transformSegments($attrValue,
+                            CallTransformer::submitKeepsPage($tag, $attrName, $attrValue, $params));
                         $transformedValue = CallTransformer::resolveSegments($segments);
                         // Validated as written in the build's language. Any
                         // translation is written as a complete literal, so no

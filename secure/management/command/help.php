@@ -5228,8 +5228,8 @@ $GLOBALS['__help_commands'] = [
                         'type' => 'core'
                     ]
                 ],
-                'count' => 26,
-                'core_count' => 26,
+                'count' => 27,
+                'core_count' => 27,
                 'custom_count' => 0,
                 'names' => ['show', 'hide'],
                 'core_names' => ['show', 'hide'],
@@ -5243,7 +5243,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
         ],
-        'notes' => 'Returns the functions built into the QS namespace, each with its category, signature, arguments, events and an example, from the QS verb catalogue. custom_count is always 0: a site adds no function of its own. Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput.'
+        'notes' => 'Returns the functions built into the QS namespace, each with its category, signature, arguments, events and an example, from the QS verb catalogue; a function that makes a request also carries sends: true. custom_count is always 0: a site adds no function of its own. Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput. On a submit, the page stays when the chain holds a function marked sends, or when the form has no action of its own: the page writes QS.prevent(event) at the head of the chain. A form with its own action whose chain sends nothing still posts there once the chain has run. validate stops a submit only when the form is invalid, or cannot be found. prevent keeps a link from leaving: {{call:prevent:event}}. A GET or HEAD fetch whose body holds a password field is not sent.'
     ],
 
     'listDataBindings' => [
