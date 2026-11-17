@@ -2420,7 +2420,7 @@
             "uploading": "Envoi…",
             "uploadFailed": "L'envoi a échoué.",
             "description": "Courte description",
-            "descriptionHint": "Lue à voix haute aux personnes qui ne voient pas l'image, et affichée quand elle ne peut pas se charger.",
+            "descriptionHint": "Lue à voix haute aux personnes qui ne voient pas l'image, et affichée quand elle ne peut pas se charger. Laissée vide : le texte alternatif de l'image dans Media.",
             "mediaControls": "Affiché avec ses commandes de lecture.",
             "listItems": "Éléments",
             "listItem": "Élément {n}",
@@ -2978,5 +2978,18 @@
             "previewJson": "JSON converti (modifier avant l'import si nécessaire)",
             "previewJsonHint": "Les modifications ici prennent effet à l'import. Utilisez ce champ pour ajuster les schémas ou les descriptions avant l'enregistrement."
         }
+    },
+    "media": {
+        "altLabel": "Texte alternatif",
+        "altLongPlaceholder": "Texte alternatif de l'image (accessibilité)",
+        "altLanguage": "Langue",
+        "altHint": "Ce que montre l'image, lu par les lecteurs d'écran et les moteurs de recherche. Un par langue.",
+        "altHintOne": "Ce que montre l'image, lu par les lecteurs d'écran et les moteurs de recherche.",
+        "altMissing": "Pas de texte alternatif : :langs",
+        "altMissingOne": "Pas de texte alternatif",
+        "altRefused": "Le texte alternatif en :lang n'a pas été enregistré : :message",
+        "altNotTakenBack": "Ce qui était déjà écrit n'a pas pu être retiré : les fichiers de traduction le gardent sous :key (:langs).",
+        "altUnreadable": "Les textes alternatifs n'ont pas pu être lus, ils ne peuvent donc pas être modifiés pour l'instant : :message",
+        "view": "Voir :name"
     }
 }

@@ -108,6 +108,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/panel-mode.js` | The mode (*The mode: simple or advanced* above): the account menu's **Mode** row, the chooser for an account with no mode, and what follows the first pick (the account menu open, the row's glow, the bubble). Loaded on every page of a signed-in account, after `admin.js`. |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
 | `js/core/media-pictures.js` | `window.QSMediaPictures.list()`: the pictures a shared link's card can show — Media's images, each named as Media names it (`images/<file>`), SVG left out. The one list the console's picture field and the Social previews page offer (§9.19); loaded by those two pages. |
+| `js/core/media-alt.js` | `window.QSMediaAlt`: a picture's alt text per language, the one rule the Media page reads and saves it by (§9.15) — whether an alt is a translation key (the renderer's test; a text after the raw marker `__RAW__` never is), a new key's name (`freeKey()`), a picture's text in each of the project's languages and the languages it has none in, and the writes a save makes with what takes each back (`plan()`, `run()`). It sends nothing itself. Loaded by the Media page. |
 | `js/core/social-figures.js` | `window.QSSocialFigures`: a shared link's texts judged by `getSocialPreview`'s platform table — a text's length in characters or bytes, its cut at a platform's length, the platforms that draw a page's card (X by its card type), the platforms a text is longer than. Holds no figure of its own. Loaded by the Social previews page and the visual editor (the Description field's mark, §8.2). |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, the menu's groups after both filters (`applyMenuGroups()`), `canRun(command)` (the one answer to whether a page shows a control: the role holds the command, and a project-scoped command has a project), delegation. |
 
@@ -272,7 +273,7 @@ whose click it holds is followed afterwards, a mode or tab switch happens afterw
 | `pages/history.js` | Command history listing, detail modal, CSV export, clear dialog (§9.18). |
 | `pages/settings.js` | User settings + AI config status. |
 | `pages/apis.js` | External API registry CRUD + endpoint test UI. |
-| `pages/assets.js` | Asset browser, upload, edit, delete. |
+| `pages/assets.js` | Asset browser, upload, edit, delete; a picture's alt text per language and its badge; a picture shown large (the viewer). |
 | `pages/sitemap.js` | Route tree + reachability graph + sitemap controls + resolver authoring. |
 | `pages/builds.js` | Builds page: the project's single build — create, download, delete — plus the space picture and the near-the-limit warning (§9.16). |
 | `pages/social-previews.js` | Social previews page: the site's and a page's link-preview values, and each platform's card for a computer or a phone (§9.19). |
@@ -474,7 +475,7 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **Title** | `<h1>` (Big), `<h2>` (Medium) or `<h3>` (Small) | its size, three cards side by side, each word in its own size; its text. It starts on Big on a page with no big title and on Medium on one that has one; while Big is picked on such a page, it says search engines read a page's big title as its subject, so one per page is best — a hint, never a refusal |
 | **Button** | `<button>` with its text: `type="submit"` where it lands inside a form (it sends the form), `type="button"` anywhere else | its text, and a line saying which: it sends the form, or it does nothing until an action is given to it in Advanced, under Interactions |
 | **Link** | `<a>` with its text and `href`; `target="_blank"` when **Open in a new tab** is ticked (unticked at first) | its text; where it goes: a page of the site from a list (a page whose address takes a parameter is not listed) or an outside address, written in full (`https://`, `http://`, `mailto:` or `tel:`) |
-| **Image** | `<img>` with its `src`, and its short description as its `alt`, a key of its own; no description, no `alt` | a file from Media; the short description |
+| **Image** | `<img>` with its `src`, and its short description as its `alt`, a key of its own; no description: the picture's own `alt` from Media as Media holds it (its key, §9.15), when it has one, else no `alt` | a file from Media; the short description |
 | **Video**, **Audio** | `<video>` / `<audio>` with its `src`, and its play controls (the engine's default) | a file from Media |
 | **List** | a bulleted list, `<ul>`, an `<li>` per line | its lines: three to start, **+ Add an item** adds one and each line's **×** removes it (one always stays); a line left empty takes its placeholder's words (*Item 3*) |
 | **Block** | a plain box, `<div>`, empty | nothing: it is selected once added, an empty box you can see, to add elements inside |
@@ -578,7 +579,8 @@ one the Complex Element wizards use, which can create a key inline) instead of a
 plain text box. It is optional: leaving it empty writes no attribute at all,
 and nothing is generated on the author's behalf. Picking an asset through the
 browse button pre-fills `alt` from that asset's own metadata when it has some
-and the field is still empty.
+and the field is still empty. Media holds a picture's `alt` as a translation key
+whose text it writes per language (§9.15), so the key is what arrives.
 
 ### 8.6 Commands the editor calls
 
@@ -1171,7 +1173,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Settings** (`settings.js`) | System information (QuickSite's version, from the `VERSION` file as the footer's is, and how many commands `help` documents), the caller's permissions, admin preferences (keyboard shortcuts, toast duration), AI configuration status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
-| **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
+| **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`; for a picture's alt text, `getLangList`, `getTranslations`, `setTranslationKeys`, `deleteTranslationKeys`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Social previews** (`social-previews.js`) | The card a shared link of the site gets on each platform, drawn for a computer or a phone, and the site's and each page's values it is drawn from — see §9.19. Commands: `getSocialPreview`, `setSocialPreview`. In the Advanced menu's **Site** group. |
 | **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
@@ -3800,6 +3802,34 @@ A batch delete can delete some files and not others: the answer lists both, and 
 A delete is a delete once the file is gone. If the asset list (each file's description, alt text and star) cannot be saved after it, or the favicon setting still names a deleted image and cannot be cleared, `deleteAsset` answers `500 server.file_write_failed`: the page shows that answer's message as an error, then does what a delete does — the edit area of a deleted file closes, a selection is cleared, the grid reloads without the file. A rename or an edit whose asset list (or, for the favicon image, whose favicon setting) cannot be saved changes nothing, and an upload the asset list cannot record is not kept: each is an ordinary failure, its message shown.
 
 A page links its icon only when the icon's file exists: the chosen asset, or `assets/images/favicon.png` when none is chosen. The preview checks on every view, so an icon added while you work shows on the next one; a build decides once, for the files it copies, and a built page makes no check of its own.
+
+#### A picture's alt text, per language
+
+A picture's **Alt Text** is what the picture shows, read by screen readers and search engines, and a page reads it in its own language. The edit form (a card's ✏️ *Edit alt/description*) shows it for a picture alone; a font, a sound or a video has none. It is a language selector and a text: the selector lists the **project's** languages, never the panel's (the panel can be in French while the site runs English, Spanish and German), and starts on the project's default language; a one-language project has no selector. What is typed in one language is kept while another is shown, and **Save Changes** writes each language typed in, and only those.
+
+Media keeps the text in the project's word files under a translation key, which the author never sees:
+
+- **The first text** makes the key: `alt.` and a name from the picture's file name (lower case, letters and digits, `_` for anything else, accents dropped; a random name when that leaves fewer than three characters). A name a word file already holds — on a page or on none — is not used: a random suffix of ten characters is added until it is free. The text goes to the language written, then the picture's `alt` names the key (`setTranslationKeys`, then `editAsset`).
+- **A picture whose `alt` already names a key** (shaped as the renderer reads a key, held by a word file or not yet) is edited in place: each language's word under that key, no key made.
+- **A text written before the alt had languages** shows as the default language's text. The first save of an alt change makes it a key, holding that text in the default language and what was typed in the others. Nothing is converted until then; a save of the Description alone converts nothing.
+- **The other languages are left without a text**, never given a copy: until a language is written, its pages show the missing marker in a placed picture's `alt`, and the card says which languages are missing.
+- **A text emptied** removes that language's word (on a one-language project from `default.json` too, which its pages read); the key and the picture's `alt` stay, since pages may use the key. Emptying a text written before the alt had languages leaves the picture with no `alt`. A deleted picture leaves its key.
+
+A write that is refused stops the save: what the save already wrote is taken back, newest first, the form keeps what was typed, and the line under **Save Changes** says which language was refused and why — a key that cannot be made (`alt` held as a single word in a language) is said there, not worked around. A take-back that is itself refused is said too, with the key the word files still hold.
+
+The **badge** under a picture's card names the languages it has no alt text in, by their codes — *No alt text: FR, DE* — or, on a one-language project, *No alt text*; a picture described in every language has none. A text written before the alt had languages counts as described. The page reads the languages and the word files once when it loads and again after a save, not once per card. The grid's own `<img alt>` and the edit form's preview show the text in the project's default language, or the file name when there is none.
+
+What reads a picture's `alt`: a picture placed in the editor (the picker copies the key into the element, §8.1), the link-preview tags (`og:image:alt`, in the page's language: no tag where that language has no text, §9.19), and the site-building workflows, which read the starred pictures with `listAssets`.
+
+The upload queue and the address import have no alt field: a picture's alt text is written per language once it is in Media. The queue's Description stays; it is for the AI workflows, written in whatever language the author picks, and never translated.
+
+#### A picture shown large
+
+A click on a picture's thumbnail — a raster or an SVG — shows it in the panel's dialog: the picture, its file name, and an × at the top right; Escape, the × or a click beside it closes it, and the focus goes back to the thumbnail. The thumbnail is a button, so Tab reaches it and Enter or Space opens it. The picture shows at its own size, or smaller to fit the window, sized by the stylesheet alone; an SVG, which has no size in pixels, shows 24rem wide, or the window's width when that is narrower. A video and a sound keep their play buttons, a font its specimen. In **Select** mode a click selects the card and nothing opens; the ✏️ button keeps opening the details.
+
+#### What each role sees
+
+Each control that sends a command is drawn only for a role that can run it: the upload card (`uploadAsset`); **Select**, the batch bar and a card's 🗑️ (`deleteAsset`); a card's rename and star, and the edit form's Description and **Save Changes** (`editAsset`); the favicon radio (`editFavicon`); the alt text (`setTranslationKeys`, `deleteTranslationKeys` and `editAsset`, all three). Every role that opens Media sees the grid, the badges, the viewer and the details: a viewer's ✏️ opens a picture's preview and its size, type and date, with nothing to change.
 
 ### 9.16 Builds (/admin/builds)
 

@@ -18,7 +18,8 @@
  *     (QS_SOCIAL_LANGUAGE_TERRITORIES), and each other language of a multilingual site as an alternate; a
  *     language with neither, none;
  *   - the picture, the card type: the project's social values (`data/social-preview.json`), the picture a
- *     Media file whose size, type and description Media's metadata holds (a build: its own copy);
+ *     Media file whose size, type and description Media's metadata holds (a build: its own copy), the
+ *     description read in the page's language when Media holds it under a translation key;
  *   - the X account and the theme colour: the site's values.
  * Every address is a full one, composed by qs_full_address() (requestRuntime.php). A response that is not a
  * page of the site (a 404) carries the theme colour alone.
@@ -529,12 +530,43 @@ if (!function_exists('qs_social_picture')) {
 
 if (!function_exists('qs_social_picture_alt')) {
     /**
-     * A picture's description for `og:image:alt`, in a language: Media's `alt`. The one reader of it for the
-     * tags, so a description per language changes this function alone.
+     * A picture's description for `og:image:alt`, in a language: Media's `alt`, the one reader of it for the tags.
+     * Media keeps a description per language under a translation key, so an `alt` shaped like a key (the renderer's
+     * shape) is read in that language from the project's word files, the file a page of that language reads
+     * (Translator::loadTranslations()'s rule): a word missing or empty there gives '' (no tag), never the missing
+     * marker a placed picture shows. `__RAW__` before a text keeps the text as written, as the renderer reads it;
+     * any other text is the description in every language.
      */
-    function qs_social_picture_alt(array $entry, string $lang): string
+    function qs_social_picture_alt(array $entry, string $lang, string $projectPath): string
     {
-        return is_string($entry['alt'] ?? null) ? trim($entry['alt']) : '';
+        $alt = is_string($entry['alt'] ?? null) ? trim($entry['alt']) : '';
+        if (strpos($alt, '__RAW__') === 0) {
+            return trim(substr($alt, 7));
+        }
+        if (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $alt) !== 1) {
+            return $alt;
+        }
+        if (preg_match('/^[a-z0-9_-]+$/iD', $lang) !== 1) {
+            return '';
+        }
+        $folder = $projectPath . '/translate/';
+        $file = $folder . $lang . '.json';
+        if (!qs_project_is_multilingual() || !file_exists($file)) {
+            $file = $folder . 'default.json';
+        }
+        static $words = [];
+        if (!array_key_exists($file, $words)) {
+            $decoded = json_decode((string) @file_get_contents($file), true);
+            $words[$file] = is_array($decoded) ? $decoded : [];
+        }
+        $current = $words[$file];
+        foreach (explode('.', $alt) as $segment) {
+            if (!is_array($current) || !array_key_exists($segment, $current)) {
+                return '';
+            }
+            $current = $current[$segment];
+        }
+        return is_scalar($current) ? trim((string) $current) : '';
     }
 }
 
@@ -619,7 +651,7 @@ if (!function_exists('qs_social_tag_list')) {
                 if (is_string($picture['mime_type'] ?? null) && preg_match('#^image/[a-z0-9.+-]+$#D', $picture['mime_type']) === 1) {
                     $add('property', 'og:image:type', $picture['mime_type']);
                 }
-                $add('property', 'og:image:alt', qs_social_picture_alt($picture, $lang));
+                $add('property', 'og:image:alt', qs_social_picture_alt($picture, $lang, (string) $in['projectPath']));
             }
 
             $cardType = $page['cardType'] ?? $site['cardType'] ?? ($picture !== null ? 'large' : 'small');

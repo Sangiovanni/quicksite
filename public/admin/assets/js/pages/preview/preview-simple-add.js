@@ -71,11 +71,14 @@ window.PreviewSimpleAdd = (function () {
             },
         },
         image: {
-            // The short description is the image's alt, keyed like any text; none given, no alt (nothing invented).
+            // The short description is the image's alt, keyed like any text. None given, the picture's own alt from
+            // Media (its key, whose text Media writes per language), as the advanced picker's auto-fill takes it;
+            // neither, no alt (nothing invented).
             texts: (v) => (v.alt ? 1 : 0),
             build: (v, keys) => {
                 const params = { src: v.file };
                 if (v.alt) params.alt = keys[0];
+                else if (v.mediaAlt) params.alt = v.mediaAlt;
                 return node('img', params, null, v.alt ? [v.alt] : []);
             },
         },
@@ -456,6 +459,22 @@ window.PreviewSimpleAdd = (function () {
         return list.length ? list : [ctx.editedLanguage()];
     }
 
+    /**
+     * The picked picture's alt in Media, as listAssets answers it (Media's key, or a text written before the alt had
+     * languages), or '' when it has none or the list cannot be read. Matched by the address the picker wrote.
+     */
+    async function mediaAlt(file) {
+        const bare = (p) => String(p || '').replace(/^\/+/, '');
+        try {
+            const res = await QuickSiteAdmin.apiRequest('listAssets', 'GET', null, ['images']);
+            const assets = res && res.ok && res.data && res.data.data && res.data.data.assets;
+            const hit = ((assets && assets.images) || []).find(a => bare(a.path || '/assets/images/' + a.filename) === bare(file));
+            return hit && typeof hit.alt === 'string' ? hit.alt.trim() : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
     async function existingKeys(lang) {
         const res = await QuickSiteAdmin.apiRequest('getTranslations', 'GET', null, [lang]);
         if (!res || !res.ok) throw new Error(res?.data?.message || 'getTranslations');
@@ -512,6 +531,7 @@ window.PreviewSimpleAdd = (function () {
         const isRoot = !t.node && t.node !== 0;
         const position = isRoot ? 'inside' : ctx.position();
         const env = { inForm: current === 'button' && landsInForm() };
+        if (current === 'image' && v.alt === '') v.mediaAlt = await mediaAlt(v.file);
 
         const count = textCount(current, v);
         let langs = [];

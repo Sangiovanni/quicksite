@@ -771,7 +771,7 @@ or another control character becomes a space):
 | `og:url` | the address the page was served at, without its query string, each segment encoded, written as the site links its pages: no trailing slash but on a language's home (`fr/`) |
 | `og:site_name` | the translation key `site.name` |
 | `og:locale`, `og:locale:alternate` | the page's language and its territory (`fr_BE`): the one the author gave the language, else the language's usual one (`fr_FR`). A language's territories are the regions where Unicode CLDR has it, each an officially assigned ISO 3166-1 alpha-2 code, its usual one CLDR's likely one, in one table in `socialPreview.php`; a language CLDR gives none (Esperanto) writes none. On a multilingual site, each other language is an alternate, by the same rule |
-| `og:image`, `og:image:width`, `og:image:height`, `og:image:type`, `og:image:alt` | the page's picture, else the site's: a file of Media's images, with the size, the type and the description Media's metadata holds; a picture no longer in Media writes none |
+| `og:image`, `og:image:width`, `og:image:height`, `og:image:type`, `og:image:alt` | the page's picture, else the site's: a file of Media's images, with the size, the type and the description Media's metadata holds; a picture no longer in Media writes none. A description Media holds as a translation key (its alt text per language) is read in the page's language from the word file that language's pages read; a language with no text, or an empty one, writes no `og:image:alt` |
 | `twitter:card` | the page's card type, else the site's, else `summary_large_image` for a page with a picture and `summary` without |
 | `twitter:site` | the site's X account |
 | `theme-color` | the site's theme colour |

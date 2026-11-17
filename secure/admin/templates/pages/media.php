@@ -19,6 +19,7 @@ foreach (['media', 'common'] as $qsSubtree) {
 <script>
 window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
+<script src="<?= $baseUrl ?>/admin/assets/js/core/media-alt.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/media-alt.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/assets.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/assets.js') ?>"></script>
 
 <div class="asset-page">
@@ -34,8 +35,8 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
         <p class="admin-page-header__subtitle"><?= __admin('media.subtitle') ?></p>
     </div>
 
-    <!-- Upload Zone -->
-    <section class="admin-card">
+    <!-- Upload Zone: for a role that can upload -->
+    <section class="admin-card" data-requires-command="uploadAsset">
         <div class="admin-card__header">
             <h2 class="admin-card__title">
                 <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -88,25 +89,31 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
     <!-- Edit Area (hidden by default, shown when editing an asset) -->
     <section class="asset-edit-area" id="asset-edit-area" style="display:none">
         <div class="admin-card">
-            <div class="admin-card__header">
+            <div class="admin-card__header asset-edit-area__header">
                 <h2 class="admin-card__title" id="asset-edit-title"><?= __admin('media.editAsset') ?></h2>
-                <button type="button" class="admin-btn" id="asset-edit-close">&times; <?= __admin('common.close') ?></button>
+                <button type="button" class="admin-modal__close asset-edit-area__close" id="asset-edit-close" aria-label="<?= __admin('common.close') ?>" title="<?= __admin('common.close') ?>">&times;</button>
             </div>
             <div class="admin-card__body asset-edit-area__content">
                 <div class="asset-edit-area__preview" id="asset-edit-preview"></div>
                 <div class="asset-edit-area__fields">
                     <div class="asset-edit-area__info" id="asset-edit-info"></div>
-                    <div class="admin-form-group">
-                        <label class="admin-label"><?= __admin('media.altLabel') ?></label>
-                        <input type="text" class="admin-input" id="asset-edit-alt" placeholder="<?= __admin('media.altLongPlaceholder') ?>" maxlength="250" autocomplete="off">
+                    <!-- A picture's alt text, per language of the PROJECT (never the panel's); its key stays out of sight.
+                         assets.js fills the selector and shows the group for a picture only. -->
+                    <div class="admin-form-group" id="asset-edit-alt-group" data-requires-command="setTranslationKeys,deleteTranslationKeys,editAsset" hidden>
+                        <label class="admin-label" for="asset-edit-alt"><?= __admin('media.altLabel') ?></label>
+                        <div class="asset-edit-area__alt-row">
+                            <select class="admin-select asset-edit-area__lang" id="asset-edit-alt-lang" aria-label="<?= __admin('media.altLanguage') ?>" title="<?= __admin('media.altLanguage') ?>"></select>
+                            <input type="text" class="admin-input asset-edit-area__alt" id="asset-edit-alt" placeholder="<?= __admin('media.altLongPlaceholder') ?>" maxlength="250" autocomplete="off" aria-describedby="asset-edit-alt-hint">
+                        </div>
+                        <p class="admin-hint" id="asset-edit-alt-hint"></p>
                     </div>
-                    <div class="admin-form-group">
-                        <label class="admin-label"><?= __admin('media.descriptionLabel') ?></label>
+                    <div class="admin-form-group" data-requires-command="editAsset">
+                        <label class="admin-label" for="asset-edit-description"><?= __admin('media.descriptionLabel') ?></label>
                         <textarea class="admin-input asset-edit-description" id="asset-edit-description" placeholder="<?= __admin('media.descriptionLongPlaceholder') ?>" maxlength="500" rows="3" autocomplete="off"></textarea>
                     </div>
-                    <div class="asset-edit-area__actions">
+                    <div class="asset-edit-area__actions" data-requires-command="editAsset">
                         <button type="button" class="admin-btn admin-btn--primary" id="asset-edit-save"><?= __admin('media.saveChanges') ?></button>
-                        <span class="asset-edit-area__status" id="asset-edit-status"></span>
+                        <span class="asset-edit-area__status" id="asset-edit-status" role="status"></span>
                     </div>
                 </div>
             </div>
@@ -122,7 +129,7 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
                 <button class="asset-tabs__tab" data-category="font"><?= __admin('media.tabFont') ?> <span class="asset-tabs__count" id="count-font">0</span></button>
                 <button class="asset-tabs__tab" data-category="audio"><?= __admin('media.tabAudio') ?> <span class="asset-tabs__count" id="count-audio">0</span></button>
                 <button class="asset-tabs__tab" data-category="videos"><?= __admin('media.tabVideos') ?> <span class="asset-tabs__count" id="count-videos">0</span></button>
-                <button type="button" class="asset-tabs__tab asset-tabs__select" id="asset-select-mode"><?= __admin('media.selectOff') ?></button>
+                <button type="button" class="asset-tabs__tab asset-tabs__select" id="asset-select-mode" data-requires-command="deleteAsset"><?= __admin('media.selectOff') ?></button>
             </div>
             <div class="asset-browser__actions">
                 <div class="asset-search">
@@ -150,7 +157,7 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
         </div>
 
         <!-- Batch action bar -->
-        <div class="asset-batch-bar" id="asset-batch-bar" style="display:none">
+        <div class="asset-batch-bar" id="asset-batch-bar" style="display:none" data-requires-command="deleteAsset">
             <span id="asset-batch-count"><?= __admin('media.selectedCount', ['count' => 0]) ?></span>
             <div>
                 <button type="button" class="admin-btn" id="asset-batch-select-all"><?= __admin('media.selectAll') ?></button>
