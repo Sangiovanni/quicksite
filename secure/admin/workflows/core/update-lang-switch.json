@@ -6,9 +6,8 @@
         "icon": "🌐",
         "titleKey": "workflows.specs.updateLangSwitch.title",
         "descriptionKey": "workflows.specs.updateLangSwitch.description",
-        "category": "modification",
-        "tags": ["language", "switch", "multilingual"],
-        "difficulty": "beginner"
+        "category": "texts",
+        "tags": ["language", "switch", "multilingual"]
     },
     "parameters": [],
     "dataRequirements": [

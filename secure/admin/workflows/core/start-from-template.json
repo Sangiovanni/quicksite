@@ -1,0 +1,122 @@
+{
+    "$schema": "../schema.json",
+    "id": "start-from-template",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🧩",
+        "titleKey": "workflows.specs.startFromTemplate.title",
+        "descriptionKey": "workflows.specs.startFromTemplate.description",
+        "category": "start",
+        "tags": ["template", "starter", "landing", "business", "website", "multilingual", "dark"]
+    },
+    "stepsFrom": "template",
+    "preWorkflows": [
+        { "id": "fresh-start", "params": { "keepLanguages": true } },
+        {
+            "id": "setup-languages",
+            "params": {
+                "multilingual": "{{param.multilingual}}",
+                "languages": "{{param.languages}}",
+                "defaultLanguage": "{{param.language}}",
+                "updateLangSwitch": "{{param.multilingual}}"
+            }
+        },
+        { "id": "setup-theme-switch", "condition": "param.darkMode === true" }
+    ],
+    "parameters": [
+        {
+            "id": "template",
+            "type": "template",
+            "labelKey": "workflows.specs.startFromTemplate.params.template.label",
+            "required": true,
+            "options": [
+                { "value": "services", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.services" },
+                { "value": "hospitality", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.hospitality" },
+                { "value": "shops", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.shops" },
+                { "value": "gatherings", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.gatherings" },
+                { "value": "general", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.general" }
+            ]
+        },
+        {
+            "id": "multilingual",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.startFromTemplate.params.multilingual.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.multilingual.help",
+            "default": false,
+            "condition": "chosen.template && chosen.template.languages.length > 1"
+        },
+        {
+            "id": "languages",
+            "type": "tag-select",
+            "labelKey": "workflows.specs.startFromTemplate.params.languages.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.languages.help",
+            "optionsFrom": { "data": "allLanguages", "value": "code", "label": "name", "filterFrom": "template" },
+            "condition": "chosen.template && multilingual === true",
+            "validation": { "minItems": 2 }
+        },
+        {
+            "id": "language",
+            "type": "select",
+            "labelKey": "workflows.specs.startFromTemplate.params.language.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.language.help",
+            "optionsFrom": { "data": "allLanguages", "value": "code", "label": "name", "filterFrom": ["template", "languages"] },
+            "condition": "chosen.template"
+        },
+        {
+            "id": "darkMode",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.startFromTemplate.params.darkMode.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.darkMode.help",
+            "default": false,
+            "condition": "chosen.template && chosen.template.dark === true"
+        },
+        {
+            "id": "businessName",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.businessName.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.businessName.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('businessName') !== -1",
+            "validation": { "maxLength": 80 }
+        },
+        {
+            "id": "phone",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.phone.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.phone.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('phone') !== -1",
+            "validation": { "pattern": "\\+?[0-9][0-9 .()/-]{4,24}" }
+        },
+        {
+            "id": "email",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.email.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.email.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('email') !== -1",
+            "validation": { "pattern": "[^\\s@]+@[^\\s@]+\\.[^\\s@]+", "maxLength": 120 }
+        },
+        {
+            "id": "address",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.address.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.address.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('address') !== -1",
+            "validation": { "maxLength": 160 }
+        },
+        {
+            "id": "bookingUrl",
+            "type": "text",
+            "labelKey": "workflows.specs.startFromTemplate.params.bookingUrl.label",
+            "helpKey": "workflows.specs.startFromTemplate.params.bookingUrl.help",
+            "condition": "chosen.template && chosen.template.asks.indexOf('bookingUrl') !== -1",
+            "validation": { "pattern": "https?://[^\\s\"<>]+", "maxLength": 300 }
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "allLanguages",
+            "command": "getLanguageList",
+            "extract": "data.languages"
+        }
+    ],
+    "steps": []
+}

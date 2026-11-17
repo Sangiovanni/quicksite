@@ -100,7 +100,8 @@ $GLOBALS['__help_commands'] = [
                 'aliases_removed' => ['/old-guides'],
                 'page_events_cleaned' => ['guides'],
                 'resolvers_cleaned' => ['guides'],
-                'social_cleaned' => ['guides']
+                'social_cleaned' => ['guides'],
+                'policy_records_cleared' => []
             ]
         ],
         'error_responses' => [
@@ -112,7 +113,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.',
             '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.'
         ],
-        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config, the resolvers and the social values (setSocialPreview\'s picture and card type) of every route it deletes. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned, social_cleaned.'
+        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config, the resolvers and the social values (setSocialPreview\'s picture and card type) of every route it deletes. A deleted route that held a generated policy page has its record forgotten, so the cookie banner stops linking to it: policy_records_cleared names which, cookie or privacy. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned, social_cleaned.'
     ],
     
     'setRouteLayout' => [
@@ -1347,6 +1348,13 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'true',
                 'default' => false,
                 'validation' => 'Boolean value'
+            ],
+            'keep' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'With replace only: dotted groups of the file that survive the replace. The translations sent win where they name the same key. A group the file does not hold is skipped.',
+                'example' => '["consent", "storage.desc"]',
+                'validation' => 'A list of dotted group names; refused without replace: true'
             ]
         ],
         'example_patch' => 'PATCH /management/p/<projectId>/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',
@@ -1888,7 +1896,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'uploadAsset' => [
-        'description' => 'Uploads a file to the assets folder with validation and automatic naming. Category is auto-detected from file extension. Supports multipart file upload or HTTPS URL download.',
+        'description' => 'Uploads a file to the assets folder with validation and automatic naming. Category is auto-detected from file extension. Supports multipart file upload, HTTPS URL download, or a photo QuickSite ships for its site templates.',
         'method' => 'POST',
         'content_type' => 'multipart/form-data or application/json',
         'parameters' => [
@@ -1904,6 +1912,13 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'HTTPS URL to download the file from. Used if no file is uploaded.',
                 'example' => 'https://example.com/image.png',
                 'validation' => 'Must be HTTPS. Max 2048 characters.'
+            ],
+            'templatePhoto' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The file name of a photo QuickSite ships for its site templates, in <secure>/admin/workflows/templates/photos/. It is copied from that folder, with no network, then checked as any upload. A site template\'s run sends it. Not with file or url. When the project\'s images already hold the same photo under that name, nothing is added (200, reused: true).',
+                'example' => 'trades-job.webp',
+                'validation' => 'A file name only: lowercase letters, digits and hyphens, then .webp, .jpg, .jpeg, .png or .avif. Max 100 characters. A file of that folder.'
             ],
             'description' => [
                 'required' => false,
@@ -1936,7 +1951,7 @@ $GLOBALS['__help_commands'] = [
             'videos' => 'mp4, webm, ogv',
             'note' => 'The shipped extensions. An operator can replace a category\'s list in <secure>/management/config/import-policy.php.'
         ],
-        'example_post' => 'POST /management/p/<projectId>/uploadAsset (multipart/form-data, the file in the field "file") or POST /management/p/<projectId>/uploadAsset with body: {"url": "https://example.com/photo.jpg"}',
+        'example_post' => 'POST /management/p/<projectId>/uploadAsset (multipart/form-data, the file in the field "file") or POST /management/p/<projectId>/uploadAsset with body: {"url": "https://example.com/photo.jpg"} or {"templatePhoto": "trades-job.webp"}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -1957,13 +1972,15 @@ $GLOBALS['__help_commands'] = [
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '400.asset.invalid_upload' => 'File was not uploaded via HTTP POST.',
             '400.validation.forbidden_extension' => 'Executable file types are not allowed.',
+            '400.validation.conflict' => 'templatePhoto was sent with file or url: send one file source.',
+            '404.asset.template_photo_not_found' => 'No photo of that name is shipped for the site templates.',
             '400.validation.invalid_extension' => 'The file extension — on the uploaded file or on the url — is not one this install recognises, so the asset category cannot be determined.',
             '400.validation.invalid_file' => 'Invalid or missing filename. Could not determine filename from URL. URL must point to a file with a recognized extension. Invalid filename provided. File must have a valid extension. Could not determine file type. Filename cannot be empty. SVG file could not be sanitized — it may contain malformed XML.',
-            '400.validation.invalid_format' => 'Filename contains only invalid characters.',
+            '400.validation.invalid_format' => 'Filename contains only invalid characters. The templatePhoto parameter is not a file name of the shipped photos\' form.',
             '400.validation.invalid_length' => 'The description parameter must not exceed 500 characters. The alt parameter must not exceed 250 characters. URL must not exceed 2048 characters. Filename must not exceed 100 characters. Filename with uniqueness counter exceeds 100 characters. Please use a shorter filename.',
             '400.validation.invalid_mime_type' => 'File type not allowed for category.',
-            '400.validation.invalid_type' => 'The description parameter must be a string. The alt parameter must be a string. The url parameter must be a string.',
-            '400.validation.missing_field' => 'No file source provided. Upload a file or provide a url parameter.',
+            '400.validation.invalid_type' => 'The description parameter must be a string. The alt parameter must be a string. The url parameter must be a string. The templatePhoto parameter must be a string.',
+            '400.validation.missing_field' => 'No file source provided. Upload a file, or provide a url or a templatePhoto parameter.',
             '413.request.body_too_large' => 'The request body exceeded what this server accepts, so PHP discarded it before the command could read it.',
             '429.quota.rate_limited' => 'Too many uploads in the current period (upload_rate), or a window of the write rate is used up (see limits.write_rate in the overview). Both carry retry_after (seconds) and a message stating the limit in force; the write rate also names its window and sends Retry-After.',
             '500.server.directory_not_found' => 'The asset directory for the resolved category does not exist under the project. The category is named in the message.',
@@ -1972,10 +1989,10 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_verification_failed' => 'File upload failed: file not found after move.',
             '500.server.permission_denied' => 'Target directory is not writable.',
             '500.server.too_many_duplicates' => 'Unable to generate unique filename after 1000 attempts.',
-            '500.server.file_write_failed' => 'The file could not be added to the asset list (where its description, alt text and star are kept), so it was not kept. data: filename and category.',
+            '500.server.file_write_failed' => 'The file could not be added to the asset list (where its description, alt text and star are kept), so it was not kept. data: filename and category. Or a template photo could not be copied for the upload.',
             '507.quota.storage_exceeded' => 'Storing this file would take the owner over their configured storage quota. Charged to the project owner, so the refusal is generic when the caller is not that owner.'
         ],
-        'notes' => 'Category is auto-detected from file extension (no category parameter needed). Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. Either file or url must be provided. A file the asset list cannot record is not kept (500 server.file_write_failed).'
+        'notes' => 'Category is auto-detected from file extension (no category parameter needed). Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. A template photo is read from <secure>/admin/workflows/templates/photos/ alone and is never fetched. One of file, url or templatePhoto must be provided. A file the asset list cannot record is not kept (500 server.file_write_failed).'
     ],
     
     'deleteAsset' => [

@@ -1,5 +1,5 @@
 /*
- * AI tools panel (preview-ai-tools.js).
+ * Workflows panel (preview-ai-tools.js, mode ai-tools: the file names keep the panel's first name, AI tools).
  *
  * Theme: --admin-* variables (admin is dark-themed).
  */
@@ -12,7 +12,7 @@
 }
 
 
-/* Backup-first warning banner (top of AI tools panel) */
+/* Backup-first warning banner (top of the Workflows panel) */
 .preview-contextual-ai-tools__backup-banner {
     display: flex;
     flex-direction: column;
@@ -121,70 +121,97 @@
     box-shadow: 0 0 0 2px var(--admin-accent-muted);
 }
 
-.preview-contextual-ai-tools__tag-mode-row {
+/* Options, under the search: a thin line, closed by default, naming the switches on and how many rows they hide */
+.preview-contextual-ai-tools__options {
     display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--admin-text-muted);
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-top: calc(-1 * var(--space-xs));
 }
 
-.preview-contextual-ai-tools__tag-mode-label {
+.preview-contextual-ai-tools__options-toggle {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-xs);
+    width: 100%;
+    padding: 2px 0;
+    background: none;
+    border: none;
+    color: var(--admin-text-muted);
+    font: inherit;
+    font-size: var(--font-size-xs);
+    text-align: left;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+.preview-contextual-ai-tools__options-toggle:hover {
+    color: var(--admin-text);
+}
+.preview-contextual-ai-tools__options-toggle:focus-visible {
+    outline: 2px solid var(--admin-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Its marker, drawn (no character to be read out): pointing right when closed, down when open */
+.preview-contextual-ai-tools__options-toggle::before {
+    content: '';
+    flex-shrink: 0;
+    align-self: center;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid currentColor;
+    transition: transform 0.12s ease;
+}
+.preview-contextual-ai-tools__options-toggle[aria-expanded="true"]::before {
+    transform: rotate(90deg);
+}
+
+.preview-contextual-ai-tools__options-title {
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+}
+
+/* Which switches are on and how many rows they hide: it wraps rather than being cut */
+.preview-contextual-ai-tools__options-summary {
+    min-width: 0;
+}
+
+/* The switches, in the open Options: each keeps only the rows it names */
+.preview-contextual-ai-tools__switches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
+}
+
+.preview-contextual-ai-tools__switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--admin-text);
+    cursor: pointer;
     user-select: none;
 }
 
-.preview-contextual-ai-tools__tag-mode {
-    padding: 3px 9px;
-    background: var(--admin-card-bg);
-    color: var(--admin-text-muted);
-    border: 1px solid var(--admin-border);
-    border-radius: 4px;
-    font-size: 11px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.preview-contextual-ai-tools__tag-mode:hover {
-    color: var(--admin-text);
-    border-color: var(--admin-border-focus);
-}
-.preview-contextual-ai-tools__tag-mode--active {
-    background: var(--admin-accent);
-    color: var(--admin-on-accent);
-    border-color: var(--admin-accent);
-}
-
-.preview-contextual-ai-tools__tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-}
-
-.preview-contextual-ai-tools__tag-toggle {
-    background: transparent;
-    color: var(--admin-text-muted);
-    border: none;
-    padding: 3px 4px;
-    font-size: 11px;
-    font-family: inherit;
-    cursor: pointer;
-    text-decoration: underline;
-    transition: color 0.12s ease;
-}
-.preview-contextual-ai-tools__tag-toggle:hover {
-    color: var(--admin-text);
-}
-/* The phone block shows these two, and hides the other count */
-.preview-contextual-ai-tools__tag-toggle--phone-only,
-.preview-contextual-ai-tools__tag-toggle-count--phone {
+/* Their display would show them closed: hidden wins */
+.preview-contextual-ai-tools__switches[hidden],
+.preview-contextual-ai-tools__switch[hidden] {
     display: none;
+}
+
+.preview-contextual-ai-tools__switch input {
+    margin: 0;
+    accent-color: var(--admin-accent);
+    cursor: pointer;
 }
 
 .preview-contextual-ai-tools__categories {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-lg);
 }
 
 .preview-contextual-ai-tools__category-group {
@@ -193,36 +220,43 @@
     gap: 4px;
 }
 
+/* A group's title stays at the top of the panel while its rows scroll under it: opaque, on the panel's own colour,
+   its shadow covering the panel's top padding above it */
 .preview-contextual-ai-tools__category-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
     margin: 0;
-    padding: 0;
-    font-size: 12px;
+    padding: var(--space-xs) 0;
+    font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
-    opacity: 0.9;
+    background: var(--admin-surface);
+    box-shadow: 0 calc(-1 * var(--space-xs)) 0 0 var(--admin-surface);
 }
 
-.preview-contextual-ai-tools__tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px 9px;
-    background: var(--admin-card-bg);
-    color: var(--admin-text-muted);
-    border: 1px solid var(--admin-border);
-    border-radius: 999px;
-    font-size: 11px;
-    line-height: 1.4;
+/* Folded, a group's header is the summary a click opens: the browser's own marker says which way */
+.preview-contextual-ai-tools__category-header--fold {
+    display: list-item;
     cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
-.preview-contextual-ai-tools__tag:hover {
-    color: var(--admin-text);
-    border-color: var(--admin-border-focus);
+
+.preview-contextual-ai-tools__category-header--fold .preview-contextual-ai-tools__category-line {
+    display: block;
 }
-.preview-contextual-ai-tools__tag--active {
-    background: var(--admin-accent);
-    color: var(--admin-on-accent);
-    border-color: var(--admin-accent);
+
+.preview-contextual-ai-tools__category-count {
+    font-weight: var(--font-weight-normal);
+    color: var(--admin-text-muted);
+}
+
+.preview-contextual-ai-tools__category-line {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+    color: var(--admin-text-muted);
 }
 
 .preview-contextual-ai-tools__section {
@@ -277,19 +311,8 @@
     font-size: 13px;
     font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
-
-.preview-contextual-ai-tools__tool-card-badge {
-    flex-shrink: 0;
-    font-size: 12px;
-    line-height: 1;
-    opacity: 0.7;
-    cursor: help;
-}
-
 
 .preview-contextual-ai-tools__tool-card-desc {
     margin: 0;
@@ -302,57 +325,135 @@
     overflow: hidden;
 }
 
-.preview-contextual-ai-tools__tool-card-meta {
+/* A row's second line: what a run does, in words, one line per fact, never cut */
+.preview-contextual-ai-tools__tool-card-facts {
+    display: block;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
+    color: var(--admin-text);
+}
+
+.preview-contextual-ai-tools__tool-card-fact {
     display: flex;
-    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+/* What a run can delete: the words say it, the colour points at it */
+.preview-contextual-ai-tools__tool-card-fact--delete {
+    color: var(--admin-warning);
+}
+
+/* A fact's icon (QSDom.icon()): before its words on a row, alone on a small card. A fact with no icon keeps its place */
+.preview-contextual-ai-tools__fact-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    margin-top: 1px;
+}
+
+.preview-contextual-ai-tools__fact-icon--delete {
+    color: var(--admin-warning);
+}
+
+/* A workflow the role cannot run, shown only when asked for: greyed, nothing to press, no hand and no hover border. Each rule
+   names the card's own class twice over, so it outranks the card's pointer and hover wherever it stands in this file */
+.preview-contextual-ai-tools__tool-card.preview-contextual-ai-tools__tool-card--unrunnable,
+.preview-contextual-ai-tools__small-card.preview-contextual-ai-tools__small-card--unrunnable {
+    opacity: 0.55;
+    cursor: default;
+}
+.preview-contextual-ai-tools__tool-card.preview-contextual-ai-tools__tool-card--unrunnable:hover,
+.preview-contextual-ai-tools__small-card.preview-contextual-ai-tools__small-card--unrunnable:hover,
+.preview-contextual-ai-tools__small-card.preview-contextual-ai-tools__small-card--unrunnable:focus-within {
+    border-color: var(--admin-border);
+}
+
+.preview-contextual-ai-tools__tool-card-unrunnable {
+    font-size: var(--font-size-xs);
+    font-style: italic;
+    color: var(--admin-text-muted);
+}
+
+/* The compact view: small cards side by side, every one the same size, wrapping as the panel narrows */
+.preview-contextual-ai-tools__tool-list--compact {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+    gap: 6px;
+}
+
+.preview-contextual-ai-tools__small-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 8px 6px 6px;
+    background: var(--admin-card-bg);
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.12s ease;
+}
+.preview-contextual-ai-tools__small-card:hover,
+.preview-contextual-ai-tools__small-card:focus-within {
+    border-color: var(--admin-accent);
+}
+
+.preview-contextual-ai-tools__small-card-open {
+    display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 4px;
-    font-size: 11px;
-    color: var(--admin-text-muted);
-}
-
-.preview-contextual-ai-tools__tool-card-meta-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 1px 6px;
-    background: var(--admin-bg);
-    border: 1px solid var(--admin-border);
-    border-radius: 3px;
-    line-height: 1.4;
-}
-.preview-contextual-ai-tools__tool-card-meta-chip--difficulty-beginner {
-    color: #22c55e;
-    border-color: #22c55e4d;
-}
-.preview-contextual-ai-tools__tool-card-meta-chip--difficulty-intermediate {
-    color: #f59e0b;
-    border-color: #f59e0b4d;
-}
-.preview-contextual-ai-tools__tool-card-meta-chip--difficulty-advanced {
-    color: #ef4444;
-    border-color: #ef44444d;
-}
-
-.preview-contextual-ai-tools__show-more {
     width: 100%;
-    padding: 8px;
-    background: transparent;
-    color: var(--admin-text-muted);
-    border: 1px dashed var(--admin-border);
+    min-width: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+    cursor: inherit;
+}
+.preview-contextual-ai-tools__small-card-open:focus-visible {
+    outline: 2px solid var(--admin-accent);
+    outline-offset: 2px;
     border-radius: 4px;
+}
+
+.preview-contextual-ai-tools__small-card-icon {
+    font-size: 2rem;
+    line-height: 1;
+}
+
+/* The name on three lines at most, then "…": its box is always three lines tall, so every card is the same size */
+.preview-contextual-ai-tools__small-card-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    width: 100%;
+    height: calc(3 * 1.3em);
     font-size: 12px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: color 0.12s ease, border-color 0.12s ease;
+    line-height: 1.3;
+    font-weight: var(--font-weight-semibold);
+    overflow-wrap: anywhere;
 }
-.preview-contextual-ai-tools__show-more:hover {
-    color: var(--admin-text);
-    border-color: var(--admin-border-focus);
+
+.preview-contextual-ai-tools__small-card-facts {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    height: 14px;
 }
-.preview-contextual-ai-tools__show-more:focus-visible {
-    outline: none;
-    border-color: var(--admin-accent);
-    color: var(--admin-text);
+
+/* Recently used, above the groups once they fold */
+.preview-contextual-ai-tools__recent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
 }
 
 .preview-contextual-ai-tools__empty {
@@ -360,6 +461,11 @@
     color: var(--admin-text-muted);
     font-size: 13px;
     text-align: center;
+}
+
+/* The switches hid every row: the words, then Show all */
+.preview-contextual-ai-tools__empty-text {
+    margin: 0 0 var(--space-sm);
 }
 
 .preview-contextual-ai-tools__loading {
@@ -923,6 +1029,11 @@
     color: #ef4444;
     word-break: break-word;
 }
+.preview-contextual-ai-tools__ai-response-left-out {
+    margin-top: 2px;
+    color: #f59e0b;
+    word-break: break-word;
+}
 
 /* Footer (Model + Touches) — discreet inline line */
 
@@ -1281,4 +1392,283 @@
     font-size: 11px;
     line-height: 1.4;
     color: var(--admin-text-muted);
+}
+
+/* A picker of templates: radio cards that wrap as the panel narrows, each with its picture (or its icon), its name and its line;
+   a Preview button under the card of a template that has a built preview */
+
+.preview-contextual-ai-tools__template-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), 1fr));
+    gap: 8px;
+}
+
+/* The templates by kind: a row of buttons that wraps (All, then a kind each), then each kind's name over its cards.
+   A card or a kind the buttons leave out is not drawn */
+.preview-contextual-ai-tools__template-pick,
+.preview-contextual-ai-tools__template-picker--kinds,
+.preview-contextual-ai-tools__template-kind {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.preview-contextual-ai-tools__template-pick {
+    gap: 10px;
+}
+
+.preview-contextual-ai-tools__template-picker--kinds {
+    gap: 12px;
+}
+
+.preview-contextual-ai-tools__template-kind {
+    gap: 6px;
+}
+
+.preview-contextual-ai-tools__template-kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.preview-contextual-ai-tools__template-kind-name {
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--admin-text-muted);
+}
+
+.preview-contextual-ai-tools__template-kind-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), 1fr));
+    gap: 8px;
+}
+
+.preview-contextual-ai-tools__template-kind[hidden],
+.preview-contextual-ai-tools__template-card[hidden] {
+    display: none;
+}
+
+.preview-contextual-ai-tools__template-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px;
+    background: var(--admin-card-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+}
+
+.preview-contextual-ai-tools__template-card:hover {
+    border-color: var(--admin-accent);
+}
+
+.preview-contextual-ai-tools__template-card--chosen {
+    border-color: var(--admin-accent);
+    box-shadow: 0 0 0 2px var(--admin-accent-muted);
+}
+
+.preview-contextual-ai-tools__template-card:focus-within {
+    outline: 2px solid var(--admin-accent);
+    outline-offset: 1px;
+}
+
+/* The picture first, then the radio beside the name and its line */
+.preview-contextual-ai-tools__template-choice {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 6px;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.preview-contextual-ai-tools__template-radio {
+    grid-row: 2;
+    grid-column: 1;
+    margin: 2px 0 0;
+    accent-color: var(--admin-accent);
+}
+
+.preview-contextual-ai-tools__template-text {
+    grid-row: 2;
+    grid-column: 2;
+}
+
+.preview-contextual-ai-tools__template-picture {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    display: block;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+}
+
+.preview-contextual-ai-tools__template-picture img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+}
+
+.preview-contextual-ai-tools__template-picture--icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+}
+
+.preview-contextual-ai-tools__template-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.preview-contextual-ai-tools__template-name {
+    font-size: 12px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+
+.preview-contextual-ai-tools__template-line {
+    font-size: 11px;
+    line-height: 1.3;
+    color: var(--admin-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.preview-contextual-ai-tools__template-preview,
+.preview-contextual-ai-tools__template-theme,
+.preview-contextual-ai-tools__template-kind-btn {
+    min-height: 2rem;
+    padding: 4px 12px;
+    background: transparent;
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.preview-contextual-ai-tools__template-preview {
+    align-self: flex-start;
+    margin-top: auto;
+}
+
+.preview-contextual-ai-tools__template-preview:hover,
+.preview-contextual-ai-tools__template-theme:hover,
+.preview-contextual-ai-tools__template-kind-btn:hover {
+    border-color: var(--admin-accent);
+    color: var(--admin-accent);
+}
+
+.preview-contextual-ai-tools__template-theme[aria-pressed="true"],
+.preview-contextual-ai-tools__template-kind-btn[aria-pressed="true"] {
+    border-color: var(--admin-accent);
+    box-shadow: 0 0 0 2px var(--admin-accent-muted);
+}
+
+/* A template's built preview, in the panel's dialog: as wide and as tall as the screen allows. Its head holds the title and, at its
+   top right at every width, the close; the theme buttons sit beside the title where there is room and under it where there is not */
+
+.admin-modal-dialog.preview-contextual-ai-tools__template-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 72rem;
+    width: calc(100% - 2 * var(--space-md));
+    max-height: calc(100% - 2 * var(--space-md));
+    padding: var(--space-md);
+    text-align: left;
+}
+
+.preview-contextual-ai-tools__template-dialog-head {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 2rem;
+    padding-right: 3rem;
+}
+
+/* The dialog's close: the panel's × (admin-modal__close), a finger's size, out of the row that wraps and centred on its first row */
+.preview-contextual-ai-tools__template-dialog-head .preview-contextual-ai-tools__template-close {
+    position: absolute;
+    top: -0.25rem;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.preview-contextual-ai-tools__template-dialog-title {
+    flex: 1 1 12rem;
+    margin: 0;
+    font-size: var(--font-size-base);
+    color: var(--admin-text);
+}
+
+.preview-contextual-ai-tools__template-themes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.preview-contextual-ai-tools__template-dialog-note {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--admin-text-muted);
+}
+
+/* What the dialog says when a link that leads out of the preview is pressed: a line under the note, there only while it has words */
+.preview-contextual-ai-tools__template-dialog-outside {
+    margin: 6px 0 0;
+    padding: 6px 10px;
+    border-left: 3px solid var(--admin-accent);
+    border-radius: 4px;
+    background: var(--admin-accent-muted);
+    color: var(--admin-text);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.preview-contextual-ai-tools__template-dialog-outside:empty {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.preview-contextual-ai-tools__template-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 70vh;
+    min-height: 12rem;
+    background: #ffffff;
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+}
+
+.preview-contextual-ai-tools__template-dialog-end {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
 }

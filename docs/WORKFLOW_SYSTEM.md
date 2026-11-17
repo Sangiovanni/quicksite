@@ -9,11 +9,12 @@
 3. [Files Involved](#files-involved)
 4. [Workflow Types](#workflow-types)
 5. [Adding a workflow](#adding-a-workflow)
-6. [JSON Spec Reference](#json-spec-reference)
-7. [Markdown Template Reference](#markdown-template-reference)
-8. [Execution Flow](#execution-flow)
-9. [Condition Syntax](#condition-syntax)
-10. [Known Patterns & Gotchas](#known-patterns--gotchas)
+6. [Site templates](#site-templates)
+7. [JSON Spec Reference](#json-spec-reference)
+8. [Markdown Template Reference](#markdown-template-reference)
+9. [Execution Flow](#execution-flow)
+10. [Condition Syntax](#condition-syntax)
+11. [Known Patterns & Gotchas](#known-patterns--gotchas)
 
 ---
 
@@ -32,7 +33,7 @@ A workflow can have steps (manual), a promptTemplate (AI), or both.
 ## Architecture
 
 ```
-User fills parameters in the AI tools panel
+User fills parameters in the Workflows panel
         │
         ▼
 ┌─────────────────────────────────────┐
@@ -85,6 +86,9 @@ User fills parameters in the AI tools panel
 | `<secure>/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` |
 | `<secure>/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` |
 | `<secure>/admin/workflows/examples/*.md` | Example fragments referenced via `{{> example.X}}` |
+| `<secure>/admin/workflows/templates/*.json` | Site templates: what *Start from a template* builds, one file per template (see *Site templates*) |
+| `public/admin/assets/template-previews/<template>/` | Each template's built preview, written by `<secure>/tools/template-previews.php` |
+| `public/admin/assets/images/templates/<template>.jpg` | Each template's picture in the picker (`.webp` and `.png` are read too) |
 
 **Workflows are extensible by file.** There is no in-app authoring surface and no
 authoring command: a workflow *is* a JSON spec, plus a Markdown template beside it
@@ -93,8 +97,8 @@ see *Adding a workflow* below. The panel runs workflows; it does not create them
 
 ### Admin UI
 
-Workflows are run from the visual editor's **AI tools** mode
-(`/admin/preview` → AI tools). Any `/admin/workflows*` URL redirects there.
+Workflows are run from the visual editor's **Workflows** mode (`ai-tools`)
+(`/admin/preview` → Workflows). Any `/admin/workflows*` URL redirects there.
 
 | File | Purpose |
 |------|---------|
@@ -200,9 +204,9 @@ workflow with no parameters — the least a real spec can carry:
         "icon": "🎨",
         "titleKey": "ai.specs.globalDesign.title",
         "descriptionKey": "ai.specs.globalDesign.description",
-        "category": "style",
-        "tags": ["design", "colors", "variables", "theme"],
-        "difficulty": "beginner"
+        "category": "look",
+        "answerLength": "short",
+        "tags": ["design", "colors", "variables", "theme"]
     },
     "parameters": [],
     "dataRequirements": [
@@ -238,7 +242,7 @@ so your own workflow will display as `my-workflow` until you add translations.
 Direct strings need none:
 
 ```json
-"meta": { "icon": "🎨", "name": "My Workflow", "description": "What it does", "category": "style" }
+"meta": { "icon": "🎨", "name": "My Workflow", "description": "What it does", "category": "look" }
 ```
 
 ### How the template consumes what the spec declares
@@ -281,9 +285,9 @@ placeholders resolve against `dataRequirements` ids, not against arbitrary names
    This is what decides whether the workflow is offered to a given role — leave a
    command out and the workflow is shown to people who cannot run it.
 
-5. **Reload the panel and run it.** Open the visual editor, switch to **AI
-   tools**, and your workflow appears in the list under its category. Running it
-   is the check — see below.
+5. **Reload the panel and run it.** Open the visual editor, switch to
+   **Workflows**, and your workflow appears in the list under its group, its row
+   saying what a run does. Running it is the check — see below.
 
 ### How you know it worked
 
@@ -308,7 +312,153 @@ up:
 time against the Management API, and a failure part-way leaves the earlier
 commands applied. Test a destructive workflow on a project you can throw away, or take a backup
 first — the shipped `fresh-start` deletes every route, asset, language and
-component before it resets styles.
+component before it resets styles. It keeps the words the consent layer and the storage and privacy
+registries own, as those outlive the pages: its `setTranslationKeys` steps name them in `keep`. A workflow
+that replaces a language's texts does the same.
+
+---
+
+## Site templates
+
+*Start from a template* (`start-from-template.json`) is one workflow for every ready-made site. Its first
+parameter is a picker of templates; its steps are the picked template's. It asks no model.
+
+**A template is one file**, `<secure>/admin/workflows/templates/<id>.json`. Put a file there and the picker
+offers it: nothing else is edited. Like workflows, templates are shipped files: only that folder is read, and
+a run names a template by its id.
+
+```json
+{
+    "id": "my-template",
+    "icon": "🏠",
+    "title": "My template",
+    "description": "One line under the name",
+    "languages": ["en", "fr"],
+    "asks": ["businessName", "phone"],
+    "steps": [
+        { "command": "editStructure", "params": { "type": "menu", "structure": [
+            { "tag": "nav", "children": [
+                { "tag": "a", "params": { "href": "/" }, "children": [{ "textKey": "site.name" }] },
+                { "$if": "param.darkMode === true", "component": "theme-switch", "data": {} }
+            ] }
+        ] } },
+        { "command": "setTranslationKeys", "condition": "param.multilingual !== true", "forEach": "param.language",
+          "params": { "language": "{{$value}}", "translations": "{{texts.{{$value}}}}" } },
+        { "command": "setTranslationKeys", "condition": "param.multilingual === true", "forEach": "param.languages",
+          "params": { "language": "{{$value}}", "translations": "{{texts.{{$value}}}}" } }
+    ],
+    "data": {
+        "texts": { "en": { "site": { "name": "My site" } }, "fr": { "site": { "name": "Mon site" } } },
+        "dark": { "--color-bg": "#111111" }
+    }
+}
+```
+
+| Key | What it is |
+|---|---|
+| `id` | The file's name without `.json`. A file whose `id` is not its name is left out. |
+| `title`, `description` | The name and the line on the template's card, as written. `titleKey` and `descriptionKey` name a translation instead (the shipped templates use them). |
+| `icon` | Shown on the card when the template has no picture |
+| `languages` | The languages the template is written in. A run offers these and no other. |
+| `kind` | The kind of site the template is for, as an id: `services`, `hospitality`, `shops`, `gatherings` or `general` in the shipped row. The picker lists the templates kind by kind. Left out, the template comes last. |
+| `asks` | The optional fields the template asks a run for, by the row's parameter ids: `businessName`, `phone`, `email`, `address`, `bookingUrl`. The form shows a field only for a template that lists it. Left out, the template asks for none. |
+| `steps` | The template's commands, read as any workflow's steps (see *`steps`*): `condition`, `forEach`, `filter`, placeholders and `$if`. |
+| `data` | What the steps read, by key: `{{texts.fr}}`, `{{dark}}`. A template whose `data.dark` is not empty is offered with a dark mode. |
+
+**What a run chooses, and what the steps read:**
+
+| Field | In a step | What the row does with it |
+|---|---|---|
+| Template | `param.template` | The steps are that file's |
+| Several languages | `param.multilingual` | Runs *Setup Languages* with the languages ticked, then *Update Language Switch* |
+| Languages | `param.languages` | The template's languages, at least two ticked |
+| Main language | `param.language` | The site's default language, one of the template's |
+| Include dark mode | `param.darkMode` | Runs *Theme Switch Button*; shown only for a template with dark colours |
+| Name, Phone number, E-mail address, Address, Booking or ordering link | `param.businessName`, `param.phone`, `param.email`, `param.address`, `param.bookingUrl` | Nothing: the template's own steps read them. Each is shown only for a template whose `asks` lists it, and is empty when left empty |
+
+A run goes through *Fresh Start*, *Setup Languages*, *Update Language Switch* when the site has several
+languages, *Theme Switch Button* when it has a dark mode, then the template's steps. The languages are set
+before the template's steps, since a language's texts can only be sent once the language exists.
+
+**The kinds are the picker's own list.** The row's `template` parameter lists them as its `options`, in the order the picker
+shows them: each a kind's id (`value`) and the key of its name (`labelKey`). A template states one of those ids as its `kind`.
+The picker then shows the templates kind by kind, each kind under its name, with a row of buttons above them (**All**, then
+one per kind with the number of its templates) that shows one kind alone. A template whose `kind` is missing, or is no id of
+the list, comes last under **Other**. A new kind is one more entry of `options` and its name in the translations; with no
+`options` the picker shows no kinds.
+
+**A field a template asks for is optional, and the template holds the sample that stands in for it.** The template always sends its
+sample texts; a step under a condition (`"condition": "param.multilingual !== true && param.phone"`) then sends what was typed over
+them, as a text of the site, the same in every language. A link is written in its two variants, each under `$if`: the field's value
+(`"$if": "param.phone"`, `"href": "tel:{{param.phone | tel}}"`) or the sample's (`"$if": "!param.phone"`). The `tel` filter keeps a
+number's digits and a leading `+`, which is what a `tel:` address takes. For one value to fill every place, a template keeps the
+business name out of its sentences: it is a text of its own (`site.name`), shown where a name stands alone.
+
+**What a shipped template shows.** A template by type of business holds what a person of that trade needs on one site, with sample
+content that cannot pass for real: every business and person name carries *Sample* (*Exemple* in French), every address is of
+`example.com` or of a street and a town that do not exist, every phone number is one that is never assigned, and a review says that
+it is a sample. Nothing it shows comes from outside: its pictures are its own photos (below) or what its stylesheet draws. A way
+to book, call, order or ask for a quote is a link (`tel:`, `mailto:`, or the address of the service the author uses), not a form.
+
+**Photos in a template.** A template's photos are QuickSite's own, shipped in `<secure>/admin/workflows/templates/photos/`
+beside `photos.json`, the record of how each was made (the model, the prompt, any edit, the terms; the photos are CC0). One
+folder holds every template's photos: a photo's name starts with its template's id, and is the asset's name in a project. A run
+brings each into the project's images with one `uploadAsset` step, before the pages that show it:
+
+```json
+{ "command": "uploadAsset", "params": { "templatePhoto": "trades-job.webp" } }
+```
+
+`templatePhoto` reads that folder alone and fetches nothing, so a run brings its photos the same way on a server and on a local
+install; the photo then goes through every check of an upload. A second run on the same project finds the same photo there and
+adds no copy. A page shows a photo as an image (`"tag": "img"`, `"src": "/assets/images/trades-job.webp"`), never as a stylesheet
+background, so an author swaps it in the editor like any image; its `alt` is a key of the template's texts, so it follows the
+language. No text is laid on a photo: words sit beside or under it, so their contrast is the palette's whatever photo an author
+puts in its place. The previews' tool keeps a template's photos once for both themes, and a photo that changes makes its
+template's preview stale.
+
+**Adding a language to a template:** add its code to `languages` and its texts under `data.texts`. The
+shipped templates send each chosen language's texts with one step, `{{texts.{{$value}}}}`, so nothing else
+changes.
+
+**A template fits a phone, a tablet and a computer.** QuickSite has two limits, the panel's own: a phone up
+to `40rem` (640 px), a tablet up to `64rem` (1024 px), a computer above. A template is never made for one of them
+alone, and it fits from the narrowest phone in use, 320 px wide, up.
+
+- **Wrap first.** A layout that needs no width uses none: a grid's columns as `minmax(min(320px, 100%), 1fr)`, a
+  title's size as a `clamp()` whose largest value is the computer's, `flex-wrap: wrap` on a row of links,
+  `overflow-wrap: break-word` for a word longer than the screen. Each fits every width with no media query.
+- **When a width is needed,** only `@media (max-width: 64rem)` (the tablet) and `@media (max-width: 40rem)` (the
+  phone), written exactly so: at most one block of each, at the end of the stylesheet, the tablet's before the
+  phone's, and no plain rule after them, which would override them. A template that needs neither has none. A
+  `rem` in a media query is the browser's default text size, never the site's root size: the limits stay 640 and
+  1024 px whatever the site sets on `html`, and grow only for a visitor who raised their browser's text size.
+- **Nothing is out of reach.** At every width, no page is wider than the screen, no text is cut, and every link and
+  button can be reached. A menu that does not fit wraps onto another row; on a phone, a bar fixed or sticky at
+  the top scrolls with the page, so it never covers what is under it.
+- **What the run's options add fits too:** the language switch and the light/dark button take their look from the
+  template's stylesheet.
+
+The tool below refuses a template whose stylesheet names another width, holds a second block of either, puts the
+phone's before the tablet's, or a plain rule after them: it builds no preview for it, and `--check` names it. A
+media query that names no width (`prefers-reduced-motion`, say) is not this rule's.
+
+**The picture and the preview.** A template's picture is `public/admin/assets/images/templates/<id>.jpg`
+(`.webp` or `.png`); without one its card shows its icon. Its preview is built by a tool, from a shell:
+
+```
+php <secure>/tools/template-previews.php
+```
+
+It builds each template with every one of its languages, in its light theme and in its dark theme when it
+has one, and keeps the pages as static files under `public/admin/assets/template-previews/<id>/`. The panel
+shows a preview only while it matches the template's file: change the file, and its card shows no **Preview**
+button until the tool has run again. `--check` builds nothing and says which previews are stale.
+
+**A link that leads out of a preview.** A preview holds the template's own pages, in its own languages, and nothing else:
+that list is the build's, so nothing is written in a template for it. A link to anything else (the sample's booking page, a
+call, a letter, a page the preview does not hold) is switched off in the preview's copy, and a press on it makes the dialog
+say, in the panel's language, that the link works on a real site. The site a run makes keeps every link.
 
 ---
 
@@ -323,27 +473,64 @@ component before it resets styles.
     "meta": {
         "icon": "🎯",             // emoji for display
         "name": "My Workflow",     // display name (alternative to titleKey)
-        "category": "advanced"     // see categories below
+        "category": "tools"        // see groups below
     }
 }
 ```
 
 > Core workflows use `titleKey`/`descriptionKey` (i18n translation keys) instead of `name`/`description`.
 
-### Categories
+### Groups (`meta.category`)
 
-`creation` | `modification` | `content` | `style` | `advanced` | `wip` | `template`
+The Workflows panel lists the workflows by what a person wants to do, in this order:
+
+| Value | Group, on screen | Under it |
+|---|---|---|
+| `start` | Start a new site | Replaces what is there |
+| `add` | Add to my site | Keeps what is there |
+| `look` | Change the look | Colours, styles, animations |
+| `texts` | Texts and languages | Words, translations, the switch |
+| `privacy` | Cookies and privacy | Your consent banner and pages |
+| `tools` | Tools | For when you know what you want |
+
+The list is `schema.json`'s enum, and its order is the panel's; a group's words are `ai.categories.<value>.title` and `.desc` in the
+panel's translations. A group with no workflow shows nothing. Another name still runs, as the engine checks only that `category`
+names a group, and the panel lists it last, under its own name.
+
+### What a workflow's row says
+
+Under its title, a row says what a run does, read from the workflow's file and every workflow it may reach
+(`WorkflowManager::rowFacts()`), so a new file says it with nothing to declare:
+
+- **AI or not, and how many requests:** a `promptTemplate` in its reach asks a model, unless that workflow is `pasteOnly`; one
+  request, or several when its reach holds two AI workflows or a `forEach` repeats one. `meta.answerLength` adds how long the
+  answer runs.
+- **Can delete** and **Changes:** each step of its reach as its file writes it, and each command an AI answer may send
+  (`relatedCommands`), read as a run's review reads them (*What a run warns about*, below). As nothing is fetched, each says what a
+  run *can* do: a step repeated over a project's pages deletes nothing where there is none.
+- **Can run any command, one that deletes included:** `answerRules.anyCommand`.
+- **What it needs:** `meta.needsKey`.
 
 ### Optional Fields
 
 #### `meta.description` / `meta.descriptionKey`
-Short description shown in the workflow browser.
+Short description shown on the workflow's row, cut at two lines.
 
 #### `meta.tags` (array of strings)
-For filtering/search in the browser. Example: `["create", "website", "multi-page"]`
+Words the list's search reads and nothing shows. Example: `["create", "website", "multi-page"]`
 
-#### `meta.difficulty`
-`beginner` | `intermediate` | `advanced` — shown as a visual indicator.
+#### `meta.answerLength`
+`short` | `long` — how long the AI's answer runs, added to the row's words (*Uses AI: one request, short answer*): short is up to
+about 5,000 characters, long is the whole of a site. Set it only from a measure or an estimate that stands far from the line; left
+out, the row says how many requests and no more.
+
+#### `meta.needsKey`
+A translation key of a short text naming what the project must hold before a run makes sense, shown on the row: *Needs a cookie
+banner*. It is shown in the panel's language only where that language holds the key.
+
+#### `pasteOnly` (boolean)
+The commands are pasted by hand and no model is asked: the row says *No AI: you paste the commands*, and the requests a run sends
+count none for it. Its `promptTemplate` is what the paste box asks for. `run-batch` is the one.
 
 #### `parameters` (array)
 User input form fields. Each parameter:
@@ -383,7 +570,8 @@ Hidden parameters (those failing their own `condition`) skip validation entirely
 - `checkbox` — boolean toggle
 - `number` — numeric input (renders `<input type="number">`)
 - `nodeSelector` — visual node picker from page structures
-- `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the AI tools panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc.
+- `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the Workflows panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc.
+- `template` — a picker of site templates: one radio card per file of `templates/`, with its picture, its name and its line. Its value is the template's id. It takes no `options`: the engine lists the folder. See *Site templates*.
 - `hidden` — not shown in UI, value set programmatically
 
 **Default values from data**: `default` accepts either a literal value or a template string referencing fetched `dataRequirements`. For example:
@@ -438,6 +626,11 @@ Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. Wit
 
 **Conditional visibility:** `"condition": "multilingual === true"` — references another parameter's ID (not prefixed with `param.`).
 
+**Fields that follow a picked template.** Beside a `template` parameter:
+- a condition reads the template picked as `chosen.<the parameter's id>`, which is empty until one is picked: `"condition": "chosen.template && chosen.template.dark === true"`. It holds the template's `languages` and `dark`.
+- `filterFrom` may name the `template` parameter: the options are then limited to the picked template's languages. `filterFrom` also takes a list of parameters, each narrowing the options in turn: `"filterFrom": ["template", "languages"]`.
+- when a template is picked, a `tag-select` its languages filter starts with all of them ticked.
+
 #### `dataRequirements` (array)
 System data fetched before execution via `CommandRunner`:
 
@@ -464,7 +657,7 @@ Hardcoded data available as `data.*` in steps and templates:
 ```
 
 #### `relatedCommands` (array of strings)
-List of API command names. Used for two things:
+List of API command names. Used for three things:
 
 1. **Deciding whether the workflow is listed at all.** The panel hides a workflow
    from anyone whose role does not grant every command in `relatedCommands` — and
@@ -476,9 +669,23 @@ List of API command names. Used for two things:
 2. **Building command documentation into the prompt** — `{{> command.X}}`,
    `{{> command.$relatedCommands}}` and the `{{#each commands}}` context all draw
    on help data fetched for these names.
+3. **Bounding an AI answer** — an answer runs only the commands named here, unless
+   `answerRules` says otherwise. A command it does not name is left out, and the
+   panel says so before anything runs.
 
 #### `promptTemplate` (string)
 Filename of the markdown template (e.g., `"create-website.md"`). Loaded from the same folder as the JSON spec.
+
+#### `answerRules` (object)
+What an AI answer of this workflow may run, beyond its `relatedCommands`. `WorkflowManager::answerSteps()` reads
+them each time an answer comes back: a step they refuse never becomes a step, and the answer's status line in the
+panel names it. Each is optional.
+
+| Rule | What it does | Example |
+|------|--------------|---------|
+| `anyCommand` | The answer may send any command, each still passing the user's role. For a workflow whose purpose is any command. | `run-batch` |
+| `selectorStarts` | Where a step names a `selector`, every selector of its list begins with one of these, as a whole name: `#a b` begins with `#a`, `#a-b` does not. A `+` or `~` straight after the start's own part is refused, as it selects what follows the element, not what is inside it; one deeper in is not. A selector with an escape or a comment is refused, as a browser reads it otherwise than its text. | `["#qs-consent-banner", "#qs-consent-popup"]` |
+| `forbiddenProperties` | A step whose `styles` declare one of these is left out, whatever the case of its name. An object's values are read as declarations too, and a property name with anything but letters, digits, `-` and `_` (an escape, say) is refused, as a browser could read it as one of these. | `["display", "position"]` |
 
 #### `steps` (array)
 For manual workflows. Each step:
@@ -499,6 +706,12 @@ For manual workflows. Each step:
     "maxRetries": 2,
     "retryDelayMs": 500
 }
+```
+
+**A part of `params` kept only on a condition.** An object anywhere inside `params` that carries `$if` is kept, without that key, when its condition holds, and left out when it does not. The condition is read as a step's `condition`. A structure can hold a node for one choice only:
+
+```json
+{ "$if": "param.darkMode === true", "component": "theme-switch", "data": {} }
 ```
 
 A step that fails is counted and the run carries on, unless it sets `abortOnFail: true`: the run then stops at that step — the later steps and phases do not run, and the rest is kept for later. `retryOn` lists the HTTP statuses that send the step again, up to `maxRetries` times (default 3), `retryDelayMs` apart (default 1000).
@@ -522,6 +735,9 @@ The `in` / `not_in` operators are the foundation of diff-style workflows. For ex
 ```
 
 Paired with the symmetric `not_in` step against `param.languages` filtered by `data.langData.languages`, this lets a workflow synchronise the project state with the user's selection — only adding new items and only deleting absent ones, leaving the rest untouched.
+
+#### `stepsFrom` (string)
+The id of one of the workflow's parameters, of type `template`. The workflow's steps are then the picked template's, and the template's `data` is the run's static data; the workflow's own `steps` stays empty. A run with no template picked has no phase. A run that names something that is no template is refused whole: none of its phases is resolved, the workflows before its steps included. A workflow with `stepsFrom` has no `promptTemplate`. See *Site templates*.
 
 #### `preWorkflows` / `postWorkflows` (array)
 Sub-workflows to run before/after. Can be a simple string ID or an object with `id`, `params`, `condition`, `forEach` with its `filter` and `label`, and `request`. Each one runs as a phase of its own (one per item with `forEach`), and may be an AI workflow (see *Sub-Workflows*).
@@ -623,7 +839,7 @@ Then wire styles:
 {{> command.editStyles}}
 ```
 
-The partial form routes to `formatCommandFull()`, which writes the description, the method, the parameters with their types and one fenced example.
+The partial form routes to `formatCommandFull()`, which writes the description, the method, the parameters with their types and one fenced example: the first `example_*` of the command's help, as `{"command": …, "params": …}` when its line shows a request's body, the shape an answer uses, and as the line itself when it shows none.
 
 ### Pass 3: JSON Export — `{{json}}`
 
@@ -700,8 +916,9 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
    connection is configured, otherwise copied out and pasted back
 7. Client validates the JSON response structure
 8. The same request with { phase, answer } reads the commands back, with what each
-   deletes or changes; each is POSTed to /management/p/<projectId>/{command} in turn,
-   results shown per-row in the Batch panel
+   deletes or changes and, in "refused", what the workflow does not allow; each kept
+   command is POSTed to /management/p/<projectId>/{command} in turn, results shown
+   per-row in the Batch panel
 9. Each post-workflow phase runs
 ```
 
@@ -768,7 +985,7 @@ That is how the prompt's `{{#if}}` reads a `param.` value and how a data require
 }
 ```
 
-Available filters: `uppercase`/`upper`, `lowercase`/`lower`, `ucfirst`/`capitalize`, `ucwords`/`title`, `trim`, `langname`/`language`
+Available filters: `uppercase`/`upper`, `lowercase`/`lower`, `ucfirst`/`capitalize`, `ucwords`/`title`, `trim`, `tel` (a phone number as a `tel:` address takes it: its digits and a leading `+`, a `(0)` written after a country code left out), `langname`/`language`
 
 ---
 

@@ -6,9 +6,8 @@
         "icon": "🌐",
         "titleKey": "workflows.specs.setupLanguages.title",
         "descriptionKey": "workflows.specs.setupLanguages.description",
-        "category": "modification",
-        "tags": ["language", "multilingual", "i18n", "setup"],
-        "difficulty": "beginner"
+        "category": "texts",
+        "tags": ["language", "multilingual", "i18n", "setup"]
     },
     "parameters": [
         {

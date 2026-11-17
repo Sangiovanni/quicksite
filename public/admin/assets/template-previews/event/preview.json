@@ -1,0 +1,30 @@
+{
+    "template": "bf4c66040b9bb2f4b02f87c4b5a14b567c9da0794ec817d22a8f84cad58fe3df",
+    "engine": "77573f1f567b0536d97f201cf1453367725ca31f4a241102517450063e89c62d",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home"
+    ],
+    "scripts": true,
+    "photos": {
+        "event-break.webp": "0b078df9acebe8b0fd03331f9b9f211fc6b695dae327251a85318c09c6c2a201",
+        "event-hall.webp": "b349a71118761bf83b8bc3de5eaeee9c79f66866c04e20b3121f6c28c5243969"
+    },
+    "files": [
+        "assets/images/event-break.webp",
+        "assets/images/event-hall.webp",
+        "dark/en/home.html",
+        "dark/fr/home.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/fr/home.html",
+        "light/style/style.css"
+    ]
+}

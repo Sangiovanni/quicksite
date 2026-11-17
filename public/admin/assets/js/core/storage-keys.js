@@ -79,6 +79,20 @@ window.QuickSiteStorageKeys = Object.freeze({
     // project: a way of looking, not the project's.
     socialPreviewDevice: 'qs_social_preview_device',
 
+    // Visual editor — the Workflows panel: the workflows last opened, newest first,
+    // and the groups left open once the list folds, as JSON {"recent": ["restyle"],
+    // "open": ["look"]}. One per browser, for every project. A missing or malformed
+    // part reads as empty.
+    workflowsList:       'qs_workflows_list',
+    // The panel's backup message put away for good. The name predates the registry
+    // and stays, so no one sees the message again.
+    workflowsBackupNoteHidden: 'quicksite-ai-tools-backup-note-hidden',
+    // The Workflows panel's Options, as JSON {"noAi": false, "nothingDeleted": false,
+    // "compact": true, "unrunnable": false}: the two switches, the compact view and the
+    // box that shows the workflows the role cannot run. One per browser, for every
+    // project. A missing or malformed part reads as unticked.
+    workflowsOptions:    'qs_workflows_options',
+
     // Operator update notice. Written only in a browser signed in as an account
     // named in operator.php — nobody else runs update-notice.js at all.
     //   updateCheckAt      epoch ms of the last update check, so a panel

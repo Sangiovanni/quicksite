@@ -11,4 +11,4 @@
 
 ## Images
 
-PNG assets live in [`images/`](images/). They are referenced by the QuickSite v2 template workflow (`secure/admin/workflows/core/build-quicksite-v2.json`) via raw GitHub URLs (`https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/images/<file>.png`). If you rename or move them, update those URLs in the workflow in the same commit so the build doesn't 404.
+PNG assets live in [`images/`](images/). They are referenced by the Build QuickSite template workflow (`secure/admin/workflows/core/build-quicksite.json`) via raw GitHub URLs (`https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/images/<file>.png`). If you rename or move them, update those URLs in the workflow in the same commit so the build doesn't 404.

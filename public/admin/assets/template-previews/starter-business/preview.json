@@ -1,0 +1,45 @@
+{
+    "template": "7e3f392d8962cf6cd618b7f79f0c8bd3996507bc810a5ac72bada43740f1072a",
+    "engine": "77573f1f567b0536d97f201cf1453367725ca31f4a241102517450063e89c62d",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "about",
+        "services",
+        "contact"
+    ],
+    "scripts": true,
+    "photos": {
+        "starter-business-meeting.webp": "3af857990f09222885d0cbdf632634b904eb0e60554a58211e0911608cb16243",
+        "starter-business-office.webp": "b2ef48dab08b41e0c789b9dec275550b0abd1b4d7acd3f1729d2e425c44d376e"
+    },
+    "files": [
+        "assets/images/starter-business-meeting.webp",
+        "assets/images/starter-business-office.webp",
+        "dark/en/about.html",
+        "dark/en/contact.html",
+        "dark/en/home.html",
+        "dark/en/services.html",
+        "dark/fr/about.html",
+        "dark/fr/contact.html",
+        "dark/fr/home.html",
+        "dark/fr/services.html",
+        "dark/style/style.css",
+        "light/en/about.html",
+        "light/en/contact.html",
+        "light/en/home.html",
+        "light/en/services.html",
+        "light/fr/about.html",
+        "light/fr/contact.html",
+        "light/fr/home.html",
+        "light/fr/services.html",
+        "light/style/style.css"
+    ]
+}

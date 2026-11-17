@@ -5,6 +5,7 @@
  * Removes orphaned references from:
  * - page-events.json (page events referencing deleted routes or API endpoints)
  * - Element-level interactions in JSON structures ({{call:fetch:@api/endpoint}} on nodes)
+ * - The cookie and privacy policies' recorded routes, and the banner's link to the first
  * 
  * Included by: deleteRoute, deleteApi, editApi (deleteEndpoint)
  * Prefixed with underscore to indicate it's not a command itself.
@@ -19,6 +20,42 @@ if (!defined('SECURE_FOLDER_PATH')) {
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+
+// =============================================================================
+// POLICY ROUTES CLEANUP
+// =============================================================================
+
+/**
+ * A deleted route that a generated policy page lived at: its record is forgotten, so nothing goes on
+ * pointing at it (the cookie policy's route also drops the banner's link).
+ *
+ * @param array $routeNames The deleted routes, without their leading slash
+ * @return array Which records were cleared: 'cookie', 'privacy'
+ */
+function cleanPolicyRoutesForRoutes(array $routeNames): array {
+    $cleared = [];
+
+    require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
+    require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
+    $consent = loadConsentConfig();
+    $policyRoute = $consent['policyRoute'] ?? null;
+    if (is_string($policyRoute) && in_array(trim($policyRoute, '/'), $routeNames, true)) {
+        consentForgetPolicyRoute($consent);
+        $cleared[] = 'cookie';
+    }
+
+    require_once SECURE_FOLDER_PATH . '/src/functions/privacyHelpers.php';
+    $privacy = loadPrivacyRegistry();
+    $privacyRoute = $privacy['privacyRoute'] ?? null;
+    if (is_string($privacyRoute) && in_array(trim($privacyRoute, '/'), $routeNames, true)) {
+        $privacy['privacyRoute'] = null;
+        savePrivacyRegistry($privacy);
+        qs_small_write_send_refusal();
+        $cleared[] = 'privacy';
+    }
+
+    return $cleared;
+}
 
 // =============================================================================
 // PAGE EVENTS CLEANUP

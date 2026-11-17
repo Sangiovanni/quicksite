@@ -1,0 +1,39 @@
+{
+    "template": "31bc7384c6f75314470e512a76ed3f8abb03d3bdcf9887e8f5da6ab85d0bc983",
+    "engine": "77573f1f567b0536d97f201cf1453367725ca31f4a241102517450063e89c62d",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "menu"
+    ],
+    "scripts": true,
+    "photos": {
+        "food-and-drink-garden.webp": "ab7effb22205eb581e2002f9d726138cc5b19abfe6e5650b3d8080d46fcf2eb2",
+        "food-and-drink-room.webp": "bef4ee1fb5687e08b4cda21470c8631627407072b11e6f183c1a92197cfcaa13",
+        "food-and-drink-stew.webp": "3d85393a47b06a6df53cf8c927781b586521deb54c0cf34f1ec4bb6b7ab4d2c5",
+        "food-and-drink-waffle.webp": "56ec62e52432ae3adcc7f79e1c3f8db12ca5676c2ff9df8fd7a5cab04df96475"
+    },
+    "files": [
+        "assets/images/food-and-drink-garden.webp",
+        "assets/images/food-and-drink-room.webp",
+        "assets/images/food-and-drink-stew.webp",
+        "assets/images/food-and-drink-waffle.webp",
+        "dark/en/home.html",
+        "dark/en/menu.html",
+        "dark/fr/home.html",
+        "dark/fr/menu.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/en/menu.html",
+        "light/fr/home.html",
+        "light/fr/menu.html",
+        "light/style/style.css"
+    ]
+}

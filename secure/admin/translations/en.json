@@ -1860,7 +1860,7 @@
             "invalidImport": "Invalid import file: must contain spec and template"
         },
         "spec": {
-            "editorHint": "You can also run this workflow without leaving the visual editor — open <strong>Preview → AI tools</strong>.",
+            "editorHint": "You can also run this workflow without leaving the visual editor — open <strong>Preview → Workflows</strong>.",
             "openEditor": "Open editor →",
             "manual": "Manual",
             "ai": "AI",
@@ -1901,43 +1901,93 @@
             "searchPlaceholder": "Type to search..."
         },
         "categories": {
-            "creation": {
-                "title": "Creation",
-                "desc": "Create new websites and pages from scratch"
+            "start": {
+                "title": "Start a new site",
+                "desc": "Replaces what is there"
             },
-            "template": {
-                "title": "Templates",
-                "desc": "Ready-to-use site templates - no AI required"
+            "add": {
+                "title": "Add to my site",
+                "desc": "Keeps what is there"
             },
-            "modification": {
-                "title": "Modification",
-                "desc": "Modify existing structures and content"
+            "look": {
+                "title": "Change the look",
+                "desc": "Colours, styles, animations"
             },
-            "content": {
-                "title": "Content",
-                "desc": "Add or update page content and text"
+            "texts": {
+                "title": "Texts and languages",
+                "desc": "Words, translations, the switch"
             },
-            "style": {
-                "title": "Style",
-                "desc": "Change appearance and design"
+            "privacy": {
+                "title": "Cookies and privacy",
+                "desc": "Your consent banner and pages"
             },
-            "advanced": {
-                "title": "Advanced",
-                "desc": "Complex operations and configurations"
-            },
-            "wip": {
-                "title": "Work in Progress",
-                "desc": "Experimental specs in development"
+            "tools": {
+                "title": "Tools",
+                "desc": "For when you know what you want"
             }
         },
-        "difficulty": {
-            "beginner": "Beginner",
-            "intermediate": "Intermediate",
-            "advanced": "Advanced"
+        "needs": {
+            "cookieBanner": "Needs a cookie banner",
+            "consentPages": "Needs your cookie policy or privacy page",
+            "secondLanguage": "Needs a second language"
+        },
+        "templates": {
+            "landingPage": {
+                "title": "Landing Page",
+                "description": "One page: a hero, three features and a call to action. Purple."
+            },
+            "starterBusiness": {
+                "title": "Starter Business",
+                "description": "Four pages (home, about, services, contact) with a menu and a footer. Teal."
+            },
+            "appointments": {
+                "title": "Appointments",
+                "description": "One page for a salon or a practice: services with times and prices, the team, hours, a button to book. Green."
+            },
+            "foodAndDrink": {
+                "title": "Food and drink",
+                "description": "Phone first: a home page and a menu with prices, the hours, the address, buttons to call or order. Red."
+            },
+            "trades": {
+                "title": "Trades and home services",
+                "description": "Home and quote pages: services, the area served, why trust you, a button to ask for a quote. Navy and amber."
+            },
+            "professional": {
+                "title": "Professional office",
+                "description": "For an accountant, a lawyer or an adviser: areas of practice, the team, how a first meeting goes, a button to book one. Burgundy."
+            },
+            "portfolio": {
+                "title": "Portfolio",
+                "description": "Your work first: a grid of pieces with their captions, an about page, a button to write to you. Black and white."
+            },
+            "stay": {
+                "title": "Stay",
+                "description": "For a B&B or a holiday rental: the rooms with their prices, breakfast, what is nearby, a button to check availability. Blue and sand."
+            },
+            "event": {
+                "title": "Event",
+                "description": "One page for a conference, a festival or an open day: the date and the place, the programme, the speakers, tickets by a link. Yellow and black."
+            },
+            "club": {
+                "title": "Club or association",
+                "description": "For a sports club or an association: the week's sessions, the dates to come, the committee, how to join. Green and orange."
+            },
+            "personal": {
+                "title": "Personal page",
+                "description": "Phone first: one page with your photo, a line about you and your links as large buttons. Pink."
+            },
+            "shop": {
+                "title": "Shop window",
+                "description": "For a shop: the new arrivals with their prices, the shelves, the hours, buttons to order or call. Terracotta."
+            }
         },
         "specs": {
             "shared": {
                 "params": {
+                    "coloursOnly": {
+                        "label": "Colours only",
+                        "help": "Sends the site's CSS variables instead of its whole stylesheet: a much shorter prompt, but the AI cannot see the corners, shadows and buttons to match."
+                    },
                     "includeAssets": {
                         "label": "Include my starred assets in the prompt",
                         "help": "The AI will use your starred assets (images, fonts, etc.) instead of placeholders. Star them on the Media page first."
@@ -1974,8 +2024,8 @@
                 }
             },
             "createWebsite": {
-                "title": "Create Website",
-                "description": "Generate a complete website: several pages with navigation, or one page whose menu links to its sections, with a shared header and footer and consistent styling.",
+                "title": "Create Website: one AI request",
+                "description": "Generate a complete website in one AI request: several pages with navigation, or one page whose menu links to its sections, with a shared header and footer, the texts of every language and consistent styling.",
                 "params": {
                     "onePage": {
                         "label": "One page only",
@@ -2002,9 +2052,17 @@
                     "agency": { "title": "Creative Agency", "prompt": "Create a creative agency website with home, work, services, team, blog, contact" }
                 }
             },
-            "createWebsiteV2": {
-                "title": "Create Website v2",
-                "description": "Builds the site in several shorter AI answers: the pages and their texts in the default language, then each other language, then the look. A shorter answer is less likely to be cut, and a cut one costs one part."
+            "createWebsiteSteps": {
+                "title": "Create Website: several AI requests",
+                "description": "Builds the site in several AI requests: the pages and their texts in the default language, then each other language, then the look. A cut answer costs only its own part."
+            },
+            "fitCookieBanner": {
+                "title": "Fit my cookie banner",
+                "description": "Gives the cookie banner and its popup your site's look. Generate the banner first, on the Compliance page."
+            },
+            "fitConsentPages": {
+                "title": "Fit my consent pages",
+                "description": "Gives the cookie policy and privacy pages your site's look. Generate them first, on the Compliance page."
             },
             "translateSite": {
                 "title": "Translate Site",
@@ -2093,21 +2151,57 @@
                 "title": "Run Command Batch",
                 "description": "Paste and execute a JSON command batch directly — no prompt generation needed."
             },
-            "starterBusiness": {
-                "title": "Starter Business",
-                "description": "Business website with menu, footer, 4 pages and teal theme. Single language."
-            },
-            "starterBusinessMultilingual": {
-                "title": "Starter Business (Multilingual)",
-                "description": "Business website with EN + FR translations and dark amber theme."
-            },
-            "landingPage": {
-                "title": "Landing Page",
-                "description": "Single-page landing with hero, features and CTA sections. Purple gradient theme."
-            },
-            "landingPageMultilingual": {
-                "title": "Landing Page (Multilingual)",
-                "description": "Single-page landing with EN + FR translations and language switcher."
+            "startFromTemplate": {
+                "title": "Start from a template",
+                "description": "Builds a ready-made site from the template you pick: in one language or several, with a dark theme if you want one. It replaces what the project holds.",
+                "params": {
+                    "template": {
+                        "label": "Template",
+                        "kinds": {
+                            "services": "Services",
+                            "hospitality": "Food and stays",
+                            "shops": "Shops and makers",
+                            "gatherings": "Events and groups",
+                            "general": "General"
+                        }
+                    },
+                    "multilingual": {
+                        "label": "Several languages",
+                        "help": "Builds the site in each language you tick, with a language switch in its footer"
+                    },
+                    "languages": {
+                        "label": "Languages",
+                        "help": "The languages this template is written in. Tick at least two."
+                    },
+                    "language": {
+                        "label": "Main language",
+                        "help": "The language a visitor gets first"
+                    },
+                    "darkMode": {
+                        "label": "Include dark mode",
+                        "help": "Adds the template's dark colours and a light/dark button in its menu"
+                    },
+                    "businessName": {
+                        "label": "Name",
+                        "help": "The name of your business, your studio, your club or your event, or your own: shown in the menu, the titles and the footer. Left empty, the template's sample name."
+                    },
+                    "phone": {
+                        "label": "Phone number",
+                        "help": "Shown on the site, and called by its Call buttons. Digits, spaces and a leading + only. Left empty, the template's sample number."
+                    },
+                    "email": {
+                        "label": "E-mail address",
+                        "help": "Shown on the site, and written to by its e-mail links. Left empty, the template's sample address."
+                    },
+                    "address": {
+                        "label": "Address",
+                        "help": "The street address shown on the site, on one line. Left empty, the template's sample address."
+                    },
+                    "bookingUrl": {
+                        "label": "Booking or ordering link",
+                        "help": "Where the template's main button leads (book, order, join): the page of the service you use, starting with https://. Left empty, a sample link."
+                    }
+                }
             },
             "freshStart": {
                 "title": "Fresh Start",
@@ -2149,6 +2243,10 @@
             "updateLangSwitch": {
                 "title": "Update Language Switch",
                 "description": "Rebuild the language switch component based on the current project languages."
+            },
+            "setupThemeSwitch": {
+                "title": "Theme Switch Button",
+                "description": "Writes a light/dark button as the component theme-switch. Visitors see it only once you place it on a page or in the menu."
             }
         }
     },
@@ -2229,22 +2327,44 @@
         "toolStyle": "CSS",
         "toolJs": "Interactions",
         "toolTranslation": "Translations",
-        "toolAiTools": "AI tools",
-        "aiToolsSearchPlaceholder": "Search AI tools…",
-        "aiToolsSuggestedHeader": "Suggested",
-        "aiToolsAllHeader": "All workflows",
-        "aiToolsMatchLabel": "Match:",
-        "aiToolsMatchAny": "Any",
-        "aiToolsMatchAll": "All",
-        "aiToolsTagShowMore": "+{n} more",
-        "aiToolsTagShowLess": "Show less",
+        "toolAiTools": "Workflows",
+        "aiToolsSearchPlaceholder": "Search workflows…",
+        "workflowsSwitchNoAi": "No AI",
+        "workflowsSwitchNothingDeleted": "Nothing deleted",
+        "workflowsSwitchCompact": "Compact view",
+        "workflowsSwitchUnrunnable": "Show workflows my role can't run",
+        "workflowsOptions": "Options",
+        "workflowsOptionsHidden": "{n} hidden",
+        "workflowsOptionsHideAll": "Your options hide every workflow.",
+        "workflowsShowAll": "Show all",
+        "workflowsUnrunnable": "Your role can't run this workflow",
+        "workflowsTemplatePreview": "Preview",
+        "workflowsTemplatePreviewOf": "Preview {name}",
+        "workflowsTemplatePreviewTitle": "Preview: {name}",
+        "workflowsTemplatePreviewFrame": "Preview of {name}",
+        "workflowsTemplatePreviewNote": "The preview shows every option on: all the template's languages and its light/dark button. A run builds only what you choose.",
+        "workflowsTemplateTheme": "Theme",
+        "workflowsTemplateThemeLight": "Light",
+        "workflowsTemplateThemeDark": "Dark",
+        "workflowsTemplateKinds": "Show",
+        "workflowsTemplateKindAll": "All",
+        "workflowsTemplateKindOther": "Other",
+        "workflowsTemplateKindCount": "{name} ({count})",
+        "workflowsTemplatePreviewOutside": "This link is switched off in the preview. On your site, it works.",
+        "workflowsFactNoAi": "No AI",
+        "workflowsFactPaste": "No AI: you paste the commands",
+        "workflowsFactAiOne": "Uses AI: one request",
+        "workflowsFactAiOneShort": "Uses AI: one request, short answer",
+        "workflowsFactAiOneLong": "Uses AI: one request, long answer",
+        "workflowsFactAiSeveral": "Uses AI: several requests",
+        "workflowsFactAiSeveralShort": "Uses AI: several requests, short answers",
+        "workflowsFactAiSeveralLong": "Uses AI: several requests, long answers",
+        "workflowsFactCanDelete": "Can delete: {what}",
+        "workflowsFactChanges": "Changes: {what}",
+        "workflowsFactAnyCommand": "Can run any command, one that deletes included",
+        "workflowsRecent": "Recently used",
         "aiToolsLoading": "Loading…",
-        "aiToolsShowMore": "Show more",
-        "aiToolsEmpty": "No tools match the current filters.",
-        "aiToolsShowMoreCount": "Show {n} more",
-        "aiToolsAiBadgeTooltip": "AI workflow — generates a prompt",
-        "aiToolsManualBadgeTooltip": "Steps-only workflow — runs commands without AI",
-        "aiToolsSourceCustom": "custom",
+        "aiToolsEmpty": "No workflow matches your search and switches.",
         "aiToolsBackToList": "← Back",
         "aiToolsSectionYourPrompt": "Your prompt",
         "aiToolsSectionParameters": "Parameters",
@@ -2385,6 +2505,10 @@
         "aiToolsWhatTranslationFiles": "Translation files of languages the project no longer has",
         "aiToolsAnswerCut": "The answer was cut at the connection's output limit ({n} tokens), so none of it runs. Raise the limit in AI connections, or ask for less.",
         "aiToolsAnswerStopped": "The AI stopped its answer early ({reason}), so none of it runs.",
+        "aiToolsAnswerNothingRuns": "Nothing in this answer can run.",
+        "aiToolsAnswerLeftOutCommand": "Left out, as this workflow does not send them: {list}",
+        "aiToolsAnswerLeftOutSelector": "Left out, as this workflow only styles its own elements: {list}",
+        "aiToolsAnswerLeftOutProperty": "Left out, as this workflow may not set: {list}",
         "aiToolsAnswerBrokeOff": "The answer broke off after {chars} characters: {error}",
         "aiToolsContinueAnswer": "Continue the answer",
         "aiToolsContinueAnswerTitle": "Keeps the commands that arrived whole ({n}) and asks the AI only for the rest, from the command that was cut. The answer put together runs only when you click Execute.",
@@ -2414,7 +2538,7 @@
         "aiToolsStreaming": "Receiving from {model}… ({chars} chars)",
         "aiToolsSendingWithElapsed": "Sending to {model}… ({sec}s)",
         "aiToolsStreamingWithElapsed": "Receiving from {model}… ({chars} chars, {sec}s)",
-        "aiToolsBackupWarning": "AI tools modify your site directly. Changes cannot be easily reverted.",
+        "aiToolsBackupWarning": "Workflows modify your site directly. Changes cannot be easily reverted.",
         "aiToolsBackupRecommendation": "We recommend creating a backup before running any workflow you're not sure about.",
         "aiToolsBackupBtn": "Create backup now",
         "aiToolsBackupCreating": "Creating backup…",
@@ -3888,7 +4012,7 @@
         "persistHint": "Off = cleared on tab close (sessionStorage). Local connections always persist (URLs aren't sensitive).",
         "runWithoutStoppingLabel": "Run without stopping",
         "autoExecuteCaution": "Use with caution.",
-        "runWithoutStoppingHint": ":caution An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the AI tools panel (Preview → AI tools). What a part deletes or changes is still confirmed first.",
+        "runWithoutStoppingHint": ":caution An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the Workflows panel (Preview → Workflows). What a part deletes or changes is still confirmed first.",
         "modalTitle": "Add a connection",
         "empty": "No AI connection yet.",
         "emptyAdd": "+ Add your first connection",

@@ -8,6 +8,7 @@
  * @param string language - Language code (e.g., 'en', 'fr') or 'default'
  * @param object translations - Keys to set/update (nested structure supported)
  * @param bool replace - Optional. If true, replaces entire file instead of merging (default: false)
+ * @param array keep - Optional, with replace only. Dotted groups of the file that survive the replace, e.g. ["consent", "storage.desc"]
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
@@ -107,6 +108,29 @@ if ($translationSize > $maxSize) {
 // Optional: replace mode (replaces entire file instead of merging)
 $replaceMode = isset($params['replace']) && $params['replace'] === true;
 
+// Optional: what a replace keeps of the file it replaces. Read before any write.
+$keep = $params['keep'] ?? [];
+$keepValid = is_array($keep) && array_is_list($keep);
+if ($keepValid) {
+    foreach ($keep as $group) {
+        if (!is_string($group) || preg_match('/^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/D', $group) !== 1) {
+            $keepValid = false;
+        }
+    }
+}
+if (!$keepValid) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('keep must be a list of dotted translation groups')
+        ->withErrors([['field' => 'keep', 'reason' => 'invalid_format', 'expected' => 'a list such as ["consent", "storage.desc"]']])
+        ->send();
+}
+if ($keep !== [] && !$replaceMode) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('keep is only read with replace: true')
+        ->withErrors([['field' => 'keep', 'reason' => 'needs_replace']])
+        ->send();
+}
+
 // Normalise the incoming payload: flatten dot-notation, strip any
 // stray {{ component placeholder keys. Both transforms idempotent.
 $newTranslations = convertDotNotationToNested($newTranslations);
@@ -116,7 +140,7 @@ $newTranslations = sanitizePlaceholderKeys($newTranslations);
 // merge → write → optional default.json sync). Every helper used
 // here lives in src/functions/translationHelpers.php so future
 // translation-writing commands get the same plumbing for free.
-$writeResult = writeTranslationsToFile($language, $newTranslations, $replaceMode);
+$writeResult = writeTranslationsToFile($language, $newTranslations, $replaceMode, $keep);
 
 if (!$writeResult['ok']) {
     if ($writeResult['reason'] === 'refused') {

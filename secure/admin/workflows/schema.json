@@ -46,18 +46,22 @@
         },
         "category": {
           "type": "string",
-          "enum": ["creation", "modification", "content", "style", "advanced", "wip", "template"],
-          "description": "Category for organizing workflows"
+          "enum": ["start", "add", "look", "texts", "privacy", "tools"],
+          "description": "The group the Workflows panel lists the workflow in, by what a person wants to do. The panel shows the groups in this order: start (Start a new site), add (Add to my site), look (Change the look), texts (Texts and languages), privacy (Cookies and privacy), tools (Tools); a group's words are ai.categories.<value>.title and .desc in the panel's translations. Another name still runs (the engine checks only that the field names a group), and the panel lists it last, under its own name."
         },
         "tags": {
           "type": "array",
           "items": { "type": "string" },
           "description": "Tags for filtering and search"
         },
-        "difficulty": {
+        "answerLength": {
           "type": "string",
-          "enum": ["beginner", "intermediate", "advanced"],
-          "description": "Complexity level for user guidance"
+          "enum": ["short", "long"],
+          "description": "How long the AI's answer runs, for the row's words ('one request, short answer'): short is up to about 5,000 characters, long is the whole of a site. Set it only from a measure or an estimate that stands far from the line; left out, the row says how many requests and no more."
+        },
+        "needsKey": {
+          "type": "string",
+          "description": "Translation key of a short text naming what the project must hold before a run makes sense ('Needs a cookie banner'), shown on the workflow's row. Left out, the row names no need."
         },
         "suppressPinsHeader": {
           "type": "boolean",
@@ -73,6 +77,10 @@
       "type": "object",
       "description": "Static data available in steps via forEach or template placeholders. Keys become data paths (e.g., 'assets' is referenced as forEach: 'assets').",
       "additionalProperties": true
+    },
+    "stepsFrom": {
+      "type": "string",
+      "description": "The id of one of this workflow's parameters, of type `template`: the workflow's steps are those of the template that parameter picks (a file of templates/, see definitions.siteTemplate), and the template's `data` is the run's static data. With no template picked the run has no phase; with a name that is no template nothing of the run is resolved, the workflows before it included. Such a workflow has no promptTemplate, and its own `steps` stays empty."
     },
     "preWorkflows": {
       "type": "array",
@@ -106,8 +114,8 @@
           },
           "type": {
             "type": "string",
-            "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "hidden"],
-            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc."
+            "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "template", "hidden"],
+            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc. `template` is a picker of the site templates in templates/: one radio card per file, with its picture, its name and its line, and a Preview button when it has a built preview. Its value is the template's id. The engine lists the choices itself: every valid file of the folder, so a file added there is offered with no other change. Its `options` are the kinds the picker groups the templates under, in the order it shows them (a kind's id as `value`, and its name): a template states its kind in its own file, and one that states none, or a kind listed nowhere here, comes last under the picker's own word. With no `options` the picker shows no kinds. Another field's `condition` reads the template picked as `chosen.<this parameter's id>` (its `languages`, `dark`, `asks`), and a field whose `optionsFrom.filterFrom` names this parameter is limited to the picked template's languages."
           },
           "searchable": {
             "type": "boolean",
@@ -139,7 +147,7 @@
           },
           "options": {
             "type": "array",
-            "description": "Static options for select type. Each item has a value and either label (direct text) or labelKey (translation key).",
+            "description": "Static options for select type. Each item has a value and either label (direct text) or labelKey (translation key). On a `template` parameter: the kinds its templates are grouped under, in order.",
             "items": {
               "type": "object",
               "required": ["value"],
@@ -176,8 +184,11 @@
                     }
                   },
                   "filterFrom": {
-                    "type": "string",
-                    "description": "Another parameter ID whose current value(s) restrict the available options. The filter only applies when the referenced param is currently visible (its own `condition` evaluates truthy) AND its value is non-empty. Otherwise the full optionsFrom list is used. Useful for cascading selects (e.g. 'defaultLanguage' restricted to languages picked in the multi-select 'languages')."
+                    "oneOf": [
+                      { "type": "string" },
+                      { "type": "array", "items": { "type": "string" } }
+                    ],
+                    "description": "Another parameter ID whose current value(s) restrict the available options, or a list of them, each narrowing the list in turn. The filter only applies when the referenced param is currently visible (its own `condition` evaluates truthy) AND its value is non-empty. Otherwise the full optionsFrom list is used. Useful for cascading selects (e.g. 'defaultLanguage' restricted to languages picked in the multi-select 'languages'). A parameter of type `template` stands for the languages of the template picked."
                   },
                   "excludeFrom": {
                     "type": "string",
@@ -201,7 +212,7 @@
           },
           "condition": {
             "type": "string",
-            "description": "Conditional expression to show/hide this parameter. Supports: ==, ===, !=, !==, >, <, >=, <=, &&, ||, ! (negation), and truthy checks. Example: 'multilingual === true', 'pages > 1 && multilingual !== false'"
+            "description": "Conditional expression to show/hide this parameter. Supports: ==, ===, !=, !==, >, <, >=, <=, &&, ||, ! (negation), and truthy checks. Example: 'multilingual === true', 'pages > 1 && multilingual !== false'. `chosen.<id>` is the template a parameter of type `template` holds, or null: 'chosen.template && chosen.template.dark === true', or 'chosen.template && chosen.template.asks.indexOf(\"phone\") !== -1' for a field only a template that asks for it shows."
           },
           "structures": {
             "type": "array",
@@ -275,6 +286,30 @@
     "promptTemplate": {
       "type": "string",
       "description": "Filename of the .md prompt template (same folder as spec)"
+    },
+    "pasteOnly": {
+      "type": "boolean",
+      "description": "The commands are pasted by hand and no model is asked: the workflow's row says No AI, and how many requests a run sends counts none for it. Its promptTemplate is what the paste box asks for."
+    },
+    "answerRules": {
+      "type": "object",
+      "description": "What an AI answer of this workflow may run. Whatever the rules refuse is left out of the run, and the panel says so. With none of them, an answer sends only the commands relatedCommands names.",
+      "properties": {
+        "anyCommand": {
+          "type": "boolean",
+          "description": "The answer may send any command, not only those relatedCommands names (each still passes the user's role)."
+        },
+        "selectorStarts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Where a step names a selector, every selector of its list must begin with one of these, as a whole name: '#a b' begins with '#a', '#a-b' does not. A + or ~ straight after the start's own part, an escape or a comment is refused."
+        },
+        "forbiddenProperties": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "A step whose styles declare one of these CSS properties is left out, an object's values read as declarations too. A property name with anything but letters, digits, - and _ is refused."
+        }
+      }
     },
     "steps": {
       "type": "array",
@@ -366,7 +401,7 @@
         },
         "params": {
           "type": "object",
-          "description": "Parameters for the command. Supports {{config.X}}, {{param.X}}, {{dataRequirementId.path}}, and in forEach: {{$key}}, {{$value}}, {{$value.field}}",
+          "description": "Parameters for the command. Supports {{config.X}}, {{param.X}}, {{dataRequirementId.path}}, and in forEach: {{$key}}, {{$value}}, {{$value.field}}. An object anywhere inside that carries `$if` (a condition, read as a step's `condition`) is kept without that key when the condition holds, and left out of its list or object when it does not: a menu's structure holds { \"$if\": \"param.darkMode === true\", \"component\": \"theme-switch\" } only for a run with dark mode.",
           "additionalProperties": true
         },
         "abortOnFail": {
@@ -413,6 +448,66 @@
         }
       },
       "required": ["$each", "$item"]
+    },
+    "siteTemplate": {
+      "type": "object",
+      "description": "A site template: one file of templates/, named <id>.json, that a workflow with `stepsFrom` runs. Shipped, as workflows are: only that folder is read. A file that does not hold what is required here is left out of every picker.",
+      "required": ["id", "languages", "steps"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The template's id: its file's name without .json (letters, digits, hyphens, underscores)"
+        },
+        "version": { "type": "string" },
+        "icon": {
+          "type": "string",
+          "description": "Emoji shown on the template's card when it has no picture"
+        },
+        "titleKey": {
+          "type": "string",
+          "description": "Translation key for the template's name (the shipped templates)"
+        },
+        "title": {
+          "type": "string",
+          "description": "The template's name as written here: what a file with no key shows, and the fallback of titleKey. With neither, the id."
+        },
+        "descriptionKey": {
+          "type": "string",
+          "description": "Translation key for the one line under the name"
+        },
+        "description": {
+          "type": "string",
+          "description": "That line as written here"
+        },
+        "languages": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "The language codes the template is written in, the first one first in its preview. A run offers these and no other; a language is added by adding its code here and its texts under data."
+        },
+        "kind": {
+          "type": "string",
+          "description": "The kind of site the template is for, as an id (letters, digits, hyphens, underscores): the picker lists the templates kind by kind and filters them by it. The kinds, their order and their names are the `options` of the workflow's `template` parameter (the shipped row lists services, hospitality, shops, gatherings, general). Left out, the template comes last."
+        },
+        "asks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "The optional fields this template asks a run for, by the ids of the workflow's parameters (the shipped row offers businessName, phone, email, address, bookingUrl). A field whose `condition` reads `chosen.<picker>.asks` is shown only for a template that lists it. The template's steps read each as param.<id>, and use its own sample when the field is left empty."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The template's commands, read as a workflow's steps: condition, forEach, filter, placeholders and `$if`. They read the run's parameters as param.<id>, the keys of `data` as data paths, and `template.id` / `template.languages`.",
+          "items": {
+            "$ref": "#/definitions/specCommand"
+          }
+        },
+        "data": {
+          "type": "object",
+          "description": "What the template's steps read: the run's static data. The shipped templates keep here their texts per language (`texts`), their colours (`light`), their dark theme's colours (`dark`) and their stylesheet (`styles`). A template with a non-empty `dark` is offered with a dark mode.",
+          "additionalProperties": true
+        }
+      }
     }
   }
 }

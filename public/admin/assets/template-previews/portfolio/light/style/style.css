@@ -1,0 +1,134 @@
+/* GLOBAL */
+html { scroll-behavior: smooth; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.6; background: var(--color-bg); overflow-wrap: break-word; }
+h1, h2, h3 { font-weight: 300; line-height: 1.15; color: var(--color-text); letter-spacing: -0.01em; }
+a { color: var(--color-text); text-underline-offset: 0.2em; }
+a:hover { color: var(--color-accent); }
+ul, ol { list-style: none; }
+
+/* MENU */
+.site-nav { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 2rem; padding: 1.1rem 2rem; background: var(--color-bg); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 100; }
+.nav-logo { font-size: 1.15rem; font-weight: 600; letter-spacing: 0.02em; color: var(--color-text); text-decoration: none; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 0.25rem 1.75rem; margin-left: auto; }
+.nav-links a { color: var(--color-text); text-decoration: none; padding: 0.35rem 0; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+.nav-links a:hover { border-bottom-color: var(--color-text); color: var(--color-text); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: 0.6rem 1.6rem; border: 1px solid var(--color-text); font-weight: 500; text-decoration: none; text-align: center; transition: background 0.2s, color 0.2s; }
+.btn-primary { background: var(--color-text); color: var(--color-bg); }
+.btn-primary:hover { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
+.btn-ghost { background: transparent; color: var(--color-text); }
+.btn-ghost:hover { background: var(--color-text); color: var(--color-bg); }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+/* HERO: one line of words, then the work at once */
+.hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem 2rem; max-width: 76rem; margin: 0 auto; padding: 2rem 2rem 1.75rem; }
+.hero h1 { font-size: clamp(1.35rem, 1.5vw + 1rem, 2rem); max-width: 44rem; margin-bottom: 0.35rem; }
+.hero-lead { color: var(--color-text-muted); max-width: 38rem; }
+.status { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; }
+.status::before { content: ''; width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--color-accent); }
+
+/* THE WORK: a grid of pieces, each above its caption */
+.work { max-width: 76rem; margin: 0 auto; padding: 0 2rem 4.5rem; }
+.work-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr)); gap: 3rem 2.5rem; }
+.piece figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.15rem 1rem; padding-top: 0.85rem; }
+.piece-title { font-weight: 500; }
+.piece-meta { color: var(--color-text-muted); font-size: 0.9rem; }
+
+/* PHOTOS: the template's own, each an image an author swaps for theirs; a little dimmer in the dark theme */
+.photo { display: block; width: 100%; height: auto; object-fit: cover; filter: brightness(var(--photo-brightness)); }
+.piece .photo { aspect-ratio: 4 / 5; background: var(--color-surface-alt); }
+.studio-photo .photo { aspect-ratio: 3 / 2; }
+
+/* SECTIONS */
+.section { max-width: 76rem; margin: 0 auto; padding: 4rem 2rem; }
+.section h2 { font-size: clamp(1.6rem, 2.5vw + 0.9rem, 2.4rem); margin-bottom: 1rem; }
+.section-lead { color: var(--color-text-muted); max-width: 38rem; margin-bottom: 2rem; }
+.band { background: var(--color-surface-alt); }
+
+/* COMMISSIONS, AND HOW A PIECE IS MADE: three numbered lines */
+.step-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 1.5rem 2.5rem; margin-bottom: 2rem; counter-reset: step; }
+.step-list li { counter-increment: step; padding-top: 1rem; border-top: 1px solid var(--color-text); }
+.step-list li::before { content: '0' counter(step); display: block; font-size: 0.85rem; letter-spacing: 0.14em; color: var(--color-text-muted); margin-bottom: 0.5rem; }
+.step-list h3 { font-size: 1.2rem; font-weight: 500; margin-bottom: 0.25rem; }
+.step-list p { color: var(--color-text-muted); }
+
+/* THE ABOUT PAGE */
+.about-head { max-width: 76rem; margin: 0 auto; padding: 3.5rem 2rem 0; }
+.about-head h1 { font-size: clamp(2rem, 4.5vw + 0.8rem, 3.75rem); margin-bottom: 2rem; }
+.story { max-width: 44rem; }
+.story p { font-size: 1.15rem; margin-bottom: 1rem; }
+.see-list li { padding: 0.85rem 0; border-top: 1px solid var(--color-border); }
+.see-list li:last-child { border-bottom: 1px solid var(--color-border); }
+.reach p { margin-top: 0.5rem; }
+.reach-note { color: var(--color-text-muted); font-size: 0.95rem; }
+.reach .actions { margin-top: 1.5rem; }
+
+/* FOOTER */
+.site-footer { background: var(--color-footer-bg); color: var(--color-footer-text); border-top: 1px solid var(--color-border); padding: 2.5rem 2rem 1.25rem; }
+.footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1.5rem 2rem; max-width: 76rem; margin: 0 auto; }
+.footer-logo { font-size: 1.05rem; font-weight: 600; letter-spacing: 0.02em; }
+.footer-brand p { color: var(--color-footer-muted); font-size: 0.9rem; margin-top: 0.35rem; }
+.footer-note { max-width: 76rem; margin: 1.75rem auto 0; padding-top: 1.25rem; border-top: 1px solid var(--color-border); color: var(--color-footer-muted); font-size: 0.85rem; }
+
+/* LANGUAGE SWITCH (a site in several languages) */
+.footer-lang { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.lang-label { color: var(--color-footer-muted); font-size: 0.9rem; }
+.lang-switch { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.lang-btn { color: var(--color-footer-text); text-decoration: none; padding: 0.35rem 0.9rem; font-size: 0.85rem; border: 1px solid var(--color-switch-border); }
+.lang-btn:hover { border-color: var(--color-footer-text); color: var(--color-footer-text); }
+
+/* THEME SWITCH (a site with a dark theme) */
+.theme-switch { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem; border: 1px solid var(--color-switch-border); background: transparent; color: var(--color-switch-text); font: inherit; font-size: 0.85rem; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
+.theme-switch:hover { border-color: var(--color-text); color: var(--color-text); }
+
+/* LESS MOTION, for a visitor who asked their system for it */
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+}
+
+/* PHONE (a screen up to 40rem): the menu scrolls with the page and wraps, its links taking the room left; buttons take the whole width */
+@media (max-width: 40rem) {
+    .site-nav { position: static; padding: 0.75rem 1rem; gap: 0.5rem 1rem; }
+    .nav-links { flex: 1 1 auto; margin-left: 0; gap: 0.25rem 1.25rem; }
+    .hero { padding: 1.5rem 1rem 1.25rem; }
+    .work { padding: 0 1rem 3rem; }
+    .work-grid { gap: 2.25rem 1rem; }
+    .actions .btn { flex: 1 1 100%; }
+    .section { padding: 2.5rem 1rem; }
+    .about-head { padding: 2.5rem 1rem 0; }
+    .site-footer { padding: 2rem 1rem 1rem; }
+}
+:root {
+    --color-bg: #ffffff;
+    --color-surface-alt: #f4f4f2;
+    --color-text: #141414;
+    --color-text-muted: #5a5a57;
+    --color-accent: #1f3fae;
+    --color-on-accent: #ffffff;
+    --color-border: #dededa;
+    --color-footer-bg: #ffffff;
+    --color-footer-text: #141414;
+    --color-footer-muted: #5a5a57;
+    --color-switch-border: #c9c9c4;
+    --color-switch-text: #5a5a57;
+    --photo-brightness: 1;
+}
+
+[data-theme="dark"] {
+    --color-bg: #0f0f10;
+    --color-surface-alt: #19191b;
+    --color-text: #f1f1ee;
+    --color-text-muted: #a6a6a1;
+    --color-accent: #aaaefc;
+    --color-on-accent: #0b1233;
+    --color-border: #2e2e32;
+    --color-footer-bg: #0f0f10;
+    --color-footer-text: #f1f1ee;
+    --color-footer-muted: #a6a6a1;
+    --color-switch-border: #45454a;
+    --color-switch-text: #a6a6a1;
+    --photo-brightness: 0.9;
+}

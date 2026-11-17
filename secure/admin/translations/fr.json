@@ -1327,7 +1327,7 @@
             "invalidImport": "Fichier d'import invalide : doit contenir spec et template"
         },
         "spec": {
-            "editorHint": "Vous pouvez aussi exécuter ce workflow sans quitter l'éditeur visuel — ouvrez <strong>Aperçu → Outils IA</strong>.",
+            "editorHint": "Vous pouvez aussi exécuter ce workflow sans quitter l'éditeur visuel — ouvrez <strong>Aperçu → Workflows</strong>.",
             "openEditor": "Ouvrir l'éditeur →",
             "manual": "Manuel",
             "ai": "IA",
@@ -1367,40 +1367,60 @@
         "tagSelect": {
             "searchPlaceholder": "Tapez pour rechercher..."
         },
-        "categories": {
-            "creation": {
-                "title": "Création",
-                "desc": "Créer de nouveaux sites et pages à partir de zéro"
-            },
-            "template": {
-                "title": "Templates",
-                "desc": "Modèles de sites prêts à l'emploi - sans IA"
-            },
-            "modification": {
-                "title": "Modification",
-                "desc": "Modifier les structures et le contenu existants"
-            },
-            "content": {
-                "title": "Contenu",
-                "desc": "Ajouter ou mettre à jour le contenu des pages"
-            },
-            "style": {
-                "title": "Style",
-                "desc": "Changer l'apparence et le design"
-            },
-            "advanced": {
-                "title": "Avancé",
-                "desc": "Opérations et configurations complexes"
-            },
-            "wip": {
-                "title": "En développement",
-                "desc": "Specs expérimentales en cours de développement"
-            }
+        "needs": {
+            "cookieBanner": "Nécessite une bannière de cookies",
+            "consentPages": "Nécessite votre page de politique de cookies ou de confidentialité",
+            "secondLanguage": "Nécessite une deuxième langue"
         },
-        "difficulty": {
-            "beginner": "Débutant",
-            "intermediate": "Intermédiaire",
-            "advanced": "Avancé"
+        "templates": {
+            "landingPage": {
+                "title": "Page d'atterrissage",
+                "description": "Une page : une accroche, trois atouts et un appel à l'action. Violet."
+            },
+            "starterBusiness": {
+                "title": "Starter Business",
+                "description": "Quatre pages (accueil, à propos, services, contact) avec un menu et un pied de page. Turquoise."
+            },
+            "appointments": {
+                "title": "Rendez-vous",
+                "description": "Une page pour un salon ou un cabinet : prestations avec durées et prix, équipe, horaires, bouton pour réserver. Vert."
+            },
+            "foodAndDrink": {
+                "title": "Restauration",
+                "description": "Pensé pour le téléphone : un accueil et une carte avec les prix, les horaires, l'adresse, des boutons pour appeler ou commander. Rouge."
+            },
+            "trades": {
+                "title": "Artisans et services à domicile",
+                "description": "Accueil et devis : services, zone desservie, raisons de vous faire confiance, bouton pour demander un devis. Bleu marine et ambre."
+            },
+            "professional": {
+                "title": "Cabinet professionnel",
+                "description": "Pour un comptable, un avocat ou un conseiller : domaines d'activité, équipe, déroulement d'un premier rendez-vous, bouton pour le réserver. Bordeaux."
+            },
+            "portfolio": {
+                "title": "Portfolio",
+                "description": "Vos réalisations d'abord : une grille de pièces avec leurs légendes, une page à propos, un bouton pour vous écrire. Noir et blanc."
+            },
+            "stay": {
+                "title": "Hébergement",
+                "description": "Pour des chambres d'hôtes ou un gîte : les chambres et leurs prix, le petit-déjeuner, les environs, un bouton pour vérifier les disponibilités. Bleu et sable."
+            },
+            "event": {
+                "title": "Événement",
+                "description": "Une page pour une conférence, un festival ou une journée portes ouvertes : la date et le lieu, le programme, les intervenants, la billetterie par un lien. Jaune et noir."
+            },
+            "club": {
+                "title": "Club ou association",
+                "description": "Pour un club sportif ou une association : les séances de la semaine, les dates à venir, le comité, comment adhérer. Vert et orange."
+            },
+            "personal": {
+                "title": "Page personnelle",
+                "description": "Pensé pour le téléphone : une page avec votre photo, une ligne sur vous et vos liens en gros boutons. Rose."
+            },
+            "shop": {
+                "title": "Vitrine de magasin",
+                "description": "Pour un magasin : les nouveautés avec leurs prix, les rayons, les horaires, des boutons pour commander ou appeler. Terre cuite."
+            }
         },
         "specs": {
             "shared": {
@@ -1441,8 +1461,8 @@
                 }
             },
             "createWebsite": {
-                "title": "Créer un Site Multi-Pages",
-                "description": "Générer un site web multi-pages complet avec navigation, plusieurs pages, en-tête/pied de page partagés et style cohérent.",
+                "title": "Créer un site : une seule requête à l'IA",
+                "description": "Générer un site web complet en une seule requête à l'IA : plusieurs pages avec navigation, ou une page dont le menu mène à ses sections, avec un en-tête et un pied de page partagés, les textes de chaque langue et un style cohérent.",
                 "params": {
                     "multilingual": {
                         "label": "Activer le multilingue",
@@ -1464,6 +1484,10 @@
                     "restaurant": { "title": "Restaurant", "prompt": "Créer un site de restaurant avec accueil, menu, à propos, galerie, réservations, contact" },
                     "agency": { "title": "Agence Créative", "prompt": "Créer un site d'agence créative avec accueil, réalisations, services, équipe, blog, contact" }
                 }
+            },
+            "createWebsiteSteps": {
+                "title": "Créer un site : plusieurs requêtes à l'IA",
+                "description": "Construit le site en plusieurs requêtes à l'IA : les pages et leurs textes dans la langue par défaut, puis chaque autre langue, puis l'apparence. Une réponse coupée ne coûte que sa propre partie."
             },
             "addPage": {
                 "title": "Ajouter une Page",
@@ -1538,21 +1562,57 @@
                 "title": "Exécuter un lot de commandes",
                 "description": "Collez et exécutez un lot de commandes JSON directement — aucune génération de prompt nécessaire."
             },
-            "starterBusiness": {
-                "title": "Starter Business",
-                "description": "Site web business avec menu, pied de page, 4 pages et thème turquoise. Langue unique."
-            },
-            "starterBusinessMultilingual": {
-                "title": "Starter Business (Multilingue)",
-                "description": "Site web business avec traductions EN + FR et thème sombre ambre."
-            },
-            "landingPage": {
-                "title": "Page d'Atterrissage",
-                "description": "Landing page avec hero, fonctionnalités et sections CTA. Thème violet dégradé."
-            },
-            "landingPageMultilingual": {
-                "title": "Page d'Atterrissage (Multilingue)",
-                "description": "Landing page avec traductions EN + FR et sélecteur de langue."
+            "startFromTemplate": {
+                "title": "Partir d'un modèle",
+                "description": "Construit un site prêt à l'emploi à partir du modèle choisi : en une langue ou plusieurs, avec un thème sombre si vous le souhaitez. Il remplace le contenu du projet.",
+                "params": {
+                    "template": {
+                        "label": "Modèle",
+                        "kinds": {
+                            "services": "Services",
+                            "hospitality": "Restauration et séjours",
+                            "shops": "Boutiques et créateurs",
+                            "gatherings": "Événements et associations",
+                            "general": "Généralistes"
+                        }
+                    },
+                    "multilingual": {
+                        "label": "Plusieurs langues",
+                        "help": "Construit le site dans chaque langue cochée, avec un sélecteur de langue dans son pied de page"
+                    },
+                    "languages": {
+                        "label": "Langues",
+                        "help": "Les langues dans lesquelles ce modèle est écrit. Cochez-en au moins deux."
+                    },
+                    "language": {
+                        "label": "Langue principale",
+                        "help": "La langue qu'un visiteur voit en premier"
+                    },
+                    "darkMode": {
+                        "label": "Inclure le mode sombre",
+                        "help": "Ajoute les couleurs sombres du modèle et un bouton clair/sombre dans son menu"
+                    },
+                    "businessName": {
+                        "label": "Nom",
+                        "help": "Le nom de votre entreprise, de votre atelier, de votre club ou de votre événement, ou le vôtre : affiché dans le menu, les titres et le pied de page. Laissé vide, le nom d'exemple du modèle."
+                    },
+                    "phone": {
+                        "label": "Numéro de téléphone",
+                        "help": "Affiché sur le site, et appelé par ses boutons Appeler. Des chiffres, des espaces et un + au début seulement. Laissé vide, le numéro d'exemple du modèle."
+                    },
+                    "email": {
+                        "label": "Adresse e-mail",
+                        "help": "Affichée sur le site, et utilisée par ses liens e-mail. Laissée vide, l'adresse d'exemple du modèle."
+                    },
+                    "address": {
+                        "label": "Adresse",
+                        "help": "L'adresse postale affichée sur le site, sur une ligne. Laissée vide, l'adresse d'exemple du modèle."
+                    },
+                    "bookingUrl": {
+                        "label": "Lien de réservation ou de commande",
+                        "help": "Là où mène le bouton principal du modèle (réserver, commander, adhérer) : la page du service que vous utilisez, commençant par https://. Laissé vide, un lien d'exemple."
+                    }
+                }
             },
             "freshStart": {
                 "title": "Nouveau Départ",
@@ -1590,6 +1650,22 @@
             "updateLangSwitch": {
                 "title": "Mettre à jour le sélecteur de langue",
                 "description": "Reconstruire le composant de sélection de langue à partir des langues actuelles du projet."
+            },
+            "translateSite": {
+                "title": "Traduire le site",
+                "description": "Traduit tous les textes du site d'une de ses langues vers une autre : pour une langue tout juste ajoutée, dont les textes sont encore une copie de ceux de la langue par défaut."
+            },
+            "fitCookieBanner": {
+                "title": "Adapter ma bannière de cookies",
+                "description": "Donne à la bannière de cookies et à sa fenêtre l'apparence de votre site. Générez d'abord la bannière, sur la page Compliance."
+            },
+            "fitConsentPages": {
+                "title": "Adapter mes pages de consentement",
+                "description": "Donne aux pages de politique de cookies et de confidentialité l'apparence de votre site. Générez-les d'abord, sur la page Compliance."
+            },
+            "setupThemeSwitch": {
+                "title": "Bouton de changement de thème",
+                "description": "Écrit un bouton clair/sombre, le composant theme-switch. Les visiteurs ne le voient qu'une fois que vous l'avez placé sur une page ou dans le menu."
             }
         }
     },
@@ -1658,23 +1734,24 @@
         "toolStyle": "CSS",
         "toolJs": "Interactions",
         "toolTranslation": "Traductions",
-        "toolAiTools": "Outils IA",
-        "aiToolsSearchPlaceholder": "Rechercher des outils IA…",
-        "aiToolsSuggestedHeader": "Suggérés",
-        "aiToolsAllHeader": "Tous les workflows",
-        "aiToolsMatchLabel": "Correspondance :",
-        "aiToolsMatchAny": "L'un",
-        "aiToolsMatchAll": "Tous",
-        "aiToolsTagShowMore": "+{n} de plus",
-        "aiToolsTagShowLess": "Voir moins",
+        "toolAiTools": "Workflows",
+        "aiToolsSearchPlaceholder": "Rechercher un workflow…",
         "aiToolsLoading": "Chargement…",
-        "aiToolsShowMore": "Voir plus",
-        "aiToolsEmpty": "Aucun outil ne correspond aux filtres.",
-        "aiToolsShowMoreCount": "Voir {n} de plus",
-        "aiToolsAiBadgeTooltip": "Workflow IA — génère une invite",
-        "aiToolsManualBadgeTooltip": "Workflow d'étapes — exécute des commandes sans IA",
-        "aiToolsSourceCustom": "personnalisé",
+        "aiToolsEmpty": "Aucun workflow ne correspond à votre recherche et à vos filtres.",
         "aiToolsBackToList": "← Retour",
+        "workflowsTemplatePreview": "Aperçu",
+        "workflowsTemplatePreviewOf": "Aperçu de {name}",
+        "workflowsTemplatePreviewTitle": "Aperçu : {name}",
+        "workflowsTemplatePreviewFrame": "Aperçu de {name}",
+        "workflowsTemplatePreviewNote": "L'aperçu montre toutes les options activées : toutes les langues du modèle et son bouton clair/sombre. Une exécution ne construit que ce que vous choisissez.",
+        "workflowsTemplateTheme": "Thème",
+        "workflowsTemplateThemeLight": "Clair",
+        "workflowsTemplateThemeDark": "Sombre",
+        "workflowsTemplateKinds": "Afficher",
+        "workflowsTemplateKindAll": "Tous",
+        "workflowsTemplateKindOther": "Autres",
+        "workflowsTemplateKindCount": "{name} ({count})",
+        "workflowsTemplatePreviewOutside": "Ce lien est désactivé dans l'aperçu. Sur votre site, il fonctionne.",
         "aiToolsSectionYourPrompt": "Votre invite",
         "aiToolsSectionParameters": "Paramètres",
         "aiToolsSectionGeneralPrompt": "Invite générale",
@@ -1757,7 +1834,7 @@
         "aiToolsStreaming": "Réception depuis {model}… ({chars} car.)",
         "aiToolsSendingWithElapsed": "Envoi à {model}… ({sec}s)",
         "aiToolsStreamingWithElapsed": "Réception depuis {model}… ({chars} car., {sec}s)",
-        "aiToolsBackupWarning": "Les outils IA modifient votre site directement. Les changements ne peuvent pas être facilement annulés.",
+        "aiToolsBackupWarning": "Les workflows modifient votre site directement. Les changements ne peuvent pas être facilement annulés.",
         "aiToolsBackupRecommendation": "Nous recommandons de créer une sauvegarde avant d'exécuter un workflow dont vous n'êtes pas sûr.",
         "aiToolsBackupBtn": "Créer une sauvegarde maintenant",
         "aiToolsBackupCreating": "Création de la sauvegarde…",

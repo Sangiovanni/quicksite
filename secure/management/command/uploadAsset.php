@@ -15,9 +15,11 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * 
  * Uploads files to assets folders with auto-detected category.
  * Category is resolved from the file extension using filePolicy.php's asset taxonomy.
- * Supports two sources (first available wins):
+ * Supports three sources:
  *   1. Multipart file upload ($_FILES['file'])
- *   2. HTTPS URL download (url parameter)
+ *   2. HTTPS URL download (url parameter); a file upload wins over it
+ *   3. A photo QuickSite ships for its site templates (templatePhoto parameter), copied from
+ *      that one folder with no network; refused beside either of the other two
  * Category passed via POST/multipart form data.
  * Optional description for AI context.
  */
@@ -261,6 +263,17 @@ if ($rateWait > 0) {
 // Priority: multipart file upload > URL
 $hasFileUpload = isset($_FILES['file']) && ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
 
+// A shipped template photo is a source of its own: named beside a file or a url, it is
+// refused rather than silently losing to them.
+$templatePhoto = $params['templatePhoto'] ?? null;
+$hasTemplatePhoto = $templatePhoto !== null && $templatePhoto !== '';
+if ($hasTemplatePhoto && ($hasFileUpload || !empty($url))) {
+    ApiResponse::create(400, 'validation.conflict')
+        ->withMessage('Send one file source: a file, a url or a templatePhoto.')
+        ->withErrors([['field' => 'templatePhoto', 'reason' => 'conflict']])
+        ->send();
+}
+
 if ($hasFileUpload) {
     // ---- SOURCE: Multipart file upload ----
     $sourceType = 'upload';
@@ -385,6 +398,83 @@ if ($hasFileUpload) {
         'error'    => UPLOAD_ERR_OK,
     ];
 
+} elseif ($hasTemplatePhoto) {
+    // ---- SOURCE: a photo shipped for the site templates ----
+    // Read from one folder of the engine, never fetched: the same on a server and on a
+    // local install. Past this block it is an upload like the others, every check included.
+    $sourceType = 'templatePhoto';
+
+    if (!is_string($templatePhoto)) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The templatePhoto parameter must be a string.')
+            ->withErrors([['field' => 'templatePhoto', 'reason' => 'invalid_type', 'expected' => 'string']])
+            ->send();
+    }
+
+    // A file name and nothing else: no separator can pass, so no path and no traversal,
+    // and only the photo types.
+    if (strlen($templatePhoto) > 100 || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:webp|jpe?g|png|avif)$/', $templatePhoto)) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('The templatePhoto parameter is the file name of a photo shipped for the site templates: lowercase letters, digits and hyphens, then .webp, .jpg, .jpeg, .png or .avif.')
+            ->withErrors([['field' => 'templatePhoto', 'reason' => 'invalid_format']])
+            ->send();
+    }
+
+    // The real paths, compared: a name that is not a file of that very folder is refused,
+    // a link or a junction there that leads elsewhere included.
+    $photosDir = realpath(SECURE_FOLDER_PATH . '/admin/workflows/templates/photos');
+    $photoPath = $photosDir !== false ? realpath($photosDir . DIRECTORY_SEPARATOR . $templatePhoto) : false;
+    if ($photoPath === false || !is_file($photoPath) || dirname($photoPath) !== $photosDir) {
+        ApiResponse::create(404, 'asset.template_photo_not_found')
+            ->withMessage('No photo of that name is shipped for the site templates.')
+            ->withErrors([['field' => 'templatePhoto', 'reason' => 'not_found']])
+            ->send();
+    }
+
+    // The same photo already in the project (a template run again on it) is answered as it
+    // is: nothing written, no quota spent, no second copy under another name.
+    $photoCategory = $metaManager->resolveCategory($templatePhoto);
+    $existing = $photoCategory !== null ? PUBLIC_CONTENT_PATH . '/assets/' . $photoCategory . '/' . $templatePhoto : null;
+    if ($existing !== null && is_file($existing) && hash_file('sha256', $existing) === hash_file('sha256', $photoPath)) {
+        $existingInfo = @getimagesize($existing);
+        $reused = [
+            'filename' => $templatePhoto,
+            'category' => $photoCategory,
+            'path' => '/assets/' . $photoCategory . '/' . $templatePhoto,
+            'size' => filesize($existing),
+        ];
+        if ($existingInfo) {
+            $reused['mime_type'] = $existingInfo['mime'];
+            $reused['dimensions'] = $existingInfo[0] . 'x' . $existingInfo[1];
+        }
+        $reused['reused'] = true;
+        ApiResponse::create(200, 'operation.success')
+            ->withMessage('This photo is already in the project: nothing was added.')
+            ->withData($reused)
+            ->send();
+    }
+
+    // Copied, never moved: the shipped photo stays for the next run.
+    $tmpDir = SECURE_FOLDER_PATH . '/tmp';
+    if (!is_dir($tmpDir)) {
+        mkdir($tmpDir, 0750, true);
+    }
+    $tmpFile = tempnam($tmpDir, 'asset_');
+    if ($tmpFile === false || !copy($photoPath, $tmpFile)) {
+        if ($tmpFile !== false) @unlink($tmpFile);
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('The photo could not be copied for the upload.')
+            ->send();
+    }
+    $cleanupTmpFile = $tmpFile;
+
+    $file = [
+        'tmp_name' => $tmpFile,
+        'name'     => $templatePhoto,
+        'size'     => filesize($tmpFile),
+        'error'    => UPLOAD_ERR_OK,
+    ];
+
 } else {
     // "You sent no file" and "PHP threw your file away" are indistinguishable
     // from inside the command — both arrive as an empty $_FILES. The dispatcher
@@ -401,9 +491,9 @@ if ($hasFileUpload) {
 
     $limits = qs_upload_limits();
     ApiResponse::create(400, 'validation.missing_field')
-        ->withMessage('No file source provided. Upload a file or provide a url parameter.')
+        ->withMessage('No file source provided. Upload a file, or provide a url or a templatePhoto parameter.')
         ->withData([
-            'accepted_sources'    => ['file (multipart)', 'url (HTTPS)'],
+            'accepted_sources'    => ['file (multipart)', 'url (HTTPS)', 'templatePhoto (a photo shipped for the site templates)'],
             'max_file_size'       => $limits['effective_max'],
             'max_file_size_human' => qs_format_size($limits['effective_max']),
         ])

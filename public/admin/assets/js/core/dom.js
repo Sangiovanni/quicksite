@@ -71,6 +71,66 @@ window.QSDom = (function () {
     }
 
     /**
+     * The panel's named icons: one map of names to drawings, each drawing a list of shapes ([element name, attributes]) on a
+     * 24 × 24 grid, stroked in the text's colour (currentColor), so both themes draw them. icon() builds one with
+     * createElementNS; nothing is parsed. A new icon is one entry here.
+     */
+    var ICONS = {
+        // Uses AI: a spark
+        ai: [
+            ['path', { d: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z' }],
+            ['path', { d: 'M19 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z' }]
+        ],
+        // No AI: the spark, struck through
+        noAi: [
+            ['path', { d: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z' }],
+            ['line', { x1: '3', y1: '3', x2: '21', y2: '21' }]
+        ],
+        // Can delete: a bin
+        canDelete: [
+            ['path', { d: 'M3 6h18' }],
+            ['path', { d: 'M8 6V4h8v2' }],
+            ['path', { d: 'M19 6l-1 14H6L5 6' }],
+            ['path', { d: 'M10 11v5M14 11v5' }]
+        ],
+        // Needs something first: a plug
+        needs: [
+            ['path', { d: 'M9 2v5M15 2v5' }],
+            ['path', { d: 'M6 7h12v4a6 6 0 0 1-12 0z' }],
+            ['path', { d: 'M12 17v5' }]
+        ]
+    };
+
+    /**
+     * A named icon (ICONS) as an element, hidden from assistive technology: the caller gives it a name where it stands alone.
+     * @param {string} name
+     * @param {number} [size=14]
+     * @returns {SVGElement|null} null for a name the map does not hold
+     */
+    function icon(name, size) {
+        var shapes = Object.prototype.hasOwnProperty.call(ICONS, name) ? ICONS[name] : null;
+        if (!shapes) return null;
+        var ns = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('fill', 'none');
+        svg.setAttribute('stroke', 'currentColor');
+        svg.setAttribute('stroke-width', '2');
+        svg.setAttribute('stroke-linecap', 'round');
+        svg.setAttribute('stroke-linejoin', 'round');
+        svg.setAttribute('width', String(size || 14));
+        svg.setAttribute('height', String(size || 14));
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        shapes.forEach(function (shape) {
+            var part = document.createElementNS(ns, shape[0]);
+            Object.keys(shape[1]).forEach(function (k) { part.setAttribute(k, shape[1][k]); });
+            svg.appendChild(part);
+        });
+        return svg;
+    }
+
+    /**
      * The one scroller of a table of the panel: .admin-table-wrapper's edge shadow says there
      * is more, and the keyboard reaches it.
      * @param {HTMLElement} table
@@ -257,6 +317,7 @@ window.QSDom = (function () {
     return {
         el: el,
         svgIcon: svgIcon,
+        icon: icon,
         iconEl: iconEl,
         tableWrapper: tableWrapper,
         clear: clear,

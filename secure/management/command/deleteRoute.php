@@ -314,6 +314,12 @@ require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php';
 $socialCleaned = qs_social_forget_routes(PROJECT_PATH, $deletedRouteNames);
 
 // ============================================================================
+// CLEAN UP POLICY RECORDS
+// ============================================================================
+
+$policyRecordsCleared = cleanPolicyRoutesForRoutes($deletedRouteNames);
+
+// ============================================================================
 // SUCCESS RESPONSE
 // ============================================================================
 
@@ -329,6 +335,7 @@ ApiResponse::create(200, 'route.deleted')
         'page_events_cleaned' => $pageEventsCleanup['cleaned'] ?? [],
         'resolvers_cleaned' => $deletedResolverRoutes,
         'social_cleaned' => $socialCleaned,
+        'policy_records_cleared' => $policyRecordsCleared,
     ])
     ->send();
 

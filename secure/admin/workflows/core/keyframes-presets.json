@@ -6,9 +6,8 @@
         "icon": "🎬",
         "name": "Keyframe Animation Presets",
         "description": "Install a starter library of @keyframes animations (fade, slide, pulse, shake, collapse). Existing keyframes with the same name are skipped — your edits are safe.",
-        "category": "style",
-        "tags": ["animation", "keyframes", "css", "presets", "library"],
-        "difficulty": "beginner"
+        "category": "look",
+        "tags": ["animation", "keyframes", "css", "presets", "library"]
     },
     "parameters": [],
     "staticData": {

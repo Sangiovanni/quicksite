@@ -1,0 +1,30 @@
+{
+    "template": "8d08f71286dafbc95623848600dd882e2192e98be084f03e8d34d23b71393fa3",
+    "engine": "77573f1f567b0536d97f201cf1453367725ca31f4a241102517450063e89c62d",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home"
+    ],
+    "scripts": true,
+    "photos": {
+        "appointments-salon.webp": "f7c9e01c562e687115f156075202b648719e1d158ee106bd404f8f0d9b3b5d2e",
+        "appointments-welcome.webp": "635280dded077e402e5d7b033465c773c12c1f88aa91a04a712c28f4bdcb751c"
+    },
+    "files": [
+        "assets/images/appointments-salon.webp",
+        "assets/images/appointments-welcome.webp",
+        "dark/en/home.html",
+        "dark/fr/home.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/fr/home.html",
+        "light/style/style.css"
+    ]
+}

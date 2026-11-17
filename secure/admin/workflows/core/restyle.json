@@ -6,9 +6,8 @@
         "icon": "✨",
         "titleKey": "ai.specs.restyle.title",
         "descriptionKey": "ai.specs.restyle.description",
-        "category": "style",
-        "tags": ["style", "css", "redesign", "visual"],
-        "difficulty": "intermediate"
+        "category": "look",
+        "tags": ["style", "css", "redesign", "visual"]
     },
     "parameters": [],
     "dataRequirements": [

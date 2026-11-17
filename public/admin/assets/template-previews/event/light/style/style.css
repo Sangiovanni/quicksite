@@ -1,0 +1,179 @@
+/* GLOBAL */
+html { scroll-behavior: smooth; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: var(--color-text); line-height: 1.6; background: var(--color-bg); overflow-wrap: break-word; }
+h1, h2, h3 { font-weight: 800; line-height: 1.1; color: var(--color-text); letter-spacing: -0.02em; }
+a { color: var(--color-link); text-underline-offset: 0.2em; }
+ul, ol { list-style: none; }
+
+/* MENU */
+.site-nav { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem 2rem; padding: 0.8rem 2rem; background: var(--color-surface); border-bottom: 3px solid var(--color-rule); position: sticky; top: 0; z-index: 100; }
+.nav-logo { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.01em; color: var(--color-text); text-decoration: none; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; margin-left: auto; }
+.nav-links a { color: var(--color-text); text-decoration: none; font-weight: 600; padding: 0.35rem 0; border-bottom: 3px solid transparent; transition: border-color 0.2s; }
+.nav-links a:hover { border-bottom-color: var(--color-primary); }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 3rem; padding: 0.6rem 1.6rem; border: 3px solid var(--color-ink); font-weight: 800; text-decoration: none; text-align: center; transition: background 0.2s, color 0.2s, transform 0.2s; }
+.btn-ink { background: var(--color-ink); color: var(--color-on-ink); }
+.btn-ink:hover { background: transparent; color: var(--color-ink); }
+.btn-line { background: transparent; color: var(--color-ink); }
+.btn-line:hover { background: var(--color-ink); color: var(--color-on-ink); }
+.btn-bright { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
+.btn-bright:hover { background: var(--color-primary-strong); border-color: var(--color-primary-strong); }
+/* On the bright block, in either theme, a button is drawn in the block's own ink */
+.hero .btn, .last-band .btn { border-color: var(--color-on-primary); }
+.hero .btn-ink, .last-band .btn-ink { background: var(--color-on-primary); color: var(--color-primary); }
+.hero .btn-ink:hover, .last-band .btn-ink:hover { background: transparent; color: var(--color-on-primary); }
+.hero .btn-line, .last-band .btn-line { color: var(--color-on-primary); }
+.hero .btn-line:hover, .last-band .btn-line:hover { background: var(--color-on-primary); color: var(--color-primary); }
+.nav-ticket { min-height: 2.5rem; padding: 0.3rem 1rem; font-size: 0.95rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+
+/* HERO: the poster's bright block, then the hall */
+.hero { background: var(--color-primary); color: var(--color-on-primary); }
+.hero-inner { max-width: 72rem; margin: 0 auto; padding: 4rem 2rem 4.5rem; }
+.kicker { font-size: 1rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 1rem; }
+.hero h1 { color: var(--color-on-primary); font-size: clamp(2.6rem, 8vw + 0.5rem, 6rem); line-height: 0.98; margin-bottom: 1.25rem; }
+.hero-lead { font-size: 1.2rem; font-weight: 500; max-width: 38rem; margin-bottom: 2rem; }
+.hero-photo { max-width: 72rem; margin: -2.5rem auto 0; padding: 0 2rem; }
+
+/* THE FIGURES */
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(9rem, 100%), 1fr)); gap: 1.5rem 2rem; max-width: 72rem; margin: 0 auto; padding: 3rem 2rem 1rem; }
+.fact { border-top: 3px solid var(--color-rule); padding-top: 0.75rem; }
+.fact-number { display: block; font-size: clamp(2.5rem, 5vw + 1rem, 4rem); font-weight: 800; line-height: 1; letter-spacing: -0.03em; }
+.fact-label { color: var(--color-text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.85rem; }
+
+/* SECTIONS */
+.section { max-width: 72rem; margin: 0 auto; padding: 4rem 2rem; scroll-margin-top: 4rem; }
+.section h2 { font-size: clamp(2rem, 4vw + 0.8rem, 3.25rem); margin-bottom: 0.75rem; }
+.section-lead { color: var(--color-text-muted); max-width: 40rem; margin-bottom: 2rem; font-size: 1.05rem; }
+.band { background: var(--color-surface-alt); }
+
+/* THE PROGRAMME: an hour, a title, who */
+.programme li { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr); gap: 0.25rem 1.5rem; padding: 1rem 0; border-top: 1px solid var(--color-border); }
+.programme li:first-child { border-top: 3px solid var(--color-rule); }
+.slot-time { font-weight: 800; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.slot-title { font-weight: 700; font-size: 1.15rem; }
+.slot-by { display: block; color: var(--color-text-muted); }
+
+/* THE SPEAKERS: initials in a square, where a portrait goes */
+.speaker-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr)); gap: 1.5rem; }
+.speaker { background: var(--color-surface); border: 1px solid var(--color-border); padding: 1.25rem; }
+.avatar { display: flex; align-items: center; justify-content: center; width: 4.5rem; height: 4.5rem; margin-bottom: 1rem; background: var(--color-primary); color: var(--color-on-primary); font-weight: 800; font-size: 1.4rem; }
+.speaker h3 { font-size: 1.15rem; margin-bottom: 0.2rem; }
+.speaker p { color: var(--color-text-muted); }
+
+/* THE VENUE: where and how, beside a photo */
+.venue-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(19rem, 100%), 1fr)); gap: 2rem 3rem; align-items: center; }
+.venue-name { font-size: 1.3rem; font-weight: 800; }
+.venue-list { margin-top: 1.25rem; }
+.venue-list li { padding: 0.75rem 0; border-top: 1px solid var(--color-border); }
+.venue-list h3 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.15rem; }
+.venue-list p { color: var(--color-text-muted); }
+
+/* PHOTOS: the template's own, each an image an author swaps for theirs; a little dimmer in the dark theme */
+.photo { display: block; width: 100%; height: auto; object-fit: cover; filter: brightness(var(--photo-brightness)); }
+.hero-photo .photo { aspect-ratio: 16 / 9; border: 3px solid var(--color-rule); }
+.venue-photo .photo { aspect-ratio: 4 / 3; border: 3px solid var(--color-rule); }
+
+/* TICKETS: three prices, each with its button */
+.ticket-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr)); gap: 1.5rem; }
+.ticket { display: flex; flex-direction: column; background: var(--color-surface); border: 3px solid var(--color-rule); padding: 1.5rem; }
+.ticket h3 { font-size: 1.1rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.ticket-price { font-size: 3rem; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; margin: 0.25rem 0 0.5rem; }
+.ticket-desc { color: var(--color-text-muted); margin-bottom: 1.25rem; }
+.ticket .btn { margin-top: auto; }
+
+/* QUESTIONS */
+.faq-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr)); gap: 1.75rem 3rem; }
+.faq h3 { font-size: 1.15rem; margin-bottom: 0.35rem; }
+.faq p { color: var(--color-text-muted); }
+
+/* THE CLOSING BAND */
+.last-band { text-align: center; padding: 4rem 2rem; background: var(--color-primary); color: var(--color-on-primary); }
+.last-band h2 { color: var(--color-on-primary); font-size: clamp(2rem, 4vw + 0.8rem, 3.25rem); margin-bottom: 0.5rem; }
+.last-band p { max-width: 34rem; margin: 0 auto 1.75rem; font-weight: 500; }
+.last-band .actions { justify-content: center; }
+
+/* FOOTER */
+.site-footer { background: var(--color-footer-bg); color: var(--color-footer-text); padding: 2.5rem 2rem 1.25rem; }
+.footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1.5rem 2rem; max-width: 72rem; margin: 0 auto; }
+.footer-logo { font-size: 1.2rem; font-weight: 800; }
+.footer-brand p { color: var(--color-footer-muted); font-size: 0.9rem; margin-top: 0.35rem; }
+.footer-note { max-width: 72rem; margin: 1.75rem auto 0; padding-top: 1.25rem; border-top: 1px solid rgba(255, 255, 255, 0.15); color: var(--color-footer-muted); font-size: 0.85rem; }
+
+/* LANGUAGE SWITCH (a site in several languages) */
+.footer-lang { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; }
+.lang-label { color: var(--color-footer-muted); font-size: 0.9rem; }
+.lang-switch { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.lang-btn { color: var(--color-footer-text); text-decoration: none; padding: 0.35rem 0.9rem; font-size: 0.85rem; font-weight: 600; border: 1px solid rgba(255, 255, 255, 0.3); }
+.lang-btn:hover { border-color: var(--color-footer-text); }
+
+/* THEME SWITCH (a site with a dark theme) */
+.theme-switch { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.9rem; border: 1px solid var(--color-switch-border); background: transparent; color: var(--color-switch-text); font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
+.theme-switch:hover { border-color: var(--color-text); color: var(--color-text); }
+
+/* LESS MOTION, for a visitor who asked their system for it */
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+}
+
+/* PHONE (a screen up to 40rem): the menu scrolls with the page and wraps, its links taking the room left; buttons take the whole width */
+@media (max-width: 40rem) {
+    .site-nav { position: static; padding: 0.75rem 1rem; gap: 0.5rem 1rem; }
+    .nav-links { flex: 1 1 auto; margin-left: 0; gap: 0.25rem 1.25rem; }
+    .hero-inner { padding: 2.5rem 1rem 3.5rem; }
+    .hero-photo { padding: 0 1rem; margin-top: -1.75rem; }
+    .actions .btn { flex: 1 1 100%; }
+    .facts { padding: 2.25rem 1rem 0.5rem; }
+    .section { padding: 2.5rem 1rem; scroll-margin-top: 1rem; }
+    .programme li { grid-template-columns: 3.75rem minmax(0, 1fr); gap: 0.25rem 1rem; }
+    .ticket { padding: 1.25rem 1rem; }
+    .last-band { padding: 2.5rem 1rem; }
+    .site-footer { padding: 2rem 1rem 1rem; }
+}
+:root {
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-alt: #f3f1ea;
+    --color-text: #111111;
+    --color-text-muted: #55534d;
+    --color-link: #111111;
+    --color-primary: #ffd21f;
+    --color-primary-strong: #f2c200;
+    --color-on-primary: #111111;
+    --color-ink: #111111;
+    --color-on-ink: #ffffff;
+    --color-rule: #111111;
+    --color-border: #d9d5c8;
+    --color-footer-bg: #111111;
+    --color-footer-text: #f3f1ea;
+    --color-footer-muted: #a8a59c;
+    --color-switch-border: #bdb8a8;
+    --color-switch-text: #55534d;
+    --photo-brightness: 1;
+}
+
+[data-theme="dark"] {
+    --color-bg: #0d0d0d;
+    --color-surface: #171717;
+    --color-surface-alt: #1c1c1a;
+    --color-text: #f3f1ea;
+    --color-text-muted: #a8a59c;
+    --color-link: #ffd21f;
+    --color-primary: #ffd21f;
+    --color-primary-strong: #ffe066;
+    --color-on-primary: #111111;
+    --color-ink: #ffd21f;
+    --color-on-ink: #111111;
+    --color-rule: #ffd21f;
+    --color-border: #35342f;
+    --color-footer-bg: #000000;
+    --color-footer-text: #f3f1ea;
+    --color-footer-muted: #98958c;
+    --color-switch-border: #4a4942;
+    --color-switch-text: #a8a59c;
+    --photo-brightness: 0.9;
+}

@@ -15,6 +15,11 @@ quicksite/
 │   ├── admin/                    # Admin panel UI (HTML/JS/CSS)
 │   │   ├── index.php             # Panel router — pages, auth, rendering
 │   │   ├── api/                  # Read-only helper arms (form options, update check)
+│   │   ├── assets/               # The panel's own stylesheets, scripts and images
+│   │   │   ├── images/templates/ #   each site template's picture, shown in its picker
+│   │   │   └── template-previews/ #  each site template's built preview: static pages the
+│   │   │                         #   panel shows in a frame with no access to it; written
+│   │   │                         #   by secure/tools/template-previews.php
 │   │   ├── self/                 # The signed-in account and its project memberships
 │   │   └── state/                # The panel's own per-user state (which project it edits)
 │   └── management/               # API entry point
@@ -54,7 +59,11 @@ quicksite/
 │   │   ├── templates/            # Admin panel page templates
 │   │   ├── translations/         # Admin UI translations
 │   │   └── workflows/            # Workflow specs, prompt templates and their schema — the
-│   │                             #   manual and AI-assisted runs offered on /admin/workflows
+│   │       │                     #   manual and AI-assisted runs offered on /admin/workflows
+│   │       └── templates/        # Site templates, one JSON file each: what Start from a
+│   │           │                 #   template's picker lists
+│   │           └── photos/       # Their photos, brought into a project by uploadAsset's
+│   │                             #   templatePhoto, and photos.json: how each was made
 │   ├── src/                      # Shared engine code
 │   │   ├── classes/              # Core classes (ApiResponse, JsonToHtmlRenderer,
 │   │   │                         #   JsonToPhpCompiler, CssParser, Translator, etc.)
@@ -113,7 +122,8 @@ quicksite/
 │   ├── tools/                    # The deployer's tools: scripts an operator runs on the machine,
 │   │                             #   not through the API, because they act on the whole
 │   │                             #   installation rather than on one project — session-sweep.php
-│   │                             #   tidies the session store; README.md says how to run it
+│   │                             #   tidies the session store, template-previews.php builds the
+│   │                             #   site templates' previews; README.md says how to run each
 │   ├── cache/                    # Generated caches, safe to delete (gitignored)
 │   │   ├── resolver/             #   data-resolver responses, held for their TTL
 │   │   └── space/                #   measured per-project disk sizes

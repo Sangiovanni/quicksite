@@ -524,6 +524,10 @@
     .qs-easing-picker__footer {
         flex-wrap: wrap;
     }
+    /* A template's preview: as tall as the screen at most, its border included (a long title on two lines reaches that height) */
+    .admin-modal-dialog.preview-contextual-ai-tools__template-dialog {
+        max-height: calc(100% - 2 * var(--space-md) - 2px);
+    }
     /* Add, Edit Params and the two Save forms fill the window, and their own Back, x or Cancel leaves them */
     .preview-workspace[data-mode="add"] .preview-sidebar,
     .preview-workspace--panel-fills .preview-sidebar {
@@ -541,16 +545,9 @@
     .preview-workspace--panel-fills .preview-sidebar__options {
         display: block;
     }
-    /* AI tools: three tags and the count of the rest */
     .preview-workspace[data-mode="add"] .preview-sidebar__toggle,
-    .preview-workspace--panel-fills .preview-sidebar__toggle,
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag--past-phone,
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle-count {
+    .preview-workspace--panel-fills .preview-sidebar__toggle {
         display: none;
-    }
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle--phone-only,
-    .preview-contextual-ai-tools__tags .preview-contextual-ai-tools__tag-toggle-count--phone {
-        display: inline;
     }
 
     /* Media */

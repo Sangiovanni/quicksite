@@ -6,13 +6,13 @@
         "icon": "📦",
         "titleKey": "ai.specs.runBatch.title",
         "descriptionKey": "ai.specs.runBatch.description",
-        "category": "advanced",
-        "tags": ["batch", "commands", "paste", "advanced"],
-        "difficulty": "advanced"
+        "category": "tools",
+        "tags": ["batch", "commands", "paste", "advanced"]
     },
     "parameters": [],
     "dataRequirements": [],
     "relatedCommands": [],
     "pasteOnly": true,
+    "answerRules": { "anyCommand": true },
     "promptTemplate": "run-batch.md"
 }

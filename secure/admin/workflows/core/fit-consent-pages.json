@@ -1,0 +1,49 @@
+{
+    "$schema": "../schema.json",
+    "id": "fit-consent-pages",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "📜",
+        "titleKey": "workflows.specs.fitConsentPages.title",
+        "descriptionKey": "workflows.specs.fitConsentPages.description",
+        "category": "privacy",
+        "answerLength": "short",
+        "needsKey": "workflows.needs.consentPages",
+        "tags": ["cookie", "privacy", "policy", "consent", "style"]
+    },
+    "parameters": [
+        {
+            "id": "coloursOnly",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.shared.params.coloursOnly.label",
+            "helpKey": "workflows.specs.shared.params.coloursOnly.help",
+            "default": false
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "rootVariables",
+            "command": "getRootVariables",
+            "extract": "data.variables",
+            "condition": "coloursOnly === true"
+        },
+        {
+            "id": "styles",
+            "command": "getStyles",
+            "extract": "data",
+            "condition": "coloursOnly !== true"
+        },
+        {
+            "id": "helpSetStyleRule",
+            "command": "help",
+            "urlParams": ["setStyleRule"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setStyleRule"],
+    "answerRules": {
+        "selectorStarts": [".qs-cookie-policy-page", ".qs-privacy-policy-page"],
+        "forbiddenProperties": ["display", "visibility", "position", "z-index", "all"]
+    },
+    "promptTemplate": "fit-consent-pages.md"
+}

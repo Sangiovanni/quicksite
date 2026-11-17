@@ -3,7 +3,8 @@
  * WorkflowManager - Manages workflow specification loading, validation, and rendering
  * 
  * This class handles:
- * - Loading workflow JSON files from the core/ directory
+ * - Loading workflow JSON files from the core/ directory, and the site templates of templates/
+ *   that a workflow may take its steps from
  * - Validating workflows against the JSON schema
  * - Fetching data requirements via CommandRunner
  * - Rendering prompt templates with variable substitution
@@ -25,6 +26,9 @@ class WorkflowManager {
     
     /** @var array Cached workflows */
     private array $workflowsCache = [];
+
+    /** @var array|null The templates folder as listTemplates() read it, once per request */
+    private ?array $templatesCache = null;
     
     /** @var string Project ID */
     private string $projectId;
@@ -34,6 +38,9 @@ class WorkflowManager {
     
     /** @var array Per-render help cache: [commandName => helpData]. Lifetime = one renderPrompt() call. */
     private array $helpCache = [];
+
+    /** @var array Each command's category, as stepEffect() reads it: getCommandCategory() reads the categories file at every call. */
+    private array $categoryCache = [];
     
     /** Max recursion depth for {{> partial}} resolution (cycle/runaway guard). */
     private const PARTIALS_MAX_DEPTH = 5;
@@ -49,6 +56,12 @@ class WorkflowManager {
 
     /** A command whose name begins so adds something new: a run is never warned about it. */
     private const CREATE_NAME = '/^(add|create|upload|insert|duplicate)/';
+
+    /**
+     * A property name as an answer's bound reads it: letters, digits, `-` and `_`, or a custom property
+     * (--name). A name with an escape or any other character could read in a browser as one it refuses.
+     */
+    private const PLAIN_PROPERTY = '/^(?:--[A-Za-z0-9_-]+|-?[A-Za-z_][A-Za-z0-9_-]*)$/D';
 
     /** The categories whose writes change the site's content: such a write that neither deletes nor adds is warned as a change. */
     private const CONTENT_CATEGORIES = [
@@ -119,25 +132,21 @@ class WorkflowManager {
     }
     
     /**
-     * Get workflows organized by category
-     * 
-     * @return array Workflows grouped by category
+     * The groups a workflow may be listed in (meta.category), in the order the Workflows panel shows them: the schema's
+     * own list, so a new group is one edit there. Read once per request.
+     *
+     * @return string[]
      */
-    public function getWorkflowsByCategory(): array {
-        $workflows = $this->listWorkflows();
-        $byCategory = [];
-        
-        foreach ($workflows as $workflow) {
-            $category = $workflow['meta']['category'] ?? 'other';
-            if (!isset($byCategory[$category])) {
-                $byCategory[$category] = [];
-            }
-            $byCategory[$category][] = $workflow;
+    public function categories(): array {
+        static $categories = null;
+        if ($categories === null) {
+            $schema = json_decode((string) @file_get_contents($this->workflowsBasePath . '/schema.json'), true);
+            $enum = $schema['properties']['meta']['properties']['category']['enum'] ?? null;
+            $categories = is_array($enum) ? array_values(array_filter($enum, 'is_string')) : [];
         }
-        
-        return $byCategory;
+        return $categories;
     }
-    
+
     /**
      * Load a workflow by ID
      * 
@@ -171,6 +180,7 @@ class WorkflowManager {
                     $workflow['_filePath'] = $path;
                     $workflow['_folder'] = dirname($path);
                     $workflow['_source'] = 'core';
+                    $this->offerTemplates($workflow);
 
                     $this->workflowsCache[$workflowId] = $workflow;
                     return $workflow;
@@ -179,6 +189,172 @@ class WorkflowManager {
         }
         
         return null;
+    }
+
+    /**
+     * The site templates a workflow may take its steps from: every valid file of `templates/`, by id, in the files' order.
+     *
+     * Templates are SHIPPED, as workflows are: one folder is read, and nothing a request names reaches a file outside
+     * it (loadTemplate()). A file is a template when it is a JSON object whose `id` is its file's name, with a list of
+     * languages and a list of steps that each name a command; any other file is left out and logged.
+     *
+     * @return array<string, array> id => the template's file as an array
+     */
+    public function listTemplates(): array {
+        if ($this->templatesCache !== null) return $this->templatesCache;
+        $this->templatesCache = [];
+        $files = glob($this->workflowsBasePath . '/templates/*.json') ?: [];
+        sort($files);
+        foreach ($files as $file) {
+            $id = basename($file, '.json');
+            $text = (string) @file_get_contents($file);
+            $template = json_decode($text, true);
+            $why = $this->templateRefusal($id, $template);
+            if ($why !== null) {
+                error_log("[WorkflowManager] template '{$id}' left out: {$why}");
+                continue;
+            }
+            // The file's hash with one kind of line ending, as the previews' tool takes it: a checkout's endings change nothing.
+            $template['_hash'] = hash('sha256', str_replace("\r\n", "\n", $text));
+            $this->templatesCache[$id] = $template;
+        }
+        return $this->templatesCache;
+    }
+
+    /** One template by its id, or null: an id is letters, digits, hyphens and underscores, and names a file listTemplates() holds. */
+    public function loadTemplate(string $templateId): ?array {
+        if (!RegexPatterns::match('identifier_alphanum', $templateId)) return null;
+        return $this->listTemplates()[$templateId] ?? null;
+    }
+
+    /** Why a file of `templates/` is no template, or null when it is one. */
+    private function templateRefusal(string $id, $template): ?string {
+        if (!RegexPatterns::match('identifier_alphanum', $id)) return 'its file name is not an id';
+        if (!is_array($template)) return 'it is not a JSON object';
+        if (($template['id'] ?? null) !== $id) return 'its id is not its file name';
+        $languages = $template['languages'] ?? null;
+        if (!is_array($languages) || $languages === [] || array_filter($languages, static fn($l) => !is_string($l) || $l === '') !== []) {
+            return 'it lists no languages';
+        }
+        $steps = $template['steps'] ?? null;
+        if (!is_array($steps) || $steps === []) return 'it has no steps';
+        foreach ($steps as $step) {
+            if (!is_array($step) || !is_string($step['command'] ?? null) || $step['command'] === '') return 'a step names no command';
+        }
+        if (isset($template['data']) && !is_array($template['data'])) return 'its data is not an object';
+        return null;
+    }
+
+    /**
+     * What a template's file says of itself, for a picker: its id, icon, name and line (in the panel's language, from its
+     * keys, else as the file writes them), its kind (an id the picker groups it under, '' when the file states none), its
+     * languages, whether it holds a dark theme, the fields it asks a run for
+     * (`asks`: ids of the workflow's parameters, which a field's condition reads to show itself), and its file's hash.
+     */
+    public function templateChoice(array $template): array {
+        if (!function_exists('__workflow')) {
+            require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
+        }
+        $id = (string) $template['id'];
+        $text = static function (string $field) use ($template, $id): string {
+            $direct = is_string($template[$field] ?? null) ? $template[$field] : '';
+            $key = $template[$field . 'Key'] ?? null;
+            if (!is_string($key) || $key === '') return $direct !== '' ? $direct : ($field === 'title' ? $id : '');
+            return (string) __workflow($template, $key, $direct !== '' ? $direct : ($field === 'title' ? $id : ''));
+        };
+        return [
+            'id' => $id,
+            'icon' => is_string($template['icon'] ?? null) ? $template['icon'] : '',
+            'title' => $text('title'),
+            'description' => $text('description'),
+            'kind' => is_string($template['kind'] ?? null) && RegexPatterns::match('identifier_alphanum', $template['kind']) ? $template['kind'] : '',
+            'languages' => array_values($template['languages']),
+            'dark' => is_array($template['data']['dark'] ?? null) && $template['data']['dark'] !== [],
+            'asks' => array_values(array_filter(
+                is_array($template['asks'] ?? null) ? $template['asks'] : [],
+                static fn($field) => is_string($field) && RegexPatterns::match('identifier_alphanum', $field)
+            )),
+            'hash' => (string) ($template['_hash'] ?? ''),
+            'picture' => $this->templatePicture($id),
+            'preview' => $this->templatePreview($id, (string) ($template['_hash'] ?? '')),
+        ];
+    }
+
+    /** The folder of the panel's own assets, or null outside a web request (a tool, a probe): no picture and no preview then. */
+    private function panelAssets(): ?string {
+        return defined('ADMIN_ASSET_ROOT') ? rtrim(str_replace('\\', '/', (string) ADMIN_ASSET_ROOT), '/') . '/admin/assets' : null;
+    }
+
+    /** A template's picture among the panel's images (templates/<id>.webp, .jpg or .png), as its file name, or null. */
+    private function templatePicture(string $id): ?string {
+        $assets = $this->panelAssets();
+        if ($assets === null) return null;
+        foreach (['webp', 'jpg', 'png'] as $ext) {
+            if (is_file("$assets/images/templates/$id.$ext")) return "$id.$ext";
+        }
+        return null;
+    }
+
+    /**
+     * A template's built preview, when the panel may show it: the one the previews' tool wrote for this very file (its
+     * hash is the file's). A preview of a template that changed since is not shown. Whether the engine that built it is
+     * today's is the tool's own check (--check), run at each release: an installed engine changes only with one.
+     *
+     * @return array{themes: string[], languages: string[], pages: string[], scripts: bool}|null
+     */
+    private function templatePreview(string $id, string $hash): ?array {
+        $assets = $this->panelAssets();
+        if ($assets === null || $hash === '') return null;
+        $manifest = json_decode((string) @file_get_contents("$assets/template-previews/$id/preview.json"), true);
+        if (!is_array($manifest) || ($manifest['template'] ?? null) !== $hash) return null;
+        $list = static fn($v): array => array_values(array_filter(is_array($v) ? $v : [], 'is_string'));
+        $themes = $list($manifest['themes'] ?? null);
+        $pages = $list($manifest['pages'] ?? null);
+        if ($themes === [] || $pages === []) return null;
+        return [
+            'themes' => $themes,
+            'languages' => $list($manifest['languages'] ?? null),
+            'pages' => $pages,
+            'scripts' => !empty($manifest['scripts']),
+        ];
+    }
+
+    /** A `template` parameter is given its choices as the workflow loads: every template, as templateChoice() says it. */
+    private function offerTemplates(array &$workflow): void {
+        if (empty($workflow['parameters']) || !is_array($workflow['parameters'])) return;
+        foreach ($workflow['parameters'] as &$param) {
+            if (!is_array($param) || ($param['type'] ?? null) !== 'template') continue;
+            $param['templates'] = array_map([$this, 'templateChoice'], array_values($this->listTemplates()));
+        }
+        unset($param);
+    }
+
+    /**
+     * The template a run of this workflow takes its steps from: the one its `stepsFrom` parameter names. Null for a
+     * workflow with no `stepsFrom`, and for a run that names none yet. A name that is no template is refused whole
+     * (an exception), so no phase of that run is resolved: not the workflows that run before its steps either.
+     */
+    private function chosenTemplate(array $workflow, array $userParams): ?array {
+        $paramId = $workflow['stepsFrom'] ?? null;
+        if (!is_string($paramId) || $paramId === '') return null;
+        $chosen = $userParams[$paramId] ?? '';
+        if ($chosen === '' || $chosen === null) return null;
+        $template = is_string($chosen) ? $this->loadTemplate($chosen) : null;
+        if ($template === null) {
+            throw new InvalidArgumentException("workflow '" . ($workflow['id'] ?? '') . "': no such template");
+        }
+        return $template;
+    }
+
+    /** The steps a workflow's file can send: its own, and for one that takes its steps from a template, every template's. */
+    private function everyStep(array $workflow): array {
+        $steps = array_values(array_filter($workflow['steps'] ?? [], 'is_array'));
+        if (is_string($workflow['stepsFrom'] ?? null) && $workflow['stepsFrom'] !== '') {
+            foreach ($this->listTemplates() as $template) {
+                foreach ($template['steps'] as $step) $steps[] = $step;
+            }
+        }
+        return $steps;
     }
     
     /**
@@ -358,6 +534,18 @@ class WorkflowManager {
     public function generateSteps(array $workflow, array $userParams = [], array $fetchedData = [], array $configData = []): array {
         $expandedSteps = [];
 
+        // A workflow that takes its steps from a template runs the chosen template's, with the template's own data
+        // (its texts, its dark theme) as static data.
+        $template = $this->chosenTemplate($workflow, $userParams);
+        if ($template !== null) {
+            $workflow['steps'] = $template['steps'];
+            $workflow['staticData'] = array_merge(
+                is_array($template['data'] ?? null) ? $template['data'] : [],
+                ['template' => ['id' => $template['id'], 'languages' => array_values($template['languages'])]],
+                is_array($workflow['staticData'] ?? null) ? $workflow['staticData'] : []
+            );
+        }
+
         // Merge static data defined in the workflow itself
         if (!empty($workflow['staticData']) && is_array($workflow['staticData'])) {
             $fetchedData = array_merge($workflow['staticData'], $fetchedData);
@@ -430,6 +618,12 @@ class WorkflowManager {
      *               'label'? => string (a repeated entry's item)]
      */
     public function getWorkflowPhases(array $workflow, array $userParams = []): array {
+        // A run that takes its steps from a template has no phase until one is chosen, and none at all for a name
+        // that is no template (chosenTemplate() refuses it): Fresh Start never runs ahead of steps that do not exist.
+        if (is_string($workflow['stepsFrom'] ?? null) && $workflow['stepsFrom'] !== ''
+            && $this->chosenTemplate($workflow, $userParams) === null) {
+            return [];
+        }
         $phases = [];
         $this->collectPhases($workflow, $userParams, 'main', [], $phases, []);
         return $this->settleRequests($phases);
@@ -457,7 +651,8 @@ class WorkflowManager {
 
     /**
      * The commands a run of this workflow may send, for a role check: the related commands and the
-     * steps' commands of every workflow it may reach (reachableWorkflows()).
+     * steps' commands of every workflow it may reach (reachableWorkflows()); for one that takes its
+     * steps from a template, every template's (everyStep()).
      */
     public function runCommands(array $workflow): array {
         $commands = [];
@@ -465,11 +660,80 @@ class WorkflowManager {
             foreach (($reached['relatedCommands'] ?? []) as $command) {
                 if (is_string($command) && $command !== '') $commands[] = $command;
             }
-            foreach (($reached['steps'] ?? []) as $step) {
-                if (is_array($step) && is_string($step['command'] ?? null) && $step['command'] !== '') $commands[] = $step['command'];
+            foreach ($this->everyStep($reached) as $step) {
+                if (is_string($step['command'] ?? null) && $step['command'] !== '') $commands[] = $step['command'];
             }
         }
         return array_values(array_unique($commands));
+    }
+
+    /**
+     * What a run of this workflow does, read from its file and every workflow it may reach (reachableWorkflows()), for the
+     * words of its row in the Workflows panel. Nothing is fetched and the project is not read, so each fact says what a run
+     * CAN do: a step repeated over a project's pages deletes nothing on a project with none.
+     *   'ai'         a model is asked: a workflow of its reach has a promptTemplate and is not pasteOnly
+     *   'paste'      the commands of an AI phase are pasted by hand (pasteOnly): no model is asked for them
+     *   'requests'   the AI requests a run sends: 0, 1, or 2 for several (two AI workflows in reach, or one a forEach repeats)
+     *   'effects'    each [effect, what, command] a step can have, as the run's review words it (stepEffect()): every step
+     *                as its file writes it, and every command an AI answer may send (relatedCommands), once each
+     *   'anyCommand' an AI answer may send any command (answerRules.anyCommand): what it changes is not known before
+     *   'answerLength', 'needsKey'  the file's own meta, when set
+     *
+     * @return array{ai: bool, paste: bool, requests: int, effects: array, anyCommand: bool, answerLength: ?string, needsKey: ?string}
+     */
+    public function rowFacts(array $workflow): array {
+        $paste = false;
+        $any = false;
+        $effects = [];
+        foreach ($this->reachableWorkflows($workflow) as $reached) {
+            if ($this->isAiWorkflow($reached)) {
+                if (!empty($reached['pasteOnly'])) $paste = true;
+                if (!empty($reached['answerRules']['anyCommand'])) $any = true;
+                $steps = array_map(static fn($command) => ['command' => $command], array_filter($reached['relatedCommands'] ?? [], 'is_string'));
+            } else {
+                $steps = $this->everyStep($reached);
+            }
+            foreach ($steps as $step) {
+                $effect = $this->stepEffect($step);
+                if ($effect === null) continue;
+                $key = $effect['effect'] . '|' . $effect['what'] . '|' . $effect['command'];
+                $effects[$key] = ['effect' => $effect['effect'], 'what' => $effect['what'], 'command' => $effect['command']];
+            }
+        }
+        $requests = min($this->aiRequests($workflow, []), 2);
+        $meta = is_array($workflow['meta'] ?? null) ? $workflow['meta'] : [];
+        return [
+            'ai' => $requests > 0,
+            'paste' => $paste,
+            'requests' => $requests,
+            'effects' => array_values($effects),
+            'anyCommand' => $any,
+            'answerLength' => in_array($meta['answerLength'] ?? null, ['short', 'long'], true) ? $meta['answerLength'] : null,
+            'needsKey' => is_string($meta['needsKey'] ?? null) && $meta['needsKey'] !== '' ? $meta['needsKey'] : null,
+        ];
+    }
+
+    /**
+     * How many AI requests a run of this workflow sends at most, counting its pre- and post-workflows at any depth as
+     * collectPhases() follows them: one per AI workflow that is not pasteOnly, two for one that a forEach repeats (it runs once
+     * per item). A conditional entry counts, as it may run; a cycle or a nesting past PHASES_MAX_DEPTH stops the count.
+     */
+    private function aiRequests(array $workflow, array $trail): int {
+        $id = (string) ($workflow['id'] ?? '');
+        if (in_array($id, $trail, true) || count($trail) >= self::PHASES_MAX_DEPTH) return 0;
+        $trail[] = $id;
+        $count = $this->isAiWorkflow($workflow) && empty($workflow['pasteOnly']) ? 1 : 0;
+        foreach (['preWorkflows', 'postWorkflows'] as $list) {
+            foreach (($workflow[$list] ?? []) as $entry) {
+                $subId = is_string($entry) ? $entry : (is_array($entry) ? (string) ($entry['id'] ?? '') : '');
+                $sub = $subId !== '' ? $this->loadWorkflow($subId) : null;
+                if (!$sub) continue;
+                $n = $this->aiRequests($sub, $trail);
+                if ($n > 0 && is_array($entry) && is_string($entry['forEach'] ?? null)) $n = max($n, 2);
+                $count += $n;
+            }
+        }
+        return $count;
     }
 
     /**
@@ -622,7 +886,7 @@ class WorkflowManager {
      * and nothing is resolved — a condition or a forEach that reads the project's data planned another run.
      *
      * @return array|null ['index', 'kind', 'workflowId', 'key', 'title', 'icon', 'ai', 'requestFrom', 'steps',
-     *                    'count', 'effects', 'prompt'?, 'validationErrors'?], ['planChanged' => true], or null
+     *                    'count', 'effects', 'prompt'?, 'validationErrors'?, 'refused'?], ['planChanged' => true], or null
      *                    when the run has no such phase (and no key was given)
      */
     public function resolvePhase(array $workflow, array $userParams, int $index, array $options = []): ?array {
@@ -650,7 +914,7 @@ class WorkflowManager {
         ];
         $steps = [];
         if ($ai && isset($options['answer']) && is_array($options['answer'])) {
-            $steps = $this->answerSteps($options['answer']);
+            [$steps, $resolved['refused']] = $this->answerSteps($options['answer'], $workflow);
         }
         // An AI phase reads its data only for its prompt.
         if (!$ai || !empty($options['prompt'])) {
@@ -696,10 +960,14 @@ class WorkflowManager {
 
     /**
      * The commands an AI answered, as a phase's steps: each entry that names a command, with its method,
-     * its parameters and the execution options the runner honours; anything else is left out.
+     * its parameters and the execution options the runner honours; anything else is left out. A step its
+     * workflow does not allow never becomes a step: it goes on the list of what was refused (answerRefusal()).
+     *
+     * @return array [the steps, the refusals]
      */
-    private function answerSteps(array $answer): array {
+    private function answerSteps(array $answer, array $workflow): array {
         $steps = [];
+        $refused = [];
         foreach ($answer as $entry) {
             if (!is_array($entry)) continue;
             $command = $entry['command'] ?? $entry['name'] ?? null;
@@ -714,9 +982,144 @@ class WorkflowManager {
                     $step[$prop] = $entry[$prop];
                 }
             }
+            $refusal = $this->answerRefusal($step, $workflow);
+            if ($refusal !== null) {
+                $refused[] = $refusal;
+                continue;
+            }
             $steps[] = $step;
         }
-        return $steps;
+        return [$steps, $refused];
+    }
+
+    /**
+     * Why a workflow does not let its AI answer hold this step, or null when it may. An answer sends only
+     * the commands its workflow names in relatedCommands, unless answerRules.anyCommand opens that. Where
+     * a step names a CSS selector, answerRules.selectorStarts holds it to the elements the workflow is about,
+     * and answerRules.forbiddenProperties keeps it from declaring what the workflow must not change, or a
+     * property whose name the bound cannot read plainly (PLAIN_PROPERTY).
+     *
+     * @return array|null ['reason' => 'command'|'selector'|'property', 'command' => the step's, 'target' => what was refused]
+     */
+    private function answerRefusal(array $step, array $workflow): ?array {
+        $rules = is_array($workflow['answerRules'] ?? null) ? $workflow['answerRules'] : [];
+        $command = $step['command'];
+        if (empty($rules['anyCommand']) && !in_array($command, $workflow['relatedCommands'] ?? [], true)) {
+            return ['reason' => 'command', 'command' => $command, 'target' => $command];
+        }
+        $params = $step['params'];
+        if (!empty($rules['selectorStarts']) && array_key_exists('selector', $params)) {
+            $selector = $params['selector'];
+            if (!is_string($selector) || !$this->selectorStaysWithin($selector, $rules['selectorStarts'])) {
+                return ['reason' => 'selector', 'command' => $command, 'target' => is_string($selector) ? $selector : ''];
+            }
+        }
+        if (!empty($rules['forbiddenProperties'])) {
+            $forbidden = array_map(static fn($name) => strtolower((string) $name), $rules['forbiddenProperties']);
+            foreach ($this->declaredProperties($params['styles'] ?? null) as $name) {
+                $plain = preg_match(self::PLAIN_PROPERTY, $name) === 1;
+                if (!$plain || in_array(strtolower($name), $forbidden, true)) {
+                    return ['reason' => 'property', 'command' => $command, 'target' => $plain ? strtolower($name) : $name];
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether every selector of a CSS selector list begins with one of the given starts, as a whole name,
+     * and stays inside it: `#a b` and `#a > b` begin with `#a`, `#a-b` does not, and `#a + b` or `#a ~ b`
+     * select what follows `#a`, not what is in it. A comma, a `+` or a `~` inside a string, brackets or
+     * parentheses is not the list's (selectorTopLevel()). A selector with an escape or a comment is refused:
+     * a browser reads those as other characters, and this reads the text as it is written.
+     */
+    private function selectorStaysWithin(string $selectorList, array $starts): bool {
+        if (str_contains($selectorList, '\\') || str_contains($selectorList, '/*')) return false;
+        $top = $this->selectorTopLevel($selectorList);
+        if ($top === null) return false;
+        $length = strlen($selectorList);
+        $from = 0;
+        for ($i = 0; $i <= $length; $i++) {
+            if ($i < $length && !($selectorList[$i] === ',' && $top[$i])) continue;
+            if (!$this->selectorPartStaysWithin($selectorList, $top, $from, $i, $starts)) return false;
+            $from = $i + 1;
+        }
+        return true;
+    }
+
+    /**
+     * One selector of a list, its bytes from $from up to $to, as selectorStaysWithin() reads it: it begins
+     * with a start as a whole name (a name goes on with a letter, a digit, `-`, `_` or any byte of a
+     * non-ASCII character), and the start's compound is not followed by `+` or `~`.
+     */
+    private function selectorPartStaysWithin(string $list, array $top, int $from, int $to, array $starts): bool {
+        $space = " \t\n\r\f";
+        while ($from < $to && str_contains($space, $list[$from])) $from++;
+        foreach ($starts as $start) {
+            $start = (string) $start;
+            $end = $from + strlen($start);
+            if ($start === '' || $end > $to || substr_compare($list, $start, $from, strlen($start)) !== 0) continue;
+            if ($end < $to && (ctype_alnum($list[$end]) || $list[$end] === '-' || $list[$end] === '_' || ord($list[$end]) >= 0x80)) continue;
+            $i = $end;
+            while ($i < $to && !($top[$i] && str_contains($space . '>+~', $list[$i]))) $i++;
+            while ($i < $to && str_contains($space, $list[$i])) $i++;
+            return $i >= $to || ($list[$i] !== '+' && $list[$i] !== '~');
+        }
+        return false;
+    }
+
+    /**
+     * Which bytes of a selector stand outside every string, bracket and parenthesis: one flag per byte.
+     * Null when one is left open, a bracket is closed by the other kind, or a string runs onto a new line,
+     * where a browser and this reading could part ways.
+     */
+    private function selectorTopLevel(string $selector): ?array {
+        $top = [];
+        $open = [];
+        $quote = null;
+        $length = strlen($selector);
+        for ($i = 0; $i < $length; $i++) {
+            $char = $selector[$i];
+            if ($quote !== null) {
+                $top[$i] = false;
+                if ($char === "\n" || $char === "\r" || $char === "\f") return null;
+                if ($char === $quote) $quote = null;
+                continue;
+            }
+            $top[$i] = $open === [];
+            if ($char === '"' || $char === "'") {
+                $quote = $char;
+            } elseif ($char === '(' || $char === '[') {
+                $open[] = $char === '(' ? ')' : ']';
+            } elseif ($char === ')' || $char === ']') {
+                if (array_pop($open) !== $char) return null;
+            }
+        }
+        return $quote === null && $open === [] ? $top : null;
+    }
+
+    /**
+     * The property names a command's styles declare, as written. An object is read as setStyleRule writes
+     * it, `name: value;` for each entry, so a value holding a `;` declares what follows it too. The text is
+     * cut at every `;`, one in a string included, so no declaration hides inside another, and a whole
+     * comment in a name is dropped. The caller lowers the case and checks each against PLAIN_PROPERTY.
+     */
+    private function declaredProperties($styles): array {
+        if (is_array($styles)) {
+            $text = '';
+            foreach ($styles as $name => $value) {
+                $text .= $name . ': ' . (is_scalar($value) ? (string) $value : '') . ';';
+            }
+            $styles = $text;
+        }
+        if (!is_string($styles)) return [];
+        $names = [];
+        foreach (explode(';', $styles) as $declaration) {
+            $colon = strpos($declaration, ':');
+            if ($colon === false) continue;
+            $names[] = trim((string) preg_replace('#/\*.*?\*/#s', '', substr($declaration, 0, $colon)));
+        }
+        return $names;
     }
 
     /**
@@ -740,7 +1143,7 @@ class WorkflowManager {
             require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
         }
         if (!qs_write_rate_counts($command)) return null;
-        $category = (string) getCommandCategory($command);
+        $category = $this->categoryCache[$command] ??= (string) getCommandCategory($command);
         $deletes = preg_match(self::DELETE_NAME, $command) === 1
             || ($command === 'editStructure' && ($params['action'] ?? null) === 'delete')
             || ($command === 'editStructure' && ($params['type'] ?? null) === 'component' && ($params['structure'] ?? null) === [])
@@ -1272,6 +1675,11 @@ class WorkflowManager {
             'ucfirst', 'capitalize' => ucfirst($value),
             'ucwords', 'title' => ucwords($value),
             'trim' => trim($value),
+            // A phone number as a `tel:` address takes it: its digits and a leading +, the spaces and dots a person types left
+            // out, and the "(0)" some write after a country code, which is not dialled with it.
+            'tel' => str_starts_with(ltrim($value), '+')
+                ? '+' . preg_replace('/\D+/', '', str_replace('(0)', '', $value))
+                : preg_replace('/\D+/', '', $value),
             'langname', 'language' => qs_language_label($value),
             default => $value
         };
@@ -1746,12 +2154,10 @@ class WorkflowManager {
             }
             if (!isset($meta['category'])) {
                 $errors[] = "Missing required meta field: category";
-            } else {
-                // Validate category value
-                $validCategories = ['creation', 'modification', 'advanced', 'style', 'template', 'content', 'wip'];
-                if (!in_array($meta['category'], $validCategories)) {
-                    $errors[] = "Invalid category: {$meta['category']}. Must be one of: " . implode(', ', $validCategories);
-                }
+            } elseif (!is_string($meta['category']) || trim($meta['category']) === '') {
+                // Any group name runs: the panel lists one the schema does not know (categories()) last, under its own name,
+                // so an older file keeps running.
+                $errors[] = "Invalid category: it must name a group. The panel's groups are: " . implode(', ', $this->categories());
             }
         }
         
@@ -1788,6 +2194,21 @@ class WorkflowManager {
             }
         }
         
+        // A workflow that takes its steps from a template names the parameter that picks it, and that parameter is a
+        // picker of templates. It asks no model: its steps are a file's.
+        if (isset($workflow['stepsFrom'])) {
+            $picker = null;
+            foreach (($workflow['parameters'] ?? []) as $param) {
+                if (is_array($param) && ($param['id'] ?? null) === $workflow['stepsFrom']) $picker = $param;
+            }
+            if (!is_string($workflow['stepsFrom']) || $picker === null || ($picker['type'] ?? null) !== 'template') {
+                $errors[] = "'stepsFrom' must name a parameter of this workflow whose type is template";
+            }
+            if (isset($workflow['promptTemplate'])) {
+                $errors[] = "A workflow with 'stepsFrom' takes its steps from a template: it has no promptTemplate";
+            }
+        }
+
         // Validate pins / warnings — must be string arrays whose IDs map to existing files.
         $warnings = [];
         if (isset($workflow['promptTemplate'], $workflow['steps'])) {
@@ -1850,13 +2271,13 @@ class WorkflowManager {
     /**
      * Format a single command's help data as clean markdown for inclusion in an AI prompt.
      *
-     * Used by the {{> command.X}} partial resolver. Default `$concise = true` keeps prompts tight;
-     * verbose mode adds error_responses and a fuller example block.
+     * Used by the {{> command.X}} partial resolver. Default `$concise = true` keeps prompts tight, with
+     * the first example; verbose mode adds error_responses and every example.
      *
      * @param string $command   Command name (used for the heading)
      * @param array  $helpData  Output of `help` command for this command (description, method,
-     *                          parameters, example, notes, error_responses, ...)
-     * @param bool   $concise   When true (default) drop error_responses and trim the example.
+     *                          parameters, example_*, notes, error_responses, ...)
+     * @param bool   $concise   When true (default) drop error_responses and keep one example.
      * @return string Markdown block (no trailing newline)
      */
     public function formatCommandFull(string $command, array $helpData, bool $concise = true): string {
@@ -1888,18 +2309,23 @@ class WorkflowManager {
             }
         }
         
-        // Example — pick the smallest meaningful one in concise mode.
-        $example = $helpData['example'] ?? ($helpData['examples'][0] ?? null);
-        if ($example !== null) {
-            $out[] = '';
-            $out[] = '**Example:**';
+        // Examples — the first in concise mode, each as an answer writes it where help shows a body.
+        $examples = $this->helpExamples($command, $helpData);
+        if ($concise) {
+            $examples = array_slice($examples, 0, 1);
+        }
+        foreach ($examples as $index => $example) {
+            if ($index === 0) {
+                $out[] = '';
+                $out[] = '**Example:**';
+            }
             if (is_array($example)) {
                 $out[] = '```json';
-                $out[] = json_encode($example, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $out[] = json_encode($example, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 $out[] = '```';
             } else {
                 $out[] = '```';
-                $out[] = (string)$example;
+                $out[] = $example;
                 $out[] = '```';
             }
         }
@@ -1920,6 +2346,59 @@ class WorkflowManager {
         return implode("\n", $out);
     }
     
+    /**
+     * A command's examples from its help entry: every key beginning `example`, in the entry's order. Each
+     * is {command, params} when the line shows a request's body, the shape an AI answer uses; a line that
+     * shows none stays as it is.
+     *
+     * @return array Of arrays and strings
+     */
+    private function helpExamples(string $command, array $helpData): array {
+        $examples = [];
+        foreach ($helpData as $key => $value) {
+            if (strncmp((string) $key, 'example', 7) !== 0) continue;
+            if (is_array($value)) {
+                $examples[] = $value;
+                continue;
+            }
+            $line = (string) $value;
+            $body = $this->firstJsonObject($line, (int) strpos($line, 'with body:'));
+            $examples[] = strpos($line, 'with body:') !== false && $body !== null
+                ? ['command' => $command, 'params' => $body]
+                : $line;
+        }
+        return $examples;
+    }
+
+    /** The first whole JSON object of a text from an offset, decoded; null when there is none. */
+    private function firstJsonObject(string $text, int $from): ?array {
+        $start = strpos($text, '{', $from);
+        if ($start === false) return null;
+        $depth = 0;
+        $inString = false;
+        $length = strlen($text);
+        for ($i = $start; $i < $length; $i++) {
+            $char = $text[$i];
+            if ($inString) {
+                if ($char === '\\') {
+                    $i++;
+                } elseif ($char === '"') {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ($char === '"') {
+                $inString = true;
+            } elseif ($char === '{') {
+                $depth++;
+            } elseif ($char === '}' && --$depth === 0) {
+                $decoded = json_decode(substr($text, $start, $i - $start + 1), true);
+                return is_array($decoded) ? $decoded : null;
+            }
+        }
+        return null;
+    }
+
     /**
      * Look up help data for a single command, going through the per-render cache first.
      * Returns null if neither cache nor live fetch yields data.
@@ -2093,9 +2572,24 @@ class WorkflowManager {
     /**
      * Resolve $each loops in params
      * Used for generating arrays from fetched data (data.langData.languages) or param values
+     *
+     * An object that carries `$if` (a condition, read as a step's) is kept without it when the condition holds, and
+     * left out of its list or object when it does not: a template's menu holds its theme switch only when dark mode
+     * is chosen.
      */
     private function resolveEachLoops(array $params, array $context): array {
+        $wasList = array_is_list($params);
+        $dropped = false;
         foreach ($params as $key => $value) {
+            if (is_array($value) && array_key_exists('$if', $value)) {
+                if (!is_string($value['$if']) || !$this->evaluateStepCondition($value['$if'], $context)) {
+                    unset($params[$key]);
+                    $dropped = true;
+                    continue;
+                }
+                unset($value['$if']);
+                $params[$key] = $value;
+            }
             if (is_array($value)) {
                 // Check if this is an $each loop
                 if (isset($value['$each'])) {
@@ -2132,6 +2626,6 @@ class WorkflowManager {
             }
         }
         
-        return $params;
+        return $dropped && $wasList ? array_values($params) : $params;
     }
 }
