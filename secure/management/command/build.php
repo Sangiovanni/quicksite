@@ -641,6 +641,9 @@ foreach ($classFiles as $file) {
 // its own preview; and the policy's connect-src is DERIVED from this project's
 // API registry, which is why it has to travel rather than be baked into the
 // entry point as a string.
+// socialPreview.php: the description, Open Graph and X tags every page writes in
+// its head, from the social values compiled below; their addresses are composed
+// per request by requestRuntime.php's qs_full_address().
 //
 // The rest are the REQUEST-time half of the engine. Each has an authoring
 // counterpart that deliberately does NOT travel: apiRegistry is the read half
@@ -668,6 +671,7 @@ $functionFiles = [
     'oauthProviderHelpers.php',
     'errorHygiene.php',
     'contentSecurityPolicy.php',
+    'socialPreview.php',
 ];
 
 foreach ($functionFiles as $file) {
@@ -924,6 +928,39 @@ if ($consentPayload !== null) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to write the consent runtime payload")
+        );
+    }
+}
+
+// The social values, COMPILED. Every built page writes its description, Open
+// Graph and X tags from them (socialPreview.php): the project's own values, plus
+// the Media entry of each picture they name (its size, its type, its description),
+// written only for a picture this build carries. A built page reads this one file
+// and never Media's metadata, which stays behind with the authoring data. With no
+// value set there is no file, and every page writes what it derives from its
+// title, its address and the site's name.
+require_once SECURE_FOLDER_PATH . '/src/functions/socialPreview.php';
+$socialValues = qs_social_values(PROJECT_PATH);
+if ($socialValues['site'] !== [] || $socialValues['pages'] !== []) {
+    $socialCompiled = ['site' => $socialValues['site'], 'pages' => $socialValues['pages'], 'media' => []];
+    $socialPictures = array_merge([$socialValues['site']['picture'] ?? null], array_column($socialValues['pages'], 'picture'));
+    foreach (array_unique(array_filter($socialPictures, 'is_string')) as $socialKey) {
+        $socialEntry = qs_social_picture(PROJECT_PATH, $socialKey);
+        if ($socialEntry !== null && is_file($publicContentPath . '/assets/' . $socialKey)) {
+            $socialCompiled['media'][$socialKey] = $socialEntry;
+        }
+    }
+    if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
+        abort_build(
+            ApiResponse::create(500, 'server.directory_create_failed')
+                ->withMessage("Failed to create the build's data directory")
+        );
+    }
+    // Every level is a map: a route named 0 must stay a key, never become a list.
+    if (!qs_json_write($dataDir . '/social-preview.json', $socialCompiled, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT)) {
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to write the social values")
         );
     }
 }

@@ -44,7 +44,9 @@ $chooserDrawing = static function (bool $simple): string {
         $active = $i === 0;
         $svg .= '<rect class="admin-mode-drawing__pill' . ($active ? ' admin-mode-drawing__pill--active' : '') . '" x="' . round($x, 2)
             . '" y="30" width="' . round($width, 2) . '" height="12" rx="4"/>';
-        if (isset($item['entries'])) {
+        // A group draws its arrow only where the menu does: with more than one entry in this mode (one left is a link).
+        $inMode = isset($item['entries']) ? array_filter($item['entries'], static fn($e) => !$simple || $e['simple']) : [];
+        if (count($inMode) > 1) {
             $cx = $x + $width - 5;
             $svg .= '<polyline class="admin-mode-drawing__arrow" points="' . round($cx - 2, 2) . ',35 ' . round($cx, 2) . ',37 ' . round($cx + 2, 2) . ',35"/>';
             if ($drop === '' && ($item['group'] ?? '') === 'build') {

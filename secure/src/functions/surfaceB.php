@@ -24,13 +24,13 @@
  *      'p' marker, so an optional PUBLIC_FOLDER_SPACE prefix that we cannot read
  *      pre-init does not matter.
  *      Whether that id names a real project is NOT asked here — the gate decides,
- *      and it is the same decision for "private" and for "does not exist", which
+ *      and it is the same decision for "not a member" and for "does not exist", which
  *      is what keeps the two indistinguishable (see qs_surface_b_gate).
  *      Sets BASE_URL before init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: it is bound
  *      beside PROJECT_PATH in qs_load_project_context(), so there is no competing
  *      definition to pre-empt.
  *   2. qs_surface_b_finish()        — runs AFTER init + qs_load_project_context(id).
- *      Enforces visibility + membership, then either serves a static asset
+ *      Reached by a member only, it either serves a static asset
  *      through the canonicalise+prefix-checked passthrough (secrets UNREACHABLE),
  *      or sets up the HTML live-render (freshness/backfill of qs-*.js, CSP header,
  *      REQUEST_URI rewrite) and returns so public/p/index.php's normal pipeline renders.
@@ -66,24 +66,25 @@ const QS_SB_ETAG_CONTENT_MAX = 1048576; // 1 MiB
 const QS_SB_STREAM_CHUNK = 262144; // 256 KiB
 
 /**
- * The surface-B visibility + membership gate. PRE-INIT-safe: only needs
+ * The surface-B membership gate: a project's site is served to its members and
+ * to nobody else. PRE-INIT-safe: only needs
  * SECURE_FOLDER_PATH (defined here from the computed secure root when init.php
  * has not run yet) + members.json + the session store.
  *
  * EXISTENCE POSTURE: every refusal is 404, the SAME status an id that names no
- * project gets. A private project is therefore indistinguishable from one that
+ * project gets. A project is therefore indistinguishable from one that
  * does not exist — for an anonymous visitor and for an authenticated
  * non-member alike. `/management` already answers a uniform 403 for both cases
  * on every project-scoped command, so surface B was the install's only
  * project-existence oracle; answering 401 (no identity) or 403 (identity, not a
- * member) here would confirm "this id is a real private project" to anyone who
- * asked. The cost is accepted and deliberate: a signed-out member of a private
+ * member) here would confirm "this id is a real project" to anyone who
+ * asked. The cost is accepted and deliberate: a signed-out member of a
  * project sees 404 rather than a prompt to sign in.
  *
  * THE GATE NEVER ASKS WHETHER THE PROJECT EXISTS. That is not an oversight, it
  * is the whole mechanism: an id naming nothing has no members.json, so
- * loadProjectMembers() hands back the empty shape and the id reads as PRIVATE
- * WITH NO MEMBERS — which is precisely what it is. A ghost id and a private
+ * getUserRoleForProject() finds no role for anyone, and the id reads as a
+ * PROJECT WITH NO MEMBERS — which is precisely what it is. A ghost id and a
  * project therefore execute the SAME LINES and cannot answer differently.
  * Existence is a BINDING question (which folder do we serve from?), answered
  * only after this function admits, and admission already implies a members.json
@@ -110,10 +111,10 @@ const QS_SB_STREAM_CHUNK = 262144; // 256 KiB
  * way in, so the cookie is always the credential that is actually available.
  *
  * Safe to call with ANY id a URL can carry — malformed, oversized, naming
- * nothing. Those cases are refused by the ordinary private-project path, not by
+ * nothing. Those cases are refused by the ordinary refusal path, not by
  * an early return of their own.
  *
- * @return int|null null = allowed (public project, or authenticated member);
+ * @return int|null null = allowed (an authenticated member);
  *                  404 = refused, reason deliberately not distinguished.
  */
 function qs_surface_b_gate(string $id, string $secure): ?int {
@@ -122,23 +123,8 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
     }
     require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
-    // The shape rule is this function's own precondition now that it is handed
-    // raw URL segments: the one id rule, is_valid_project_name(). A malformed id —
-    // one holding `_` included — takes the empty shape: the same shape an id
-    // naming no project takes, and the same shape a private project with no
-    // members takes, so all three walk the identity check below together.
-    // (loadProjectMembers refuses a separator or `..` itself; this is not its defence.)
-    $members    = is_valid_project_name($id) ? loadProjectMembers($id) : ['members' => []];
-    $visibility = $members['visibility'] ?? 'private';   // secure default: private
-    // Stashed for qs_sb_send_file(), which has to choose `Cache-Control: public`
-    // or `private` and must not re-derive the answer — two readings of the same
-    // question are two things to keep in step. Written on EVERY path, including
-    // the refusals below, so it is never left over from a previous call.
-    $GLOBALS['__qs_sb_public'] = ($visibility === 'public');
-    if ($visibility === 'public') {
-        return null;
-    }
-    // Private → require identity, from the session cookie (see above). Read
+    // Identity first, from the session cookie (see above), for every id: a project,
+    // an id naming nothing and a malformed id all walk this same check. Read
     // without holding the session open, so the author's-site OAuth state store
     // can still start its own session later in this same request.
     $auth = qs_session_auth();
@@ -146,9 +132,12 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
         return 404; // no identity — indistinguishable from "no such project"
     }
     $userId = $auth['user']['id'] ?? '';
-    // The role is read from the roster itself, which knows nothing of the id rule: a
-    // malformed id is refused here too, after the same identity check, so a folder on
-    // disk under an id the rule refuses is served to nobody, its own members included.
+    // The shape rule is this function's own precondition, since it is handed raw URL
+    // segments: the one id rule, is_valid_project_name(). The role is read from the
+    // roster itself, which knows nothing of that rule, so a malformed id — one holding
+    // `_` included — is refused here, after the same identity check: a folder on disk
+    // under an id the rule refuses is served to nobody, its own members included.
+    // (loadProjectMembers refuses a separator or `..` itself; this is not its defence.)
     if ($userId === '' || !is_valid_project_name($id) || getUserRoleForProject($userId, $id) === null) {
         return 404; // identity, but not a member — same answer, no oracle
     }
@@ -208,9 +197,9 @@ function qs_surface_b_maybe_handle(): void {
 
     $id = rawurldecode($segs[$idIndex + 1]);
 
-    // ---- visibility + membership gate — PRE-INIT deliberately -------------------
-    // THE single decision point for every id this surface is asked about: private,
-    // public, nonexistent and malformed all arrive here and are answered by the
+    // ---- membership gate — PRE-INIT deliberately ---------------------------------
+    // THE single decision point for every id this surface is asked about: a project,
+    // a nonexistent id and a malformed one all arrive here and are answered by the
     // same lines at the same moment in the request. A refused request answers a
     // generic, engine-owned status page and stops — it does not reach init.php,
     // and neither does a nonexistent one any more, so there is no longer a pair
@@ -218,7 +207,7 @@ function qs_surface_b_maybe_handle(): void {
     // There is no served MAIN project whose error page the NORMAL pipeline could
     // render, so there is no other
     // project to borrow a template from — and borrowing the REQUESTED project's own
-    // template would hand a non-member that private project's styling and branding.
+    // template would hand a non-member that project's styling and branding.
     // The generic page is byte-identical whatever the reason, so it adds no oracle.
     // The gate only needs members.json + the session store, none of the init constants.
     $denyStatus = qs_surface_b_gate($id, $secure);
@@ -252,7 +241,7 @@ function qs_surface_b_maybe_handle(): void {
 }
 
 /**
- * POST-INIT: gate visibility, then serve a static asset (passthrough) OR set up the
+ * POST-INIT: serve a static asset (passthrough) OR set up the
  * HTML live-render and return. Call in public/index.php right after init.php +
  * qs_load_project_context(QS_SURFACE_B_PROJECT).
  */
@@ -265,9 +254,8 @@ function qs_surface_b_finish(): void {
     $projectDir = $sb['projectDir'];
     $subpath    = $sb['subpath'];
 
-    // (The visibility + membership gate ran PRE-INIT in qs_surface_b_maybe_handle —
-    // a denied request never reaches this function: it boots the MAIN site and
-    // renders its error page instead. Reaching here = public project or member.)
+    // (The membership gate ran PRE-INIT in qs_surface_b_maybe_handle — a denied
+    // request never reaches this function. Reaching here = a member.)
 
     // ---- static passthrough ------------------------------------------------------
     if ($subpath !== '') {
@@ -432,11 +420,9 @@ function qs_sb_send_file(string $file): void {
     // early is how a 206 ends up announcing the size of the whole file.
     header('Content-Type: ' . $ctype);
     header('X-Content-Type-Options: nosniff');
-    // `public` invites ANY cache to store this, shared proxies and CDNs included;
-    // on a member-only project that is an asset stored where a non-member's
-    // request could be answered from. The gate already decided the project's
-    // visibility (qs_surface_b_gate stashes it) — read that answer, never a
-    // second reading of members.json.
+    // `private`, never `public`: `public` invites ANY cache to store this, shared
+    // proxies and CDNs included, and every asset here is a member's, so a shared
+    // copy is one a non-member's request could be answered from.
     //
     // `private`, NOT `no-store`: a member's own browser holding an asset it was
     // entitled to fetch is fine and is the whole point of the ETag/Last-Modified
@@ -444,12 +430,7 @@ function qs_sb_send_file(string $file): void {
     // would refetch the bytes instead of answering 304 — a real cost paid for no
     // gain, since the thing being kept out is the SHARED cache and `private`
     // already keeps it out.
-    //
-    // DEFAULT-ON-ABSENT leans private: an unset flag means the gate did not run,
-    // which cannot happen through qs_surface_b_finish() but must fail closed if a
-    // future caller finds another way in.
-    $sharedCacheable = !empty($GLOBALS['__qs_sb_public']);
-    header('Cache-Control: ' . ($sharedCacheable ? 'public' : 'private') . ', max-age=300');
+    header('Cache-Control: private, max-age=300');
     header('Accept-Ranges: bytes');
     header('ETag: ' . $etag);
     header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');

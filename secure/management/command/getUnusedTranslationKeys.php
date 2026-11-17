@@ -126,25 +126,12 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
     // Get all keys used in structures
     $usedKeys = extractAllUsedKeys();
 
-    // Also include page.titles.{route} keys which are used dynamically.
-    // Iterate KEYS (the top-level route names), not `$routes as $route`:
-    // routes.php is a NESTED structure (children are arrays, not strings), so
-    // iterating values would raise an "Array to string conversion" warning whose
-    // HTML leaks into the response body of any caller that pipes this command
-    // through the helper layer (admin/api/translation-keys-grouped), breaking
-    // JSON parsing. Keys are what is intended — only top-level pages have title
-    // keys today
-    // (page.titles.home / page.titles.atelier / etc.); nested-route title
-    // tracking is a separate concern.
+    // The page keys, read dynamically (qs_page_translation_keys()): every route's title, a nested
+    // route's included, and below, per language, each description that language holds.
     $routesFile = PROJECT_PATH . '/routes.php';
-    if (file_exists($routesFile)) {
-        $routes = include $routesFile;
-        if (is_array($routes)) {
-            foreach (array_keys($routes) as $route) {
-                $usedKeys[] = 'page.titles.' . $route;
-            }
-        }
-    }
+    $routes = file_exists($routesFile) ? include $routesFile : [];
+    $routes = is_array($routes) ? $routes : [];
+    $usedKeys = array_merge($usedKeys, qs_page_translation_keys($routes, [])['titles']);
 
     $usedKeys = array_unique($usedKeys);
 
@@ -182,14 +169,16 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
         $translationKeys = flattenTranslationKeys($translations);
         
         // Find keys that exist in translations but not in structures
-        $unusedKeys = array_values(array_diff($translationKeys, $usedKeys));
+        // A page's description is used where this language holds it.
+        $langUsedKeys = array_values(array_unique(array_merge($usedKeys, qs_page_translation_keys($routes, $translations)['descriptions'])));
+        $unusedKeys = array_values(array_diff($translationKeys, $langUsedKeys));
         sort($unusedKeys);
         
         $results[$lang] = [
             'file_exists' => true,
             'file_valid' => true,
             'total_translation_keys' => count($translationKeys),
-            'total_used_keys' => count($usedKeys),
+            'total_used_keys' => count($langUsedKeys),
             'unused_keys' => $unusedKeys,
             'total_unused' => count($unusedKeys),
             'usage_percent' => count($translationKeys) > 0

@@ -85,7 +85,7 @@
 #
 # and in nginx a REGEX location outranks a PREFIX one. A project's stylesheets,
 # scripts and images are served THROUGH PHP — they live in
-# secure/projects/<id>/public/, not in the web root, so the visibility gate can
+# secure/projects/<id>/public/, not in the web root, so the membership gate can
 # run before any byte is sent. A block like the one above will look for them on
 # disk, not find them, and answer 404, while extensionless page routes keep
 # rendering perfectly. The generated include solves this with `^~` — see the

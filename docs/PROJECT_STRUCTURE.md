@@ -79,7 +79,7 @@ quicksite/
 │   │       │                     #   it came: no roster, so it is served to nobody
 │   │       ├── config.php        # Project config (languages, settings)
 │   │       ├── config/           # Per-project settings that are not page content:
-│   │       │                     #   members.json (owner, visibility, join_policy, members
+│   │       │                     #   members.json (owner, join_policy, members
 │   │       │                     #   {userId → role} + pending invitations/requests — gitignored),
 │   │       │                     #   project.json (the project's name: {"name": "…"}; a project
 │   │       │                     #   without one is shown by its id),
@@ -89,7 +89,9 @@ quicksite/
 │   │       ├── translate/        # Translation files (en.json, fr.json, etc.)
 │   │       ├── data/             # Project data (aliases, asset metadata, API endpoints,
 │   │       │                     #   state stores, route resolvers, page events, the storage
-│   │       │                     #   and consent registries). oauth-secrets.json — the
+│   │       │                     #   and consent registries, social-preview.json — the
+│   │       │                     #   site's and each page's link-preview values, written by
+│   │       │                     #   setSocialPreview). oauth-secrets.json — the
 │   │       │                     #   project's OAuth keys, a preview set and a build set
 │   │       │                     #   per provider — is the one secret here and is gitignored
 │   │       ├── public/           # What /p/<projectId>/ serves — the project's own web files

@@ -87,7 +87,7 @@ function qsDataAttributeCatalog(): array {
         ],
         [
             'name' => 'data-state-list',
-            'description' => 'Bind a container to a state-store array field. First child is cloned as the per-item template; descendants use data-bind / data-bind-attr.',
+            'description' => 'Bind a container to a state-store array field. First child is cloned as the per-item template; descendants use data-bind / data-bind-attr. Several containers may name the same field: each is filled, from its own first child.',
             'category' => 'state',
             'valueShape' => 'store-field-ref',
             'valuePlaceholder' => 'storeId.fieldName',
@@ -386,7 +386,7 @@ function qsDataAttributeCatalog(): array {
         ],
         [
             'name' => 'data-qs-raw',
-            'description' => 'Editor-only marker on data-qs-textkey wrappers that hold a __RAW__/__LIT__ literal (vs a translation key). Tells the Text-tool to save via editStructure (literal write) instead of setTranslationKeys.',
+            'description' => 'Editor-only marker on data-qs-textkey wrappers that hold a __RAW__ raw text (vs a translation key). Tells the Text-tool to save via editStructure (literal write) instead of setTranslationKeys.',
             'category' => 'internal',
             'valueShape' => 'enum',
             'valueOptions' => ['true'],

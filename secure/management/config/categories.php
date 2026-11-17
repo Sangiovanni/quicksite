@@ -40,7 +40,7 @@ return [
             'listStyleRules', 'getStyleRule', 'listKeyframes', 'getKeyframes',
             'getAnimatedSelectors', 'listAliases', 'listJsFunctions',
             'listDataBindings', 'listInteractions', 'getPageEvents', 'getStateStores',
-            'listSnippets', 'getSnippet', 'getIframeSandbox', 'getBuild',
+            'listSnippets', 'getSnippet', 'getIframeSandbox', 'getBuild', 'getSocialPreview',
         ],
     ],
 
@@ -79,8 +79,9 @@ return [
         'scope' => 'project',
         // setSiteMapConfig writes the sitemap sidecar AND publishes sitemap.txt —
         // it decides which routes the world sees, so it belongs with the route
-        // writers, not with the read-only getSiteMap.
-        'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'createAlias', 'deleteAlias', 'setSiteMapConfig'],
+        // writers, not with the read-only getSiteMap. setSocialPreview decides the
+        // card a shared link of the site gets, beside it; getSocialPreview reads.
+        'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'createAlias', 'deleteAlias', 'setSiteMapConfig', 'setSocialPreview'],
     ],
 
     // Server-side data source wiring — a developer capability, split out of route.write. developer+.
@@ -178,15 +179,6 @@ return [
     'project.members' => [
         'scope' => 'project',
         'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'approveJoinRequest', 'denyJoinRequest', 'reconcileMemberships'],
-    ],
-
-    // Owner-only project exposure. setProjectVisibility flips surface-B
-    // public/private serving — the gravest exposure a project carries (public =
-    // anyone on the internet reads the site), so it sits at the delete/transfer
-    // tier, NOT the admin-tier project.settings that setJoinPolicy uses.
-    'project.visibility' => [
-        'scope' => 'project',
-        'commands' => ['setProjectVisibility'],
     ],
 
     // Reduced roster for EVERY member rank: active members only —

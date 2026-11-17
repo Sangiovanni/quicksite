@@ -9,6 +9,13 @@ v3, whose copyright and permission notice follows.
 The language codes are ISO 639 codes, written as BCP 47 writes a primary language
 subtag.
 
+Each language's territories, the table QS_SOCIAL_LANGUAGE_TERRITORIES in
+secure/src/functions/socialPreview.php (the territories a language may be given
+for a page's og:locale, its usual one first), are taken from the Unicode Common
+Locale Data Repository (CLDR), version 49 (cldr-json, cldr-core 49.0.0): its
+available locales, default contents and likely subtags. They are used under the
+same Unicode License v3, whose copyright and permission notice follows.
+
 --------------------------------------------------------------------------------
 
 UNICODE LICENSE V3

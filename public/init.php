@@ -134,7 +134,7 @@ if (defined('QS_SURFACE_B_ENTRY')) {
     // surface B could not, because public/p/index.php cannot name secure/ until
     // this file has resolved SECURE_FOLDER_PATH. So it registers here, at the
     // first line of surface B that is allowed to load engine code — which also
-    // puts the visibility gate itself inside the handler's reach.
+    // puts the membership gate itself inside the handler's reach.
     //
     // Without it, a fatal anywhere in a project render answered HTTP 200 with
     // PHP's own error text in the body — absolute server path included — to
@@ -341,7 +341,8 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContext.php';
 
 // BASE_URL = where this INSTALL (panel + management API) is. Derived
-// through qs_request_origin() — validated Host, optional QS_TRUSTED_HOSTS pin — never
+// through qs_request_origin() — validated Host, optional QS_TRUSTED_HOSTS pin, the
+// scheme of qs_request_is_https() (a proxy ending HTTPS included) — never
 // the raw attacker-controllable header. The PUBLIC base a rendered project's links
 // compose against is a SEPARATE render-scoped value (renderBootstrap.php).
 if (!defined('BASE_URL')) {

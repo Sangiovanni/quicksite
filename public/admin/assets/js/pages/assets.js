@@ -1,8 +1,10 @@
 /**
  * Media Page JavaScript
- * 
- * Full-featured asset manager: upload zone, browser grid, edit area, batch delete.
- * Uses existing API commands: listAssets, uploadAsset, editAsset, deleteAsset.
+ *
+ * Full-featured asset manager: upload zone, browser grid, edit area, batch delete, and a picture shown large.
+ * Uses existing API commands: listAssets, uploadAsset, editAsset, deleteAsset, editFavicon; and for a picture's alt
+ * text per language (core/media-alt.js): getLangList and getTranslations to read, setTranslationKeys and
+ * deleteTranslationKeys to write. Each control that sends a command is drawn only for a role that can run it.
  */
 (function() {
     'use strict';
@@ -31,6 +33,17 @@
     // degrades to the previous behaviour (server refuses, honestly, on POST)
     // rather than refusing everything client-side.
     let uploadLimits = null;
+
+    // A picture's alt text per language (core/media-alt.js). The PROJECT's languages, never the panel's: the panel
+    // can be in French while the project runs en, es and de. Read once per page load and again after a save.
+    let projectLangs = [];       // the project's language codes, its default first or as getLangList lists them
+    let defaultLang = '';
+    let pagesReadDefault = true; // a one-language project's pages read default.json (a word removed goes from it too)
+    let langNames = {};          // {code: name}, as getLangList names them
+    let words = {};              // {code: tree}: the word file each language's pages read
+    let wordsError = null;       // why the words could not be read, or null
+    let altDrafts = {};          // {code: text}: what the edit form holds for each language it showed
+    let altLang = '';            // the language the edit form shows
 
     // ─── Init ────────────────────────────────────────────────────────────────
     function init() {
@@ -120,7 +133,58 @@
         return typeof bytes === 'number' && bytes > 0 ? bytes : null;
     }
 
+    /** Whether this role can run a command here (the server still decides): a control that sends one is drawn only then. */
+    function can(command) {
+        return !!(window.QuickSiteAdmin && typeof QuickSiteAdmin.canRun === 'function' && QuickSiteAdmin.canRun(command));
+    }
+
+    /** The alt text editor sends three commands: a role that lacks one of them is not offered it. */
+    function canEditAlt() {
+        return can('setTranslationKeys') && can('deleteTranslationKeys') && can('editAsset');
+    }
+
+    /**
+     * The project's languages and the word file each one's pages read: one read per page load (and one after a
+     * save), for every card's badge and the edit form, never one per card.
+     */
+    async function loadWords() {
+        try {
+            const [langRes, wordRes] = await Promise.all([
+                QuickSiteAdmin.apiRequest('getLangList', 'GET'),
+                QuickSiteAdmin.apiRequest('getTranslations', 'GET')
+            ]);
+            const langData = (langRes && langRes.data && (langRes.data.data || langRes.data)) || {};
+            const wordData = (wordRes && wordRes.data && (wordRes.data.data || wordRes.data)) || {};
+            if (!langRes || !langRes.ok || !Array.isArray(langData.languages) || langData.languages.length === 0) {
+                throw new Error((langRes && langRes.data && langRes.data.message) || 'getLangList');
+            }
+            if (!wordRes || !wordRes.ok) {
+                throw new Error((wordRes && wordRes.data && wordRes.data.message) || 'getTranslations');
+            }
+            projectLangs = langData.languages.map(String);
+            defaultLang = String(langData.default_language || projectLangs[0]);
+            pagesReadDefault = !langData.multilingual_enabled;
+            langNames = langData.language_names || {};
+            const files = wordData.translations || {};
+            words = {};
+            projectLangs.forEach(l => { words[l] = pagesReadDefault ? (files.default || {}) : (files[l] || {}); });
+            wordsError = null;
+        } catch (e) {
+            words = {};
+            wordsError = e.message || String(e);
+        }
+    }
+
+    /** A language as the selector names it: its name and its code. */
+    function langLabel(code) {
+        const name = langNames[code];
+        return name && name !== code ? name + ' (' + code + ')' : code;
+    }
+
     async function loadAssets() {
+        // The controls a card draws depend on the role: wait for it, as every page that draws them does.
+        try { await (QuickSiteAdmin.permissionsReady || Promise.resolve()); } catch (e) { /* drawn as a role without them */ }
+        const wordsRead = loadWords();
         try {
             const result = await QuickSiteAdmin.apiRequest('listAssets', 'GET');
             if (result.ok && result.data?.data?.assets) {
@@ -136,6 +200,7 @@
             allAssets = {};
             currentFavicon = null;
         }
+        await wordsRead;
         flattenAssets();
         renderGrid();
         updateCounts();
@@ -439,7 +504,6 @@
             name,
             size: type === 'file' ? file.size : null,
             category,
-            alt: '',
             description: ''
         });
         renderQueue();
@@ -453,9 +517,10 @@
     // ─── Queue rendering ─────────────────────────────────────────────────────
     // Built with createElement + textContent. Every value on a queue row comes
     // from OUTSIDE the panel — `name` is a filename the user chose or a segment
-    // of a URL they pasted, `alt` and `description` are whatever they type —
-    // and the row used to be an interpolated HTML string with those values
-    // glued in. Each _render* helper returns exactly ONE Element.
+    // of a URL they pasted, `description` is whatever they type — and the row
+    // used to be an interpolated HTML string with those values glued in. Each
+    // _render* helper returns exactly ONE Element. No alt text here: a picture's
+    // alt text is written per language in the edit form, once it is uploaded.
 
     /** One small labelled span in a queue row. Returns ONE Element. */
     function _renderQueueCell(className, text) {
@@ -476,7 +541,7 @@
         return btn;
     }
 
-    /** One metadata input (alt / description) for row `index`. Returns ONE Element. */
+    /** One metadata input (the description) for row `index`. Returns ONE Element. */
     function _renderQueueMetaInput(field, placeholder, value, index) {
         const input = document.createElement('input');
         input.type = 'text';
@@ -506,7 +571,6 @@
 
         const meta = document.createElement('div');
         meta.className = 'asset-queue__meta';
-        meta.appendChild(_renderQueueMetaInput('alt', t('media.altPlaceholder'), item.alt, index));
         meta.appendChild(_renderQueueMetaInput('description', t('media.descriptionPlaceholder'), item.description, index));
         li.appendChild(meta);
 
@@ -544,7 +608,7 @@
             }
         });
 
-        // Track alt/description input changes
+        // Track the description inputs
         container.addEventListener('input', (e) => {
             const field = e.target.dataset.queueField;
             const index = e.target.dataset.queueIndex;
@@ -606,12 +670,10 @@
                 if (item.type === 'file') {
                     const formData = new FormData();
                     formData.append('file', item.file);
-                    if (item.alt) formData.append('alt', item.alt);
                     if (item.description) formData.append('description', item.description);
                     result = await QuickSiteAdmin.apiUpload('uploadAsset', formData);
                 } else {
                     const data = { url: item.url };
-                    if (item.alt) data.alt = item.alt;
                     if (item.description) data.description = item.description;
                     result = await QuickSiteAdmin.apiRequest('uploadAsset', 'POST', data);
                 }
@@ -729,7 +791,8 @@
     // OUTSIDE the panel — the filename the user chose, the alt text they typed —
     // and the card used to be a multi-line interpolated HTML string with all of
     // it glued in, assembled with `grid.innerHTML = assets.map(...).join('')`.
-    // Each _render* helper below returns exactly ONE Element.
+    // Each _render* helper below returns exactly ONE Element. A control that
+    // sends a command is drawn only for a role that can run it (can()).
 
     /** A small square action button on a card. Returns ONE Element. */
     function _renderCardButton(className, dataKey, filename, title, label) {
@@ -755,10 +818,11 @@
      * Only rendered for favicon-capable formats — a .bmp or a .mp3 has no
      * favicon affordance at all, rather than a disabled one nobody can explain.
      *
-     * Returns ONE Element, or null when this asset cannot be a favicon.
+     * Returns ONE Element, or null when this asset cannot be a favicon or this
+     * role cannot set one (editFavicon).
      */
     function _renderFaviconControl(asset) {
-        if (!isFaviconCapable(asset)) return null;
+        if (!isFaviconCapable(asset) || !can('editFavicon')) return null;
 
         const label = document.createElement('label');
         label.className = 'asset-card__favicon';
@@ -796,17 +860,36 @@
         return label;
     }
 
-    /** The thumbnail area's inner preview. Returns ONE Element. */
+    /**
+     * The alt text a picture shows in the panel: its text in the project's default language (a key read in that
+     * language's word file), or ''.
+     */
+    function shownAlt(asset) {
+        return QSMediaAlt.shown(asset.alt || '', defaultLang, words);
+    }
+
+    /**
+     * The thumbnail area's inner preview. Returns ONE Element. A picture is a button that shows it large (the
+     * viewer), reached from the keyboard; not in select mode, where a click on the card selects it.
+     */
     function _renderThumb(asset) {
         const url = getAssetUrl(asset);
         switch (asset.category) {
             case 'images': {
                 const img = document.createElement('img');
                 img.src = url;
-                img.alt = asset.alt || asset.filename;
+                img.alt = shownAlt(asset) || asset.filename;
                 img.loading = 'lazy';
                 img.className = 'asset-card__image';
-                return img;
+                if (selectMode) return img;
+                const view = document.createElement('button');
+                view.type = 'button';
+                view.className = 'asset-card__view';
+                view.dataset.view = asset.filename;
+                view.title = t('media.view', { name: asset.filename });
+                view.setAttribute('aria-label', t('media.view', { name: asset.filename }));
+                view.appendChild(img);
+                return view;
             }
             case 'font': {
                 const span = document.createElement('span');
@@ -866,7 +949,7 @@
         text.textContent = stripExtension(asset.filename);
         wrap.appendChild(text);
 
-        if (!selectMode) {
+        if (!selectMode && can('editAsset')) {
             wrap.appendChild(_renderCardButton(
                 'asset-card__action asset-card__rename', 'rename', asset.filename, 'Rename', '✏️'));
         }
@@ -893,13 +976,33 @@
         if (!selectMode) {
             const actions = document.createElement('div');
             actions.className = 'asset-card__actions';
+            // The edit button opens the details for every role; what the details let a role change is its own.
             actions.appendChild(_renderCardButton(
                 'asset-card__action', 'edit', asset.filename, t('media.editMeta'), '✏️'));
-            actions.appendChild(_renderCardButton(
-                'asset-card__action asset-card__delete', 'delete', asset.filename, t('common.delete'), '🗑️'));
+            if (can('deleteAsset')) {
+                actions.appendChild(_renderCardButton(
+                    'asset-card__action asset-card__delete', 'delete', asset.filename, t('common.delete'), '🗑️'));
+            }
             wrap.appendChild(actions);
         }
         return wrap;
+    }
+
+    /**
+     * A picture's badge: the project's languages it has no alt text in (their codes), or, on a one-language project,
+     * that it has none. Null when every language has one, or when the word files could not be read.
+     * Returns ONE Element, or null.
+     */
+    function _renderAltBadge(asset) {
+        if (asset.category !== 'images' || wordsError !== null || projectLangs.length === 0) return null;
+        const missing = QSMediaAlt.missing(asset.alt || '', projectLangs, words);
+        if (missing.length === 0) return null;
+        const badge = document.createElement('span');
+        badge.className = 'asset-card__badge';
+        badge.textContent = projectLangs.length > 1
+            ? t('media.altMissing', { langs: missing.map(l => l.toUpperCase()).join(', ') })
+            : t('media.altMissingOne');
+        return badge;
     }
 
     /** One complete asset card. Returns ONE Element. */
@@ -921,11 +1024,13 @@
         thumb.className = 'asset-card__thumb';
         thumb.appendChild(_renderThumb(asset));
         if (!selectMode) {
-            thumb.appendChild(_renderCardButton(
-                'asset-card__star' + (asset.starred ? ' asset-card__star--active' : ''),
-                'star', asset.filename,
-                t(asset.starred ? 'media.unstar' : 'media.star'),
-                asset.starred ? '⭐' : '☆'));
+            if (can('editAsset')) {
+                thumb.appendChild(_renderCardButton(
+                    'asset-card__star' + (asset.starred ? ' asset-card__star--active' : ''),
+                    'star', asset.filename,
+                    t(asset.starred ? 'media.unstar' : 'media.star'),
+                    asset.starred ? '⭐' : '☆'));
+            }
             const favicon = _renderFaviconControl(asset);
             if (favicon) thumb.appendChild(favicon);
         }
@@ -935,6 +1040,8 @@
         footer.className = 'asset-card__footer';
         footer.appendChild(_renderCardName(asset));
         footer.appendChild(_renderCardInfo(asset));
+        const badge = _renderAltBadge(asset);
+        if (badge) footer.appendChild(badge);
         card.appendChild(footer);
 
         return card;
@@ -1005,6 +1112,13 @@
                 const card = e.target.closest('.asset-card');
                 if (card) card.classList.toggle('asset-card--selected', e.target.checked);
             }
+            return;
+        }
+
+        // A picture's thumbnail: the picture shown large (never in select mode, which returned above)
+        const viewBtn = e.target.closest('[data-view]');
+        if (viewBtn) {
+            openViewer(viewBtn.dataset.view);
             return;
         }
 
@@ -1127,6 +1241,56 @@
         }
     }
 
+    // ─── The viewer: a picture shown large ───────────────────────────────────
+    /**
+     * A picture in the panel's one modal (QuickSiteUtils.openModal): its file name and an × at the top right, the
+     * picture at its own size or smaller to fit the window, sized by the stylesheet alone (.asset-viewer). Escape,
+     * the × and a click beside it close it, and the focus goes back to the thumbnail.
+     */
+    function openViewer(filename) {
+        const asset = flatAssets.find(a => a.filename === filename && a.category === 'images');
+        if (!asset || selectMode) return;
+        const modal = _renderViewer(asset);
+        const closeBtn = modal.querySelector('.admin-modal__close');
+        let shown = null;
+        const close = () => {
+            if (!shown) return;
+            const s = shown;
+            shown = null;
+            s.close();
+        };
+        closeBtn.addEventListener('click', close);
+        shown = QuickSiteUtils.openModal(modal, {
+            focusable: () => [closeBtn],
+            first: closeBtn,
+            dismiss: close
+        });
+    }
+
+    /**
+     * The viewer's box: the file name with its ×, then the picture. An SVG has no size in pixels to show it at, so
+     * the stylesheet gives it one width (.asset-viewer__image--vector). Returns ONE Element.
+     */
+    function _renderViewer(asset) {
+        const id = 'asset-viewer-title';
+        const vector = asset.mime_type === 'image/svg+xml' || getExtension(asset.filename).toLowerCase() === '.svg';
+        return QSDom.el('div', {
+            class: 'admin-modal-dialog asset-viewer', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id
+        }, [
+            QSDom.el('div', { class: 'asset-viewer__header' }, [
+                QSDom.el('h2', { class: 'admin-modal-dialog__title asset-viewer__title', id: id, text: asset.filename }),
+                QSDom.el('button', {
+                    type: 'button', class: 'admin-modal__close', 'aria-label': t('common.close'), title: t('common.close'), text: '×'
+                })
+            ]),
+            QSDom.el('div', { class: 'asset-viewer__body' }, [
+                QSDom.el('img', {
+                    class: 'asset-viewer__image' + (vector ? ' asset-viewer__image--vector' : ''), src: getAssetUrl(asset), alt: shownAlt(asset)
+                })
+            ])
+        ]);
+    }
+
     // ─── Inline Rename ───────────────────────────────────────────────────────
     function startInlineRename(filename) {
         const card = document.querySelector(`.asset-card[data-filename="${CSS.escape(filename)}"]`);
@@ -1200,13 +1364,63 @@
         });
     }
 
-    // ─── Edit Area (Alt / Description) ───────────────────────────────────────
+    // ─── Edit Area (Alt text per language / Description) ─────────────────────
     function initEditArea() {
         document.getElementById('asset-edit-close')?.addEventListener('click', closeEditArea);
         document.getElementById('asset-edit-save')?.addEventListener('click', saveEdit);
+        // The alt text field shows one language at a time; what was typed in another is kept until Save.
+        document.getElementById('asset-edit-alt')?.addEventListener('input', (e) => {
+            if (altLang) altDrafts[altLang] = e.target.value;
+        });
+        document.getElementById('asset-edit-alt-lang')?.addEventListener('change', (e) => showAltLanguage(e.target.value));
     }
 
-    function openEditArea(filename) {
+    /** What each of the project's languages says now for the picture being edited (core/media-alt.js texts()). */
+    function storedAlt(asset) {
+        return QSMediaAlt.texts(asset.alt || '', projectLangs, defaultLang, words);
+    }
+
+    /** The alt text field on one language: what was typed in it since the form opened, else what it says now. */
+    function showAltLanguage(lang) {
+        if (!editingAsset || projectLangs.indexOf(lang) === -1) return;
+        altLang = lang;
+        const select = document.getElementById('asset-edit-alt-lang');
+        if (select && select.value !== lang) select.value = lang;
+        const input = document.getElementById('asset-edit-alt');
+        input.value = Object.prototype.hasOwnProperty.call(altDrafts, lang) ? altDrafts[lang] : (storedAlt(editingAsset)[lang] || '');
+    }
+
+    /**
+     * The alt text editor of the edit form: a picture's only (no other file has an alt), for a role that can run its
+     * three commands, once the words are read. The language selector lists the PROJECT's languages and starts on its
+     * default; one language, no selector.
+     */
+    function prepareAltEditor(asset, lang) {
+        const group = document.getElementById('asset-edit-alt-group');
+        const select = document.getElementById('asset-edit-alt-lang');
+        const input = document.getElementById('asset-edit-alt');
+        const hint = document.getElementById('asset-edit-alt-hint');
+        altDrafts = {};
+        altLang = '';
+        if (!group || !select || !input) return;
+        const offered = asset.category === 'images' && canEditAlt();
+        group.hidden = !offered;
+        if (!offered) return;
+        if (wordsError !== null) {
+            select.hidden = true;
+            input.value = '';
+            input.disabled = true;
+            if (hint) hint.textContent = t('media.altUnreadable', { message: wordsError });
+            return;
+        }
+        input.disabled = false;
+        select.replaceChildren(...projectLangs.map(code => QSDom.el('option', { value: code, text: langLabel(code) })));
+        select.hidden = projectLangs.length < 2;
+        if (hint) hint.textContent = t(projectLangs.length < 2 ? 'media.altHintOne' : 'media.altHint');
+        showAltLanguage(projectLangs.indexOf(lang) !== -1 ? lang : defaultLang);
+    }
+
+    function openEditArea(filename, keepLang) {
         const asset = flatAssets.find(a => a.filename === filename);
         if (!asset) return;
         editingAsset = asset;
@@ -1215,12 +1429,11 @@
         const title = document.getElementById('asset-edit-title');
         const preview = document.getElementById('asset-edit-preview');
         const info = document.getElementById('asset-edit-info');
-        const altInput = document.getElementById('asset-edit-alt');
         const descInput = document.getElementById('asset-edit-description');
         const status = document.getElementById('asset-edit-status');
 
         title.textContent = t('media.editTitle', { name: asset.filename });
-        altInput.value = asset.alt || '';
+        prepareAltEditor(asset, keepLang || defaultLang);
         descInput.value = asset.description || '';
         status.textContent = '';
 
@@ -1229,11 +1442,10 @@
         QSDom.clear(preview);
         switch (asset.category) {
             case 'images':
-                // setAttribute, not an interpolated attribute slot: alt is
-                // author-entered free text, and the escaper this replaced was
-                // the TEXT one, which leaves quotes alone.
+                // setAttribute, not an interpolated attribute slot: the alt
+                // text is author-entered free text.
                 preview.appendChild(QSDom.el('img', {
-                    src: url, alt: asset.alt || '', class: 'asset-edit-area__image'
+                    src: url, alt: shownAlt(asset), class: 'asset-edit-area__image'
                 }));
                 break;
             case 'font': {
@@ -1278,47 +1490,78 @@
     function closeEditArea() {
         document.getElementById('asset-edit-area').style.display = 'none';
         editingAsset = null;
+        altDrafts = {};
+        altLang = '';
     }
 
+    /**
+     * Save the edit form: the alt text of each language typed in (core/media-alt.js plan(): an existing key edited in
+     * place, a key made on the first text, a text written before languages made a key, an emptied language's word
+     * removed), then the Description. A refused write stops the save, what was written before it is taken back, and
+     * the form keeps what was typed and says why.
+     */
     async function saveEdit() {
         if (!editingAsset) return;
         const altInput = document.getElementById('asset-edit-alt');
         const descInput = document.getElementById('asset-edit-description');
         const status = document.getElementById('asset-edit-status');
         const saveBtn = document.getElementById('asset-edit-save');
+        const asset = editingAsset;
+        const withAlt = asset.category === 'images' && canEditAlt() && wordsError === null && !!altLang;
+        if (withAlt) altDrafts[altLang] = altInput.value;
 
-        const data = { filename: editingAsset.filename };
-        const alt = altInput.value.trim();
-        const desc = descInput.value.trim();
-
-        // Only send changed fields
-        if (alt !== (editingAsset.alt || '')) data.alt = alt;
-        if (desc !== (editingAsset.description || '')) data.description = desc;
-
-        if (Object.keys(data).length === 1) {
-            status.textContent = t('media.noChanges');
-            return;
-        }
-
+        const base = {
+            alt: asset.alt || '', filename: asset.filename,
+            langs: withAlt ? projectLangs : [], defaultLang: defaultLang, oneLanguage: pagesReadDefault,
+            stored: withAlt ? storedAlt(asset) : {}, drafts: withAlt ? Object.assign({}, altDrafts) : {},
+            newKey: null,
+            description: { from: asset.description || '', to: descInput.value }
+        };
         saveBtn.disabled = true;
-        status.textContent = t('common.saving');
-
+        _setStatus(status, t('common.saving'), 'var(--admin-text-muted)');
         try {
-            const result = await QuickSiteAdmin.apiRequest('editAsset', 'POST', data);
-            if (result.ok) {
-                _setStatus(status, t('media.saved'), 'var(--admin-success)');
-                QuickSiteAdmin.showToast(t('media.updated', { name: editingAsset.filename }), 'success');
-                await loadAssets();
-                // Keep edit area open with refreshed data
-                const refreshed = flatAssets.find(a => a.filename === editingAsset.filename);
-                if (refreshed) openEditArea(refreshed.filename);
-            } else {
-                _setStatus(status, result.data?.message || t('media.failed'), 'var(--admin-error)');
+            let p = QSMediaAlt.plan(base);
+            if (p.needsKey) {
+                // A new key's name is checked against every word file as they are now, not as the page read them.
+                const res = await QuickSiteAdmin.apiRequest('getTranslations', 'GET');
+                const files = (res && res.ok && res.data && (res.data.data || res.data).translations) || null;
+                const key = files ? QSMediaAlt.freeKey(asset.filename, Object.values(files)) : null;
+                if (!key) {
+                    _setStatus(status, t('media.altUnreadable', { message: (res && res.data && res.data.message) || t('media.failed') }), 'var(--admin-error)');
+                    return;
+                }
+                p = QSMediaAlt.plan(Object.assign({}, base, { newKey: key }));
             }
+            if (p.steps.length === 0) {
+                _setStatus(status, t('media.noChanges'), 'var(--admin-text-muted)');
+                return;
+            }
+            const out = await QSMediaAlt.run(p.steps, (command, body) => QuickSiteAdmin.apiRequest(command, 'POST', body));
+            if (!out.ok) {
+                const message = (out.response && out.response.data && out.response.data.message) || t('media.failed');
+                let said = out.failed && out.failed.lang
+                    ? t('media.altRefused', { lang: langLabel(out.failed.lang), message: message })
+                    : message;
+                if (out.notTakenBack.length) {
+                    said += ' ' + t('media.altNotTakenBack', {
+                        key: p.key || '', langs: out.notTakenBack.map(s => s.lang).filter(Boolean).join(', ')
+                    });
+                }
+                _setStatus(status, said, 'var(--admin-error)');
+                return;
+            }
+            QuickSiteAdmin.showToast(t('media.updated', { name: asset.filename }), 'success');
+            const lang = altLang;
+            await loadAssets();
+            // Keep the edit area open with the saved data, on the language it showed
+            const refreshed = flatAssets.find(a => a.filename === asset.filename);
+            if (refreshed) openEditArea(refreshed.filename, lang);
+            _setStatus(status, t('media.saved'), 'var(--admin-success)');
         } catch (error) {
             _setStatus(status, error.message, 'var(--admin-error)');
+        } finally {
+            saveBtn.disabled = false;
         }
-        saveBtn.disabled = false;
     }
 
     // deleteAsset's 500 server.file_write_failed: the files are deleted, only the asset list or the

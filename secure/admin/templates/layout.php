@@ -178,6 +178,7 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/privacy-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/members-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/builds-admin.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/social-previews.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/bubble.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">

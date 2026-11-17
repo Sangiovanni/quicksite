@@ -41,6 +41,10 @@
     // The page title field (the top bar): the page's title in the language shown
     const pageTitleGroup = document.getElementById('preview-page-title-group');
     const pageTitleInput = document.getElementById('preview-page-title');
+    const pageDescriptionGroup = document.getElementById('preview-page-description-group');
+    const pageDescriptionInput = document.getElementById('preview-page-description');
+    const pageDescriptionCut = document.getElementById('preview-page-description-cut');
+    const pageDescriptionExpand = document.getElementById('preview-page-description-expand');
     const reloadBtn = document.getElementById('preview-reload');
     const deviceBtns = document.querySelectorAll('.preview-device-btn');
     const modeBtns = document.querySelectorAll('.preview-tool[data-mode]');
@@ -1600,17 +1604,22 @@
         PreviewState.setCallback('hotReloadCss', hotReloadCss);
     }
 
-    /**
-     * opts.keepMode: the tool stays open. For a move the author did not ask for, in the AI tools,
-     * where a run's review and answer box are.
-     */
-    function navigateTo(editType, editName, opts) {
+    /** The frame on one structure: the loading veil, and the overlay injected again once it loads. */
+    function loadFrame(editType, editName) {
         showLoading();
         startLoadingTimeout();
         overlayInjected = false;
         currentEditType = editType;
         currentEditName = editName;
         iframe.src = buildUrl(editType, editName);
+    }
+
+    /**
+     * opts.keepMode: the tool stays open. For a move the author did not ask for, in the AI tools,
+     * where a run's review and answer box are.
+     */
+    function navigateTo(editType, editName, opts) {
+        loadFrame(editType, editName);
         
         // Reset tool state: switch back to select mode and clear selection.
         if (currentMode !== 'select' && !(opts && opts.keepMode)) {
@@ -1635,8 +1644,9 @@
         
         // Update layout toggles visibility (show only for pages)
         updateLayoutToggles(editType, editName);
-        // The page title field follows the page and the language shown
+        // The page title and description fields follow the page and the language shown
         updatePageTitleField(editType, editName);
+        updatePageDescriptionField(editType, editName);
         
         // A menu or a footer is brought into view once the iframe has loaded, as it can be below the
         // fold. Nothing is selected, as on a page: the tool's panel waits for a click.
@@ -1716,6 +1726,10 @@
         if (pageTitleInput) {
             pageTitleInput.value = pageTitleSaved;
             pageTitleInput.blur();
+        }
+        if (pageDescriptionInput) {
+            pageDescriptionInput.value = pageDescriptionSaved;
+            pageDescriptionInput.blur();
         }
         navigateToFirstPage({ keepMode: currentMode === 'ai-tools' });
         const shown = targetSelect.options[targetSelect.selectedIndex];
@@ -2140,6 +2154,210 @@
         } else {
             const error = (result.data && result.data.message) || String(result.status);
             showToast(PreviewConfig.i18n.pageTitleSaveFailed.replace('{error}', error), 'error');
+        }
+    }
+
+    // ==================== Page Description Field ====================
+
+    // As the title's: the description as saved (what Escape puts back), and a number that drops a read answering
+    // after a newer one. The platform table and the page's card type come with the read (getSocialPreview), for the
+    // length mark.
+    let pageDescriptionSaved = '';
+    let pageDescriptionSeq = 0;
+    let pageDescriptionPlatforms = null;
+    let pageDescriptionCardType = null;
+
+    /**
+     * The description field shows beside the title while a page of the site is the edit target (a special page
+     * carries no link-preview tag), holding its description in the language shown, read through getSocialPreview as
+     * the page reads it. Hidden for the menu, the footer and a component; a role that cannot save it never sees it
+     * (editorTools.php, toolbar.description).
+     */
+    async function updatePageDescriptionField(editType, editName) {
+        if (!pageDescriptionGroup || !pageDescriptionInput) return;
+        const seq = ++pageDescriptionSeq;
+        const special = (PreviewConfig.specialPages || []).indexOf(editName) >= 0;
+        if (editType !== 'page' || !editName || special) {
+            pageDescriptionGroup.style.display = 'none';
+            return;
+        }
+        pageDescriptionGroup.style.display = '';
+        pageDescriptionSaved = '';
+        pageDescriptionInput.value = '';
+        pageDescriptionPlatforms = null;
+        syncPageDescriptionCut();
+        const lang = getCurrentLang();
+        const result = await QuickSiteAdmin.apiRequest('getSocialPreview', 'GET', null, [], { route: editName });
+        if (seq !== pageDescriptionSeq) return;
+        const report = result.ok && result.data && result.data.data;
+        const page = report && report.pages ? report.pages[editName] : null;
+        const shown = page && page.languages ? page.languages[lang] : null;
+        pageDescriptionPlatforms = report ? report.platforms : null;
+        pageDescriptionCardType = page && page.cardType ? page.cardType.value : null;
+        pageDescriptionSaved = shown && typeof shown.description === 'string' ? shown.description : '';
+        // A description typed while the read was answering is kept.
+        if (document.activeElement !== pageDescriptionInput) pageDescriptionInput.value = pageDescriptionSaved;
+        syncPageDescriptionCut();
+    }
+
+    /**
+     * The length mark: the platforms that would cut the description as it stands, judged as it is typed by the
+     * table's figures (QSSocialFigures, the judge the Social previews page cuts its cards with): a count, and the
+     * platforms with their lengths in its title.
+     */
+    function syncPageDescriptionCut() {
+        if (!pageDescriptionCut || !pageDescriptionInput) return;
+        const warnings = descriptionWarnings(pageDescriptionInput.value.trim());
+        pageDescriptionCut.hidden = warnings.length === 0;
+        pageDescriptionCut.textContent = warnings.length ? '⚠ ' + warnings.length : '';
+        if (!warnings.length) {
+            pageDescriptionCut.removeAttribute('title');
+            return;
+        }
+        pageDescriptionCut.title = descriptionCutSentence(warnings);
+    }
+
+    /** The platforms a description would be cut by, by the table's figures (none until the table is read). */
+    function descriptionWarnings(text) {
+        const figures = window.QSSocialFigures;
+        return figures && pageDescriptionPlatforms
+            ? figures.textWarnings(text, 'description', pageDescriptionPlatforms, pageDescriptionCardType)
+            : [];
+    }
+
+    /** Those platforms in one sentence, each with where it cuts (the Social previews page's words). */
+    function descriptionCutSentence(warnings) {
+        const i18n = PreviewConfig.i18n;
+        const names = i18n.socialPlatformNames || {};
+        const items = warnings.map((w) => i18n.socialCutItem
+            .replace('{platform}', names[w.platform] || w.name)
+            .replace('{limit}', String(w.limit))
+            .replace('{unit}', w.unit === 'bytes' ? i18n.socialUnitBytes : i18n.socialUnitCharacters));
+        let list;
+        try {
+            list = new Intl.ListFormat(document.documentElement.lang || 'en', { style: 'long', type: 'conjunction' }).format(items);
+        } catch (e) {
+            list = items.join(', ');
+        }
+        return i18n.socialCutBy.replace('{list}', list);
+    }
+
+    /**
+     * The whole description in a dialog (the field's expand button): a text area holding the field's text, its length,
+     * and the platforms that would cut it named as it is typed. Save (or Enter) puts it in the field and saves it as the
+     * field does; ×, Cancel, Escape and the backdrop leave the field as it was. The panel's one modal
+     * (QuickSiteUtils.openModal): the focus stays in it, and no key reaches the editor behind it. A line break typed or
+     * pasted becomes a space, as the field holds one line.
+     */
+    function openPageDescriptionDialog() {
+        if (!pageDescriptionInput || currentEditType !== 'page' || !currentEditName || !controlOffered(pageDescriptionGroup)) return;
+        const i18n = PreviewConfig.i18n;
+        const modal = _renderDescriptionDialog(pageDescriptionInput.value);
+        const area = modal.querySelector('.preview-description-dialog__text');
+        const count = modal.querySelector('.preview-description-dialog__count');
+        const cut = modal.querySelector('.preview-description-dialog__cut');
+        const closeBtn = modal.querySelector('[data-dialog="close"]');
+        const cancelBtn = modal.querySelector('[data-dialog="cancel"]');
+        const saveBtn = modal.querySelector('[data-dialog="save"]');
+        const sync = () => {
+            const warnings = descriptionWarnings(area.value.trim());
+            cut.hidden = warnings.length === 0;
+            cut.textContent = warnings.length ? '⚠ ' + descriptionCutSentence(warnings) : '';
+            count.textContent = i18n.pageDescriptionCount.replace('{count}', String(area.value.length)).replace('{max}', String(area.maxLength));
+        };
+        let shown = null;
+        const close = () => {
+            if (!shown) return;
+            const s = shown;
+            shown = null;
+            s.close();
+        };
+        const save = () => {
+            pageDescriptionInput.value = area.value.replace(/\s*[\r\n]+\s*/g, ' ').trim();
+            close();
+            syncPageDescriptionCut();
+            savePageDescription();
+        };
+        area.addEventListener('input', sync);
+        closeBtn.addEventListener('click', close);
+        cancelBtn.addEventListener('click', close);
+        saveBtn.addEventListener('click', save);
+        shown = QuickSiteUtils.openModal(modal, {
+            focusable: () => [closeBtn, area, cancelBtn, saveBtn],
+            first: area,
+            dismiss: close,
+            onKey: (e) => {
+                if (e.key === 'Enter' && e.target === area) {
+                    e.preventDefault();
+                    save();
+                    return true;
+                }
+                return false;
+            }
+        });
+        sync();
+        area.setSelectionRange(area.value.length, area.value.length);
+    }
+
+    /** The description's dialog: its title (the page, and the language when there are several) with ×, its text, its line, its buttons. */
+    function _renderDescriptionDialog(text) {
+        const i18n = PreviewConfig.i18n;
+        const id = 'preview-description-dialog';
+        const langGroup = langSelect ? langSelect.closest('.preview-toolbar__group') : null;
+        const several = !!langGroup && langGroup.style.display !== 'none';
+        const title = i18n.pageDescriptionDialog.replace('{page}', currentEditName) + (several ? ' (' + getCurrentLang().toUpperCase() + ')' : '');
+        const area = QSDom.el('textarea', {
+            id: id + '-text', class: 'admin-input preview-description-dialog__text', rows: '6',
+            'aria-labelledby': id + '-title', 'aria-describedby': id + '-hint'
+        });
+        area.maxLength = pageDescriptionInput.maxLength;
+        area.value = text;
+        return QSDom.el('div', {
+            class: 'admin-modal-dialog preview-description-dialog', id: id, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id + '-title'
+        }, [
+            QSDom.el('div', { class: 'preview-description-dialog__header' }, [
+                QSDom.el('h3', { class: 'admin-modal-dialog__title', id: id + '-title', text: title }),
+                QSDom.el('button', { type: 'button', class: 'admin-modal__close', 'data-dialog': 'close', 'aria-label': i18n.cancel, text: '×' })
+            ]),
+            QSDom.el('div', { class: 'preview-description-dialog__body' }, [
+                QSDom.el('p', { class: 'admin-hint', id: id + '-hint', text: i18n.pageDescriptionDialogHint }),
+                area,
+                QSDom.el('p', { class: 'preview-description-dialog__count' }),
+                QSDom.el('p', { class: 'preview-description-dialog__cut', hidden: '' })
+            ]),
+            QSDom.el('div', { class: 'admin-modal-dialog__actions preview-description-dialog__actions' }, [
+                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', 'data-dialog': 'cancel', text: i18n.cancel }),
+                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary', 'data-dialog': 'save', text: i18n.save })
+            ])
+        ]);
+    }
+
+    /**
+     * Save the field through setSocialPreview when it differs from the saved description, in the language shown
+     * (the default language on a one-language site: the writer keeps default.json in step, as editTitle does). Unlike
+     * the title, an emptied description is sent empty, which removes it.
+     */
+    async function savePageDescription() {
+        if (!pageDescriptionInput || currentEditType !== 'page' || !currentEditName || !controlOffered(pageDescriptionGroup)) return;
+        const value = pageDescriptionInput.value.trim();
+        if (value === pageDescriptionSaved) {
+            pageDescriptionInput.value = pageDescriptionSaved;
+            syncPageDescriptionCut();
+            return;
+        }
+        const route = currentEditName;
+        const lang = getCurrentLang();
+        const result = await QuickSiteAdmin.apiRequest('setSocialPreview', 'POST', {
+            route: route,
+            lang: lang,
+            description: value
+        });
+        if (result.ok) {
+            if (route === currentEditName && lang === getCurrentLang()) pageDescriptionSaved = value;
+            showToast(value === '' ? PreviewConfig.i18n.pageDescriptionRemoved : PreviewConfig.i18n.pageDescriptionSaved, 'success');
+        } else {
+            const error = (result.data && result.data.message) || String(result.status);
+            showToast(PreviewConfig.i18n.pageDescriptionSaveFailed.replace('{error}', error), 'error');
         }
     }
 
@@ -3949,9 +4167,9 @@
             return;
         }
 
-        // RAW / LIT literals are NOT translation keys — update the node's textKey
+        // A RAW text is NOT a translation key — update the node's textKey
         // in the structure directly instead of writing a (bogus) translation.
-        if (textKey.startsWith('__RAW__') || textKey.startsWith('__LIT__')) {
+        if (textKey.startsWith('__RAW__')) {
             return saveRawTextEdit(data);
         }
 
@@ -4337,6 +4555,23 @@
                 }
             });
             pageTitleInput.addEventListener('blur', savePageTitle);
+        }
+
+        if (pageDescriptionInput) {
+            // As the title: Enter saves by leaving the field, Escape puts the saved description back, then leaves it
+            pageDescriptionInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    pageDescriptionInput.blur();
+                } else if (e.key === 'Escape') {
+                    pageDescriptionInput.value = pageDescriptionSaved;
+                    syncPageDescriptionCut();
+                    pageDescriptionInput.blur();
+                }
+            });
+            pageDescriptionInput.addEventListener('input', syncPageDescriptionCut);
+            pageDescriptionInput.addEventListener('blur', savePageDescription);
+            if (pageDescriptionExpand) pageDescriptionExpand.addEventListener('click', openPageDescriptionDialog);
         }
         
         reloadBtn.addEventListener('click', reloadPreview);
@@ -6903,9 +7138,9 @@
     // (TAG_INFO, declared further down: read when a preview is built, not at load).
     const SNIPPET_TRANSLATION_KEY = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/i;
 
-    /** The text of a raw (`__RAW__`) or literal (`__LIT__`) value, or null for any other value. */
+    /** The text of a raw (`__RAW__`) value, or null for any other value. */
     function snippetLiteral(value) {
-        return value.startsWith('__RAW__') || value.startsWith('__LIT__') ? value.slice(7) : null;
+        return value.startsWith('__RAW__') ? value.slice(7) : null;
     }
 
     /** A key's text in the project's default language, then in English; the key itself when neither has it. */
@@ -6923,7 +7158,11 @@
         return literal !== null ? literal : snippetTranslation(snippetData, textKey);
     }
 
-    /** An attribute's value as the page renders it; null when the page renders no such attribute. */
+    /**
+     * An attribute's value as the page renders it; null when the page renders no such attribute.
+     * A raw text (`__RAW__`) is read in a translatable attribute only, as the renderer reads it:
+     * anywhere else the value is shown as written.
+     */
     function snippetAttributeValue(snippetData, name, value) {
         // A handler never runs in the preview (no scripts), so it is not written at all
         if (/^on/i.test(name)) return null;
@@ -6937,7 +7176,7 @@
             if (literal !== null) return literal;
             if (SNIPPET_TRANSLATION_KEY.test(value)) return snippetTranslation(snippetData, value);
         }
-        return value.startsWith('__LIT__') ? value.slice(7) : value;
+        return value;
     }
 
     /** The snippet's structure (a node or a list of nodes) as nodes of the frame's document. */
@@ -7065,9 +7304,10 @@
             }
         }
         
-        // Code view toggle (persisted in localStorage)
-        const CODE_VIEW_KEY = 'tagSelector_showHtmlCode';
-        let showHtmlCode = localStorage.getItem(CODE_VIEW_KEY) === 'true';
+        // Code view toggle (persisted in localStorage, when the browser keeps it)
+        const CODE_VIEW_KEY = QuickSiteStorageKeys.tagShowHtmlCode;
+        let showHtmlCode = false;
+        try { showHtmlCode = localStorage.getItem(CODE_VIEW_KEY) === 'true'; } catch (e) { /* drawn */ }
         if (codeToggle && codeView) {
             if (showHtmlCode) {
                 codeToggle.classList.add('active');
@@ -7075,14 +7315,14 @@
             }
             codeToggle.addEventListener('click', function() {
                 showHtmlCode = !showHtmlCode;
-                localStorage.setItem(CODE_VIEW_KEY, showHtmlCode);
+                try { localStorage.setItem(CODE_VIEW_KEY, showHtmlCode); } catch (e) { /* not kept */ }
                 this.classList.toggle('active', showHtmlCode);
                 codeView.style.display = showHtmlCode ? '' : 'none';
             });
         }
         
         // Favorites from localStorage
-        const FAVORITES_KEY = 'qs-add-favorite-tags';
+        const FAVORITES_KEY = QuickSiteStorageKeys.addFavoriteTags;
         const MAX_FAVORITES = 10;
         
         function getFavorites() {
@@ -7091,7 +7331,7 @@
         }
         
         function saveFavorites(favs) {
-            localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs.slice(0, MAX_FAVORITES)));
+            try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs.slice(0, MAX_FAVORITES))); } catch (e) { /* not kept */ }
         }
         
         function isFavorite(tag) {
@@ -9618,6 +9858,44 @@
      * │ [+ Add Option]            [Save] [🗑]  │
      * └────────────────────────────────────────┘
      */
+    /**
+     * An enum map value's type: 'raw' for a raw text (`__RAW__…`), 'translation' for a key the project
+     * has, else 'value': an attribute's value, written as it is (a class, an address). The render paths
+     * read `__RAW__` in a text and a translatable attribute only, so a value for any other attribute
+     * carries no prefix.
+     */
+    function enumValueType(value) {
+        const v = String(value);
+        if (v.startsWith('__RAW__')) return 'raw';
+        return enumsPanelTranslationKeys.includes(v) ? 'translation' : 'value';
+    }
+
+    /**
+     * The type a value of an enum's variable needs, from where the component first uses `{{name}}`:
+     * 'value' in an attribute that is not translatable (a class, an address), 'raw' in a text or a
+     * translatable attribute, and 'raw' when the component does not use it yet.
+     */
+    function enumVariableValueType(varName) {
+        const slot = '{{' + varName + '}}';
+        const translatable = TAG_INFO.TRANSLATABLE_ATTRIBUTES || [];
+        let found = null;
+        (function walk(node) {
+            if (found || !node || typeof node !== 'object') return;
+            if (Array.isArray(node)) { node.forEach(walk); return; }
+            if (node.params && typeof node.params === 'object') {
+                for (const [name, v] of Object.entries(node.params)) {
+                    if (typeof v === 'string' && v.includes(slot)) {
+                        found = translatable.includes(name) ? 'raw' : 'value';
+                        return;
+                    }
+                }
+            }
+            if (typeof node.textKey === 'string' && node.textKey.includes(slot)) { found = 'raw'; return; }
+            walk(node.children);
+        })(enumsPanelStructure);
+        return found || 'raw';
+    }
+
     function createEnumCard(varName, enumDef) {
         const card = document.createElement('div');
         card.className = 'preview-enum-card';
@@ -9724,25 +10002,26 @@
         );
         card.appendChild(sourceRow);
         
-        // Detect default type from existing values
-        const rawCount = Object.values(map).filter(v => String(v).startsWith('__RAW__')).length;
-        const litCount = Object.values(map).filter(v => String(v).startsWith('__LIT__')).length;
+        // Detect default type from existing values; with none, from where the component uses the variable
+        const valueTypes = Object.values(map).map(enumValueType);
+        const rawCount = valueTypes.filter(type => type === 'raw').length;
+        const plainCount = valueTypes.filter(type => type === 'value').length;
         const totalCount = mapKeys.length;
-        const detectedDefault = totalCount === 0 ? 'literal'
-            : (litCount > rawCount && litCount >= totalCount / 2) ? 'literal'
-            : (rawCount > litCount && rawCount >= totalCount / 2) ? 'raw'
-            : 'literal';
+        const detectedDefault = totalCount === 0 ? enumVariableValueType(varName)
+            : (plainCount > rawCount && plainCount >= totalCount / 2) ? 'value'
+            : (rawCount > plainCount && rawCount >= totalCount / 2) ? 'raw'
+            : enumVariableValueType(varName);
         
         // Default value type dropdown (card-level)
         const typeRow = document.createElement('div');
         typeRow.className = 'preview-enum-card__field';
-        const litLabel = PreviewConfig.i18n?.enumTypeLiteral || 'Literal';
+        const valueLabel = PreviewConfig.i18n?.enumTypeAttributeValue || 'Attribute value';
         const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
         const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
         typeRow.append(
             QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumValueType || 'Value type') + ':' }),
             QSDom.el('select', { class: 'admin-input admin-input--sm preview-enum-card__type-select' }, [
-                _renderOption('literal', litLabel, detectedDefault === 'literal'),
+                _renderOption('value', valueLabel, detectedDefault === 'value'),
                 _renderOption('raw', rawLabel, detectedDefault === 'raw'),
                 _renderOption('translation', transLabel, detectedDefault === 'translation')
             ])
@@ -9776,11 +10055,9 @@
         
         mapKeys.forEach(key => {
             const rawValue = map[key];
-            const isRaw = String(rawValue).startsWith('__RAW__');
-            const isLit = String(rawValue).startsWith('__LIT__');
             // Per-row type: if it differs from card default, it's an override
-            const rowType = isLit ? 'literal' : isRaw ? 'raw' : 'translation';
-            const displayValue = isRaw ? String(rawValue).slice(7) : isLit ? String(rawValue).slice(7) : rawValue;
+            const rowType = enumValueType(rawValue);
+            const displayValue = rowType === 'raw' ? String(rawValue).slice(7) : rawValue;
             const hasOverride = rowType !== detectedDefault;
             tbody.appendChild(createEnumMapRow(key, displayValue, hasOverride ? rowType : null, detectedDefault));
         });
@@ -9810,7 +10087,7 @@
         addOptionBtn.className = 'admin-btn admin-btn--outline preview-enum-card__add-option';
         addOptionBtn.append(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.plus, 12), ' ' + (PreviewConfig.i18n?.enumAddOption || 'Add Option'));
         addOptionBtn.addEventListener('click', () => {
-            const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'literal';
+            const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'raw';
             tbody.appendChild(createEnumMapRow('', '', null, currentCardType));
             refreshDefaultSelect(card, tbody);
         });
@@ -9851,7 +10128,7 @@
         const tr = document.createElement('tr');
         tr.className = 'preview-enum-card__row';
         
-        const litLabel = PreviewConfig.i18n?.enumTypeLiteral || 'Literal';
+        const valueLabel = PreviewConfig.i18n?.enumTypeAttributeValue || 'Attribute value';
         const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
         const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
         const defaultLabel = PreviewConfig.i18n?.enumTypeDefault || '(default)';
@@ -9912,7 +10189,7 @@
         typeSelect.className = 'admin-input admin-input--sm preview-enum-card__row-type-select';
         typeSelect.append(
             _renderOption('', defaultLabel, false),
-            _renderOption('literal', litLabel, false),
+            _renderOption('value', valueLabel, false),
             _renderOption('raw', rawLabel, false),
             _renderOption('translation', transLabel, false)
         );
@@ -9938,7 +10215,7 @@
                 typeSelect.style.display = 'none';
                 typeLabel.style.display = '';
                 const card = tr.closest('.preview-enum-card');
-                const cardType = card?.querySelector('.preview-enum-card__type-select')?.value || 'literal';
+                const cardType = card?.querySelector('.preview-enum-card__type-select')?.value || 'raw';
                 updateEnumRowValueWidget(valInput, valSelect, cardType);
             } else {
                 updateEnumRowValueWidget(valInput, valSelect, typeSelect.value);
@@ -9983,7 +10260,7 @@
             valInput.style.display = 'none';
             valSelect.style.display = '';
         } else {
-            // Both 'literal' and 'raw' use the free text input
+            // Both 'value' and 'raw' use the free text input
             valInput.style.display = '';
             valSelect.style.display = 'none';
         }
@@ -10035,7 +10312,7 @@
         
         // Get card-level default type
         const cardTypeSelect = card.querySelector('.preview-enum-card__type-select');
-        const cardDefaultType = cardTypeSelect?.value || 'literal';
+        const cardDefaultType = cardTypeSelect?.value || 'raw';
         
         // Collect map entries (applying prefix based on effective type)
         const map = {};
@@ -10053,11 +10330,9 @@
                 value = row.querySelector('.preview-enum-card__value-input')?.value?.trim() || '';
             }
             if (key) {
-                // Apply prefix based on type: __RAW__ for raw text, __LIT__ for literal, nothing for translation
+                // A raw text gets the __RAW__ prefix; a translation key and an attribute value are written as they are
                 if (effectiveType === 'raw' && value) {
                     map[key] = '__RAW__' + value;
-                } else if (effectiveType === 'literal' && value) {
-                    map[key] = '__LIT__' + value;
                 } else {
                     map[key] = value || '';
                 }
@@ -11140,6 +11415,9 @@
     
     // Check for deep-link target from URL parameter (e.g., ?target=page-home)
     const urlTarget = new URLSearchParams(window.location.search).get('target');
+    // A page or a component the link set the list to: the frame, which opened on the site's root,
+    // moves to it below. A menu or a footer is left to the first page, as the list is.
+    let deepLinked = false;
     if (urlTarget && targetSelect) {
         // Parse target format: "page-home", "component-card", "menu", "footer"
         const parsed = parseStruct(urlTarget);
@@ -11148,6 +11426,7 @@
             const option = targetSelect.querySelector(`option[value="${CSS.escape(selectValue)}"]`);
             if (option) {
                 showEditTarget(selectValue);
+                deepLinked = !selectValue.startsWith('layout:');
             }
         }
         // Clean URL without reloading
@@ -11178,6 +11457,11 @@
             currentEditType = 'page';
             currentEditName = value;
         }
+        // A deep link (the Sitemap's edit link) set the list: the frame moves to it, as the list's own
+        // change moves it. Without one, the frame's first address already shows the list's first page.
+        if (deepLinked) {
+            loadFrame(currentEditType, currentEditName);
+        }
         
         // Update component warning on initial load
         updateComponentWarning(currentEditType, currentEditName);
@@ -11192,9 +11476,13 @@
         // The title field reads through the panel's API client, which a later script of the
         // page defines (admin.js): the first read waits for the page's scripts.
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => updatePageTitleField(currentEditType, currentEditName));
+            document.addEventListener('DOMContentLoaded', () => {
+                updatePageTitleField(currentEditType, currentEditName);
+                updatePageDescriptionField(currentEditType, currentEditName);
+            });
         } else {
             updatePageTitleField(currentEditType, currentEditName);
+            updatePageDescriptionField(currentEditType, currentEditName);
         }
     }
     

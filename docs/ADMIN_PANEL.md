@@ -104,9 +104,12 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `icon(name)` (the panel's named icons: one map of names to drawings, each built with `createElementNS` in the text's colour; a new icon is one entry) + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM — and `followPointer()`, the one drag routine of the panel's handles (the editor's options panel, the device frame's edges), on pointer events. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge, and each share on its entry (My memberships, Project members); the queue's count also per project (`adjudicationByProject`), which the Project members page names; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
-| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
+| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). An option of empty value is the list's placeholder, never a row, unless the list makes it a choice of its own (`emptyChoice`: Social previews' *The whole site* or *No territory*, chosen again after another, §9.19). |
 | `js/core/panel-mode.js` | The mode (*The mode: simple or advanced* above): the account menu's **Mode** row, the chooser for an account with no mode, and what follows the first pick (the account menu open, the row's glow, the bubble). Loaded on every page of a signed-in account, after `admin.js`. |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
+| `js/core/media-pictures.js` | `window.QSMediaPictures.list()`: the pictures a shared link's card can show — Media's images, each named as Media names it (`images/<file>`), SVG left out. The one list the console's picture field and the Social previews page offer (§9.19); loaded by those two pages. |
+| `js/core/media-alt.js` | `window.QSMediaAlt`: a picture's alt text per language, the one rule the Media page reads and saves it by (§9.15) — whether an alt is a translation key (the renderer's test; a text after the raw marker `__RAW__` never is), a new key's name (`freeKey()`), a picture's text in each of the project's languages and the languages it has none in, and the writes a save makes with what takes each back (`plan()`, `run()`). It sends nothing itself. Loaded by the Media page. |
+| `js/core/social-figures.js` | `window.QSSocialFigures`: a shared link's texts judged by `getSocialPreview`'s platform table — a text's length in characters or bytes, its cut at a platform's length, the platforms that draw a page's card (X by its card type), the platforms a text is longer than. Holds no figure of its own. Loaded by the Social previews page and the visual editor (the Description field's mark, §8.2). |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, the menu's groups after both filters (`applyMenuGroups()`), `canRun(command)` (the one answer to whether a page shows a control: the role holds the command, and a project-scoped command has a project), delegation. |
 
 **Tooltips: the panel's bubble.** A tooltip in the panel is a plain `title` attribute, in a
@@ -173,10 +176,10 @@ members** the join requests waiting for your validation, across the projects you
 **The mode: simple or advanced.** Each account chooses the menu it sees. **Simple** shows Dashboard,
 Build (Visual Editor, Builds), Media, Sitemap, Members (My memberships, Project members) and Settings
 (Settings, AI connections). **Advanced** shows every page: Commands, History and API Endpoints in
-Build, Authentication, Compliance (Storage, Privacy), Optimize and Embed Security besides. The mode
+Build, Social previews in a **Site** group beside Sitemap (its word opens Sitemap; in simple the group holds Sitemap alone and is drawn as its link), Authentication, Compliance (Storage, Privacy), Optimize and Embed Security besides. The mode
 decides the menu and nothing else: every page opens at its address for anyone whose role allows it,
 in either mode, and no permission, control or command reads the mode. A page the advanced menu reaches
-and the simple one does not (Commands, History, API Endpoints, Authentication, Storage, Privacy, Optimize,
+and the simple one does not (Commands, History, API Endpoints, Social previews, Authentication, Storage, Privacy, Optimize,
 Embed Security), opened in simple from its address or a link, says so in one line at its top, *This page is
 in the Advanced menu: you reached it from its address or a link.*, with **Switch to Advanced**, the *Mode*
 row's own switch (`qs_admin_menu_page_is_advanced()`; drawn in either mode, shown by the simple class). What simple shows is one definition
@@ -263,16 +266,17 @@ whose click it holds is followed afterwards, a mode or tab switch happens afterw
 | `pages/dashboard.js` | Stats cards, command activity, recent history. |
 | `pages/dashboard-memberships.js` | Fills the dashboard memberships card from the `quicksite:membership-counts-updated` event (computed by `core/members-badge.js`). |
 | `pages/memberships.js` | My Memberships page: my projects / invitation inbox / my join requests / my proposals / notices / request-to-join. Global self-service commands only. |
-| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (user-lookup flows), visibility control, join-policy toggle, ownership transfer for the edited project. |
+| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (user-lookup flows), join-policy toggle, ownership transfer for the edited project. |
 | `pages/account.js` | My Account page: change password, sign out everywhere, delete account (§9.13). |
 | `pages/command.js` | Command index list, permission-aware filter. |
 | `pages/command-form.js` | Dynamic per-command form, helper widgets, execution. |
 | `pages/history.js` | Command history listing, detail modal, CSV export, clear dialog (§9.18). |
 | `pages/settings.js` | User settings + AI config status. |
 | `pages/apis.js` | External API registry CRUD + endpoint test UI. |
-| `pages/assets.js` | Asset browser, upload, edit, delete. |
+| `pages/assets.js` | Asset browser, upload, edit, delete; a picture's alt text per language and its badge; a picture shown large (the viewer). |
 | `pages/sitemap.js` | Route tree + reachability graph + sitemap controls + resolver authoring. |
 | `pages/builds.js` | Builds page: the project's single build — create, download, delete — plus the space picture and the near-the-limit warning (§9.16). |
+| `pages/social-previews.js` | Social previews page: the site's and a page's link-preview values, and each platform's card for a computer or a phone (§9.19). |
 | `pages/embed-security.js` | Read-only view of the install-wide iframe embed policy. |
 | `pages/optimize.js` | Admin shell for the CSS Refiner library. |
 | `pages/oauth-providers.js` | The OAuth providers the installation offers, a how-to per provider, and the project's preview and build keys (§9.5 Tier 4). |
@@ -389,6 +393,8 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `emulateComponent`, `emulatePage` | localStorage | `preview.js` — the sample values an Emulation fills the preview with, as JSON: per component (`qs_emulate_<component>`) and per page (`qs_emulate_page_<route>`); kept in this browser, nothing written to the project |
 | `addLastTab` | localStorage | `preview.js` — the tab the advanced Add form last opened on |
 | `addPreviewExpanded`, `addPositionExpanded`, `addAdvancedExpanded` | localStorage | `preview.js` — whether each folding section of the Add form is open (`'1'`) or folded (`'0'`); `contextual-add.php` names each on its header (`data-storage-key`) |
+| `tagShowHtmlCode`, `addFavoriteTags` | localStorage | `preview.js` — the Add form's HTML Tag tab: whether a tag's example is shown as its HTML (`'true'`) or drawn, and the tags starred as favourites, newest first, as a JSON list of ten at most; stored as `tagSelector_showHtmlCode` and `qs-add-favorite-tags` |
+| `socialPreviewDevice` | localStorage | `social-previews.js` — the device the Social previews page draws its cards for: `'phone'`, or anything else (or nothing) for a computer; one per browser, for every project (§9.19) |
 | `workflowsList` | localStorage | `preview-ai-tools.js` — the Workflows panel's workflows last opened, newest first (three kept), and the groups left open once the list folds, as JSON (`{"recent": ["restyle"], "open": ["look"]}`); one per browser, for every project. A missing or malformed part reads as empty, and a failure to read or write is silent (§8.12) |
 | `workflowsBackupNoteHidden` | localStorage | `preview-ai-tools.js` — the Workflows panel's backup message put away for good (`'1'`); stored as `quicksite-ai-tools-backup-note-hidden`, its name from before the registry (§8.12) |
 | `workflowsOptions` | localStorage | `preview-ai-tools.js` — the Workflows panel's Options as JSON (`{"noAi": false, "nothingDeleted": false, "compact": true, "unrunnable": false}`): the two switches, the compact view and the box that shows the workflows the role cannot run; one per browser, for every project. A missing or malformed part reads as unticked, and a failure to read or write is silent (§8.12) |
@@ -414,11 +420,11 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/ai-connections.php` | `window.QSAC_ASSET_BASE` + `window.QS_AI_CONNECTIONS_I18N` | the asset base the provider logos load from, so they resolve when the panel is not served from the domain root; the `aiConnections` and `common` sub-trees, verbatim |
 | `templates/pages/optimize.php` | `data-lib-ready` on `.optimize-page` + `window.CSSRefiner.t` + `window.QS_OPTIMIZE_I18N` | `data-lib-ready` is `"true"` only when the CSS Refiner library is installed, and `optimize.js` does nothing otherwise; `CSSRefiner.t` is a passthrough that returns its key unchanged; the `optimize` and `common` sub-trees, verbatim |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
-| `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`), `isOwner` + `siteUrl` (the address a public visibility exposes); JS-facing strings |
+| `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` (admin/owner only, read server-side from `members.json`); JS-facing strings |
 | `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings. Never the username — the deletion's typed confirmation is checked by the server (§9.13) |
 | `templates/pages/command-form.php` | `window.QS_COMMAND_FORM_I18N` | the `commandForm`, `commands` and `common` translation sub-trees, emitted **verbatim under their own dot paths** (`AdminTranslation::getRaw()`) rather than copied field by field — the page's JS asks for the same path PHP would. `JSON_HEX_TAG` keeps a translation value from closing the script element. |
 
-A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves, so an untranslated string shows on screen instead of hiding behind English. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts, the words of the searchable dropdown (`selectPlaceholder`, `search`, `noResults`, `noMatchesFor`, `createFromSearch`; §9.9.2) and those of the project star (`starred`, `starProject`, `unstarProject`, `starFailed`; §8.0). `QuickSiteUtils.tCommon(name)` reads one; a word the page was not given shows its key.
+A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves. A language's words are laid over the English ones **key by key** (`AdminTranslation`), so a word its file leaves out reaches every sub-tree and every `__admin()` call in English, even inside a section the file holds; only a word no file holds, English included, shows its path. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts, the words of the searchable dropdown (`selectPlaceholder`, `search`, `noResults`, `noMatchesFor`, `createFromSearch`; §9.9.2) and those of the project star (`starred`, `starProject`, `unstarProject`, `starFailed`; §8.0). `QuickSiteUtils.tCommon(name)` reads one; a word the page was not given shows its key.
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
@@ -444,7 +450,7 @@ This pointer is **not** a command. Which project a person has open is a fact abo
 
 An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
 
-The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §8), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" resolves to that same view. Private projects authenticate on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a private project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
+The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §8), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" resolves to that same view. Every project authenticates on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
 
@@ -460,7 +466,7 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **Workflows** | `ai-tools` | In-editor workflow runner. A searchable list of the workflows, grouped by what you want to do, each row saying in words what a run does; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
-**Which tools a role sees.** Each tool, and each of Select's buttons, is offered only to a role that holds the commands it sends, in either mode: one definition, `secure/admin/functions/editorTools.php` (`qs_editor_controls()`), draws them as `data-requires-command`, which the role filter reads once permissions load (§5.1). Select reads, so every role has it. A viewer has Select alone, with none of its buttons; an editor has every tool but CSS; a designer and the roles above it have them all. Workflows needs what adding an element needs: every shipped workflow but one writes the site, and the one left runs what is pasted into it. A tool not offered cannot be entered (`switchMode()` goes to Select instead), and the Delete key acts only where the Delete button is offered. The server still checks each command's role.
+**Which tools a role sees.** Each tool, and each of Select's buttons, is offered only to a role that holds the commands it sends, in either mode: one definition, `secure/admin/functions/editorTools.php` (`qs_editor_controls()`), draws them as `data-requires-command`, which the role filter reads once permissions load (§5.1). Select reads, so every role has it. A viewer has Select alone, with none of its buttons; an editor has every tool but CSS; a designer and the roles above it have them all. Workflows needs what adding an element needs: every shipped workflow but one writes the site, and the one left runs what is pasted into it. A tool not offered cannot be entered (`switchMode()` goes to Select instead), and the Delete key acts only where the Delete button is offered. The server still checks each command's role. The toolbar's **Title** and **Description** fields are in the same definition (`toolbar.title`, `toolbar.description`): each is shown only to a role that holds the command it saves with, `editTitle` and `setSocialPreview`, so a viewer sees neither.
 
 **The simple view.** In simple mode (§5.1) the editor leaves out what a beginner does not need: the **Interactions** tool, CSS's **Source** and **Motion** (the tab, and a selected selector's **Animate**), and Select's **Save as Snippet** and **Save as Component**. Select's **Add** opens the simple Add in place of the five tabs. The same definition marks each of these `data-editor-advanced`, which the page's simple class hides, so a switch shows or hides them at once. A switch that would close the tool in use (Interactions, Source, Motion) or start an open Add form again first asks, **Switch** or **Stay**, saying what not saved there would be lost; **Stay** changes nothing. After **Switch** the editor leaves a tool the mode no longer shows for Select (Motion for Theme, Source for the page), and an open Add form starts again in the new mode on the same element and position. With nothing open, the switch happens at once. The mode decides what is drawn and nothing else.
 
@@ -472,7 +478,7 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **Title** | `<h1>` (Big), `<h2>` (Medium) or `<h3>` (Small) | its size, three cards side by side, each word in its own size; its text. It starts on Big on a page with no big title and on Medium on one that has one; while Big is picked on such a page, it says search engines read a page's big title as its subject, so one per page is best — a hint, never a refusal |
 | **Button** | `<button>` with its text: `type="submit"` where it lands inside a form (it sends the form), `type="button"` anywhere else | its text, and a line saying which: it sends the form, or it does nothing until an action is given to it in Advanced, under Interactions |
 | **Link** | `<a>` with its text and `href`; `target="_blank"` when **Open in a new tab** is ticked (unticked at first) | its text; where it goes: a page of the site from a list (a page whose address takes a parameter is not listed) or an outside address, written in full (`https://`, `http://`, `mailto:` or `tel:`) |
-| **Image** | `<img>` with its `src`, and its short description as its `alt`, a key of its own; no description, no `alt` | a file from Media; the short description |
+| **Image** | `<img>` with its `src`, and its short description as its `alt`, a key of its own; no description: the picture's own `alt` from Media as Media holds it (its key, §9.15), when it has one, else no `alt` | a file from Media; the short description |
 | **Video**, **Audio** | `<video>` / `<audio>` with its `src`, and its play controls (the engine's default) | a file from Media |
 | **List** | a bulleted list, `<ul>`, an `<li>` per line | its lines: three to start, **+ Add an item** adds one and each line's **×** removes it (one always stays); a line left empty takes its placeholder's words (*Item 3*) |
 | **Block** | a plain box, `<div>`, empty | nothing: it is selected once added, an empty box you can see, to add elements inside |
@@ -487,7 +493,7 @@ There is no class, no ID and no key-or-literal choice: each text gets a translat
 
 **Saving a selection as a snippet.** Select mode's *save as snippet* flow asks for a name and offers one checkbox: **"Save to my personal snippets (reusable in all my projects)"**. Leave it unchecked and the snippet belongs to the project you are editing, where every member of that project can use it. Tick it and the snippet goes to your own library instead — it follows you into every project you work on, and nobody else can see it, insert it, or delete it. The Add panel's **Snippet** tab lists all three tiers in one picker — the snippets shipped with the engine, your personal ones, and the current project's — with each entry labelled by the tier it came from. See [COMMAND_API.md](COMMAND_API.md) for how a name that exists in more than one tier resolves.
 
-**The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), a raw or literal text (`__RAW__` / `__LIT__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
+**The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), a raw text (`__RAW__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
 
 **The tag preview.** Picking a tag in the **HTML Tag** tab shows a small example of it under the picker, and its **`</>`** button switches to the example's HTML as the page holds it once parsed: a boolean attribute reads `open=""`, a table row sits in the `<tbody>` the browser adds, an `<option>` is closed. A tag that renders nothing visible (`script`, `meta`, `template`…) reads "No visual preview". The examples come with the page, one `<template>` per tag written by `_tag-selector.php` from `_tag-examples.php`, so picking a tag copies its example and parses nothing.
 
@@ -502,6 +508,8 @@ There is no class, no ID and no key-or-literal choice: each text gets a translat
 The toolbar carries an **Edit** list (the menu and the footer, every route in `routes.php` then the `404` page when it has a structure, and the project's components) and a **Language** dropdown (any active language). Switching either reloads the iframe; in Text mode the language dropdown decides which translation file is being edited. Beside **Reload**, a button hides the toolbar's lists, the tools, the element info and the options panel, leaving the page alone under the header, and brings them back as they were; the tool in use and what is selected stay as they are, and a page opened anew has them back.
 
 While a page is the edit target, the toolbar's **Title** field holds that page's title in the language shown — on a one-language site, the title the page reads from `default.json`. **Enter**, or leaving the field, saves it through `editTitle`; **Escape**, or an emptied field, puts the saved title back; a refusal says why in a toast. Its placeholder is the title the preview shows: for a page with no title of its own, the last part of its address, readable — *Get started* for `get-started` (see [ARCHITECTURE.md](ARCHITECTURE.md) §6.3, *How captured params flow*). The field hides for the menu, the footer and a component.
+
+Beside it, the **Description** field holds the page's description in the language shown: the translation key `page.descriptions.<route>`, what a shared link's card and a search engine show under the title. It behaves as the title does — **Enter**, or leaving the field, saves it, through `setSocialPreview`; **Escape** puts the saved description back — except that an emptied description is saved empty, which removes it. It holds at most the length `setSocialPreview` writes. A mark after it, ⚠ and a number, counts the platforms that would cut the text as it stands, judged as it is typed by the figures of `getSocialPreview`'s platform table (characters, or bytes where the platform counts bytes, as Discord does); its bubble names each platform and its length. The button at the field's end (⤢, *Edit the whole description*) opens the whole description in a dialog titled *Description of home*, with the language on a multilingual site (*(EN)*): a text area, the number of characters of the most the field holds, and the platforms that would cut it in one sentence, as it is typed. **Save** or **Enter** puts the text in the field and saves it as the field does (a line break becomes a space, as the field holds one line); **×**, **Cancel**, **Escape** and a click beside the dialog leave the field as it was. While the dialog is open no key reaches the editor behind it. It hides for the menu, the footer, a component and a special page (the `404` page), which carries no link-preview tag. The cards themselves are on the Social previews page (§9.19).
 
 **The Edit list follows what changes under it.** A wizard that makes routes (the OAuth button) and a workflow run change the project without leaving the page, so the list is read again: after the wizard's setup, whether it finished or stopped half way, before its element is added; and after each phase of a run that changed something, before the preview reloads. `getRoutes` answers the Pages group, `listComponents` the Components group, and both are rebuilt whole. A new route or component is on the list at once, a deleted one is gone, and the target stays selected. A read that fails changes nothing and says nothing: its group stays as it was.
 
@@ -574,7 +582,8 @@ one the Complex Element wizards use, which can create a key inline) instead of a
 plain text box. It is optional: leaving it empty writes no attribute at all,
 and nothing is generated on the author's behalf. Picking an asset through the
 browse button pre-fills `alt` from that asset's own metadata when it has some
-and the field is still empty.
+and the field is still empty. Media holds a picture's `alt` as a translation key
+whose text it writes per language (§9.15), so the key is what arrives.
 
 ### 8.6 Commands the editor calls
 
@@ -583,7 +592,7 @@ and the field is still empty.
 | Routes / structure | `getRoutes`, `getStructure`, `editStructure`, `addNode`, `editNode`, `deleteNode`, `duplicateNode`, `moveNode`, `addComplexElement`, `addRoute`, `setRouteLayout`, `setRouteResolver` |
 | Components | `listComponents`, `addComponentToNode`, `findComponentUsages` |
 | Snippets | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `insertSnippet`, `injectSnippetCss` |
-| Translations | `getTranslation`, `getTranslations`, `getLangList`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `importStructureTranslations`, `editTitle` |
+| Translations | `getTranslation`, `getTranslations`, `getLangList`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `importStructureTranslations`, `editTitle`, `getSocialPreview`, `setSocialPreview` (the Description field) |
 | Styles | `getStyles`, `editStyles`, `listStyleRules`, `getStyleRule`, `setStyleRule` |
 | Theme | `getRootVariables`, `setRootVariables`, `setThemeMode` |
 | Animations | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` |
@@ -790,12 +799,12 @@ The Add button (bottom Cancel / Add) posts `addNode` with `nodeKind:"text"` plus
 text node in the preview and makes it `contenteditable`. On commit:
 - For a translation-key node, the new value is saved via `setTranslationKeys`
   to the current-language translation file.
-- For a `__RAW__`/`__LIT__` literal, the new value is saved via `editStructure`
+- For a `__RAW__` literal, the new value is saved via `editStructure`
   by updating the node's `textKey` to `"__RAW__"+value` — *not* a translation
   entry (literals don't have one).
 
 In the renderer (`JsonToHtmlRenderer::renderText`), editor mode wraps both
-key-based AND `__RAW__`/`__LIT__` text in the `data-qs-textkey` selection span
+key-based AND `__RAW__` text in the `data-qs-textkey` selection span
 (with a `data-qs-raw="true"` marker on literals), so RAW text gets a selection
 handle just like translation-key text.
 
@@ -1203,8 +1212,9 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Settings** (`settings.js`) | System information (QuickSite's version, from the `VERSION` file as the footer's is, and how many commands `help` documents), the caller's permissions, admin preferences (keyboard shortcuts, toast duration), AI configuration status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
-| **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
+| **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`; for a picture's alt text, `getLangList`, `getTranslations`, `setTranslationKeys`, `deleteTranslationKeys`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
+| **Social previews** (`social-previews.js`) | The card a shared link of the site gets on each platform, drawn for a computer or a phone, and the site's and each page's values it is drawn from — see §9.19. Commands: `getSocialPreview`, `setSocialPreview`. In the Advanced menu's **Site** group. |
 | **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
 | **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. An installation can hide the page (setup item 11, `embed-security.php`, `qs_embed_security_shown()`; absent, it is shown): it leaves the menu and says it was turned off, while the policy stays in force and `getIframeSandbox` keeps answering every role that holds it. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
@@ -1774,9 +1784,10 @@ surfaces the placeholders as configurable inputs.
 
 **Body source**
 
-Hidden when the effective method is GET or DELETE (the browser
-forbids a body on those; qs.js already flattens such bodies to
-query-string args). Otherwise free-text — typically `#form-id`.
+Hidden when the effective method is GET or DELETE. qs.js puts a GET's
+(or a HEAD's) fields in the query string, so a GET whose body source
+holds a password field is not sent at all: the console says why.
+Otherwise free-text — typically `#form-id`.
 
 **Toast messages** (Advanced fold)
 
@@ -2127,7 +2138,7 @@ Phase 3 — Page loads, exchange runs:
 
 | Verb | Purpose | Typical chain |
 |---|---|---|
-| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (the route the server resolved for the page — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
+| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (the route the server resolved for the page — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. On success it goes to `returnTo`, else to a `?return=` path on this site, composed as every site address is: the base the page is served under and, on a multilingual site, the page's language. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
 | `QS.requestMagicLink(endpoint, email, returnTo?)` | Forward path. POSTs `{email}` to the issue endpoint. `email` accepts a literal address OR a `#selector` / `.selector` to read from an `<input>` (same convention as `setState`'s value arg). | `validate` → `requestMagicLink` → optional `redirect` to "check your email" page |
 | `QS.logoutServer(endpoint)` | Server-side logout — POST so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
 
@@ -2502,7 +2513,8 @@ init / `setState` / `fetchState`:
 - `data-state-value="store.field"` — scalar; sets `textContent` to the field
   value.
 - `data-state-list="store.field"` — array container. The container's first child
-  is the **item template** that gets cloned per array item.
+  is the **item template** that gets cloned per array item. Several containers may
+  name the same field: each is filled, from its own first child.
   - Template descendants with `data-bind="fieldName"` get `textContent` set to
     the matching field on each item; `data-bind-attr="attr"` sets an attribute
     instead. *This is the same `data-bind` mechanism used by componentList
@@ -2943,6 +2955,8 @@ covers the editor UX.
 - **Actions** (hover-revealed) — `+` to add a child, `⋯` to open the
   context menu (Add child / View in editor / Open page / Edit title /
   Configure resolver / Delete route, with Delete greyed for the home route).
+  View in editor opens the editor on that page: the **Edit:** list set to it
+  and the preview showing it.
   Home is the site's root, so its children are the top-level routes: on home,
   `+` and Add child open the form `+ Add root route` opens.
 
@@ -3038,7 +3052,7 @@ locked render order (most-authored first):
 | `form` | Forms | validate |
 | `fetch` | Fetch / network | fetch |
 | `auth` | Auth | saveToken, clearToken, refresh, exchangeMagicLink, requestMagicLink, logoutServer |
-| `nav` | Navigation | redirect, scrollTo |
+| `nav` | Navigation | redirect, scrollTo, prevent |
 | `state-store` | State stores | store, setState, fetchState, onScrollFetchState |
 | `focus` | DOM focus | focus, blur |
 | `display` | Rendering / display | filter, renderList |
@@ -3121,6 +3135,9 @@ picker filters the verb dropdown by the currently-edited event:
 - `exchangeMagicLink` declares `events: ['onload']` → page-event only.
 - `redirect` declares `events: ['onclick', 'ondblclick', 'oncontextmenu',
   'onkeydown', 'onkeyup']` → element-interaction events.
+- `prevent` declares `events: ['onclick']` → a link. A form's submit
+  needs none: the page keeps a form whose chain sends something, or that
+  has no action of its own ([ARCHITECTURE.md §9.0.1](ARCHITECTURE.md)).
 
 A **Show all** checkbox above the verb picker overrides the filter for
 the unusual cases (e.g. authoring a custom event chain). The filter
@@ -3618,7 +3635,7 @@ six-stat **Memberships** card with links to both pages.
 **My Memberships** (`/admin/memberships`) is the caller's own surface and works for
 every authenticated account — a freshly-registered, 0-membership user lands here to
 accept their first invitation, and the page fires only global self-service
-commands (zero 403 noise). Every project is named "Name #id"; a private project you
+commands (zero 403 noise). Every project is named "Name #id"; a project you
 have only asked to join shows its id alone, its name not being yours to see.
 Sections: **My projects** (`listProjects` — your starred projects first, then
 the others by name, each row starting with its ☆ / ★ toggle (§8.0); role chip,
@@ -3633,7 +3650,13 @@ vs. awaiting the person's answer; withdraw while pending), **Notices**
 (refused / removed / deleted with the recorded reason → dismiss, which also
 unblocks re-requesting; and **Join request accepted**, in green, when a request
 of yours was approved — dismissing it takes the notice away and leaves you a
-member), and a **Request to join** form (project id, with or
+member; and **Role changed**, in blue, when someone else changed your role in a
+project — the project, *from* the role you were last told of *to* the new one, and
+*Changed by* the account that made the latest change, by the name the roster shows;
+a second change before you dismiss it keeps the first role, a change back to it takes
+the notice away, and the one who makes a change is never told of it. A project can
+hold both of these at once, one row each, each dismissed on its own; the menu's dot
+and the dashboard count each row), and a **Request to join** form (project id, with or
 without the `#` it is shown with, + mandatory note; every error code mapped to a
 human message). Reading the inbox repairs your own copy of each pending entry from
 its project's roster, by the rule the header's menu is repaired with (§8.0): an
@@ -3642,7 +3665,7 @@ no longer lists goes, and a roster that cannot be read is left alone. An accepte
 request's notice is listed only while the roster lists you as a member; a later
 removal or deletion replaces it with its own notice, and leaving the project takes
 it away with the membership. No repair writes one: it exists only when the approval
-wrote it.
+wrote it. The role notice follows the same rule, written only by the change.
 
 **Project members** (`/admin/members`) manages the **edited** project — a banner
 re-states the project ("Name #id") + the caller's role, and the page follows the header
@@ -3659,17 +3682,19 @@ role + mandatory vouch). Admin/owner additionally get the **Pending queue**
 attribution; cancel for invites, approve / deny with mandatory reason for
 requests — approve of a proposal reports the conversion to an invitation), the
 **Invite** form (role picker limited to strictly below the caller's rank), and
-the **Who can ask to join** toggle (open/closed; flipping a *private* project to
+the **Who can ask to join** toggle (open/closed; flipping it to
 open first shows the knockable-by-id privacy advisory, and the warning stays
-visible while the combination is active). The owner alone gets **Who can see this
-site** (below) and **Transfer ownership** (member picker + departing-owner role +
+visible while the policy is open; the section says it opens no site: only members
+ever view a project's site). The owner alone gets **Transfer ownership** (member picker + departing-owner role +
 checkbox + final confirm modal; the page reloads after transfer since the
 caller's role changed).
 
 **People you have worked with** sits above the lookup on both the Invite and the
 Propose form, and is the same list on each: everyone the caller has already
-invited or proposed, offered with a *Use* button that selects them exactly as a
-search match does, and a *Forget* button that drops them. The block is hidden
+invited or proposed, in one searchable dropdown (each person by name, with their
+`user_id` under it; the search matches either). Choosing someone selects them
+exactly as a search match does, and the *Forget* button beside it drops the person
+chosen. The block is hidden
 entirely until there is somebody on it, so a new account never sees an empty
 panel above the search box. Somebody who is not on the list is still found the
 way they always were — by their exact public name — and succeeding at that, then
@@ -3685,31 +3710,11 @@ installation's accounts, so it can only ever show the caller something they
 already found themselves. A name that changes afterwards refreshes the next time
 they look that person up and work with them again; the `user_id` shown beside it
 is what the invitation actually uses, so an out-of-date name never misdirects one.
-
-**Who can see this site** is `setProjectVisibility`, and it is **owner-only** —
-the `project.visibility` category sits at the delete/transfer tier, so an admin
-who runs the project day to day cannot unilaterally expose it. Non-owners are not
-shown the control at all (the section is branched server-side on the caller's
-role; the command re-checks ownership in-lock regardless).
-
-It is deliberately shaped **unlike** the join-policy toggle beneath it. The two
-settings sound alike and are routinely confused — an open join policy reads as
-"the site is public", which it is not — so visibility renders as a framed block
-with a coloured state badge (PUBLIC / PRIVATE), the consequence written out
-(*"anyone with the address can view this site"* versus *"to everyone else it
-answers as if it did not exist"*), the address a public setting exposes, and a
-button named after the state it moves to rather than a generic *Toggle*. Each
-section also states what it is **not**.
-
-The wording avoids "publish" throughout, and the confirmation says so explicitly:
-making a project public **does not deploy it**. No domain is configured, nothing
-is submitted to a search engine, and the address does not change — the project's
-existing `/p/<id>/` view simply stops requiring membership (a public address can
-still be found and indexed like any other). Going public asks for a tick inside
-its confirm modal — the same friction as an ownership transfer; going back to
-members-only is a plain confirm. A visibility change never touches the pending
-request queue, and when the result is private + open the server's own advisory
-note is surfaced verbatim.
+A person who deletes their account leaves every list in the same write, so nobody
+keeps someone who no longer exists. An id no account has, still on a list (one
+written by hand, or kept from before an account's deletion took it out), is
+forgotten when an invitation or a proposal to it answers that no account has it,
+and the toast says so.
 
 Both pages render all dynamic rows via `QSDom` helpers (createElement +
 textContent); static structure and all labels live in the PHP templates
@@ -3837,6 +3842,34 @@ A batch delete can delete some files and not others: the answer lists both, and 
 A delete is a delete once the file is gone. If the asset list (each file's description, alt text and star) cannot be saved after it, or the favicon setting still names a deleted image and cannot be cleared, `deleteAsset` answers `500 server.file_write_failed`: the page shows that answer's message as an error, then does what a delete does — the edit area of a deleted file closes, a selection is cleared, the grid reloads without the file. A rename or an edit whose asset list (or, for the favicon image, whose favicon setting) cannot be saved changes nothing, and an upload the asset list cannot record is not kept: each is an ordinary failure, its message shown.
 
 A page links its icon only when the icon's file exists: the chosen asset, or `assets/images/favicon.png` when none is chosen. The preview checks on every view, so an icon added while you work shows on the next one; a build decides once, for the files it copies, and a built page makes no check of its own.
+
+#### A picture's alt text, per language
+
+A picture's **Alt Text** is what the picture shows, read by screen readers and search engines, and a page reads it in its own language. The edit form (a card's ✏️ *Edit alt/description*) shows it for a picture alone; a font, a sound or a video has none. It is a language selector and a text: the selector lists the **project's** languages, never the panel's (the panel can be in French while the site runs English, Spanish and German), and starts on the project's default language; a one-language project has no selector. What is typed in one language is kept while another is shown, and **Save Changes** writes each language typed in, and only those.
+
+Media keeps the text in the project's word files under a translation key, which the author never sees:
+
+- **The first text** makes the key: `alt.` and a name from the picture's file name (lower case, letters and digits, `_` for anything else, accents dropped; a random name when that leaves fewer than three characters). A name a word file already holds — on a page or on none — is not used: a random suffix of ten characters is added until it is free. The text goes to the language written, then the picture's `alt` names the key (`setTranslationKeys`, then `editAsset`).
+- **A picture whose `alt` already names a key** (shaped as the renderer reads a key, held by a word file or not yet) is edited in place: each language's word under that key, no key made.
+- **A text written before the alt had languages** shows as the default language's text. The first save of an alt change makes it a key, holding that text in the default language and what was typed in the others. Nothing is converted until then; a save of the Description alone converts nothing.
+- **The other languages are left without a text**, never given a copy: until a language is written, its pages show the missing marker in a placed picture's `alt`, and the card says which languages are missing.
+- **A text emptied** removes that language's word (on a one-language project from `default.json` too, which its pages read); the key and the picture's `alt` stay, since pages may use the key. Emptying a text written before the alt had languages leaves the picture with no `alt`. A deleted picture leaves its key.
+
+A write that is refused stops the save: what the save already wrote is taken back, newest first, the form keeps what was typed, and the line under **Save Changes** says which language was refused and why — a key that cannot be made (`alt` held as a single word in a language) is said there, not worked around. A take-back that is itself refused is said too, with the key the word files still hold.
+
+The **badge** under a picture's card names the languages it has no alt text in, by their codes — *No alt text: FR, DE* — or, on a one-language project, *No alt text*; a picture described in every language has none. A text written before the alt had languages counts as described. The page reads the languages and the word files once when it loads and again after a save, not once per card. The grid's own `<img alt>` and the edit form's preview show the text in the project's default language, or the file name when there is none.
+
+What reads a picture's `alt`: a picture placed in the editor (the picker copies the key into the element, §8.1), the link-preview tags (`og:image:alt`, in the page's language: no tag where that language has no text, §9.19), and the site-building workflows, which read the starred pictures with `listAssets`.
+
+The upload queue and the address import have no alt field: a picture's alt text is written per language once it is in Media. The queue's Description stays; it is for the AI workflows, written in whatever language the author picks, and never translated.
+
+#### A picture shown large
+
+A click on a picture's thumbnail — a raster or an SVG — shows it in the panel's dialog: the picture, its file name, and an × at the top right; Escape, the × or a click beside it closes it, and the focus goes back to the thumbnail. The thumbnail is a button, so Tab reaches it and Enter or Space opens it. The picture shows at its own size, or smaller to fit the window, sized by the stylesheet alone; an SVG, which has no size in pixels, shows 24rem wide, or the window's width when that is narrower. A video and a sound keep their play buttons, a font its specimen. In **Select** mode a click selects the card and nothing opens; the ✏️ button keeps opening the details.
+
+#### What each role sees
+
+Each control that sends a command is drawn only for a role that can run it: the upload card (`uploadAsset`); **Select**, the batch bar and a card's 🗑️ (`deleteAsset`); a card's rename and star, and the edit form's Description and **Save Changes** (`editAsset`); the favicon radio (`editFavicon`); the alt text (`setTranslationKeys`, `deleteTranslationKeys` and `editAsset`, all three). Every role that opens Media sees the grid, the badges, the viewer and the details: a viewer's ✏️ opens a picture's preview and its size, type and date, with nothing to change.
 
 ### 9.16 Builds (/admin/builds)
 
@@ -4065,6 +4098,41 @@ A cell whose value would otherwise begin with `=`, `+`, `-`, `@`, tab or carriag
 Today is always kept: the command refuses a future date and deletes strictly before the one given, so there is no way to clear the day in progress. On a project whose only stored day is today, clearing therefore has nothing to remove — which is why, when nothing matches, the dialog **lists the days that are actually stored** and says how the date is applied, instead of only reporting that there was nothing to delete.
 
 Clearing is available here whether or not the command console is switched on. That is the point of it being on this page: the same command is reachable through the console's generic runner, and an installation that has turned the console off would otherwise be able to read its history and never clear it.
+
+### 9.19 Social previews (/admin/social-previews)
+
+The card a link to the site gets when someone shares it on Facebook, X, LinkedIn, WhatsApp, Discord, Slack, Telegram or iMessage, drawn as a look-alike, and the values it is drawn from: the description, Open Graph and X tags every page carries in its head ([ARCHITECTURE.md](ARCHITECTURE.md) §6.4). The page reads everything from one `getSocialPreview` and writes through `setSocialPreview`; it reads again after each save.
+
+#### The whole site, or a page
+
+One searchable list at the top, **Site or page**, drives the page: **The whole site** first, then the project's pages, the home page first; beside it, on a multilingual site, the **Language**. The form below holds what is chosen, and the cards under it follow the choice and the language.
+
+- **The whole site:** the values every page uses where it sets none of its own: a **picture** (a searchable list of Media's pictures, SVG left out: no platform shows one), the **card type** (large, small, or not set: large with a picture, small without), the site's **X account**, a **theme colour** (the panel's colour picker, written as `#rrggbb`), and the **territory** of the language shown: a searchable list of that language's territories as `getSocialPreview` answers them (the regions where Unicode CLDR has the language: French offers Belgium, Canada or Switzerland, never Argentina), each named by the browser in the panel's language with its code (*France (FR)*). Its first choice is none, which names the language's usual territory (*None chosen: France (FR), this language's usual one*): a page announces the territory chosen, else the usual one, to the platforms (`og:locale`). A language Unicode CLDR gives no territory (Esperanto) has an empty list, and its pages announce none. The cards are the home page's, as every page that sets no picture or card type of its own draws them; a line says so, and says when the home page sets its own.
+- **A page:** its own **picture** and **card type**, each with the site's as its first choice (the page's wins when it sets one), its **title** in the language shown (read only: it is set in the visual editor, §8.2), and its **description** in that language. As the description is typed, a line names each platform that would cut it and where. The cards are the page's.
+
+On a multilingual site a field that is the same in every language says so (*Same in every language.*): the picture, the card type, the X account and the theme colour. The territory, a page's title and its description are the language's own, their labels naming it (**Territory (FR)**). Changing the **Language** shows that language's own fields and keeps what was typed in the shared ones.
+
+**Save** sends only the values changed; a field emptied is sent empty, which removes the value.
+
+#### A picture no longer in Media
+
+A picture deleted from Media stays named in the values, and the page's head then carries no picture. The page says so above the picture's list, which marks it *(no longer in Media)*; **Pick another** opens the list. A picture uploaded again under the same name brings the card's picture back.
+
+#### The cards
+
+A **Computer** / **Phone** switch sits above the cards, Computer first; the choice is kept in this browser (`socialPreviewDevice`, §6). One card per platform for the page and the language the list at the top names — X's large or small card, as the page's card type asks — each with the platform's name in words (no logo), the look-alike, the warnings `getSocialPreview` answers for it, a line naming what the platform does not publish, the date its figures were read, and its checker where it has one. Under the cards, a line says that Instagram draws no card for a link.
+
+Every figure a card uses comes from `getSocialPreview`'s platform table (`platforms`); the page holds none:
+
+- **The picture** is drawn large when it passes every rule the platform publishes for its large card (its minimum size, its file size, its widest shape, its formats). Where the platform publishes that a picture missing a rule is still shown small (`picture.thumbnail`: LinkedIn's under its minimum width, WhatsApp's small preview), it is drawn small beside the texts; otherwise the card has no picture. A picture is cropped to the shape the platform publishes, or drawn whole where it publishes none.
+- **The texts** are cut where the platform cuts them (in characters, or in bytes for Discord), then held to the number of lines it shows on the device (`lines`); none on a device that shows none (X's description on a phone). A length or a line count the platform does not publish leaves the text whole.
+- **The width** of a card is the look-alike's own, one per device (a computer's feed column, a phone's screen), never wider than the page.
+
+The page says the cards are look-alikes: each platform draws its own card and can change it at any time, so the date under each card says when its figures were last read, and its checker shows the real card.
+
+#### Who sees what
+
+Every member of the project opens the page: it needs `getSocialPreview`, which every role holds. The form is drawn only for a role that can run `setSocialPreview` (editor and up); a viewer chooses the whole site or a page as anyone does, and sees the same values as text and a line saying that their role can read them, not change them. The page is in the Advanced menu, in the **Site** group after Sitemap (the group's word opens Sitemap); opened in simple mode, it says it lives in the Advanced menu (§5.1).
 
 ## 10. Data attribute reference
 

@@ -73,7 +73,7 @@ require_once __DIR__ . '/uploadLimits.php';      // qs_nginx_client_max_body_siz
  *
  * /p/ is different, and it is the difference that matters: a project's files
  * live in secure/projects/<id>/public/, deliberately OUTSIDE the web root, so
- * PHP can apply the visibility gate before a single byte is sent. Nothing under
+ * PHP can apply the membership gate before a single byte is sent. Nothing under
  * /p/ can ever be found on disk. A panel-generated vhost almost always carries
  * something like
  *
@@ -202,7 +202,7 @@ function generate_nginx_config(string $publicFolderSpace, string $secureFolderNa
     // block is `^~` and why its fallback is a NAMED location.
     $config .= "# Project renderer — every project is served at /p/<projectId>/ from its own\n";
     $config .= "# folder under {$secureFolderName}/projects/, which is OUTSIDE the web root so the\n";
-    $config .= "# visibility gate runs before any byte is sent.\n";
+    $config .= "# membership gate runs before any byte is sent.\n";
     $config .= "#\n";
     $config .= "# `^~` is required: it stops a vhost's own `location ~* \\.(css|js|png|…)$`\n";
     $config .= "# regex from claiming these URLs and 404ing them (a regex outranks a plain\n";

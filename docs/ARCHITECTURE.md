@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `public/p/` + `secure/projects/<projectId>/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. The public half is a single entry point, `index.php`, through which every project is served. |
-| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 148 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 149 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. It also owns the things that are **not** about developing a project — the installation's update check, the panel's own per-user state, and everything to do with the signed-in account and its access to projects — which are served from its own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) rather than being commands. |
 
 ```
@@ -65,7 +65,7 @@ A project is a self-contained website on disk. One QuickSite installation can ho
 ```
 secure/projects/<projectId>/
 ├── config.php           # languages, default lang, multilingual flag, etc.
-├── config/              # members.json — owner, visibility, join policy, roster;
+├── config/              # members.json — owner, join policy, roster;
 │                        # project.json — the project's name
 ├── routes.php           # ['home' => …, 'about' => …, 'docs/install' => …]
 ├── templates/
@@ -134,15 +134,14 @@ An attribute value is a scalar. An array is not a value an attribute can carry: 
 
 #### Special prefixes & placeholders
 
-A small vocabulary of markers controls rendering. They are described by intent — pick the one that matches what you mean, even when the renderer would accept either.
+A small vocabulary of markers controls rendering. They are described by intent — pick the one that matches what you mean.
 
-- **`__RAW__`** — for **text content**. Marks a `textKey` value as literal: do not look it up in translations, just emit it (escaped). Use this when a textual node really is a fixed string, not a key.
-- **`__LIT__`** — for **attribute or component params**. Marks the value as literal so it is used as-is everywhere it can appear. In the renderer `__LIT__` and `__RAW__` overlap for text and translatable attributes; the distinction is one of intent for the next reader, not a behavioural difference.
+- **`__RAW__`** — for **text content**. Marks a `textKey` value as literal: do not look it up in translations, just emit it (escaped). Use this when a textual node really is a fixed string, not a key. It is read where a value can be a translation key and nowhere else: in a text node and in the translatable attributes (below), where it is removed before any placeholder is filled. In any other attribute nothing is translated and nothing is removed: a `__RAW__` there is part of the value, drawn and checked as written. It is the one such marker.
 - **`__enums__`** — a root-level metadata block on a component template that derives variables from a single source key. Each entry maps a derived variable name to a value map plus an optional default. Use `listComponents` at runtime to see what a component exposes.
 - **`{{var}}` and `{{$var}}`** — placeholders interpolated from the caller's `data` when a component is inlined. Variable names accept letters, digits, underscores, and hyphens.
 - **`{{__system__}}` placeholders** — request-time values (`{{__lang}}`, `{{__current_page}}`, `{{__current_route}}`, `{{__public_folder}}`, and the language-switch form `{{__current_page;lang=en}}`). Substituted in text AND in attributes, identically on the served site and in a build — see §4.2 for the order and why it matters.
-- **Translatable attributes** (`placeholder`, `title`, `alt`, `aria-label`, `aria-placeholder`, `aria-description`: one list, `TagRegistry::TRANSLATABLE_ATTRIBUTES`, which the renderer, the compiler and the commands that copy or remove a node's keys all read) auto-resolve their value as a translation key when it looks like one — lowercase identifiers separated by dots, e.g. `form.contact.placeholder`. Prefix with `__RAW__` or `__LIT__` to opt out. Where an attribute is meaningful on a tag, the visual editor offers it as a translation-key picker rather than a text box — `alt` on `img` and `area`, `title` on `iframe`. Both commands that write nodes (`addNode`, `editNode`) treat these as ordinary optional params: whatever the author chose is stored verbatim, and choosing nothing writes no attribute.
-- **URL attributes** (`href`, `src`, `data`, `poster`, `action`, `formaction`, `cite`, `srcset`) get base-URL and language-prefix processing automatically. EVERY placeholder inside them is substituted before the URL policy inspects the value, so the policy sees what the browser will receive (§4.2).
+- **Translatable attributes** (`placeholder`, `title`, `alt`, `aria-label`, `aria-placeholder`, `aria-description`: one list, `TagRegistry::TRANSLATABLE_ATTRIBUTES`, which the renderer, the compiler and the commands that copy or remove a node's keys all read) auto-resolve their value as a translation key when it looks like one — lowercase identifiers separated by dots, e.g. `form.contact.placeholder`. Prefix with `__RAW__` to opt out. Where an attribute is meaningful on a tag, the visual editor offers it as a translation-key picker rather than a text box — `alt` on `img` and `area`, `title` on `iframe`. Both commands that write nodes (`addNode`, `editNode`) treat these as ordinary optional params: whatever the author chose is stored verbatim, and choosing nothing writes no attribute.
+- **URL attributes** (`href`, `src`, `data`, `poster`, `action`, `formaction`, `cite`, `srcset`) get base-URL and language-prefix processing automatically. EVERY placeholder inside them is substituted before the URL policy inspects the value, so the policy sees what the browser will receive (§4.2). A `srcset` is a list of files: each file's address gets the same processing and the same policy, its descriptors (`2x`, `480w`) and the commas and spaces between files kept as written.
 
 This is the single source of truth for page content. Everything the admin panel does ultimately writes back to one of these JSON files (or to `routes.php` / `translate/*.json` / `style/style.css`).
 
@@ -200,7 +199,7 @@ ApiResponse::create(201, 'route.created')
 
 **One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. A translation key the element names that has no text yet gets the builder's starting text, written where the key has none, its words read by key from `secure/src/translations/<lang>.json`. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
 
-The full list of 148 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 149 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -252,7 +251,7 @@ An account is one entry in `users.php`, keyed by an opaque user id. A credential
 | `starred_projects` | the projects this user starred, first in each of their project lists in the panel — a display preference, never an authorization input |
 | `panel_mode` | `simple` or `advanced`, the menu this user chose; absent until the first pick. A display preference, never an authorization input: it hides menu entries, and shows a line on a page of the advanced menu opened in simple; no permission or command reads it |
 | `projects` | a status mirror of "my projects", never authoritative: access always re-reads the project's own `members.json` |
-| `contacts` | people this account has looked up and then named to a project, kept so their exact public name need not be typed again. A private list, not a directory: it holds only `user_id` and the display name as it read at the time, it is never resolved against the registry when read back, and no other account can see it |
+| `contacts` | people this account has looked up and then named to a project, kept so their exact public name need not be typed again. A private list, not a directory: it holds only `user_id` and the display name as it read at the time, it is never resolved against the registry when read back, and no other account can see it; a deleted account leaves every list in the write that deletes it |
 
 Accounts are **self-created only**. `register`, and the `/admin/register` page beside it, creates one when `auth.php` allows self-registration — the default is `false`, so a fresh install accepts no registrations and accounts exist from setup only. Registration is enumeration-safe because nobody chooses a username: the server assigns one, so there is no taken name to reveal, and hands it only to the person registering — in the `register` response, or on that browser's login page until a sign-in in that browser, for 24 hours at most.
 
@@ -278,7 +277,7 @@ Nothing anywhere creates, disables, or deletes an account **for someone else**. 
 | `registration.max_users` | 0 | absolute ceiling on accounts; 0 is no ceiling |
 | `registration.throttle.per_ip_per_minute` | 3 | registration attempts per IP |
 | `registration.throttle.global_per_hour` | 1000 | successful registrations per hour, install-wide |
-| `cors.*` | — | which **other** origins may call `/management` from a browser; a same-origin caller is allowed before this list is read |
+| `cors.*` | — | which **other** origins may call `/management` from a browser; a same-origin caller is allowed before this list is read (the installation's own origin, its scheme `https` behind a proxy that ends HTTPS, §7) |
 
 A session holds five values and nothing more: the user id, the generation stamped at login, the session token, the last-seen time, and whether it was a "remember me". Sessions are PHP's own, stored under `secure/tmp/sessions`.
 
@@ -318,7 +317,7 @@ The global set is deliberately small: `help`, `createProject`, `importProject`, 
 | `designer` | 3 | styles, CSS variables, animations, theme |
 | `developer` | 4 | builds + server-side route resolvers |
 | `admin` | 5 | API config, the project's OAuth keys, backup / export, command history; manage members (invite, adjudicate join requests, join policy) |
-| `owner` | 6 | set the project's visibility; rename the project; delete the project + transfer ownership; the single top of the project, cannot be removed by others |
+| `owner` | 6 | rename the project; delete the project + transfer ownership; the single top of the project, cannot be removed by others |
 
 `rank` also governs role management: a granter may only assign a role strictly below their own, which is the self-escalation guard.
 
@@ -461,7 +460,8 @@ the rule existed.
 | `false` | attribute dropped — **not** `=""`, which HTML reads as TRUE |
 | an array | attribute dropped, and logged |
 | a translation key in a translatable attribute | the translation |
-| `__RAW__` / `__LIT__` prefix | the prefix stripped, no translation |
+| a `__RAW__` prefix on a translatable attribute | the prefix stripped, no translation |
+| a `__RAW__` prefix on any other attribute | kept: part of the value |
 
 Arrays are dropped rather than interpreted. The whole class goes, not one shape
 of it: no command writes an array attribute, no project authors one, and the
@@ -582,7 +582,7 @@ fatal handler  (registered as soon as SECURE_FOLDER_PATH resolves, so the
   │
 surfaceB  (runs before the rest of init.php)
   ├── binds the project from the /p/<projectId>/ URL marker
-  ├── gates it by visibility + membership
+  ├── gates it by membership
   └── sets BASE_URL from the validated request origin
   │
 qs_load_project_context(<projectId>)
@@ -593,8 +593,9 @@ qs_load_project_context(<projectId>)
 renderBootstrap
   └── defines QS_PUBLIC_BASE, the root-relative base all in-page URLs
         compose against: always derived from the request (/p/<projectId>/).
-        The QS_PUBLIC_BASE_URL env var feeds only the absolute form a
-        sitemap is written with. The same derivation answers on the
+        The QS_PUBLIC_BASE_URL env var feeds only the absolute forms: the
+        one a sitemap is written with, and the full addresses of a page's
+        link-preview tags (§6.4). The same derivation answers on the
         management path, where the editor renders page FRAGMENTS (see
         below); only the constant is specific to this entry point
   │
@@ -615,15 +616,16 @@ Page template
   ├── new JsonToHtmlRenderer (or in build mode, the compiled PHP runs directly)
   ├── renders structure → HTML body
   └── PageManagement::render() (in a build, Page::render()) emits <!doctype>,
-        <head> with the page's <title>, then the menu, the page and the footer
-        with no element around them: one body on both, the author places the
-        landmarks
+        <head> with the page's <title> and its link-preview tags (§6.4),
+        then the menu, the page and the footer with no element around them:
+        one body on both, the author places the landmarks
 ```
 
 Emitted URLs are **root-relative**: a page links to `/p/mysite/about` on the install's own
 hostname and to `/about` once built and deployed — the same rendered HTML carries no scheme or
 host, so it survives domain moves, HTTPS switches, and reverse proxies. The absolute base
-exists only where a spec demands one (`sitemap.txt`).
+exists only where a spec demands one (`sitemap.txt`, and the link-preview tags of a page's head,
+which Open Graph asks to be full addresses: §6.4).
 
 That base is a property of the **project**, not of the request that happens to ask for it. The
 visual editor renders single nodes through the management API rather than through this entry
@@ -634,7 +636,7 @@ therefore reads `/p/mysite/assets/videos/intro.mp4` whether it arrives as part o
 as a freshly inserted node, and in a deployed build it reads `/assets/videos/intro.mp4` in both.
 The rule holds for every URL attribute the renderer rewrites — `href`, `src`, `srcset`, `poster`,
 `action`, `formaction`, `cite`, `data` — and for the language prefix a multilingual project adds
-to non-asset URLs. Which codes count as a language is the project's own declared set, so a site
+to non-asset URLs. In a `srcset` it holds for every file, not the first alone. Which codes count as a language is the project's own declared set, so a site
 that speaks `es` and `de` is treated exactly as one that speaks `en` and `fr`.
 
 One value is exempt from that rewriting: `{{__current_page;lang=xx}}`, the language-switch link.
@@ -687,7 +689,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 148 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 149 commands.
 
 ### 6.3 Routing — exact and parameterised routes
 
@@ -748,6 +750,59 @@ The response carries a `warnings` array of `{ type, message }` entries. The site
 - **Param defaults**. A route with required params 404s when the URL is missing a segment. Users who want optional captures hand-author both shapes (`/products/:product` and `/products/:product/:variant`).
 - **Case-insensitive matching**. Paths are case-sensitive, matching Unix filesystem + HTTP convention.
 
+### 6.4 Link previews — the tags a shared link's card is drawn from
+
+A platform that draws a card for a shared link (Facebook, X, LinkedIn, WhatsApp, Discord, Slack,
+Telegram, iMessage) reads the page's `<head>` as the server sends it: its crawler runs no script.
+So every page carries, right after its `<title>`, the description, Open Graph and X tags, written by
+one function both page shells call (`socialPreview.php`: `PageManagement::render()` on
+`/p/<projectId>/`, `Page::render()` in a build, which carries the file). A page has one set of tags:
+each platform draws its own card, on a phone and on a computer, from the same tags.
+
+Each tag is written only when it has a value, in this order, escaped as the title is (a line break
+or another control character becomes a space):
+
+| Tag | Its value |
+|---|---|
+| `<meta name="description">` | the translation key `page.descriptions.<route>` in the page's language (`default.json` on a one-language site, as the title), with the title's placeholders (`{{param:NAME}}`, `{{resolved:NAME}}`) filled; none, no tag |
+| `og:title` | the page's `<title>` |
+| `og:description` | the description above |
+| `og:type` | `website` |
+| `og:url` | the address the page was served at, without its query string, each segment encoded, written as the site links its pages: no trailing slash but on a language's home (`fr/`) |
+| `og:site_name` | the translation key `site.name` |
+| `og:locale`, `og:locale:alternate` | the page's language and its territory (`fr_BE`): the one the author gave the language, else the language's usual one (`fr_FR`). A language's territories are the regions where Unicode CLDR has it, each an officially assigned ISO 3166-1 alpha-2 code, its usual one CLDR's likely one, in one table in `socialPreview.php`; a language CLDR gives none (Esperanto) writes none. On a multilingual site, each other language is an alternate, by the same rule |
+| `og:image`, `og:image:width`, `og:image:height`, `og:image:type`, `og:image:alt` | the page's picture, else the site's: a file of Media's images, with the size, the type and the description Media's metadata holds; a picture no longer in Media writes none. A description Media holds as a translation key (its alt text per language) is read in the page's language from the word file that language's pages read; a language with no text, or an empty one, writes no `og:image:alt` |
+| `twitter:card` | the page's card type, else the site's, else `summary_large_image` for a page with a picture and `summary` without |
+| `twitter:site` | the site's X account |
+| `theme-color` | the site's theme colour |
+
+The values are the project's `data/social-preview.json`: the site's picture, card type, X account,
+theme colour and territories, and each page's picture and card type. `setSocialPreview` writes them
+and a page's description; `getSocialPreview` answers them with what each page's tags say, each
+language's territories, the warnings per platform and the platform table they come from (for each
+platform: the picture's sizes, shape, file size and formats and whether a picture missing one is
+still shown small, the texts' lengths, and the lines a computer and a phone show, each figure with
+its source and the date it was read). The panel's Social previews page draws each platform's card
+from that table
+([ADMIN_PANEL.md](ADMIN_PANEL.md) §9.19). A response that is not a page of the
+site (a 404) carries the theme colour alone.
+
+**Every address in these tags is a full one**, composed when the page is served by one function,
+`qs_full_address()` (`requestRuntime.php`, which a build carries), on `/p/<projectId>/` and in a
+build alike:
+
+- the scheme: `https` when the server says so (`HTTPS`, or port 443) or when a proxy in front says
+  `X-Forwarded-Proto: https`; the forwarded scheme can only upgrade, never downgrade;
+- the host: the validated one (`qs_request_host()`: its shape check and `QS_TRUSTED_HOSTS`, §7);
+- the base: the address the deployment declares in `QS_PUBLIC_BASE_URL` (§7) when it declares one
+  (an absolute address is taken whole, its scheme included; a path is completed with the request's
+  scheme and host), otherwise the base the request derives: `/p/<projectId>/`, or a build's `/` or
+  `/<space>/`;
+- the path.
+
+No request header reaches an address any other way: a malformed `Host`, a host outside
+`QS_TRUSTED_HOSTS` or an `X-Forwarded-Host` changes none.
+
 ---
 
 ## 7. Multi-project model
@@ -763,22 +818,19 @@ secure/projects/
 
 **A project always has exactly one owner, and may have any number of members.** Whoever runs `createProject` owns the result from its first moment; there is no ownerless project, and no way to walk away from one without handing it on first. Everybody else who works on it is a **member**, holding one of the six roles of §3 on that project and nowhere else — the same account can be an owner here, an editor there and a stranger to a third. The roster lives in the project's own `config/members.json`, and that file is the only thing any permission check reads.
 
-Membership itself changes on a **consent model**: an admin or owner *invites* an existing account to a role (rank-checked at send), the invitee sees the offer in their own invitation inbox, and the grant materializes only when the invitee accepts — where the inviter's authority is **re-validated** (a demoted or removed inviter's offer is void). Answering an invitation is an account operation rather than a command: the offer is the project's decision, the answer is the person's. Pending invitations live in a separate `invitations` block of `members.json`, so a pending entry is structurally unable to grant access — every permission check reads `members` only. Users are targeted by their opaque `user_id` (discovered by exact public-name lookup, an account operation served at `/admin/self/find-user`); membership output references people as `{user_id, name}` and never exposes the private login username. Ownership rotates atomically via `transferOwnership` (owner-only, member-only target, confirmation required); removals and project deletions leave a dismissable notice in the affected user's own project list, while self-initiated exits (leave, decline, withdraw) leave none.
+Membership itself changes on a **consent model**: an admin or owner *invites* an existing account to a role (rank-checked at send), the invitee sees the offer in their own invitation inbox, and the grant materializes only when the invitee accepts — where the inviter's authority is **re-validated** (a demoted or removed inviter's offer is void). Answering an invitation is an account operation rather than a command: the offer is the project's decision, the answer is the person's. Pending invitations live in a separate `invitations` block of `members.json`, so a pending entry is structurally unable to grant access — every permission check reads `members` only. Users are targeted by their opaque `user_id` (discovered by exact public-name lookup, an account operation served at `/admin/self/find-user`); membership output references people as `{user_id, name}` and never exposes the private login username. Ownership rotates atomically via `transferOwnership` (owner-only, member-only target, confirmation required); removals and project deletions leave a dismissable notice in the affected user's own project list, while self-initiated exits (leave, decline, withdraw) leave none. A role changed by someone else (`changeMemberRole`, and the new owner of a transfer) leaves a dismissable notice too, on the member's entry beside any other: the project, the role they were last told of, the new one and the account that changed it; the one who made a change is never told of it.
 
-Membership can also start from the **other side**. With the project's `join_policy` set to `open` (`setJoinPolicy`, default `closed`), an authenticated outsider may knock from the panel — a mandatory-note ask, fixed at the `viewer` role, and itself an account operation rather than a command — that an admin/owner answers with `approveJoinRequest` (joins immediately: both consents now exist) or `denyJoinRequest` (mandatory reason, dismissable `refused` notice; re-asking is blocked until the notice is dismissed). Separately, ANY member may `proposeMember` — vouch an outsider with a mandatory note, at a role no higher than the sponsor's own rank (a viewer proposes viewers, an editor up to editors); the proposal grants nothing, the person is told nothing, and on validation it *converts into a normal invitation* carried by the approver's rank (`sponsored_by` preserved), which the person accepts or declines like any invite — membership always materializes on exactly two consents: the person's and a ranking authority's. Enumeration posture: a private project with a closed policy answers a knock identically to a nonexistent one; opening the policy on a *private* project deliberately makes it knockable-by-id (flagged by the command); on public projects existence is already public via `/p/<projectId>/`, so a closed lane answers honestly. A requester's own inbox shows a private project's *id*, never its name, until they are a member. Two read surfaces complete the picture: `getProjectRoster` gives every member rank the active-members roster (no pending queue — adjudication data stays admin/owner via `listMembers`), and a sponsor reads their own outgoing proposals at `/admin/self/proposals` (pending validation, or approved and awaiting the person's answer).
+Membership can also start from the **other side**. With the project's `join_policy` set to `open` (`setJoinPolicy`, default `closed`), an authenticated outsider may knock from the panel — a mandatory-note ask, fixed at the `viewer` role, and itself an account operation rather than a command — that an admin/owner answers with `approveJoinRequest` (joins immediately: both consents now exist) or `denyJoinRequest` (mandatory reason, dismissable `refused` notice; re-asking is blocked until the notice is dismissed). Separately, ANY member may `proposeMember` — vouch an outsider with a mandatory note, at a role no higher than the sponsor's own rank (a viewer proposes viewers, an editor up to editors); the proposal grants nothing, the person is told nothing, and on validation it *converts into a normal invitation* carried by the approver's rank (`sponsored_by` preserved), which the person accepts or declines like any invite — membership always materializes on exactly two consents: the person's and a ranking authority's. Enumeration posture: a project with a closed policy answers a knock identically to a nonexistent one; opening the policy deliberately makes it knockable-by-id (flagged by the command). A requester's own inbox shows the project's *id*, never its name, until they are a member. Two read surfaces complete the picture: `getProjectRoster` gives every member rank the active-members roster (no pending queue — adjudication data stays admin/owner via `listMembers`), and a sponsor reads their own outgoing proposals at `/admin/self/proposals` (pending validation, or approved and awaiting the person's answer).
 
-**Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
+**Project visibility.** Every project's `/p/<projectId>/` view requires membership (owner / member / viewer): a site reaches anyone else as a deployed build (§11). Identity is the panel's own session cookie and nothing else: a preview iframe is a plain browser navigation and can carry no header of its own, and the cookie is scoped to the whole origin so `/p/<projectId>/` receives it. Every request this gate sees is therefore same-origin with the panel, since `/p/<projectId>/` is the only way a project is served here — the credential that is available is the credential that is required.
 
-- `public` — the `/p/<projectId>/` view is open to anonymous visitors (a shareable site).
-- `private` — the `/p/<projectId>/` view requires membership (owner / member / viewer). Identity is the panel's own session cookie and nothing else: a preview iframe is a plain browser navigation and can carry no header of its own, and the cookie is scoped to the whole origin so `/p/<projectId>/` receives it. Every request this gate sees is therefore same-origin with the panel, since `/p/<projectId>/` is the only way a project is served here — the credential that is available is the credential that is required.
+A refused `/p/<projectId>/` request answers `404` with a plain, engine-owned status page — the **same status, headers and bytes** an id that names no project at all gets. Whether the visitor is anonymous or signed in as a non-member makes no difference: a project is indistinguishable from one that does not exist, so `/p/` cannot be used to discover which project ids are real. (The cost is deliberate: a signed-out member of a project also sees `404` rather than a prompt to sign in.) The page borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing. A deployment can substitute its own static pages for these engine-owned statuses by declaring `QS_ERROR_PAGE_<status>` (e.g. `SetEnv QS_ERROR_PAGE_404 /404.html`): the value must be a root-relative `.html`/`.htm` file inside the document root, is served with the real status code, and an invalid value is logged and ignored. (A missing *page* inside a project that did resolve is different — that renders the project's own 404 template, no configuration involved.)
 
-A refused `/p/<projectId>/` request answers `404` with a plain, engine-owned status page — the **same status, headers and bytes** an id that names no project at all gets. Whether the visitor is anonymous or signed in as a non-member makes no difference: a private project is indistinguishable from one that does not exist, so `/p/` cannot be used to discover which project ids are real. (The cost is deliberate: a signed-out member of a private project also sees `404` rather than a prompt to sign in.) The page borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing. A deployment can substitute its own static pages for these engine-owned statuses by declaring `QS_ERROR_PAGE_<status>` (e.g. `SetEnv QS_ERROR_PAGE_404 /404.html`): the value must be a root-relative `.html`/`.htm` file inside the document root, is served with the real status code, and an invalid value is logged and ignored. (A missing *page* inside a project that did resolve is different — that renders the project's own 404 template, no configuration involved.)
-
-**Reaching a project, and choosing one to edit — two different questions.** Every project is live-rendered at its own `/p/<projectId>/`, out of its own `secure/projects/<projectId>/public/` folder. No project is privileged: they are served the same way, from their own folder, with nothing materialised elsewhere. Whether a given visitor gets in is decided by the visibility rule above and by nothing else.
+**Reaching a project, and choosing one to edit — two different questions.** Every project is live-rendered at its own `/p/<projectId>/`, out of its own `secure/projects/<projectId>/public/` folder. No project is privileged: they are served the same way, from their own folder, with nothing materialised elsewhere. Whether a given visitor gets in is decided by the membership rule above and by nothing else.
 
 **Selection is per user, and is not access.** A user's `selected_project` (in `users.php`, written by the panel through `POST /admin/state/selected-project`) names the project their admin panel opens — the visual editor edits one project at a time, previewing it through that project's own `/p/<projectId>/` view in editor mode. It is a preference, **never an authorization input**: every request is re-authorized against the target project's `members.json`. So two users can edit two different projects at once without colliding, and a project nobody has selected is still reachable at its own URL by everyone the gate admits.
 
-Static sub-resources under `/p/<projectId>/` are served by PHP through a jail that cannot leave that project's `public/` folder (§8). How long a copy of one may be reused, and by whom, follows the project's visibility: everything is cacheable for five minutes, but a **public** project's assets are marked `public` so any shared cache — proxies and CDNs included — may store them, while a project that is not public marks them `private`, which lets the visitor's own browser keep a copy and forbids a shared cache from holding one it could hand to somebody the gate never admitted. `private` and not `no-store`: a member is entitled to the bytes they just fetched, and refusing them a stored copy would also throw away revalidation, making every navigation refetch in full to prevent something `private` already prevents. The answer comes from the visibility the gate already decided, so the two can never disagree.
+Static sub-resources under `/p/<projectId>/` are served by PHP through a jail that cannot leave that project's `public/` folder (§8). How long a copy of one may be reused, and by whom: everything is cacheable for five minutes and marked `private`, which lets the visitor's own browser keep a copy and forbids a shared cache — proxies and CDNs included — from holding one it could hand to somebody the gate never admitted. `private` and not `no-store`: a member is entitled to the bytes they just fetched, and refusing them a stored copy would also throw away revalidation, making every navigation refetch in full to prevent something `private` already prevents.
 
 **Production is a build.** The authoring install serves projects at `/p/<projectId>/` and
 nowhere else; a project reaches the public by being **built** (§11) and deployed as a
@@ -795,9 +847,18 @@ Two per-vhost variables remain, and neither selects a project:
   authoring install cannot derive from the request it is answering, so the deployer declares it.
   It also covers sub-path mounts and reverse proxies, where the request-derived origin would be
   wrong. In-page links, scripts and stylesheets are root-relative, need no declaration and are
-  never moved by one: a page composes them against the base it is served under.
+  never moved by one: a page composes them against the base it is served under. The full
+  addresses of a page's link-preview tags (§6.4) are composed against it too, on
+  `/p/<projectId>/` and in a build, which reads it from its own vhost.
 - `QS_TRUSTED_HOSTS` (optional) pins the Host header: a request presenting any other host has
   its URLs composed against the first listed host instead.
+
+A proxy that ends HTTPS in front of the server says so with `X-Forwarded-Proto: https`, and the
+full addresses of a page's link-preview tags then start with `https://` (§6.4). The header can
+only upgrade the scheme: no other value of it changes an address. The same scheme is the
+request's origin (`qs_request_origin()`): the installation's own base address, a project's
+`/p/<projectId>/` base, a sitemap's default base, and the origin the CORS check compares a
+browser's `Origin` with.
 
 Copy-paste vhosts for both servers ship in `secure/deploy/apache-vhosts.conf.example` and
 `secure/deploy/nginx-vhosts.conf.example` (shared hosting can put the same `SetEnv` lines in a
@@ -827,15 +888,15 @@ Other layered protections:
 | Concern | Protection |
 |---|---|
 | Path traversal | All file paths normalised and checked against `..`; whitelisted base directories; helpers in `secure/src/functions/PathManagement.php`. |
-| XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. The two lists answer different questions, and a tag can be on neither: the blacklist names tags that would be a *security* problem, while a tag that is merely unusable is simply absent from the allowlist and refused as unknown. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. All attribute values are HTML-escaped, and an attribute *name* must be a well-formed identifier (letters, digits, underscore, colon, hyphen) or the attribute is dropped. The renderer and the compiler enforce all of this identically (`TagRegistry::isRenderable`, `TagRegistry::isRenderableAttributeName`, `UrlPolicy`), so preview and built output agree. A binding (a list item's `data-bind-attr`, an endpoint's response binding) sets an attribute in the browser after the page is served, and `qs.js` holds it to the same rules: a malformed name, an event handler, `srcdoc`, and an iframe's `src` or `sandbox` are not written, and a URL attribute's value keeps to the same allowlist, a refused one written as `#`. Nor does a binding write any `data-consent-*` name, which the consent banner and popup read to decide what a click records, or a `meta`'s `content` or `http-equiv`, which together make a refresh. A `meta` refresh's address (the address its `content` holds when its `http-equiv` is `refresh`, found where a browser finds it) is a URL sink too: it keeps to the same allowlist, a structure holding a refused one is refused on write, and both render paths draw one already stored, or filled in when the page is served, with `#` in its place. |
+| XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. The two lists answer different questions, and a tag can be on neither: the blacklist names tags that would be a *security* problem, while a tag that is merely unusable is simply absent from the allowlist and refused as unknown. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. A `srcset` is held to it file by file, a refused file drawn `#` in its place, and a structure holding one is refused on write. All attribute values are HTML-escaped, and an attribute *name* must be a well-formed identifier (letters, digits, underscore, colon, hyphen) or the attribute is dropped. The renderer and the compiler enforce all of this identically (`TagRegistry::isRenderable`, `TagRegistry::isRenderableAttributeName`, `UrlPolicy`), so preview and built output agree. A binding (a list item's `data-bind-attr`, an endpoint's response binding) sets an attribute in the browser after the page is served, and `qs.js` holds it to the same rules: a malformed name, an event handler, `srcdoc`, and an iframe's `src` or `sandbox` are not written, and a URL attribute's value keeps to the same allowlist, a refused one written as `#`. Nor does a binding write any `data-consent-*` name, which the consent banner and popup read to decide what a click records, or a `meta`'s `content` or `http-equiv`, which together make a refresh. A `meta` refresh's address (the address its `content` holds when its `http-equiv` is `refresh`, found where a browser finds it) is a URL sink too: it keeps to the same allowlist, a structure holding a refused one is refused on write, and both render paths draw one already stored, or filled in when the page is served, with `#` in its place. |
 | Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §9), transformed to allowlisted `QS.*()` calls (`CallTransformer`); raw JS is rejected. The tag policy is also enforced by the commands that take a tag or a whole structure from the request (`addNode`, `editNode`, `editStructure`, `addComplexElement`, `createSnippet`) and by `importProject` over every structure in an archive, and the attribute-name, URL-scheme and `on*` policies by every command that writes a structure file, so unsafe values are refused on write, not just dropped at render. The write-side check is a second layer, never the only one: projects can already hold structures written before a rule existed, and only the render/compile gate protects a page built from those. The same structure writers refuse a `data-bind-attr` that names what a binding cannot write, and `editApi` refuses a response binding's attribute by the same rule; the browser refuses both again, as the row above says. A `meta` refresh is judged on its `http-equiv` and its `content` together, by the same writers. |
 | File upload | MIME sniffed from content (not extension); per-category size cap; JS uploads disallowed. |
 | AuthN / AuthZ | Username+password login → a PHP session (HttpOnly cookie) plus a per-session token; both are required on every Management call. Role is checked per project on every call, and logged. A session generation counter on the user record ends every session of an account at once. Failed logins are throttled per username. The panel's own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) demand the same pair, through **one** shared gate (`secure/admin/functions/adminJsonEndpoint.php`) rather than a second copy of the check: they run engine code on the caller's behalf, so they must not be reachable on a weaker credential than the commands themselves, and two hand-written gates would drift. |
 | CSRF on admin | The session cookie alone never authorizes: a call must also carry the per-session token, which is page-embedded and unreadable to another origin. A cross-site request can make the browser send the cookie but cannot supply the token. The same rule covers the panel's own state-changing forms — signing out is a POST carrying that token, not a link. The three pre-session forms (login, register, first-run) have no session to draw a token from, so they use a double-submit pair instead: an HttpOnly, `SameSite=Strict` cookie scoped to the admin path plus a hidden field, accepted only when the two match. |
 | CORS | Configurable per deployment. |
 | What the panel shows | The panel's mode (`panel_mode`, simple or advanced) and the setup switches (`console.php`, `embed-security.php`) decide which entries the menu draws and whether two pages are offered. **None is a permission:** a page left out of the menu opens at its address for anyone whose role allows it, a page switched off says so, and every command answers on `/management/` exactly as before. They remove reach, never access, and nothing that authorizes reads them. |
-| Per-project serving (`/p/<projectId>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. Hidden paths are refused as well — no segment of a served path may begin with a dot, so neither a dotfile nor anything inside a hidden directory such as `.git/` is reachable (§6.1). HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus the Content-Security-Policy described below — the same one a built site sends, from the same writer. Private projects require membership, and that decision is taken before a single byte is read: conditional and range requests are answered inside the same passthrough, so `Range` and `If-None-Match` reach no file the caller could not have fetched whole. |
-| Error + path disclosure | A PHP fatal happens outside every `try` a program can write, so all six entry points (`/management`, `/admin/api`, `/admin/state`, `/admin/self`, `/admin`, and the per-project view at `/p/<projectId>/`) register a shared shutdown handler (`secure/src/functions/errorHygiene.php`) that discards the partial output and answers `500` — as a JSON envelope on the API surfaces, as a plain page on the panel and on the public project view. The error's type, message, file and line reach the response **only** on an install that declares itself development (`environment.php`); otherwise they go to the PHP error log. The project view registers it inside `init.php`'s `/p/` block rather than in its own entry file, because that entry file cannot name `secure/` until `SECURE_FOLDER_PATH` has been resolved; registering there also puts the visibility gate itself inside the handler's reach. Separately, no response publishes where the installation lives: paths in a response body are rewritten to be relative before the envelope is assembled (`secure/src/functions/publicPaths.php`), so the disk layout is not disclosed by an ordinary success either. See the note below on `display_errors`. |
+| Per-project serving (`/p/<projectId>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. Hidden paths are refused as well — no segment of a served path may begin with a dot, so neither a dotfile nor anything inside a hidden directory such as `.git/` is reachable (§6.1). HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus the Content-Security-Policy described below — the same one a built site sends, from the same writer. Every project requires membership, and that decision is taken before a single byte is read: conditional and range requests are answered inside the same passthrough, so `Range` and `If-None-Match` reach no file the caller could not have fetched whole. |
+| Error + path disclosure | A PHP fatal happens outside every `try` a program can write, so all six entry points (`/management`, `/admin/api`, `/admin/state`, `/admin/self`, `/admin`, and the per-project view at `/p/<projectId>/`) register a shared shutdown handler (`secure/src/functions/errorHygiene.php`) that discards the partial output and answers `500` — as a JSON envelope on the API surfaces, as a plain page on the panel and on the per-project view. The error's type, message, file and line reach the response **only** on an install that declares itself development (`environment.php`); otherwise they go to the PHP error log. The project view registers it inside `init.php`'s `/p/` block rather than in its own entry file, because that entry file cannot name `secure/` until `SECURE_FOLDER_PATH` has been resolved; registering there also puts the membership gate itself inside the handler's reach. Separately, no response publishes where the installation lives: paths in a response body are rewritten to be relative before the envelope is assembled (`secure/src/functions/publicPaths.php`), so the disk layout is not disclosed by an ordinary success either. See the note below on `display_errors`. |
 
 ### 8.1 Content-Security-Policy — one policy, every surface that serves a page
 
@@ -916,7 +977,7 @@ A single argument can contain literal commas by escaping them with `\,`. For exa
 
 **Reserved class names.** `qs.js` self-injects `<style id="qs-hidden-style">.hidden{display:none!important}</style>` into the document head at script-load time so projects without a `.hidden` rule still get a working hide. This makes `.hidden` a **reserved QuickSite class**: do not redefine it in your CSS — the `!important` will win regardless and the override won't apply. To get animated/custom hide behaviour, define your own class (e.g. `.fade-out`) and pass it as the `hideClass` arg to `QS.show`/`QS.hide`/`QS.toggleHide`/`QS.filter` instead.
 
-The core registry exposes 26 built-ins, grouped by what they act on: element visibility and classes, form fields and validation, navigation, fetching and rendering data, user feedback, browser storage and the auth-token verbs, and the state-store verbs of §9.3. The catalogue with every verb, its arguments and the picker UI each argument gets is in [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md), and `listJsFunctions` returns the same data at runtime.
+The core registry exposes 27 built-ins, grouped by what they act on: element visibility and classes, form fields and validation, navigation, fetching and rendering data, user feedback, browser storage and the auth-token verbs, and the state-store verbs of §9.3. The catalogue with every verb, its arguments and the picker UI each argument gets is in [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md), and `listJsFunctions` returns the same data at runtime.
 
 Use the live `listJsFunctions` command for the authoritative list. The catalog itself is declared **once** in `secure/src/functions/qsVerbCatalog.php` (the single source of truth) and is read by three consumers: the `listJsFunctions` command (picker payload), `JsonToHtmlRenderer` (runtime `{{call:fn:...}}` allowlist), and `JsonToPhpCompiler` (build-time allowlist). Add a new QS.* verb by adding an entry to that catalog file — the picker, the renderer, and the compiler all pick it up automatically; an unknown verb wired anyway is dropped with a `console.warn('[QS] unknown verb …')` in the rendered page. (The renderer allowlist also accepts `applyAuthState` for hand-authored manual re-scans; it is intentionally not surfaced in the picker.)
 
@@ -926,7 +987,7 @@ Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindi
 
 **Browser storage is namespaced per project.** Storage is scoped by origin and a path is not part of an origin, so every project served at `/p/<projectId>/` on one host shares a single `localStorage`. `qs.js` therefore writes and reads each key as `qsp_<projectId>_<key>` — the storage verbs, the `data-storage-*` / `data-auth-source` bindings and a state store's `localStorage:` / `sessionStorage:` init source all resolve through the same helper, so they always address the same slot. Everything an author writes names the bare key; the prefix exists only inside `qs.js`. The project id arrives from the server as `window.QS_PROJECT`, emitted before `qs.js` by `PageManagement::render()` (live) and `Page::render()` (built): at `/p/<projectId>/` the id is a URL segment, but a deployed build is served from its own root and the path carries no id at all, so deriving it client-side would give development and production different prefixes. The prefix is never stripped at build time — the two must agree on key names. Because every key goes through that helper, a project page cannot address panel state whatever a key is called: `qs_x` on a page is `qsp_<projectId>_qs_x` in the browser.
 
-**`QS.redirect` enforces a scheme allowlist** (`http`, `https`, `mailto`, `tel` — the same set as the server-side `UrlPolicy` that guards URL *attributes*), refusing anything else with a `console.warn`. Assigning a `javascript:` URL to `location.href` executes in the page's own origin, and the surface-B CSP cannot prevent it because engine pages require `script-src 'unsafe-inline'` for their own handlers. Three callers reach the sink with values the page did not choose: the `redirect` verb, the magic-link verbs' `returnTo` argument, and the `?return=` query parameter they fall back to. A binding's URL attribute is held to the same allowlist by the same check (§8, the *XSS in JSON content* row). In an attribute the server composes a written address in (`href`, `src`, `srcset`, `poster`, `action`, `formaction`, `cite`, `data`), a bound value starting with one `/` is then composed as a written one is: the base the page is served under and, on a multilingual site, the page's language, from what `window.QS_ROUTE` hands `qs.js`. Anything else a binding writes there (`https://…`, `//…`, `#…`, a relative path) is written as it comes, as a call target is (below).
+**`QS.redirect` enforces a scheme allowlist** (`http`, `https`, `mailto`, `tel` — the same set as the server-side `UrlPolicy` that guards URL *attributes*), refusing anything else with a `console.warn`. Assigning a `javascript:` URL to `location.href` executes in the page's own origin, and the surface-B CSP cannot prevent it because engine pages require `script-src 'unsafe-inline'` for their own handlers. Three callers reach the sink with values the page did not choose: the `redirect` verb, the magic-link verbs' `returnTo` argument, and the `?return=` query parameter they fall back to. That `?return=` value is followed only when it is a path on this site, and it is composed as a site address is: the base the page is served under and, on a multilingual site, the page's language. A binding's URL attribute is held to the same allowlist by the same check (§8, the *XSS in JSON content* row). In an attribute the server composes a written address in (`href`, `src`, `srcset`, `poster`, `action`, `formaction`, `cite`, `data`), a bound value starting with one `/` (in a `srcset`, each file) is then composed as a written one is: the base the page is served under and, on a multilingual site, the page's language, from what `window.QS_ROUTE` hands `qs.js`. Anything else a binding writes there (`https://…`, `//…`, `#…`, a relative path) is written as it comes, as a call target is (below).
 
 **A call target on this site is composed by the server, as a link to it is.** In the arguments the verb catalogue marks `siteUrl` — `redirect`'s URL, both magic-link `returnTo`s, and a direct-URL `fetch`'s URL — a value starting with one `/` names this site: a page gets the base and, on a multilingual site, the page's language (the same function as an `href`), a fetch's URL the base alone. The live render composes it as it renders; a build writes a call that composes it each time the page is served, against the base the site is deployed under. Anything else (`https://…`, `//…`, `#…`, a relative path) is written as authored. The `?return=` fallback, which the server never sees, is followed only when it is a path on this site, and `qs.js` composes it against `QS.basePath`; code an author writes by hand composes its own targets the same way.
 
@@ -938,13 +999,15 @@ Custom logic is expressed by composing the core functions or, for richer client 
 
 Calls in a handler attribute (`{{call:a}};{{call:b}};…`) are compiled by `CallTransformer::transform` (shared by the renderer and the compiler) with three rules:
 
-1. **Sync prelude** — verbs in `CHAIN_SYNC_PRELUDE` (`validate`) emit first as plain `QS.foo(...)` statements. They run inside the event tick and can still call `event.preventDefault()` or `throw` to abort the rest.
+1. **Sync prelude** — verbs in `CHAIN_SYNC_PRELUDE` (`prevent`, `validate`) emit first as plain `QS.foo(...)` statements. They run inside the event tick and can still call `event.preventDefault()` or `throw` to abort the rest.
 2. **Async wrap** — if the remaining body contains at least one verb from `CHAIN_AWAITABLE` (`fetch`, plus the Tier 3 magic-link verbs `exchangeMagicLink` / `requestMagicLink` / `logoutServer`), the body is wrapped in `(async()=>{await A;await B;…})().catch(e=>console.warn('[QS] chain aborted:',e))`. Every call gets `await`'d, so "fetch then hide" — or "exchangeMagicLink then saveToken then redirect" — actually waits for the response. One awaitable verb is enough: a handler holding only `{{call:fetch:…}}` is wrapped too, which is why a failing lone fetch surfaces as `[QS] chain aborted` in the console rather than an unhandled rejection.
 3. **No wrap without an awaitable verb** — a chain of purely synchronous verbs stays as-is and doesn't pay the microtask cost.
 
 Side channel: `QS.fetch` also dispatches `qs:fetch:loaded` / `qs:fetch:error` DOM events (with `detail.{ref, data}` or `detail.{ref, error}`) and caches the latest result per ref in `QS._fetchCache`. Use this when an action must react to a fetch fired from a different handler/page — see `QS.after(eventSuffix, handler)` and `QS.onceCached(eventSuffix, handler)` in `qs.js`. The chain rules above stay the default UX; events are the escape hatch.
 
-`event.preventDefault()` caveat: after the chain enters its async IIFE, calling preventDefault is a no-op (the default action has already fired). `validate` is in the sync prelude precisely for this reason. Any future verb that needs preventDefault must be added to `CHAIN_SYNC_PRELUDE`.
+`event.preventDefault()` caveat: after the chain enters its async IIFE, calling preventDefault is a no-op (the default action has already fired). `prevent` and `validate` are in the sync prelude precisely for this reason. Any future verb that needs preventDefault must be added to `CHAIN_SYNC_PRELUDE`.
+
+**A form's submit keeps the page when its chain sends something.** On an `onsubmit` handler the renderers write `QS.prevent(event)` first when the chain holds a verb the catalogue marks `sends` (one that makes a request: `fetch`, `fetchState`, `onScrollFetchState`, `refresh`, `requestMagicLink`, `exchangeMagicLink`, `logoutServer`), or when the element is a `<form>` with no `action` of its own. Otherwise the form's own submit would leave the page while the request is out, on a `GET` with every field in the address, and the answer would be lost. `CallTransformer::submitKeepsPage()` decides it once, for the live render and a build alike, from what the node authored; on an element other than a form only the first reason is read. A form with its own `action` whose chain only acts on the page (a `toast`) goes on posting there once the chain has run. `validate` stops a submit only when the form is invalid, or when it cannot be checked (no form found): a valid form goes on. `prevent` is the verb for a link: `{{call:prevent:event}}` keeps it from leaving, and the rest of its chain runs on the page. A `GET` or `HEAD` fetch puts a form's fields in its address, so one whose `body=` source holds a password field is not sent at all, and the console says why.
 
 #### 9.0.2 Compile-time translation resolution
 
@@ -1006,7 +1069,7 @@ this section covers the back-end synchronisation.
 binding references  ⊆  qs-enums.js contents  ⊆  union of all components' __enums__
 ```
 
-- Components' `__enums__` blocks (in `<projectId>/templates/model/json/components/*.json`) are the source of truth. Each entry: `{ source, map: {key: '__RAW__VALUE' | '__LIT__VALUE' | ...} }`.
+- Components' `__enums__` blocks (in `<projectId>/templates/model/json/components/*.json`) are the source of truth. Each entry: `{ source, map: {key: '__RAW__TEXT' | 'a.translation.key' | 'value'} }`: a raw text, a translation key, or a value written as it is (an attribute's, a class).
 - Each project's own `public/scripts/qs-enums.js` is its runtime registry. Contains **exactly** the enums that at least one binding references — no more, no less. Loaded by every page (when present) as `window.QS_ENUMS`.
 - Bindings reference enums by fully-qualified name: `<componentFilename>.<shortKey>` (e.g. `component-command-card.method_text`). Resolved at runtime via `QS.enum(name, value, fallback)`.
 
@@ -1023,7 +1086,7 @@ Algorithm (per call):
 2. Scan every `<projectId>/templates/model/json/components/*.json` for `__enums__` → map of available names.
 3. Validate: every referenced name has a definition. Missing references become **warnings**, not errors — the runtime gracefully degrades via `QS.enum`'s fallback (`fallback ?? value`).
 4. Build output: only entries that are BOTH available AND referenced. Sort keys for stable diffs.
-5. Strip `__RAW__` / `__LIT__` markers from values (renderer-only prefixes; the runtime reads plain strings).
+5. Strip the `__RAW__` marker from values (a renderer-only prefix; the runtime reads plain strings).
 6. Write the project's `public/scripts/qs-enums.js` with:
    ```js
    window.QS_ENUMS = { "component-command-card.method_text": { post: "POST", get: "GET", ... }, ... };
@@ -1339,7 +1402,7 @@ your-server/
     ├── config.php  routes.php  nginx_routes.conf
     ├── data/       aliases, route-resolvers, api-endpoints, embed-policy,
     │               the precomputed consent payload, the OAuth providers the
-    │               project uses and their build keys
+    │               project uses and their build keys, the social values
     ├── src/classes/    render + route + translate, plus the server-side data
     │                   path: DataResolver, OutboundUrlPolicy, IframeSandbox,
     │                   OAuthHandler
@@ -1368,7 +1431,9 @@ whole site at its root. The two answer opposite questions.
 The front controller derives its paths from its own location, not from
 `DOCUMENT_ROOT`: the build created the layout, so the depth is known. Every URL
 the site emits composes against a root-relative base built from the URL space,
-which survives a domain move, a scheme change and a reverse proxy.
+which survives a domain move, a scheme change and a reverse proxy. The one
+exception is the link-preview tags of a page's head, whose full addresses are
+composed when the page is served (§6.4).
 
 It also carries the two things a public surface owes its visitors regardless of
 which web server is in front of it:
@@ -1402,7 +1467,8 @@ files are split along that line so both halves cannot drift:
 | `ApiEndpointManager` — add/edit/validate, compile the client bundle | `apiRegistry.php` — look up an API, an endpoint, its `callableFrom` |
 | `resolverHelpers.php` — validate a config, generate schema samples | `resolverRegistry.php` — read the sidecar, hold the per-request values |
 | `consentHelpers.php` — derive the payload from the storage registry | the precomputed payload, plus `qs_consent_hydration_script()` |
-| `storageHelpers.php`, `projectContext.php` | `requestRuntime.php` — the validated host, the project-namespaced cookie name |
+| `storageHelpers.php`, `projectContext.php` | `requestRuntime.php` — the validated host, the project-namespaced cookie name, the request's scheme, the address the deployment declares and the composer of a full address |
+| `socialPreviewHelpers.php` — write the social values, check a picture against Media, the platform table and its warnings | `socialPreview.php` — read the values, write a page's link-preview tags |
 | `utilsManagement.php` | `jsonIo.php` — the one JSON writer three runtime files needed |
 
 The authoring file requires the runtime one, so there is a single definition of
@@ -1482,7 +1548,9 @@ Then:
 10. Copy `routes.php` and `config.php`, the runtime classes and function files
     (§11.2), the translations (all languages when the project is multilingual,
     `default.json` otherwise), and the project data a served page reads:
-    aliases, route resolvers and the API registry — plus the install-wide embed
+    aliases, route resolvers and the API registry, and the social values, compiled
+    with the Media entry (size, type, description) of each picture they name and
+    the build carries — plus the install-wide embed
     policy, bundled from the installation's own config rather than the project,
     so a built site keeps the same iframe sandbox rules the installation applies.
     The consent payload is PRECOMPUTED here rather than copied, because deriving

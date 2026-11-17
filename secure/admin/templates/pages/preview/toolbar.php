@@ -47,11 +47,32 @@
             </select>
         </div>
 
-        <!-- Page title: the page's title in the language shown (shown while a page is the edit target) -->
-        <div class="preview-toolbar__group" id="preview-page-title-group" style="display: none;">
+        <!-- Page title: the page's title in the language shown (shown while a page is the edit target, to a role that can change it) -->
+        <div class="preview-toolbar__group" id="preview-page-title-group" style="display: none;"<?= qs_editor_control_attrs('toolbar.title') ?>>
             <label class="preview-toolbar__label" for="preview-page-title"><?= __admin('preview.pageTitle') ?>:</label>
             <input type="text" id="preview-page-title" class="preview-toolbar__input" maxlength="200" autocomplete="off"
                    title="<?= adminEscape(__admin('preview.pageTitleHint')) ?>">
+        </div>
+
+        <!-- Page description: the page's description in the language shown, beside its title (a page of the site, not a
+             special page: those carry no link-preview tag). Its longest text is the engine's (QS_SOCIAL_DESCRIPTION_MAX);
+             the button after it opens the whole text in a dialog, and the mark names the platforms that would cut it
+             (preview.js, from getSocialPreview's table). -->
+        <?php require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php'; ?>
+        <div class="preview-toolbar__group" id="preview-page-description-group" style="display: none;"<?= qs_editor_control_attrs('toolbar.description') ?>>
+            <label class="preview-toolbar__label" for="preview-page-description"><?= __admin('preview.pageDescription') ?>:</label>
+            <input type="text" id="preview-page-description" class="preview-toolbar__input" maxlength="<?= (int) QS_SOCIAL_DESCRIPTION_MAX ?>" autocomplete="off"
+                   title="<?= adminEscape(__admin('preview.pageDescriptionHint')) ?>" aria-describedby="preview-page-description-cut">
+            <button type="button" id="preview-page-description-expand" class="admin-btn admin-btn--ghost admin-btn--icon-only preview-toolbar__expand"
+                    title="<?= adminEscape(__admin('preview.pageDescriptionExpand')) ?>" aria-label="<?= adminEscape(__admin('preview.pageDescriptionExpand')) ?>" aria-haspopup="dialog">
+                <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <polyline points="15 3 21 3 21 9"/>
+                    <polyline points="9 21 3 21 3 15"/>
+                    <line x1="21" y1="3" x2="14" y2="10"/>
+                    <line x1="3" y1="21" x2="10" y2="14"/>
+                </svg>
+            </button>
+            <span class="preview-toolbar__cut" id="preview-page-description-cut" hidden></span>
         </div>
 
         <!-- Theme Preview Toggle (always rendered; visibility managed by JS/config) -->

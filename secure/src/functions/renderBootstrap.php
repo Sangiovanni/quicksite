@@ -24,60 +24,16 @@
  *         derived base, made absolute. (getSiteMap's per-call `baseUrl` param rides
  *         above both, at its own call site.)
  *
+ * The declared value is read in one place, qs_declared_public_base() (requestRuntime.php), which a
+ * build carries: the full addresses a page's social tags hold are composed against it too
+ * (qs_full_address()).
+ *
  * Fail-safe: a malformed QS_PUBLIC_BASE_URL is error_log'd and falls through to the
  * derived base — a config typo degrades a sitemap, it never takes a render down.
  */
 
-require_once __DIR__ . '/projectContext.php'; // qs_request_origin
-
-if (!function_exists('qs_public_base_normalize')) {
-    /**
-     * Validate + normalise ONE candidate base value.
-     *
-     * Accepted shapes (anything else → null, caller logs and falls through):
-     *   - absolute http(s) URL  → ['abs' => scheme://host/path/, 'path' => /path/]
-     *   - root-relative path    → ['abs' => null,               'path' => /path/]
-     * Both forms come back with EXACTLY one trailing slash on every component —
-     * the invariant that kills two silent-failure modes
-     * (no-leading-slash relative links, glued-host absolutes) and the
-     * pre-existing `//` in emitted asset URLs.
-     *
-     * @return array{abs: ?string, path: string}|null
-     */
-    function qs_public_base_normalize(string $value): ?array
-    {
-        $value = trim($value);
-        if ($value === '' || preg_match('/[\s\0]/', $value) === 1) {
-            return null;
-        }
-        // A base carries no query/fragment — composing against one is malformed.
-        if (strpos($value, '?') !== false || strpos($value, '#') !== false) {
-            return null;
-        }
-
-        if ($value[0] === '/') {
-            $path = '/' . trim($value, '/');
-            $path = ($path === '/') ? '/' : $path . '/';
-            return ['abs' => null, 'path' => $path];
-        }
-
-        if (preg_match('#^https?://#i', $value) === 1) {
-            $parts = parse_url($value);
-            if ($parts === false || empty($parts['host'])) {
-                return null;
-            }
-            $origin = strtolower($parts['scheme']) . '://' . $parts['host'];
-            if (isset($parts['port'])) {
-                $origin .= ':' . $parts['port'];
-            }
-            $path = '/' . trim($parts['path'] ?? '/', '/');
-            $path = ($path === '/') ? '/' : $path . '/';
-            return ['abs' => $origin . $path, 'path' => $path];
-        }
-
-        return null;
-    }
-}
+require_once __DIR__ . '/projectContext.php'; // qs_request_origin, and through it requestRuntime.php:
+                                              // qs_public_base_normalize, qs_declared_public_base
 
 if (!function_exists('qs_resolve_public_base')) {
     /**
@@ -114,20 +70,14 @@ if (!function_exists('qs_resolve_public_base')) {
         }
 
         // ---- the absolute form: the deployment's word, when it declared one --
-        $env = $_SERVER['QS_PUBLIC_BASE_URL'] ?? $_SERVER['REDIRECT_QS_PUBLIC_BASE_URL'] ?? '';
-        if (is_string($env) && $env !== '') {
-            $declared = qs_public_base_normalize($env);
-            if ($declared !== null) {
-                return [
-                    'abs'  => $declared['abs'] ?? (qs_request_origin() . $declared['path']),
-                    'path' => $norm['path'],
-                ];
-            }
-            // Degrade loudly, never die over a config typo.
-            error_log(
-                "QuickSite: ignoring malformed QS_PUBLIC_BASE_URL='{$env}' "
-                . '(expected an absolute http(s) URL or a root-relative path) — using the derived base.'
-            );
+        // Read by the one reader (requestRuntime.php), which logs a malformed value and reads it as
+        // none: a config typo degrades a sitemap, never takes a render down.
+        $declared = qs_declared_public_base();
+        if ($declared !== null) {
+            return [
+                'abs'  => $declared['abs'] ?? (qs_request_origin() . $declared['path']),
+                'path' => $norm['path'],
+            ];
         }
         return ['abs' => $norm['abs'], 'path' => $norm['path']];
     }

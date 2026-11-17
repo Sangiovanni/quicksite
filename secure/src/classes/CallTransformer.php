@@ -37,11 +37,24 @@ require_once __DIR__ . '/../functions/runtimeHandoff.php';
  * with the renderer's own URL function (the composer handed to transform() /
  * resolveSegments()), and a build writes a call to the compiled page's, made
  * each time the page is served.
+ *
+ * A form's submit handler that keeps the page starts with QS.prevent(event):
+ * submitKeepsPage() decides it once, for both renderers, from what the node
+ * authored, so a form never posts natively while its chain sends it.
  */
 class CallTransformer
 {
-    /** Verbs pulled out of the async wrapper, emitted as a sync prelude. */
-    private const CHAIN_SYNC_PRELUDE = ['validate'];
+    /** One call in a chain: the verb, then its arguments after a ':'. */
+    private const CALL_PATTERN = '/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/';
+
+    /**
+     * Verbs pulled out of the async wrapper, emitted as a sync prelude: each acts on
+     * the event in its own tick, where stopping its default action still counts.
+     */
+    private const CHAIN_SYNC_PRELUDE = ['prevent', 'validate'];
+
+    /** What a chain that keeps the page starts with (submitKeepsPage()). */
+    private const KEEP_PAGE_CALL = 'QS.prevent(event)';
 
     /** Verbs returning a Promise — trigger async IIFE + `await` wrapping. */
     private const CHAIN_AWAITABLE = ['fetch', 'exchangeMagicLink', 'requestMagicLink', 'logoutServer'];
@@ -55,6 +68,9 @@ class CallTransformer
 
     private static array $siteUrlPositionalCache = [];
 
+    /** The verbs the catalogue marks `sends`, as name => true (chainSends()). */
+    private static ?array $sendingVerbs = null;
+
     /** Allowed verbs: catalog + the not-yet-cataloged applyAuthState. */
     public static function allowedFunctions(): array
     {
@@ -67,10 +83,80 @@ class CallTransformer
      * @param callable|null $composeTarget (string $url, string $kind) → string: a target on
      *                                     this site as the caller composes a link to it
      *                                     ('page' or 'resource'); null writes it as authored
+     * @param bool          $keepPage      the chain starts by stopping the event's default
+     *                                     action (submitKeepsPage())
      */
-    public static function transform(string $value, ?callable $composeTarget = null): string
+    public static function transform(string $value, ?callable $composeTarget = null, bool $keepPage = false): string
     {
-        return self::resolveSegments(self::transformSegments($value), $composeTarget);
+        return self::resolveSegments(self::transformSegments($value, $keepPage), $composeTarget);
+    }
+
+    /**
+     * Whether a submit handler keeps the page. Both renderers ask it of what a node
+     * authored and pass the answer to transform() / transformSegments(), so the live
+     * render and a build decide alike. The page is kept:
+     *   - when the chain sends something itself (a verb the catalogue marks `sends`).
+     *     Otherwise the form's own submit leaves the page while the request is out,
+     *     on a GET with every field in the address, and the answer is lost;
+     *   - when the handler is on a <form> with no action of its own. Its own submit
+     *     goes back to this very page, on a GET with every field in the address.
+     * A form with its own action whose chain only acts on the page (a toast) goes on
+     * posting there once the chain has run: where a form posts is its author's choice.
+     * On another element only the first reason is read: a form's submit bubbles to it,
+     * and which form's action applies cannot be told from the element.
+     *
+     * @param string $tag      the element carrying the handler
+     * @param string $attrName the handler's attribute
+     * @param string $chain    the handler as authored
+     * @param array  $params   the element's params, as authored
+     */
+    public static function submitKeepsPage(string $tag, string $attrName, string $chain, array $params): bool
+    {
+        if (strtolower($attrName) !== 'onsubmit') {
+            return false;
+        }
+        if (self::chainSends($chain)) {
+            return true;
+        }
+        return strtolower($tag) === 'form' && !self::hasOwnAction($params);
+    }
+
+    /** Whether a chain holds a verb the catalogue marks `sends`. */
+    private static function chainSends(string $chain): bool
+    {
+        if (!preg_match_all(self::CALL_PATTERN, $chain, $matches)) {
+            return false;
+        }
+        if (self::$sendingVerbs === null) {
+            self::$sendingVerbs = [];
+            foreach (qsVerbCatalog() as $entry) {
+                if (($entry['sends'] ?? false) === true) {
+                    self::$sendingVerbs[$entry['name']] = true;
+                }
+            }
+        }
+        foreach ($matches[1] as $fn) {
+            if (isset(self::$sendingVerbs[$fn])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * A form's own action: its first `action` param (a browser reads attribute names
+     * in any case and keeps the first), holding something other than blanks. A blank
+     * or missing one sends the form back to the page it is on. The blanks are the
+     * ones a browser strips from an address: space, tab, line feed, form feed, return.
+     */
+    private static function hasOwnAction(array $params): bool
+    {
+        foreach ($params as $name => $value) {
+            if (strtolower((string) $name) === 'action') {
+                return is_string($value) && trim($value, " \t\n\f\r") !== '';
+            }
+        }
+        return false;
     }
 
     /**
@@ -81,11 +167,13 @@ class CallTransformer
      * walk of the chain for both uses, so the live render and a build cannot write
      * different JavaScript around the argument.
      *
+     * @param bool $keepPage the chain starts with QS.prevent(event) (submitKeepsPage()),
+     *                       written once: not again when the author wrote that call
      * @return array<int, string|array{arg: string, keyword: ?string}|array{target: string, kind: string}>
      */
-    public static function transformSegments(string $value): array
+    public static function transformSegments(string $value, bool $keepPage = false): array
     {
-        if (!preg_match_all('/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/', $value, $matches, PREG_SET_ORDER)) {
+        if (!preg_match_all(self::CALL_PATTERN, $value, $matches, PREG_SET_ORDER)) {
             return [$value];
         }
         $allowed = self::allowedFunctions();
@@ -118,6 +206,12 @@ class CallTransformer
                     $hasAwaitable = true;
                 }
             }
+        }
+
+        // A chain that keeps the page stops the event's default action before
+        // anything else runs: a check that throws, or an await, comes too late.
+        if ($keepPage && !in_array([self::KEEP_PAGE_CALL], array_map(fn(array $call) => self::mergeStrings($call), $syncPrelude), true)) {
+            array_unshift($syncPrelude, [self::KEEP_PAGE_CALL]);
         }
 
         $parts = [];

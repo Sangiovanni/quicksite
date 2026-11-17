@@ -38,6 +38,12 @@ if (!defined('SECURE_FOLDER_PATH')) {
  *                multilingual site (the same function as an href)
  *   'resource' = the site's base alone (a fetch's URL in direct-URL mode)
  *
+ * sends (read by CallTransformer): true on a verb that makes a request. A form's
+ * submit chain holding one keeps the page: the renderers write QS.prevent(event)
+ * first, so the form's own submit never leaves with the fields while the request
+ * is out (CallTransformer::submitKeepsPage()). A new verb that makes a request
+ * says so here, or a form that uses it posts natively as well.
+ *
  * category hints (consumed by the admin picker, by design):
  *   'dom-toggle'  = show/hide/class manipulation
  *   'form'        = form-targeted (validate, future submit helpers)
@@ -152,6 +158,17 @@ function qsVerbCatalog(): array {
             'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
         ],
         [
+            'name' => 'prevent',
+            'category' => 'nav',
+            'signature' => 'QS.prevent(event)',
+            'args' => [
+                ['name' => 'event', 'type' => 'Event', 'required' => true, 'default' => 'event', 'description' => 'Keep the word event: the renderer forwards the click, and its default action is stopped.', 'inputType' => 'eventArg']
+            ],
+            'description' => 'Keep a link from going to its address, so the rest of the chain runs on this page: a link that opens a menu, for example. It runs first, before anything is awaited, as it must. A form needs none: the page stays when a form\'s submit chain sends something itself, or when the form has no action of its own.',
+            'example' => '{{call:prevent:event}};{{call:toggleHide:#menu}}',
+            'events' => ['onclick']
+        ],
+        [
             'name' => 'filter',
             'category' => 'display',
             'signature' => 'QS.filter(event, itemsSelector, matchAttr?, hideClass?, emptyParent?)',
@@ -233,12 +250,13 @@ function qsVerbCatalog(): array {
             'args' => [
                 ['name' => 'target', 'type' => 'string', 'required' => true, 'description' => 'What to call: @apiId/endpointId for a registered endpoint, or an HTTP method (GET, POST, PUT, PATCH, DELETE) to call a URL directly.'],
                 ['name' => 'url', 'type' => 'string', 'required' => false, 'description' => 'The URL to call, when target is a method: /api/contact. A path starting with / is on this site: the site\'s base is put in front of it (never a language). Supports a {{lang}} placeholder.', 'siteUrl' => 'resource'],
-                ['name' => 'body', 'type' => 'string', 'required' => false, 'description' => 'Send a form: body=#contact-form sends every named input inside that form or container as a JSON payload.', 'inputType' => 'selector'],
+                ['name' => 'body', 'type' => 'string', 'required' => false, 'description' => 'Send a form: body=#contact-form sends every named input inside that form or container as a JSON payload. A GET or HEAD has no body, so its fields go in the address instead, and one whose form or container holds a password field is not sent at all: the console says why.', 'inputType' => 'selector'],
                 ['name' => 'silent', 'type' => 'string', 'required' => false, 'description' => 'silent=1 keeps the default success and error toast from showing.']
             ],
-            'description' => 'Call an API: send a form to it, or load data for the page. For an endpoint of this project\'s API registry pass @apiId/endpointId; for a direct call pass METHOD, URL, then options. Use body=#form-id to send every named input inside that form or container as a JSON body: the way to submit a form after QS.validate.',
+            'description' => 'Call an API: send a form to it, or load data for the page. For an endpoint of this project\'s API registry pass @apiId/endpointId; for a direct call pass METHOD, URL, then options. Use body=#form-id to send every named input inside that form or container as a JSON body: the way to submit a form after QS.validate. On a form\'s submit the page stays while it is sent, and the answer is kept.',
             'example' => '{{call:fetch:POST,/api/contact,body=#contact-form}}',
-            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit', 'onload']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit', 'onload'],
+            'sends' => true
         ],
         [
             'name' => 'validate',
@@ -248,7 +266,7 @@ function qsVerbCatalog(): array {
                 ['name' => 'event', 'type' => 'event', 'required' => true, 'description' => 'Keep the word event: the renderer forwards the event object, and on failure preventDefault() is called on it.'],
                 ['name' => 'formSelector', 'type' => 'string', 'required' => true, 'description' => 'The <form> to check, as a CSS selector: #contact-form.', 'inputType' => 'selector']
             ],
-            'description' => 'Check a form before it is sent: required fields, a valid email and so on, by the form\'s own HTML5 rules (required, minlength, pattern, type=email, ...). On failure the rest of the {{call:...}} chain does not run, so a chained fetch only runs when the form is valid. Each invalid field\'s browser error message goes into a sibling [data-error-for="<fieldname>"] container, which is cleared when the field becomes valid.',
+            'description' => 'Check a form before it is sent: required fields, a valid email and so on, by the form\'s own HTML5 rules (required, minlength, pattern, type=email, ...). On failure the form is not sent and the rest of the {{call:...}} chain does not run, so a chained fetch only runs when the form is valid. Each invalid field\'s browser error message goes into a sibling [data-error-for="<fieldname>"] container, which is cleared when the field becomes valid. A valid form goes on: to its own action when nothing in the chain sends it, else the page stays while the chain does. A form it cannot find counts as invalid.',
             'example' => '{{call:validate:event,#contact-form}};{{call:fetch:POST,/api/contact,body=#contact-form}}',
             'events' => ['onsubmit']
         ],
@@ -299,7 +317,8 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Get a new access token by hand: a "Refresh session" button, for example. It is the same flow as the automatic refresh on a 401: it reads the refresh token from the API\'s refreshTokenSource, POSTs to its refreshEndpoint, and stores the new access token. A raw fetch to the refresh endpoint will NOT work: only this verb can inject the stored refresh token. Fires `qs:auth:saved` on success.',
             'example' => '{{call:refresh:@auth-api}}',
-            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onload']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onload'],
+            'sends' => true
         ],
         [
             'name' => 'exchangeMagicLink',
@@ -308,11 +327,12 @@ function qsVerbCatalog(): array {
             'args' => [
                 ['name' => 'endpoint', 'type' => 'string', 'required' => true, 'description' => 'The endpoint that trades the code in the address for a session token, as @apiId/endpointId: @auth-api/exchange-magic. Typically configured with auth.type=none: the exchange itself IS the login.', 'inputType' => 'apiEndpoint'],
                 ['name' => 'paramName', 'type' => 'string', 'required' => true, 'description' => 'The :param in your route URL that carries the magic code. If your route is /auth/magic/:key, pick "key". The picker lists the :params declared on the current page\'s route — typo-proof. Under the hood the verb reads QS.routeParams[name], the route the server resolved for the page (see ARCHITECTURE §6.3).', 'inputType' => 'routeParam'],
-                ['name' => 'returnTo', 'type' => 'string', 'required' => false, 'description' => 'Where to go after the exchange succeeds, such as /dashboard. Optional. A path starting with / is a page of this site, composed like a link (the site\'s base, and the page\'s language on a multilingual site). Falls back to the ?return= query param, which is followed only when it is a path on this site. With neither, no auto-redirect: chain an explicit {{call:redirect:/path}} step instead. When provided AND saveToken calls are chained after this verb, the saveTokens still run before the browser processes the queued navigation (they\'re sync and execute in the same microtask).', 'inputType' => 'route', 'siteUrl' => 'page']
+                ['name' => 'returnTo', 'type' => 'string', 'required' => false, 'description' => 'Where to go after the exchange succeeds, such as /dashboard. Optional. A path starting with / is a page of this site, composed like a link (the site\'s base, and the page\'s language on a multilingual site). Falls back to the ?return= query param, which is followed only when it is a path on this site, and is composed the same way. With neither, no auto-redirect: chain an explicit {{call:redirect:/path}} step instead. When provided AND saveToken calls are chained after this verb, the saveTokens still run before the browser processes the queued navigation (they\'re sync and execute in the same microtask).', 'inputType' => 'route', 'siteUrl' => 'page']
             ],
             'description' => 'Sign a visitor in from the link in their email: the page at /auth/magic/:key trades the code in the address for a real session token. It POSTs {key: <captured code>} to the configured endpoint and stores the response in QS._lastFetchResult, so chained saveToken calls pick up the returned token + refreshToken. The URL code is single-use and short-lived: never put the real session token in the URL directly (it leaks via email forwarding, browser history, corporate HTTPS proxy logs, and mail-client link prefetchers). The route is authored via /admin/sitemap. Dispatches qs:auth:exchange-started before fetch + qs:auth:exchange-failed in catch so a magic-link-handler component can show "connecting" / "invalid link" UI via data-auth-show.',
             'example' => '{{call:exchangeMagicLink:@auth-api/exchange-magic,key}};{{call:saveToken:localStorage,authToken,token}};{{call:saveToken:localStorage,refreshToken,refreshToken}};{{call:redirect:/dashboard}}',
-            'events' => ['onload']
+            'events' => ['onload'],
+            'sends' => true
         ],
         [
             'name' => 'requestMagicLink',
@@ -325,7 +345,8 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Email a visitor a sign-in link: a "Send me a link" form, for example. It POSTs {email} to the issue-magic endpoint, and the auth API emails a single-use code. Pairs with exchangeMagicLink, which runs on the landing page after the visitor clicks the link. The server-side endpoint MUST NOT reveal whether the email exists in its user store; the standard pattern is "always return 200" to avoid an account-enumeration oracle. That is the auth API\'s responsibility: this verb just POSTs.',
             'example' => '{{call:validate:event,#login-form}};{{call:requestMagicLink:@auth-api/issue-magic,#email-input,/check-email}}',
-            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'onsubmit'],
+            'sends' => true
         ],
         [
             'name' => 'logoutServer',
@@ -336,7 +357,8 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Log a visitor out on the server too: the first half of a "Log out" button. Chain this BEFORE clearToken, so the request still has the token attached, then clearToken to drop the local copy. It tells the auth API to invalidate the session or revoke the refresh token, as a thin wrapper around QS.fetch so the registry\'s bearer auth is applied. Logout failures are intentionally swallowed: the visitor wants out either way, so a clearToken and a redirect after it always run.',
             'example' => '{{call:logoutServer:@auth-api/logout}};{{call:clearToken:localStorage,authToken}};{{call:clearToken:localStorage,refreshToken}};{{call:redirect:/}}',
-            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup'],
+            'sends' => true
         ],
         [
             'name' => 'setState',
@@ -360,7 +382,8 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Load a state store\'s data: after setState, or once when the page opens. It runs the store\'s bound endpoint with its current field values, applies the response back into the store, and re-renders its bound DOM (data-state-value / data-state-list). For infinite-scroll triggers, prefer onScrollFetchState: it adds debounce + in-flight + exhausted guards (raw onscroll → fetchState thrashes the API).',
             'example' => '{{call:fetchState:commandsList}}',
-            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'oninput', 'onchange', 'onsubmit', 'onload']
+            'events' => ['onclick', 'ondblclick', 'oncontextmenu', 'onkeydown', 'onkeyup', 'oninput', 'onchange', 'onsubmit', 'onload'],
+            'sends' => true
         ],
         [
             'name' => 'onScrollFetchState',
@@ -373,7 +396,8 @@ function qsVerbCatalog(): array {
             ],
             'description' => 'Load more as the visitor scrolls down: infinite scroll. Use as a page-event ONLOAD action, and pair with an append:true list field. It registers (once per store) a debounced window-scroll listener that calls fetchState only when the viewport is near the page bottom, and STOPS firing once the store is marked exhausted (HTTP error, response items empty, or a both-direction cursor that did not advance). setState clears the exhausted flag (e.g. a fresh search re-arms the trigger).',
             'example' => '{{call:onScrollFetchState:scrollingStore,200,100}}',
-            'events' => ['onload']
+            'events' => ['onload'],
+            'sends' => true
         ]
     ];
 }

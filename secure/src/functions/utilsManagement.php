@@ -772,6 +772,30 @@ function flattenRoutes(array $routes, string $prefix = ''): array {
 }
 
 /**
+ * The page keys a project's routes make, for every reader of translation keys (getUnusedTranslationKeys,
+ * analyzeTranslations, validateTranslations): each route's title, `page.titles.<route>`, which every page reads,
+ * so it is used and required; and each description, `page.descriptions.<route>`, which a page MAY have, so it is
+ * used where a language holds it and never missing where it does not. Every route counts, a nested or a
+ * parameter route's page included: each has a title and a description of its own.
+ *
+ * @param array $routes       the project's routes (routes.php)
+ * @param array $translations one language's translations: the descriptions it holds are answered ([] for none)
+ * @return array{titles: string[], descriptions: string[]}
+ */
+function qs_page_translation_keys(array $routes, array $translations): array {
+    $titles = [];
+    $descriptions = [];
+    $held = is_array($translations['page']['descriptions'] ?? null) ? $translations['page']['descriptions'] : [];
+    foreach (flattenRoutes($routes) as $route) {
+        $titles[] = 'page.titles.' . $route;
+        if (array_key_exists($route, $held)) {
+            $descriptions[] = 'page.descriptions.' . $route;
+        }
+    }
+    return ['titles' => $titles, 'descriptions' => $descriptions];
+}
+
+/**
  * Check if a route path exists in nested routes structure
  * 
  * @param string $routePath Route path to check (e.g., 'guides/getting-started')
@@ -898,13 +922,13 @@ function qs_component_name_refusal($name, string $field = 'name'): ?ApiResponse
 }
 
 /**
- * Whether a text value is written as is: a `__RAW__` or `__LIT__` value, which the renderer and the
- * compiler show verbatim, never a translation key. A command that copies nodes keeps such a value as
- * it is, with no key and no translation: a key made for it would show the key's name, not the text.
+ * Whether a text value is written as is: a `__RAW__` value, which the renderer and the compiler show
+ * verbatim, never a translation key. A command that copies nodes keeps such a value as it is, with
+ * no key and no translation: a key made for it would show the key's name, not the text.
  */
 function qs_is_literal_text($value): bool
 {
-    return is_string($value) && (strncmp($value, '__RAW__', 7) === 0 || strncmp($value, '__LIT__', 7) === 0);
+    return is_string($value) && strncmp($value, '__RAW__', 7) === 0;
 }
 /**
  * Validate that params array does not contain reserved data-qs-* attributes

@@ -8,8 +8,10 @@
  * below rank 6). The owner's role is immutable here — transferOwnership is
  * the only door. Self-targeting is refused explicitly.
  *
- * No cache touch: the users.php mirror is roleless (role is authoritative in
- * members.json only) and the target's status stays 'member'.
+ * The role is authoritative in members.json only, and the target's status stays
+ * 'member'. Once the role is written, the member is told: a role notice on their
+ * own users.php entry (qs_membership_note_role_change()) names the old role, the
+ * new one and who changed it, until they dismiss it on My memberships.
  *
  * @method POST
  * @route /management/p/<projectId>/changeMemberRole
@@ -125,6 +127,11 @@ function __command_changeMemberRole(array $params = [], array $urlParams = []): 
     if ($written !== true) {
         [$status, $code, $message] = qs_members_failure_http($failure);
         return ApiResponse::create($status, $code)->withMessage($message);
+    }
+
+    // The member is told. Secondary: members.json already holds the new role.
+    if (!qs_membership_note_role_change($targetId, $project, (string)$previousRole, $newRole, $actorId)) {
+        error_log("changeMemberRole: the role notice could not be written for '{$targetId}' on '{$project}'");
     }
 
     return ApiResponse::create(200, 'operation.success')

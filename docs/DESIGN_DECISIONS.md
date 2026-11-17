@@ -5168,7 +5168,7 @@ import (rejected — the archive still discloses the roster to whoever holds it)
 `secure/management/command/exportProject.php`. Behaviour:
 [COMMAND_API.md](COMMAND_API.md).
 
-### Making a project world-visible is owner-only (locked 2026-07-18)
+### Making a project world-visible is owner-only (locked 2026-07-18) (superseded 2026-11-16)
 
 **Decision**: `setProjectVisibility` is owner-only, in its own category. The
 adjacent join-policy setter stays with admins and owners.
@@ -6610,7 +6610,7 @@ same panel without one is an inconsistency that will not survive the next reader
 `secure/admin/templates/layout.php`. Behaviour:
 [ADMIN_PANEL.md §6](ADMIN_PANEL.md), [ARCHITECTURE.md §8](ARCHITECTURE.md).
 
-### Project visibility lives on the members page, shaped deliberately unlike the join policy (locked 2026-08-11)
+### Project visibility lives on the members page, shaped deliberately unlike the join policy (locked 2026-08-11) (superseded 2026-11-16)
 
 **Decision**: `setProjectVisibility` is surfaced on `/admin/members`, above the
 join-policy control, rendered as a framed block with a coloured state badge, the
@@ -15782,6 +15782,322 @@ The three views stay as they were: a computer has all three devices, a tablet sh
 **Alternatives considered**: the list in a settings file (each item needs a form of its own, which a line of settings cannot bring); a Button drawn as a link (two different things, Sangio's ruling); the operator choosing which tools each mode shows (a third filter beside the role and the mode); every tool left visible and refused by the server (what the design review found: a viewer met Move and Text, and only a refusal); four `addNode` calls for a List (a list half-added when the write limit stops the third); keys left behind by a refused add (a translation file filling with keys nothing reads); the mode switch closing a tool without a word (a beginner loses unsaved work to a click in the account menu); an embedded YouTube or Vimeo video in the simple list (it goes through the embed policy: not now); the Media picker opening as soon as Image, Video or Audio is picked (ruled first, and dropped after the run: it read as a bug); a List of exactly three items (too rigid).
 
 **Source**: Sangio's design round of 2026-11-10, his rulings on the Add list of 2026-11-13 and his answers to the questions put that day; the panel's design review of 2026-11-09; beta.12. `secure/admin/functions/editorTools.php`, `secure/admin/templates/pages/preview/_simple-add.php`, `public/admin/assets/js/pages/preview/preview-simple-add.js`, `public/admin/assets/js/pages/preview/preview.js` (`controlOffered()`, `toolOffered()`, `updateIframeWarning()`, `embedOutsidePolicy()`), `public/admin/assets/js/core/panel-mode.js` (`QuickSitePanelModeGuards`, `quicksite:panel-mode`), `secure/admin/templates/pages/preview/tools.php`, `contextual-select.php`, `contextual-style.php`, `main-area.php`, `public/admin/assets/admin.css`.
+
+### One address rule: a link to `/0`, every file of a `srcset`, `__RAW__` the one marker and read only where a key can be, every block of a stored list, and the language on the magic-link return (locked 2026-11-13)
+
+**Supersedes** (in part): *Every insert next to or into a node follows one rule, every root of a snippet lands, and a raw text stays as written* (see above) — its "A value starting with `__RAW__` or `__LIT__`": only a `__RAW__` value is copied as written now, a `__LIT__` one being a key like any other. *The snippet preview is built in its frame element by element, shows what the page will render, and can show the keys instead* (see above) — its "a raw or literal text (`__RAW__` / `__LIT__`)": a raw text shows as written, read where the renderer reads it. The rest of both entries stands.
+
+**Decision**: six faults in how a written or bound address, and a value marked as text, become what a page draws, closed in the preview, the build and the browser together.
+
+- **A link to `/0` is a path** in the preview, as a build already drew it: the renderer's `processUrl()` compares the rest of the address with `''`, where PHP's `empty()` took the text `0` for nothing.
+- **Every file of a `srcset` is composed and checked**, on an `<img>` and on a `<source>` inside a `<picture>`. The value is split as the HTML standard splits it (an address may hold a comma; its descriptor is `1x`, `2x`, `480w` and so on); each address is held to the URL allowlist, a refused one drawn `#` in its place, and composed with the site's base and language by the same rule as an `src`, in the preview, in a build (folded when the compile knows the value, split when the page is served when a placeholder fills it) and in the browser (a bound `srcset`). The descriptors and the commas and spaces between files are kept as written. The write gate judges each file: a `srcset` whose later file carries a refused scheme is refused on save, and one written over several lines is not.
+- **`__RAW__` is the one marker, read only where a value can be a translation key**: in a text node and in the translatable attributes, at the translation step, before any placeholder is filled. Anywhere else nothing is translated and nothing is removed: a `__RAW__` there is part of the value, drawn and checked as written. The panel and the commands write `__RAW__`. `__LIT__` is no marker: a value starting with it is ordinary text, a key in a text node. The editor's enum card offers Raw text, Translation key and Attribute value, the last written with no prefix, for a class or an address.
+- **Every block naming a stored list is filled** (`data-state-list`), each from its own template.
+- **The magic-link return keeps the page's language**: `QS.exchangeMagicLink()` composes a `?return=` path on this site as every site address is composed (`_qsComposeSiteAddress()`): the base the page is served under and, on a multilingual site, the page's language.
+- **A build checks a URL attribute it does not compose** (`xlink:href`, `ping`, …) once a system placeholder in it is filled, as the preview does: the write gate reads the value as written, where a placeholder can sit inside a scheme it would refuse.
+
+**Reasoning**: the six were found while a bound address was made to compose as a written one (the entry about a binding and a refresh, above), and Sangio ruled each on 2026-11-12 ("agree"; on the `srcset`: "we should allow it and fix it so it works"). The marker went further on his word of 2026-11-13. He had agreed that `__RAW__` and `__LIT__` mean one thing, "use this text exactly, no translation", and then: "I propose replacing all LIT by RAW and stop using LIT … And so start considering __LIT__ as a textkey." Existing projects do not count: "they all will be deleted and quicksite will be rework when the quicksite engine v1 will be up". Asked where the one marker belongs, he answered from its meaning: "only textkey, alt, title, and other parameter like this see there __RAW__ replaced by the RAW. Actually everywhere a translation key make sense. I think it doesn't make sense to consider a textKey in a link parameter for example?", and chose that rule ("yes go with B"). The marker is read where it means something, and none of the translatable attributes is an address, a refresh, an event handler or a binding's target, so no check ever meets a value whose marker the page would then remove. That is how the preview had gone wrong: it removed `__LIT__` after its URL check, so on a URL attribute it does not compose, a scheme the check refuses could be drawn, and a value filled from the request could carry the marker in. Removing the marker from every attribute before anything reads it (a build's rule) would have closed that too, at the price of a marker read in five places at five moments, where he warned: "we need to be careful with some timing condition here. I remember that thing broke because we replace the __RAW__ to fast at some point". The build's check on a system placeholder was found in the same function and taken in on his word ("agree"), narrowly: an attribute the build composes has `processUrl()` in front of its value.
+
+**Alternatives considered**: the two markers kept apart (`__RAW__` for text, `__LIT__` for every attribute: two names for one meaning, which the preview and the build each read their own way); `__LIT__` kept readable as the same marker (every reader carrying two spellings of one thing); `__LIT__` as the one name; the marker removed from any attribute before anything reads the value (a link marked `__RAW__` would still get its base and language, but the marker would pass the URL check, the refresh test, a binding's target and the save checks, each needing it removed at the right moment); a refusal of the marker on an address (refusing a value that harms nothing once it is drawn as written); a `srcset` rebuilt tidily from its parts (a page whose only change is an address would change elsewhere too); a refused file dropped from the `srcset` (every other refused address is drawn `#`); a written `?…` read against the page (route parameters preferred: "I would prefer use the params /:slug we use"); the build's check applied to every URL attribute holding a system placeholder (no safety gained where `processUrl()` stands in front, and the compiled text of every page with a language switch would change).
+
+**Source**: the faults found while a bound address was made to compose as a written one, Sangio's rulings of 2026-11-12 and his answers of 2026-11-13; beta.12. `secure/src/classes/UrlPolicy.php` (`srcsetAddresses()`, `mapSrcset()`, `refusedSrcsetAddress()`), `secure/src/classes/JsonToHtmlRenderer.php` (`renderAttribute()`, `processUrl()`), `secure/src/classes/JsonToPhpCompiler.php` (`attributeValueExpr()`, `staticSrcsetExpr()`), `secure/src/functions/nodeParamPolicy.php`, `secure/src/runtime/qs.js` (`_qsMapSrcset()`, `renderList()`, `QS.exchangeMagicLink`), `public/admin/assets/js/pages/preview/preview.js` (the enum card, the snippet preview).
+
+### A member is told when someone else changes their role, by name; the one who changed it is not (locked 2026-11-13)
+
+**Amends**: *An accepted join request leaves a notice, and dismissing it ends nothing* (see above). A change made to
+your access while you are away is told, whichever way it goes.
+
+**Decision**: When `changeMemberRole` changes a member's role, or `transferOwnership` makes a member the owner, the
+member's own entry in their `users.php` copy carries a role notice (`role_change`: the role they were last told of,
+the new role, the account that made the change, the date), and *My memberships* lists **Role changed**: the project,
+*from* the old role *to* the new one, and *Changed by* the account's name as the roster shows it, read when the
+notice is listed. A second change before they dismiss it keeps the first role and takes the latest role, account and
+date; a change back to that first role takes the notice away. The one who makes a change is never told of it: the
+departing owner of a transfer gets nothing, and a role notice of theirs still waiting goes, since they chose the role
+they keep. The notice is a mark on the live member entry, beside the approved notice: a project can hold both, one row
+each, each dismissed on its own (`dismiss-notice` takes `notice`, the kind to clear; without it every notice of the
+project goes), and the menu's dot and the dashboard count each row. The shared repair keeps the mark while the roster
+lists the person as a member and never writes one. A role changed by editing `members.json` by hand tells nobody: no
+one made it through QuickSite, and the copy keeps no role to compare with.
+
+**Reasoning**: A role that loses a right loses its controls at the next page (every control a role cannot use is
+hidden from it), so without a word the person sees the panel shrink and does not know why. Sangio raised it during a
+run of the editor's simple view and agreed the shape: a notice on *My memberships*, as for a refusal, a removal, a
+deleted project and an accepted request. He chose, on a recommendation put to him, that it names who made the change: the
+roster already shows that name to every member. Asked what a project shows when two notices
+wait at once, he answered "as many row as they are needed for every potential case that can happen at the same
+time". The first role and the latest one say what changed since the person last knew, which the latest change alone
+does not when they never saw the one before it.
+
+**Alternatives considered**: no notice (the person learns from the controls that disappear); an email (QuickSite sends
+none, and a notice is where the panel already tells a member what was decided about them); a notice that does not
+name who made the change; a notice to the one who made it too (they know); the latest change only, from a role the
+person never held to their knowledge; the role notice replacing the approved one (one notice per project, the
+accepted request lost unread); the changer's name stored when the notice is written (a name the roster no longer
+shows, where *Invited by* reads it when listed).
+
+**Source**: Sangio's idea in a UX run of the editor's simple view, his ruling of 2026-11-13 and his answers of the
+same day; beta.12. `secure/src/functions/AuthManagement.php` (`QS_MEMBERSHIP_ROLE_CHANGED`,
+`qs_membership_role_change()`, `qs_membership_note_role_change()`, `qs_membership_reconciled_entry()`),
+`secure/management/command/changeMemberRole.php`, `secure/management/command/transferOwnership.php`,
+`secure/admin/functions/membershipSelf.php` (`qs_membership_list_invitations()`, `qs_membership_dismiss_notice()`),
+`public/admin/assets/js/pages/memberships.js`.
+
+### A panel language that lacks a word shows it in English, key by key (locked 2026-11-13)
+
+**Decision**: `AdminTranslation` lays a language's words over the English ones key by key. A word the language's file
+leaves out is English wherever it sits, even inside a section the file holds, through `__admin()`, `has()` and every
+sub-tree `getRaw()` hands a page; only a word `en.json` lacks too shows its key. The editor's words keep their rule:
+`preview-config.php` asks each one with no fallback of its own.
+
+**Reasoning**: English was laid under the language one section at a time, so a section the French file held hid
+every English word it left out: in French, 131 of the editor's words showed their key (`preview.pageTitle` among
+them), 786 across the panel. A key on screen does make a missing word findable, but the panel is then unusable in
+that language for that word, and what a language lacks is counted from the word files. Sangio took it with a second
+finding of the same measurement, the command categories read again at every question.
+
+**Alternatives considered**: writing the missing French words now (the language work that follows does, with every
+word renamed after the panel's last changes); a fallback written at each call (two places for one English word, and
+the editor's words are asked with none on purpose); English under French one section at a time (as before: a section
+present hides the rest).
+
+**Source**: a measurement of the editor's Workflows rows in French, Sangio's answer of 2026-11-13; beta.12.
+`secure/admin/functions/AdminTranslation.php` (`loadTranslations()`, `layOver()`).
+
+### A deleted account leaves every contact list, and the list is one searchable dropdown (locked 2026-11-14)
+
+**Decision**: When an account deletes itself, its id leaves every other account's list of people worked with
+(`contacts` on each `users.php` record) in the same write that deletes the account. The list is still never checked
+against the accounts when it is read. An id no account has that is still on a list (written by hand, or kept from
+before a deletion took it out) is forgotten by the panel when an invitation or a proposal to it answers
+`404 user.not_found`, and the toast says the account no longer exists. On the Invite and Propose forms the list is one
+searchable dropdown, the panel's own (`QSSearchableSelect`): each person by name with their `user_id` under it, the
+search matching either; choosing someone selects them as a search match does, and a *Forget* button beside it drops the
+person chosen.
+
+**Reasoning**: Sangio, in his UX run of the role notice: accounts deleted long ago were still on his list, and a list
+that grows by one row per person "might look ugly". He proposed two ways to clear the gone ones: when the page shows,
+or when an invitation to one fails. The list was built never to be checked against the accounts when it is read: a
+caller can put any id on it, so a list that dropped the ids no account has would answer whether an account exists.
+Taking the id out where the account goes keeps that true at no cost to a page load; the failed invitation catches what
+the deletion could not reach (no migration). For the dropdown he asked for one that exists rather than a new one.
+
+**Alternatives considered**: pruning when the page shows (it reopens the question the list was built not to answer,
+though an invitation already answers it to anyone who owns a project); only forgetting on a failed invitation (a gone
+account stays listed until it is used); a one-time cleanup of the lists already written (no migration); keeping the
+rows and adding a search box over them; *Forget* on the *Selected* row under the lookup.
+
+**Source**: Sangio's request of 2026-11-14 and his answers ("Yes, as recommended"); beta.12.
+`secure/admin/functions/accountSelf.php` (`qs_account_delete()`), `secure/admin/functions/contacts.php`,
+`public/admin/assets/js/pages/members.js` (`forgetGoneContact()`, the contacts dropdown),
+`secure/admin/templates/pages/members.php`.
+
+### Every page carries its link-preview tags, their addresses composed when it is served (locked 2026-11-14) (superseded 2026-11-16)
+
+**Decision**: Every page writes, right after its `<title>`, the description, Open Graph and X tags a platform draws a
+shared link's card from, in the HTML the server sends (the platforms' crawlers run no script). One function produces
+them and both page shells call it, the live render on `/p/<projectId>/` and a build's (`socialPreview.php`, which a
+build carries). With nothing set, a page writes its title, its type (`website`), its address and the site's name.
+The values are one JSON file in the project (`data/social-preview.json`): site-wide a default picture, the card type,
+an optional X account, an optional theme colour and a territory per language; per page a picture and a card type.
+The page's value wins, else the site's, else what is derived. The texts are translation keys: the title is the page's
+title, a new `page.descriptions.<route>` per language is the description (with the title's placeholders), `site.name`
+is the site's name, the picture's description in Media is `og:image:alt`, read through one function. `og:locale` is
+written only for a language the author gave a territory, with no table of territories in the engine. Two commands of
+their own: `getSocialPreview` (every role: the values, each page's tags per language, the warnings per platform, the
+platform table) and `setSocialPreview` (editor and above, beside `setSiteMapConfig`). The picture comes from Media and
+is never SVG; a picture under a platform's minimum or recommended size, a file over its limit or in a format it does
+not show, a text past what it shows are warned, never refused; the picture's shape is not warned at all, the card
+being shown instead. Every figure lives in one table in the engine, each with its source and the date it was read.
+Every address in the tags is a full one, composed per request by one function in `requestRuntime.php`, which a build
+carries: the request's scheme (a proxy's `X-Forwarded-Proto: https` upgrades it, nothing downgrades it), its validated
+host (its shape check and `QS_TRUSTED_HOSTS`), the base the deployment declares in `QS_PUBLIC_BASE_URL` or else the
+one the request derives, and the path. `_oauthIsHttps()` answers with the same scheme test, and
+`qs_resolve_public_base()` reads the declared base through the same reader, both answering as before.
+
+**Reasoning**: Sangio's idea: the card a shared link gets "render randomly" without the tags, "and each has its
+specificities", and this was "the last time to add such slice before the translation rework". On the address he
+corrected the first proposal: QuickSite need not be told its public address, it composes it when the page is served,
+and "be careful the build need to work too": a build's base was a path and it did not carry the file that read
+`QS_PUBLIC_BASE_URL`, so a deployed build could not be given its address and behind a proxy ending HTTPS its cards
+would have said `http://`. On the values: "it's a project management so maybe it's worth creating command just for
+this". On the description he added a field beside the title in the editor, so the texts are the keys the title already
+is. On the picture's shape: "We should not care, we should have a preview for each platform if possible (with a last
+update for each platform, in case they change). And so the user will see the render directly and adapt manually if
+needed." Seven of the eight platforms read the same Open Graph tags and only X has tags of its own, so a page has one
+set of tags for everyone.
+
+**Alternatives considered**: an address stored as a project setting (the request already holds it, and a build moves);
+tags per device (no platform reads such a thing: each draws its own card per device from one set); the texts written in
+the JSON file instead of translation keys (a second place for a page's words, outside the translation tools); a
+separate social title (the page's title is what the platforms show); a table of territories in the engine (the
+installation's language codes carry no region, and the author knows theirs); an option per platform (only X reads tags
+of its own); a warning for a shape far from each platform's (the preview shows the crop).
+
+**Source**: the design round of 2026-11-14 (Sangio's rulings, each asked with a recommendation) and his answers to the
+worker's questions the same day; beta.12. `secure/src/functions/socialPreview.php`, `socialPreviewHelpers.php`,
+`requestRuntime.php` (`qs_request_is_https()`, `qs_declared_public_base()`, `qs_full_address()`),
+`secure/src/classes/Page.php`, `PageManagement.php`, `secure/management/command/getSocialPreview.php`,
+`setSocialPreview.php`, `build.php`.
+
+### The social previews page draws each platform's card from the engine's table, one device at a time (locked 2026-11-15)
+
+**Decision**: An Advanced-menu page, in a **Site** group after Sitemap, shows the card a shared link of the site gets on
+Facebook, X (the
+large or the small card, as the page asks), LinkedIn, WhatsApp, Discord, Slack, Telegram and iMessage, for one page and
+one language at a time, and sets the values the cards are drawn from. One list at its top names the whole site or one
+page, and drives both the one form below and the cards: the site's values (a picture from Media, the card type, an X
+account, a theme colour, and the territory of the language shown, from that language's territories in the engine:
+see entry below), with the home page's cards; or a page's (a picture and a card type, each the site's unless the page
+sets one, its description in the language shown), with its own cards. On a multilingual site the form shows the
+language at the top's own fields (the territory, a page's title and description) and says which fields every
+language shares; switching the language keeps what was typed in those. A **Computer** / **Phone** switch draws every card for one device; the choice is kept per browser.
+Each card names its platform in words, with no logo, and is a look-alike: the page says so, dates each platform's
+figures and links its checker; Instagram is a line, as it draws no card for a link. Every figure a card uses is read
+from `getSocialPreview`'s platform table, never written in the page: the picture's crop from the platform's shape (the
+picture whole where none is published), whether it is drawn large, small beside the text or not at all from the
+platform's minimum, file size, widest shape and formats and from the rules it publishes a small picture for, the
+texts' cut from its lengths (in characters, or bytes where it counts bytes), and the lines a computer and a phone show,
+which the table gained for this. A figure the platform does not publish draws nothing and the card says so. The width
+of a card is the look-alike's own, one per device. Every role opens the page; the forms are drawn only for a role that
+can run `setSocialPreview`, and a viewer reads the same values as text. A field emptied is sent empty, which removes
+its value. In the visual editor, a **Description** field sits beside the title, behaving as the title does except that
+an emptied description is removed, and marks the platforms that would cut it as it is typed, by the same table; a button
+at its end opens the whole description in a dialog (a text area, its length, those platforms in a sentence, Save and
+Cancel), so a long one can be read and written without the toolbar growing; both fields are in the editor's one
+definition of what a role is shown, so a viewer sees neither.
+
+**Reasoning**: Sangio asked for "a preview for each social media" that ensures "the preview fit the social media", and
+for each platform's row "a last update ... in case they change", so the author "will see the render directly and adapt
+manually if needed": a card that crops and cuts by the platform's own published figures is that render, and a page
+that held a copy of the figures would go stale apart from the engine's warnings. One device at a time keeps sixteen
+cards to eight, and the difference between the two is mostly what the table now says (X shows a title on one line on
+a computer and two on a phone, and no description on a phone). A logo is brand artwork the tree would have to carry, or
+fetch; the platform's name says whose card it is. The page is for an author who looks further than the title and the
+description, which a beginner sets in the editor and which the cards are drawn from, so it is Advanced only. It sits in
+a **Site** group with Sitemap, whose word opens Sitemap, rather than as a link of its own: one more link wrapped the
+Advanced menu onto a second row on every page at laptop widths (from 1280 to 1439 pixels in English, 1366 to 1599 in
+French, measured), while the group leaves the header as it was at every width in both languages; in simple the group
+holds Sitemap alone and is drawn as its link, so the simple menu does not change. Both pages decide what the world
+sees of the site, as their two write commands share a category for that reason. One list at the top replaced two
+stacked sections, the site's then a page's, in Sangio's UX run: one choice says both what is set and what is drawn, and
+the inheritance shows in each field's first choice. A territory is a list, not two typed letters, and the list is the
+language's (see entry below): the browser names each code in any language, so the engine holds the codes alone. The
+territory is one field, for the language at the top, as a page's description is: Sangio asked for "the territory of
+only the language selected", and for the fields every language shares to say so, so that changing the language does
+not look like it changes them. Every first choice of the page's lists (no picture, the site's, none, the whole site)
+can be chosen again after another, which the panel's searchable list did not allow for an option of empty value.
+
+**Alternatives considered**: both devices side by side (twice the cards, with most of them alike); each platform's logo
+(artwork in the tree, or a fetch to a third party); the figures written in the page's code (a second copy that would
+drift from the engine's table and its warnings); the line counts read from the table's notes (prose, not figures); a
+width per platform (no platform publishes the width of its card); the page in the simple menu (a beginner has the
+title and the description in the editor); a link of its own after Sitemap (the Advanced menu on two rows at laptop
+widths, on every page); a group named Sitemap (its arrow still wrapped the French menu from 1366 to 1439 pixels);
+the site's values and a page's in two sections one above the other (the first build, which Sangio's run found
+harder to read than one choice); a toolbar Description field that grows as it is typed (the toolbar and the page
+under it would move with every line); a territory typed as two letters (any two capital letters were taken); a table of
+territory names in the engine (the browser names each one in the panel's language); a territory list per language, all
+at once (the first build: the language at the top already says which language is set); an X account per language
+(X documents `twitter:site` only as its card's attribution, and whether a card shows it is X's choice: a change of the
+stored values for an effect no one can see; the other platforms read Open Graph, which names no account).
+
+**Source**: the design round of 2026-11-14 and the worker's questions of 2026-11-15 (Sangio's rulings, each asked with
+a recommendation; his answers: "As recommended", "A Site group" on the menu's place, and his choices on the page's layout and the
+territory in his UX run of 2026-11-16); beta.12. `secure/admin/templates/pages/social-previews.php`,
+`public/admin/assets/js/pages/social-previews.js`, `public/admin/assets/js/core/social-figures.js`,
+`public/admin/assets/js/core/media-pictures.js`, `public/admin/assets/css/social-previews.css`,
+`secure/src/functions/socialPreviewHelpers.php` (`lines`, `picture.thumbnail`), `secure/admin/functions/editorTools.php`
+(`toolbar.title`, `toolbar.description`), `secure/admin/functions/panelMenu.php` (the Site group),
+`public/admin/assets/js/core/searchable-select.js` (`emptyChoice`).
+
+### A language's territories come from Unicode CLDR, its usual one announced when none is chosen (locked 2026-11-16)
+
+**Supersedes**: the territories portion of the ["Every page carries its link-preview tags
+…"](#every-page-carries-its-link-preview-tags-their-addresses-composed-when-it-is-served-locked-2026-11-14-superseded-2026-11-16)
+entry above: no table of territories in the engine, and `og:locale` written only for a language the author gave a
+territory.
+
+**Decision**: A language may be given only the territories where Unicode CLDR has it: the regions of its CLDR locales
+and its likely one, each an officially assigned ISO 3166-1 alpha-2 code (French: Belgium, Canada, Switzerland, Senegal
+and 42 more, never Argentina), held in one table in `socialPreview.php`, which a build carries, with its source and
+the date it was read. The likely one is the language's usual territory: a page announces the territory the author
+chose for its language, else the usual one (`fr_FR` for a French page with none chosen), and each other language as an
+alternate by the same rule; a language CLDR gives none (Esperanto) announces none. The table holds every language of a
+CLDR locale and every language of the shipped language list, one CLDR has no locale for with its likely territory
+alone, and a language added to the list is checked there in the same change. The one shape check refuses any other
+pair (French with AR), so the import, a served page and the panel agree with `setSocialPreview`; `getSocialPreview`
+answers each project language's usual territory and its list. A language has one territory, its default one: a
+QuickSite address is a language's (`/fr/about`), never a territory's.
+
+**Reasoning**: Sangio's UX run found a list of every code odd for a language ("it feel ok to have FR_be, but FR_ar ?")
+and asked for the language's own list, in the engine, open to the languages QuickSite will add, with a note that
+adding a language means checking the table. With no territory a page wrote no `og:locale`, and Facebook then takes it
+for American English (`en_US`), a French page included: the language's usual territory is the better default. A
+platform draws the card of an address, and QuickSite has one address per language, so several territories of one
+language could not get cards of their own: that needs languages with a region, each with its address, which the engine
+does not have. Sangio kept one territory per language, the language's default one, and takes regional languages to the
+version's manager.
+
+**Alternatives considered**: every officially assigned code for every language (French offering Argentina); the
+browser's own locale data (no table, but Chromium carries locales for part of the languages only, and the list would
+differ between browsers); no `og:locale` when none is chosen (the platforms then assume American English); a card per
+page, language and territory (no address serves a territory, so no card would show those values).
+
+**Source**: Sangio's UX run and his answers to the worker's questions of 2026-11-16; beta.12.
+`secure/src/functions/socialPreview.php` (`QS_SOCIAL_LANGUAGE_TERRITORIES`, `qs_social_language_territories()`,
+`qs_social_usual_territory()`), `socialPreviewHelpers.php` (`territories`).
+
+### A project's site is its members' alone: the choice to make it public leaves (locked 2026-11-16)
+
+**Supersedes**: *Making a project world-visible is owner-only* (locked 2026-07-18) and *Project visibility lives on the members page, shaped deliberately unlike the join policy* (locked 2026-08-11): the command and the section they decided are gone.
+
+**Supersedes** (in part), each keeping its title because what it held for a private project stands and now holds for every project: *The join-request posture matrix, including one deliberate knock-oracle* (locked 2026-07-17), its two public rows (an honest `403` on a public project's closed lane, the name shown on a public project's open one); *A private project's assets are Cache-Control private, not no-store* (locked 2026-08-15), its `public` header for a public project and the flag the gate kept to choose it.
+
+**Decision**: `setProjectVisibility` and its owner-only category `project.visibility` are gone (149 commands in 25 categories), and so is the members page's *Who can see this site* section. Every project's `/p/<projectId>/` view admits its members and nobody else: an anonymous visitor and a signed-in non-member get the `404` an id naming no project gets, whatever its `members.json` says. A project public before the upgrade is members-only after it, with no migration. A roster that still holds `visibility` is read by nothing; the roster check still holds the field to `private` or `public`, so an old file stays valid, and nothing writes it: a new roster has none, and a roster writer carries an old one on as it is. `listMembers` answers no `visibility`.
+
+Private is the only state: every project is what a private project was.
+
+- **The join-request posture follows the join policy alone.** A closed lane answers a request as an id naming no project does (`404 join.unavailable`, the same bytes). An open one records it, and so confirms to anyone who knows or guesses the id that the project exists: the owner's or an admin's choice, and `setJoinPolicy` says so whenever the policy it sets is open. A requester sees the project's id and never its name, on My memberships, in a refused notice and in a deletion notice, until they are a member.
+- **Every asset `/p/` serves is `Cache-Control: private, max-age=300`.** A member's own browser keeps its copy and revalidates it, and no shared cache holds one. `private` and not `no-store`, for the reason the entry on the assets' cache header gives: refusing a member a stored copy would also throw away revalidation, to prevent something `private` already prevents.
+
+A local `roles.php` that still names `project.visibility` needs no edit: a category that does not exist grants nothing and warns of nothing.
+
+**Reasoning**: Sangio, 2026-11-14: "we have the viewer role, and also a private/public 'Who can see this site' section ... might lead some user to misunderstanding and they might want to share the developed link while making it public rather than building it and deploy it. I would just get rid of the public/private feature." And on 2026-11-16: "public/private has been removed and replace by private only. If someone wants to share something publicly, he need to have the user as a member of its project under the viewer role." `/p/` is a development preview served from the panel's own origin, and a public one put anonymous visitors on that origin. A client sees a site as a member with the viewer role, or on a deployed build: showing someone a site before it is built was the public view's use, and it is the use it should not have had. With nothing left to make public, the owner-only category, the members page's framed section and its confirmation, and the posture's public rows had nothing left to guard. Once `/p/` admits members only, no platform can fetch a page in development to draw its card: the social previews page's look-alike cards are the preview before a deploy.
+
+**Alternatives considered**: keeping the choice, with its warnings (rejected — the warnings did not stop the misreading Sangio describes; the control itself invites sharing a development address); a separate "share a preview" link with a token or an expiry (rejected — a second way into `/p/` to secure, for a need a viewer account or a build already meets); a public view for a built site only (rejected — a build is served by its own server, never by `/p/`, so there is nothing to allow); a migration that rewrites old rosters (rejected — the field is read by nothing, and an installation before v1.0.0 holds development data only).
+
+**Source**: Sangio, 2026-11-14, and his rulings of 2026-11-16 on the stored field, `listMembers`, a project's name and an old `roles.php`; beta.12. `secure/src/functions/surfaceB.php` (`qs_surface_b_gate()`, `qs_sb_send_file()`), `secure/src/functions/AuthManagement.php` (`qs_project_birth_write_members()`), `secure/admin/functions/membershipSelf.php`, `secure/management/command/setJoinPolicy.php`, `denyJoinRequest.php`, `deleteProject.php`, `listMembers.php`, `secure/admin/templates/pages/members.php`, `public/admin/assets/js/pages/members.js`. Behaviour: [ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### The request's origin takes the one scheme test (locked 2026-11-16)
+
+**Decision**: `qs_request_origin()` takes its scheme from `qs_request_is_https()`, the test every full address a served page carries already uses: `HTTPS` set to anything but "off", in any letter case, port 443, or a proxy's `X-Forwarded-Proto: https`, which can only upgrade. Its four callers follow: the installation's own base address (the panel's and the management API's), `/p/<projectId>/`'s absolute base, a sitemap's default base and the completion of a declared path, and the origin the CORS check compares a browser's `Origin` with. Behind a proxy that ends HTTPS they read `https`. Without one they read as they did, but for an `HTTPS` value written `OFF`, which now reads as off, as the one test reads it.
+
+**Reasoning**: Two scheme tests answered differently behind such a proxy. A page's link-preview tags said `https` while the installation's base said `http`, and the CORS check compared a browser's `Origin: https://<host>` with `http://<host>`: a same-origin request, the panel's own calls to the management API among them, fell to the allowlist and was refused unless the deployer had listed the installation as another origin. One test answers the same everywhere. Trusting the header here is as safe as it is for the tags: it only ever upgrades, and it changes only the scheme of the installation's own origin, so a foreign `Origin` never matches it whatever the header says; a client outside a browser has no CORS to evade.
+
+**Alternatives considered**: keeping the origin's own test (rejected — the two tests disagree behind every proxy that ends HTTPS, and the CORS check refuses the installation's own calls there); a variable for the deployer to declare the scheme (rejected — `QS_PUBLIC_BASE_URL` already declares a site's address, and the header is how a proxy says what it ended); trusting `X-Forwarded-Host` as well (rejected — the host stays the validated one, which `QS_TRUSTED_HOSTS` pins).
+
+**Source**: a flag raised while the link-preview tags were built, accepted by Sangio on 2026-11-15; beta.12. `secure/src/functions/requestRuntime.php` (`qs_request_origin()`, `qs_request_is_https()`). Behaviour: [ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### A form's submit keeps the page when its chain sends something; a password never goes in a GET (locked 2026-11-16)
+
+**Decision**: On a form's `onsubmit`, the renderers write `QS.prevent(event)` at the head of the chain when the chain sends something itself, a verb the catalogue marks `sends` (`fetch`, `fetchState`, `onScrollFetchState`, `refresh`, `requestMagicLink`, `exchangeMagicLink`, `logoutServer`), or when the form has no `action` of its own. A form with its own `action` whose chain only acts on the page goes on posting there once the chain has run. `CallTransformer::submitKeepsPage()` decides it once, for the live render and a build alike, from what the node authored; on an element other than a form (a block a form's submit bubbles to) only the first reason is read. `validate` stops a submit only on failure, and a check that cannot run (no form found, no selector) is a failure. `prevent` is a verb, offered on a link's click. A `GET` or `HEAD` fetch whose body holds a password field, whatever it holds, is not sent, and the console says why; a `POST` carries the password in its body.
+
+**Reasoning**: An author who put a `fetch` on a sign-in form's submit with no `validate`, which the picker offers, sent the visitor's password into the page's address. The form also posted natively, and on a `GET` the page reloaded with every field in its address, into the browser's history and the server's logs; a `GET` fetch flattened every field into its query string, a password field included. Sangio on the submit, 2026-11-09: "onsubmit yes with the proposal", then, on the rule corrected the same day, "as you recommended". A form made in the panel has its own action and posts natively by default, so a page verb on it must not stop it. `validate` already promised to prevent on failure and prevented always, so a valid form with its own action and `validate` alone sent nothing. On a password in a `GET`, 2026-11-14: "Yes, all three". His answers of 2026-11-16 set the edges ("ok", and "agree" on the failed check): the mark in the catalogue, `prevent` on a click alone, a form with no chain left as plain HTML, a check that cannot run held as a failure, the refusal read from the field and said in the console, and the sending half alone on an element that is no form.
+
+**Alternatives considered**: every chain always keeps the page (rejected — an author who added a toast to a working form would lose the form, with no way back); `prevent` as an option of each verb (rejected — the renderers already decide a form's submit, and a link needs one word, not an option on every verb's list); a password allowed in a `GET` with a warning (rejected — the address is in the history and the logs before anyone reads a warning); a list of sending verbs kept in the transformer (rejected — a new verb that sends would be missed; the mark sits in its own catalogue entry); keeping the page on a form with no action and no chain (rejected — a same-page `GET` form is how a state store reads the address, and a form with no verb on it is the author's own markup).
+
+**Source**: a review of the runtime's verbs, which found the password in the address; Sangio's rulings of 2026-11-09 and 2026-11-14, and his answers of 2026-11-16; beta.12. `secure/src/classes/CallTransformer.php` (`submitKeepsPage()`, `CHAIN_SYNC_PRELUDE`), `secure/src/classes/JsonToHtmlRenderer.php`, `secure/src/classes/JsonToPhpCompiler.php`, `secure/src/functions/qsVerbCatalog.php` (`prevent`, the `sends` marks), `secure/src/runtime/qs.js` (`QS.prevent`, `QS.validate`, `_qsBodyHoldsPassword()`). A site built before keeps its behaviour until it is built again: a build carries its compiled handlers and its own copy of `qs.js`. Behaviour: [ARCHITECTURE.md §9.0.1](ARCHITECTURE.md).
+
+### A picture's alt text is written per language in Media, under a key it makes on the first text (locked 2026-11-17)
+
+**Decision**: Media keeps a picture's `alt` as a translation key, and its edit form writes the text one language at a time: a selector of the project's languages (never the panel's), starting on the project's default, and the text. The key is invisible plumbing: `alt.` and a name from the picture's file name, lower case with `_` for anything else (a random name when fewer than three characters are left), never a name a word file already holds (read with `getTranslations`, the files, not `getTranslationKeys`, the pages: a key on no page still exists), a random ten-character suffix until free. It is made on the first save of a text, never at upload, which no longer asks for an alt. A save writes the languages written and only them: the others are left without a text, and their pages show the missing marker in a placed picture's `alt` until they are written, while the card names them (*No alt text: FR, DE*). An `alt` already shaped as the renderer reads a key is edited in place, with no key made. A text written before the alt had languages reads as the default language's and becomes a key on the first save of an alt change. A language's text emptied removes its word; the key and the picture's `alt` stay. A deleted picture leaves its key. Media offers no "decorative" choice. The link-preview tags read the key in the page's language: `og:image:alt` is that language's word, or no tag. The panel orders the writes (the words, then `editAsset`) and takes them back when one is refused; no command changed.
+
+**Reasoning**: What reads a picture's `alt` already expects a key: the editor's image picker copies Media's `alt` into a translation-key picker, and the renderer reads a key's shape in the page's language, so a free text in Media reached a multilingual page in one language only. The author should write a text, never pick a key. A copy of the text into the other languages would count as written in a language it is not, and the language check that counts missing words would not see it; a missing word is what a validator and the badge can find, while an empty one is a silent claim. Whether a picture is decorative belongs to where it is placed, since the same photo can be content on one page and decoration on another, so Media does not decide it. An `alt` that already names a key is that key on the pages that placed it: editing it in place is what makes those pages right. The name comes from the file because a file's name is unique in Media's picture folder, and a name already held by a word file is never taken, so a word no page uses yet is never overwritten. Sangio, 2026-09-06 (the design), 2026-11-16 (eight answers: the engine's one change, a save writes the language written only, an existing key edited in place, a plain text converted on save, the panel's words in English and French, the viewer), and 2026-11-17 (six answers: a key's shape is a key whether or not a file holds it, the words *Alt text* beside the AI's *Description*, a text kept per language until Save, every Media control hidden from a role that cannot run it, French for the words this adds, a name without the folder).
+
+**Alternatives considered**: a key made at upload (rejected — a key with no text, on no page, is noise in an inventory of unused keys and leads nobody back to the picture; and made with an empty text and placed, it would declare every picture decorative); the text copied into every language (rejected — a text in the wrong language counts as written, and the check of missing words would not find it); a key picker on the page instead of a text (rejected — the key is plumbing; an author writes what the picture shows); a "decorative" tick in Media (rejected — a picture is decorative where it is placed, not in itself); the selector on the panel's language (rejected — the panel and the site speak different languages); a key name from the folder and the file (rejected — every picture lives in one folder, so the folder only lengthens each key).
+
+**Source**: the design of 2026-09-06, Sangio's rulings of 2026-11-16 and 2026-11-17; beta.12. `public/admin/assets/js/core/media-alt.js` (`QSMediaAlt`: the key's shape and name, a picture's texts, the badge, `plan()` and `run()`), `public/admin/assets/js/pages/assets.js`, `secure/admin/templates/pages/media.php`, `secure/src/functions/socialPreview.php` (`qs_social_picture_alt()`). Behaviour: [ADMIN_PANEL.md §9.15](ADMIN_PANEL.md).
 
 ### Fresh Start keeps the words a registry owns, and a deleted policy page leaves no record (locked 2026-11-09)
 

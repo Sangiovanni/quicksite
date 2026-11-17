@@ -20,8 +20,9 @@
 
     /**
      * Resolve one admin string by its FULL dot path; a path that resolves to
-     * nothing returns THE PATH ITSELF, so an unset string is visible on screen
-     * rather than hidden behind an English fallback.
+     * nothing returns THE PATH ITSELF, so a string no word file holds is visible
+     * on screen rather than hidden behind an English fallback here (a word a
+     * language lacks arrives in English, laid under it by the server).
      */
     function t(path, params) {
         let node = window.QS_EMBED_SECURITY_I18N || {};

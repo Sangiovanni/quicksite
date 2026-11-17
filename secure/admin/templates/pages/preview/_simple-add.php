@@ -107,7 +107,7 @@ $simpleAddItems = [
         <div class="preview-contextual-form__field" id="simple-add-alt-field">
             <label for="simple-add-alt"><?= __admin('preview.simpleAdd.description', 'Short description') ?>:</label>
             <input type="text" id="simple-add-alt" class="admin-input" autocomplete="off">
-            <p class="preview-contextual-form__hint"><?= __admin('preview.simpleAdd.descriptionHint', 'Read aloud to people who cannot see the image, and shown when it cannot load.') ?></p>
+            <p class="preview-contextual-form__hint"><?= __admin('preview.simpleAdd.descriptionHint', 'Read aloud to people who cannot see the image, and shown when it cannot load. Left empty: the picture\'s alt text in Media.') ?></p>
         </div>
         <p class="preview-contextual-form__hint" id="simple-add-media-controls"><?= __admin('preview.simpleAdd.mediaControls', 'Shown with its play controls.') ?></p>
     </div>

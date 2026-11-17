@@ -71,12 +71,14 @@ function qs_membership_resolve(array $params, ?string &$project, ?string &$userI
 
 /**
  * The caller's membership INBOX: pending invitations, their own join requests,
- * and project notices — the terminal ones (refused / removed / deleted) and the
- * approved one (their own join request accepted).
+ * and project notices — the terminal ones (refused / removed / deleted), the
+ * approved one (their own join request accepted) and the role notice (someone
+ * else changed their role). A member entry can carry the approved notice and the
+ * role notice at once: each is its own row.
  *
  * Reads the caller's OWN users.php cache (cheap — no all-projects scan), then
- * hydrates each pending entry, and each member entry carrying the approved
- * notice, from that project's AUTHORITATIVE members.json: a stale mirror can
+ * hydrates each pending entry, and each member entry carrying a notice, from
+ * that project's AUTHORITATIVE members.json: a stale mirror can
  * never misrepresent an offer or a membership, and drift self-corrects TOWARD
  * AUTHORITY by the shared repair rule (qs_membership_reconciled_entry(), as
  * reconcileMemberships and the dashboard's repair apply it) — a dangling pending
@@ -84,7 +86,7 @@ function qs_membership_resolve(array $params, ?string &$project, ?string &$userI
  * upgraded to a member entry (restores picker visibility when an approve/accept
  * mirror write was lost); a mirror whose pending KIND disagrees with the
  * authority's direction is healed to the authority's side, keeping its own date;
- * an approved notice is listed only while the roster lists the caller as a
+ * a member entry's notice is listed only while the roster lists the caller as a
  * member, and goes with an entry the roster contradicts.
  * Sponsored proposals (`by` != me) are never mine to see: a drifted mirror
  * pointing at one is pruned, and the row is not listed. The heal writes the copy
@@ -171,12 +173,11 @@ function qs_membership_list_invitations(): ApiResponse {
             } else {
                 // 'pending_request': my own join request (a sponsored proposal,
                 // by != me, was never mine to see: the rule pruned it above).
-                // Name privacy: the project's name only when it is public; a
-                // private project shows the id the requester typed.
+                // Name privacy: the id the requester typed, never the project's
+                // name — a requester is not a member.
                 $row = [
                     'project'      => $projectId,
-                    'project_name' => (($authority['visibility'] ?? 'private') === 'public')
-                        ? qs_project_display_name($projectId) : $projectId,
+                    'project_name' => $projectId,
                     'role'         => $inv['role'] ?? null,
                     'at'           => $inv['at'] ?? ($entry['at'] ?? null),
                 ];
@@ -198,8 +199,9 @@ function qs_membership_list_invitations(): ApiResponse {
                 $row['note'] = $entry['note'];
             }
             $notices[] = $row;
-        } elseif (qs_membership_has_approved_notice($entry)) {
-            // The caller's own join request, accepted. Listed only while the
+        } elseif (qs_membership_has_approved_notice($entry) || qs_membership_role_change($entry) !== null) {
+            // A member entry's notices: the caller's own join request, accepted,
+            // and their role changed by someone else. Listed only while the
             // roster lists them as a member: then the project's name is theirs
             // to read, so it is read now, as for any membership.
             if ($projectId === '' || strpbrk($projectId, "/\\") !== false || strpos($projectId, '..') !== false) {
@@ -222,15 +224,25 @@ function qs_membership_list_invitations(): ApiResponse {
             if ($want !== $entry) {
                 $heal[$projectId] = $want;
             }
-            if (!qs_membership_has_approved_notice($want)) {
-                continue;
+            // One row per notice the entry carries, each naming the project.
+            $project = ['project' => $projectId, 'project_name' => qs_project_display_name($projectId)];
+            if (qs_membership_has_approved_notice($want)) {
+                $notices[] = $project + [
+                    'status' => QS_MEMBERSHIP_APPROVED,
+                    'at'     => $entry['created'] ?? null,
+                ];
             }
-            $notices[] = [
-                'project'      => $projectId,
-                'project_name' => qs_project_display_name($projectId),
-                'status'       => QS_MEMBERSHIP_APPROVED,
-                'at'           => $entry['created'] ?? null,
-            ];
+            $change = qs_membership_role_change($want);
+            if ($change !== null) {
+                // Who changed it, by the name the roster shows, read now.
+                $notices[] = $project + [
+                    'status' => QS_MEMBERSHIP_ROLE_CHANGED,
+                    'from'   => $change['from'],
+                    'to'     => $change['to'],
+                    'by'     => qs_public_user_ref($change['by'], $usersCfg),
+                    'at'     => $change['at'],
+                ];
+            }
         }
         // Any other member entry is not an inbox item.
     }
@@ -487,20 +499,25 @@ function qs_membership_leave(array $params): ApiResponse {
 }
 
 /**
- * Clear ONE notice from the CALLER's own users.php cache — the "OK, seen it" for
+ * Clear a notice from the CALLER's own users.php cache — the "OK, seen it" for
  * the notices the inbox surfaces. A terminal notice (refused | removed |
- * deleted) is the whole entry, and goes. The approved notice is a mark on a live
- * member entry: the mark goes and the membership stays exactly as it was.
+ * deleted) is the whole entry, and goes. The approved notice and the role notice
+ * are marks on a live member entry, and can wait side by side: the mark goes and
+ * the membership stays exactly as it was.
+ *
+ * `notice` (optional) names the one to clear: refused, removed, deleted,
+ * approved or role_changed. Without it, every notice the project holds for the
+ * caller goes. Naming one the project does not hold answers 404.
  *
  * LIVE states are never dismissable: a membership is ended by leaving the
- * project, a pending invitation by declining it. So a member entry without the
+ * project, a pending invitation by declining it. So a member entry without a
  * mark, and every pending entry, is refused, and no dismissal can end one.
  *
  * Pure cache operation: no members.json involved (for a 'deleted' notice the
  * project — and its members.json — no longer exists; that is the point). The
  * project id is shape-checked only, never existence-checked.
  *
- * @param array $params project
+ * @param array $params project, notice (optional)
  * @return ApiResponse
  */
 function qs_membership_dismiss_notice(array $params): ApiResponse {
@@ -508,10 +525,18 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
     if ($refusal = qs_membership_resolve($params, $project, $userId)) {
         return $refusal;
     }
+    $kind = $params['notice'] ?? null;
+    $kinds = array_merge(QS_MEMBERSHIP_NOTICES, [QS_MEMBERSHIP_APPROVED, QS_MEMBERSHIP_ROLE_CHANGED]);
+    if ($kind !== null && (!is_string($kind) || !in_array($kind, $kinds, true))) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('notice must be one of: ' . implode(', ', $kinds))
+            ->withErrors(['notice' => 'Unknown notice']);
+    }
 
     $error = null;
     $status = null;
-    $written = qs_users_mutate(function (array &$cfg) use ($userId, $project, &$error, &$status) {
+    $cleared = [];
+    $written = qs_users_mutate(function (array &$cfg) use ($userId, $project, $kind, &$error, &$status, &$cleared) {
         $entry = $cfg['users'][$userId]['projects'][$project] ?? null;
         if (!is_array($entry)) {
             $error = 'notice.not_found';
@@ -519,15 +544,38 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
         }
         $status = $entry['status'] ?? 'member';
         if (in_array($status, QS_MEMBERSHIP_NOTICES, true)) {
+            if ($kind !== null && $kind !== $status) {
+                $error = 'notice.not_found';
+                return false;
+            }
             unset($cfg['users'][$userId]['projects'][$project]);
+            $cleared = [$status];
             return true;
         }
+        // A member entry's marks: each notice kind and the field that holds it.
+        $marks = [];
         if (qs_membership_has_approved_notice($entry)) {
-            unset($cfg['users'][$userId]['projects'][$project]['notice']);
-            return true;
+            $marks[QS_MEMBERSHIP_APPROVED] = 'notice';
         }
-        $error = 'notice.not_dismissable';
-        return false;
+        if (qs_membership_role_change($entry) !== null) {
+            $marks[QS_MEMBERSHIP_ROLE_CHANGED] = 'role_change';
+        }
+        if ($marks === []) {
+            $error = 'notice.not_dismissable';
+            return false;
+        }
+        if ($kind !== null) {
+            if (!isset($marks[$kind])) {
+                $error = 'notice.not_found';
+                return false;
+            }
+            $marks = [$kind => $marks[$kind]];
+        }
+        foreach ($marks as $field) {
+            unset($cfg['users'][$userId]['projects'][$project][$field]);
+        }
+        $cleared = array_keys($marks);
+        return true;
     });
 
     if ($error === 'notice.not_found') {
@@ -549,6 +597,7 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
         ->withData([
             'project'   => $project,
             'dismissed' => true,
+            'notices'   => $cleared,
         ]);
 }
 
@@ -563,17 +612,13 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
  * don't set terms — the note says what they want, approval materializes viewer,
  * and changeMemberRole handles upgrades.
  *
- * Enumeration posture (visibility × join_policy):
- *   private+closed  → 404 join.unavailable, IDENTICAL to a nonexistent project
- *                     (no existence oracle).
- *   private+open    → 201; the owner OPTED into knockability-by-id. The
- *                     caller's inbox shows the PROJECT ID, never the
- *                     project's name — a knock may confirm existence, not the
- *                     name.
- *   public+closed   → honest 403 join.requests_closed (existence is already
- *                     public via /p/<id>/ serving; a uniform 404 would be
- *                     theater).
- *   public+open     → 201; the inbox shows the project's name (public anyway).
+ * Enumeration posture (by join_policy):
+ *   closed  → 404 join.unavailable, IDENTICAL to a nonexistent project
+ *             (no existence oracle).
+ *   open    → 201; the owner OPTED into knockability-by-id. The
+ *             caller's inbox shows the PROJECT ID, never the
+ *             project's name — a knock may confirm existence, not the
+ *             name.
  * The project is the id as typed, with or without a leading `#`.
  * Self-knowledge is never an oracle: already-member → 409; my own pending
  * invite/request → 409. A SPONSORED proposal about the caller is NOT
@@ -633,10 +678,7 @@ function qs_membership_request_join(array $params): ApiResponse {
     $today = date('Y-m-d');
     $error = null;
     $failure = null;
-    $visibility = 'private';
-    $written = qs_members_mutate($project, function (array &$m) use ($userId, $note, $today, &$error, &$visibility) {
-        $visibility = $m['visibility'] ?? 'private';
-
+    $written = qs_members_mutate($project, function (array &$m) use ($userId, $note, $today, &$error) {
         // Self-knowledge branches (each reveals only what the caller's own
         // membership/inbox already shows).
         if (isset($m['members'][$userId])) {
@@ -662,7 +704,7 @@ function qs_membership_request_join(array $params): ApiResponse {
         // The lane gate (in-lock — a concurrent setJoinPolicy cannot be outrun).
         $policy = $m['join_policy'] ?? 'closed';
         if ($policy !== 'open') {
-            $error = ($visibility === 'public') ? 'requests_closed' : 'unavailable';
+            $error = 'unavailable';
             return false;
         }
 
@@ -679,15 +721,11 @@ function qs_membership_request_join(array $params): ApiResponse {
         return true;
     }, $failure);
 
-    // Uniform not-found: a nonexistent project answers EXACTLY like a private
+    // Uniform not-found: a nonexistent project answers EXACTLY like a
     // project whose request lane is closed — no existence oracle.
     if ($failure === 'missing' || $failure === 'invalid_project' || $error === 'unavailable') {
         return ApiResponse::create(404, 'join.unavailable')
             ->withMessage('This project does not accept join requests');
-    }
-    if ($error === 'requests_closed') {
-        return ApiResponse::create(403, 'join.requests_closed')
-            ->withMessage('This project does not currently accept join requests');
     }
     if ($error === 'member.already_exists') {
         return ApiResponse::create(409, 'member.already_exists')
@@ -707,7 +745,7 @@ function qs_membership_request_join(array $params): ApiResponse {
     }
 
     // Status mirror (secondary write, silent-failure by ruling). No name: the
-    // inbox reads it when it lists, and only for a public project.
+    // inbox shows the id the requester typed.
     $mirror = qs_membership_mirror_entry('pending_request', $today);
     if (!qs_membership_cache_set($userId, $project, $mirror)) {
         error_log("membership request: cache mirror write failed for '{$userId}' on '{$project}'");

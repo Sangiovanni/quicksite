@@ -36,16 +36,14 @@ foreach (loadRolesConfig() as $__rName => $__rCfg) {
     }
 }
 
-// join_policy + visibility for the admin-only policy zone — read server-side
+// join_policy for the admin-only policy zone — read server-side
 // from members.json (no API read surface for join_policy exists, deliberately:
 // the page renders on the same engine). Emitted ONLY for admin/owner, the
 // setJoinPolicy audience.
 $__joinPolicy = null;
-$__visibility = null;
 if ($__isAdmin && $__project !== '') {
     $__membersData = loadProjectMembers($__project);
     $__joinPolicy = $__membersData['join_policy'] ?? 'closed';
-    $__visibility = $__membersData['visibility'] ?? 'private';
 }
 ?>
 
@@ -53,15 +51,9 @@ if ($__isAdmin && $__project !== '') {
 window.QS_MEMBERS_CONFIG = {
     project: <?= json_encode($__project) ?>,
     myUserId: <?= json_encode($__myUserId) ?>,
-    myRole: <?= json_encode($__myRole) ?>,
     myRank: <?= (int)$__myRank ?>,
     roleRanks: <?= json_encode($__roleRanks) ?>,
-    joinPolicy: <?= json_encode($__joinPolicy) ?>,
-    visibility: <?= json_encode($__visibility) ?>,
-    isOwner: <?= $__isOwner ? 'true' : 'false' ?>,
-    // The URL a 'public' visibility actually exposes — shown so the owner sees
-    // what they are opening up, not just an abstract word.
-    siteUrl: <?= json_encode($__project !== '' ? $router->projectSiteBase() . '/' : '') ?>
+    joinPolicy: <?= json_encode($__joinPolicy) ?>
 };
 window.QS_MEMBERS_I18N = <?= json_encode([
     'loading'          => __admin('common.loading'),
@@ -106,8 +98,8 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'selected'         => __admin('members.invite.selected', 'Selected'),
     'inviteSentMsg'    => __admin('members.invite.sentMsg', 'Invitation sent'),
     'proposeSentMsg'   => __admin('members.propose.sentMsg', 'Proposal recorded — an admin or the owner must validate it'),
-    'contactUse'        => __admin('members.contacts.use'),
-    'contactForget'     => __admin('members.contacts.forget'),
+    'contactPick'       => __admin('members.contacts.pick'),
+    'contactGone'       => __admin('members.contacts.gone'),
     'contactForgotten'  => __admin('members.contacts.forgotten'),
     'contactForgetFailed' => __admin('members.contacts.forgetFailed'),
     'contactSaveFailed' => __admin('members.contacts.saveFailed'),
@@ -118,23 +110,8 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'policyOpen'       => __admin('members.policy.open', 'open'),
     'policyClosed'     => __admin('members.policy.closed', 'closed'),
     'policySavedMsg'   => __admin('members.policy.savedMsg', 'Join policy updated'),
-    'policyAdvisory'   => __admin('members.policy.advisory', 'Privacy note: this project is PRIVATE with an OPEN join policy — any authenticated account that knows or guesses its id can send a request and thereby learn the project exists.'),
-    'policyConfirmOpenPrivate' => __admin('members.policy.confirmOpenPrivate', 'This project is PRIVATE. Opening the join policy makes it knockable by id: anyone authenticated who knows or guesses the id can send a request and learn the project exists. Open anyway?'),
-    'visPublic'        => __admin('members.visibility.public', 'PUBLIC'),
-    'visPrivate'       => __admin('members.visibility.private', 'PRIVATE'),
-    'visMeaningPublic' => __admin('members.visibility.meaningPublic', 'Anyone with the address can view this site — no account, no invitation, no login.'),
-    'visMeaningPrivate'=> __admin('members.visibility.meaningPrivate', 'Only signed-in members of this project can reach the site. To everyone else it answers as if it did not exist.'),
-    'visUrlLabel'      => __admin('members.visibility.urlLabel', 'Reachable at'),
-    'visGoPublic'      => __admin('members.visibility.goPublic', 'Make it public to everyone'),
-    'visGoPrivate'     => __admin('members.visibility.goPrivate', 'Make it members-only'),
-    'visConfirmPublicTitle' => __admin('members.visibility.confirmPublicTitle', 'Make this site public to everyone?'),
-    'visConfirmPublicBody'  => __admin('members.visibility.confirmPublicBody', 'Everything this project serves becomes viewable by anyone who has the address, with no account and no login. This does not deploy the site: no domain is set up, nothing is submitted to a search engine, and the address does not change — it simply stops requiring membership. A public address can still be found and indexed like any other. You can make it members-only again, but anything already read cannot be unread.'),
-    'visConfirmPublicCheck' => __admin('members.visibility.confirmPublicCheck', 'I understand anyone with the address can view this site.'),
-    'visConfirmPrivateTitle'=> __admin('members.visibility.confirmPrivateTitle', 'Make this site members-only?'),
-    'visConfirmPrivateBody' => __admin('members.visibility.confirmPrivateBody', 'The site stops being served to the public. Visitors without a membership get the same answer as for a project that does not exist. Existing links stop working for them.'),
-    'visCheckRequired' => __admin('members.visibility.checkRequired', 'Tick the confirmation first.'),
-    'visSavedPublic'   => __admin('members.visibility.savedPublicMsg', 'This site is now PUBLIC'),
-    'visSavedPrivate'  => __admin('members.visibility.savedPrivateMsg', 'This site is now members-only'),
+    'policyAdvisory'   => __admin('members.policy.advisory', 'Privacy note: this project has an OPEN join policy — any authenticated account that knows or guesses its id can send a request and thereby learn the project exists.'),
+    'policyConfirmOpenPrivate' => __admin('members.policy.confirmOpenPrivate', 'Opening the join policy makes this project knockable by id: anyone authenticated who knows or guesses the id can send a request and learn the project exists. Open anyway?'),
     'transferConfirmRequired' => __admin('members.transfer.confirmRequired', 'Tick the confirmation checkbox first.'),
     'transferMemberRequired'  => __admin('members.transfer.memberRequired', 'Pick the member who becomes the new owner.'),
     'transferTitle'    => __admin('members.transfer.modalTitle', 'Transfer ownership — final confirmation'),
@@ -207,9 +184,14 @@ window.QS_MEMBERS_I18N = <?= json_encode([
                  put in it — a new account has nobody, and an empty panel above
                  the search box helps no one. -->
             <div class="members-contacts" id="invite-contacts" hidden>
-                <h3 class="members-contacts__title"><?= __admin('members.contacts.title') ?></h3>
+                <h3 class="members-contacts__title" id="invite-contacts-title"><?= __admin('members.contacts.title') ?></h3>
                 <p class="admin-hint"><?= __admin('members.contacts.hint') ?></p>
-                <div class="members-contacts__list" id="invite-contacts-list"></div>
+                <div class="members-find-row">
+                    <div class="admin-form-group members-find-row__name">
+                        <select id="invite-contacts-select" class="admin-input" aria-labelledby="invite-contacts-title"></select>
+                    </div>
+                    <button type="button" id="btn-invite-contact-forget" class="admin-btn admin-btn--ghost" disabled><?= __admin('members.contacts.forget') ?></button>
+                </div>
             </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
@@ -253,9 +235,14 @@ window.QS_MEMBERS_I18N = <?= json_encode([
             <p class="admin-hint"><?= __admin('members.propose.hint', 'Vouch for someone: an admin or the owner validates your proposal before the person is even told. Your note IS the vouch — make it count.') ?></p>
             <?php endif; ?>
             <div class="members-contacts" id="propose-contacts" hidden>
-                <h3 class="members-contacts__title"><?= __admin('members.contacts.title') ?></h3>
+                <h3 class="members-contacts__title" id="propose-contacts-title"><?= __admin('members.contacts.title') ?></h3>
                 <p class="admin-hint"><?= __admin('members.contacts.hint') ?></p>
-                <div class="members-contacts__list" id="propose-contacts-list"></div>
+                <div class="members-find-row">
+                    <div class="admin-form-group members-find-row__name">
+                        <select id="propose-contacts-select" class="admin-input" aria-labelledby="propose-contacts-title"></select>
+                    </div>
+                    <button type="button" id="btn-propose-contact-forget" class="admin-btn admin-btn--ghost" disabled><?= __admin('members.contacts.forget') ?></button>
+                </div>
             </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
@@ -281,31 +268,6 @@ window.QS_MEMBERS_I18N = <?= json_encode([
 </section>
 <?php endif; ?>
 
-<?php if ($__isOwner): ?>
-<!-- Visibility — OWNER ONLY (project.visibility, the delete/transfer tier).
-     Deliberately NOT shaped like the join-policy row below it. The two were
-     confused in testing — an open join policy was read as "the site is public"
-     — so this one states the actual consequence in a sentence, shows the URL
-     it exposes, names its button after the state it moves to, and sits in its
-     own framed block. Two lookalike toggles side by side IS the defect. -->
-<section class="admin-section" id="members-visibility-section" data-requires-command="setProjectVisibility">
-    <h2 class="admin-section__title"><?= __admin('members.visibility.title', 'Who can see this site') ?></h2>
-    <div class="admin-card">
-        <div class="admin-card__body">
-            <div class="members-visibility" id="members-visibility-block">
-                <div class="members-visibility__state">
-                    <span class="members-visibility__badge" id="members-visibility-badge">…</span>
-                    <p class="members-visibility__meaning" id="members-visibility-meaning"></p>
-                </div>
-                <p class="members-visibility__url" id="members-visibility-url" hidden></p>
-                <button type="button" id="btn-toggle-visibility" class="admin-btn" disabled>…</button>
-            </div>
-            <p class="admin-hint"><?= __admin('members.visibility.notPolicy', 'This is not the same as the join policy below. Visibility decides who can VIEW the site; the join policy decides who can ASK to become a member.') ?></p>
-        </div>
-    </div>
-</section>
-<?php endif; ?>
-
 <?php if ($__isAdmin): ?>
 <!-- Join policy — admin/owner -->
 <section class="admin-section" id="members-policy-section" data-requires-command="setJoinPolicy">
@@ -313,7 +275,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     <div class="admin-card">
         <div class="admin-card__body">
             <p class="admin-hint"><?= __admin('members.policy.hint', 'Open = anyone authenticated may send a join request (the self-service front door). Closed = requests bounce; invitations and member proposals always work. Closing never discards requests already pending.') ?></p>
-            <p class="admin-hint"><?= __admin('members.policy.notVisibility', 'This does NOT make the site public. A project with an open join policy is still visible to members only — the visibility setting above is what opens the site to everyone.') ?></p>
+            <p class="admin-hint"><?= __admin('members.policy.notVisibility', 'This does not open the site to anyone: only members of this project can view it. The join policy decides who can ASK to become one.') ?></p>
             <div class="members-policy-row" id="members-policy-row">
                 <span class="admin-label"><?= __admin('members.policy.label', 'Self-service join requests') ?>:</span>
                 <span class="members-policy-value" id="members-policy-value">…</span>

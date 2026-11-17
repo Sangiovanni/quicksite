@@ -145,7 +145,7 @@ $routePath = $trimParameters->routePath(); // e.g., 'guides/installation'
 $routeFound = $trimParameters->routeFound();
 
 // Handle 404 — a route that does not exist inside this project. Reaching here means the
-// project resolved AND the visitor passed surface B's visibility/membership gate, so the
+// project resolved AND the visitor passed surface B's membership gate, so the
 // project's own styled error page is the right thing to show. (A REFUSED /p/<id>/ never
 // gets this far: surface B answers a generic engine page and exits.)
 if (!$routeFound || $routePath === '404') {

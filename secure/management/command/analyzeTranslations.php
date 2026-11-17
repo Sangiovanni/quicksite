@@ -68,15 +68,13 @@ function extractRequiredKeys_analyze(): array {
         }
     }
     
-    // Add page.titles.{route} keys (used dynamically)
+    // Every route's title, read dynamically (qs_page_translation_keys()): a nested route's included.
+    // A page's description is optional, never required: it is counted used where a language holds it (below).
     $routesFile = PROJECT_PATH . '/routes.php';
     if (file_exists($routesFile)) {
         $routes = include $routesFile;
         if (is_array($routes)) {
-            // Routes are keyed by route name, values are config arrays
-            foreach (array_keys($routes) as $route) {
-                $allKeys[] = 'page.titles.' . $route;
-            }
+            $allKeys = array_merge($allKeys, qs_page_translation_keys($routes, [])['titles']);
         }
     }
     
@@ -205,9 +203,12 @@ function __command_analyzeTranslations(array $params = [], array $urlParams = []
             }
         }
         
-        // Find unused keys (in translations but not required)
+        // Find unused keys (in translations but not required). A page's description this language holds
+        // is used, never missing where it does not.
         $translationKeys = flattenKeys_analyze($translations);
-        $unusedKeys = array_values(array_diff($translationKeys, $requiredKeys));
+        $routes = is_file(PROJECT_PATH . '/routes.php') ? include PROJECT_PATH . '/routes.php' : [];
+        $heldDescriptions = qs_page_translation_keys(is_array($routes) ? $routes : [], $translations)['descriptions'];
+        $unusedKeys = array_values(array_diff($translationKeys, $requiredKeys, $heldDescriptions));
         
         sort($missingKeys);
         sort($unusedKeys);

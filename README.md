@@ -347,7 +347,7 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    > **If your vhost already has a static-asset block** — panels usually add
    > something like `location ~* \.(css|js|png|…)$ { expires max; }` — you don't
    > need to change it, **as long as it is in the same server block as the
-   > include**. A project's assets live outside the web root so the visibility
+   > include**. A project's assets live outside the web root so the membership
    > gate can run, and the generated `/p/` block uses `^~` precisely so that
    > regex can't claim them.
 

@@ -4393,6 +4393,74 @@ kbd {
     box-shadow: 0 0 0 3px #d9770633;
 }
 
+/* The page description's length mark: how many platforms would cut it (its title names them) */
+.preview-toolbar__cut {
+    font-size: var(--font-size-xs);
+    color: var(--admin-warning);
+    white-space: nowrap;
+}
+
+/* The description's expand button, at the field's end */
+.preview-toolbar__expand {
+    flex-shrink: 0;
+}
+
+/* The description's dialog, in the one modal: wider than a question, its text area as wide as it, its title and its x on
+   one line at every width, its body scrolling inside the screen's height and its buttons wrapping */
+.preview-description-dialog {
+    display: flex;
+    flex-direction: column;
+    max-width: 40rem;
+    width: calc(100% - 2 * var(--space-md));
+    max-height: 90vh;
+    box-sizing: border-box;
+    padding: var(--space-lg);
+    text-align: left;
+}
+.preview-description-dialog__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+.preview-description-dialog__header .admin-modal-dialog__title {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.preview-description-dialog__header .admin-modal__close {
+    flex-shrink: 0;
+    font-size: var(--font-size-xl);
+    line-height: 1;
+}
+.preview-description-dialog__body {
+    min-height: 0;
+    overflow-y: auto;
+    margin: var(--space-md) 0;
+}
+.preview-description-dialog__text {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 8em;
+    resize: vertical;
+    font-family: inherit;
+}
+.preview-description-dialog__count,
+.preview-description-dialog__cut {
+    margin: var(--space-xs) 0 0;
+    font-size: var(--font-size-xs);
+}
+.preview-description-dialog__count {
+    color: var(--admin-text-muted);
+}
+.preview-description-dialog__cut {
+    color: var(--admin-warning);
+}
+.preview-description-dialog__actions {
+    justify-content: flex-end;
+}
+
 /* Create Component Button (+ next to dropdown) */
 .preview-toolbar__add-btn {
     display: flex;
@@ -13401,8 +13469,89 @@ kbd {
 .asset-edit-area__status {
     font-size: var(--font-size-sm);
     color: var(--admin-success);
-    opacity: 0;
-    transition: opacity 0.3s;
+}
+
+/* The edit area's and the viewer's title with its x on one line at every width, the x at the top right */
+.asset-edit-area__header,
+.asset-viewer__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+/* A basis of 0: the title shrinks and wraps inside its line, so the x is never sent to a line of its own (a phone's card
+   header wraps its items) */
+.asset-edit-area__header .admin-card__title {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.asset-edit-area__close,
+.asset-viewer__header .admin-modal__close {
+    flex-shrink: 0;
+    font-size: var(--font-size-xl);
+    line-height: 1;
+}
+
+/* A picture's alt text: the project's language, then its text; they wrap under each other where the row is short */
+.asset-edit-area__alt-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+}
+
+.asset-edit-area__lang {
+    width: auto;
+    max-width: 100%;
+}
+
+.asset-edit-area__alt {
+    flex: 1 1 14rem;
+    min-width: 0;
+}
+
+/* The viewer: a picture at its own size, or smaller to fit the screen, its file name and its x on one line at every width.
+   Sized here alone: no script reads the window. */
+.asset-viewer {
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    max-width: calc(100vw - 2 * var(--space-md));
+    max-height: calc(100vh - 2 * var(--space-md));
+    box-sizing: border-box;
+    padding: var(--space-md);
+}
+
+.asset-viewer__title {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.asset-viewer__body {
+    display: flex;
+    justify-content: center;
+    min-height: 0;
+    overflow: auto;
+    margin-top: var(--space-md);
+}
+
+/* Capped by the window, not by the box: a percentage would let the box shrink to its title and the picture with it
+   (an SVG that names no size of its own) */
+.asset-viewer__image {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: calc(100vw - 4 * var(--space-md) - 2px);
+    max-height: calc(100vh - 8rem);
+    object-fit: contain;
+}
+
+/* An SVG is drawn, not counted in pixels, and often names no size of its own: one width, or the window's when narrower */
+.asset-viewer__image--vector {
+    width: min(24rem, calc(100vw - 4 * var(--space-md) - 2px));
 }
 
 /* --- Asset Browser Toolbar --- */
@@ -13622,6 +13771,33 @@ kbd {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+}
+
+/* A picture's thumbnail is a button that shows it large: it fills the thumbnail, so the picture sits as it would alone */
+.asset-card__view {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: zoom-in;
+}
+
+.asset-card__view:focus-visible {
+    outline: 2px solid var(--admin-primary);
+    outline-offset: -2px;
+}
+
+/* The languages a picture has no alt text in: a line of the card's own, which wraps */
+.asset-card__badge {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--font-size-xs);
+    color: var(--admin-warning);
+    overflow-wrap: anywhere;
 }
 
 .asset-card__video {

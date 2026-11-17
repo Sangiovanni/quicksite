@@ -100,6 +100,7 @@ $GLOBALS['__help_commands'] = [
                 'aliases_removed' => ['/old-guides'],
                 'page_events_cleaned' => ['guides'],
                 'resolvers_cleaned' => ['guides'],
+                'social_cleaned' => ['guides'],
                 'policy_records_cleared' => []
             ]
         ],
@@ -112,7 +113,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.',
             '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.'
         ],
-        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config and the resolvers of every route it deletes. A deleted route that held a generated policy page has its record forgotten, so the cookie banner stops linking to it: policy_records_cleared names which, cookie or privacy. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned.'
+        'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, the route layout config, the resolvers and the social values (setSocialPreview\'s picture and card type) of every route it deletes. A deleted route that held a generated policy page has its record forgotten, so the cookie banner stops linking to it: policy_records_cleared names which, cookie or privacy. When force=true, deletes all descendant routes recursively. data lists what went: deleted_routes, deleted_files and deleted_directories (paths relative to the project), failed_files, aliases_removed, page_events_cleaned, resolvers_cleaned, social_cleaned.'
     ],
     
     'setRouteLayout' => [
@@ -935,6 +936,164 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Sending only one of excludedRoutes / customUrls merges onto the stored value rather than clearing the other. Requires route.write (editor and above) — getSiteMap remains readable by viewers but can no longer write anything.'
     ],
 
+    'getSocialPreview' => [
+        'description' => 'Reads what the card a shared link of the site gets is drawn from, and what each page\'s description, Open Graph and X tags will say: the site\'s social values; each page\'s values (or one page\'s), with its picture as Media holds it; per language, the page\'s title and description, its tags and the warnings per platform; and the platform table those warnings come from, each figure with its source and the date it was read.',
+        'method' => 'GET',
+        'url_structure' => '/management/p/<projectId>/getSocialPreview',
+        'parameters' => [
+            'route' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'One page, by its route path (about-us, guides/installation, products/:slug). Omit for every page.',
+                'example' => 'about-us',
+                'validation' => 'The rule every page command shares: each segment letters, digits, hyphens and underscores, or ":" and a parameter name; an existing route; at most 200 bytes; no "..", backslash or NUL byte. A special page (404, 500, 403, 401) carries no social tags and is refused.'
+            ]
+        ],
+        'example_get' => 'GET /management/p/<projectId>/getSocialPreview?route=about-us or GET /management/p/<projectId>/getSocialPreview',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Social preview of page \'about-us\'',
+            'data' => [
+                'project' => 'h4w8tn3ra',
+                'multilingual' => false,
+                'languages' => ['en'],
+                'site' => ['picture' => 'images/banner.png', 'xAccount' => '@example', 'themeColor' => '#336699', 'locales' => ['en' => 'GB']],
+                'pages' => [
+                    'about-us' => [
+                        'values' => ['cardType' => 'large'],
+                        'picture' => ['key' => 'images/banner.png', 'from' => 'site', 'inMedia' => true, 'path' => 'assets/images/banner.png', 'width' => 1200, 'height' => 630, 'type' => 'image/png', 'bytes' => 48211],
+                        'cardType' => ['value' => 'large', 'from' => 'page'],
+                        'languages' => [
+                            'en' => [
+                                'title' => 'About us',
+                                'description' => 'Who we are and what we make.',
+                                'tags' => [
+                                    ['attribute' => 'name', 'name' => 'description', 'content' => 'Who we are and what we make.'],
+                                    ['attribute' => 'property', 'name' => 'og:title', 'content' => 'About us'],
+                                    ['attribute' => 'property', 'name' => 'og:url', 'content' => 'https://example.com/p/h4w8tn3ra/about-us'],
+                                    ['attribute' => 'property', 'name' => 'og:image', 'content' => 'https://example.com/p/h4w8tn3ra/assets/images/banner.png'],
+                                    ['attribute' => 'name', 'name' => 'twitter:card', 'content' => 'summary_large_image']
+                                ],
+                                'warnings' => [
+                                    ['platform' => 'facebook', 'code' => 'title.cut', 'limit' => 60, 'actual' => 72, 'message' => 'Facebook shows about 60 characters of a title']
+                                ]
+                            ]
+                        ]
+                    ]
+                ],
+                'platforms' => ['facebook' => ['name' => 'Facebook', 'checked' => '2026-11-14', 'checker' => 'https://developers.facebook.com/tools/debug/', 'picture' => ['…'], 'title' => ['…'], 'description' => ['…'], 'lines' => ['…']]],
+                'territories' => ['en' => ['usual' => 'US', 'codes' => ['US', 'AE', 'AG', '…']], 'fr' => ['usual' => 'FR', 'codes' => ['FR', 'BE', 'BF', '…']]]
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'called without the /p/<projectId>/ marker',
+            '400.validation.invalid_value' => 'a parameter other than route (errors[0].reason unknown_field)',
+            '400.validation.invalid_type' => 'route is not a string',
+            '400.validation.invalid_length' => 'route longer than 200 bytes',
+            '400.validation.invalid_format' => 'a route with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule',
+            '404.route.not_found' => 'the route is not one of the project\'s, or is a special page (errors[0].reason special_page)'
+        ],
+        'notes' => 'Read-only, every role. The tags are made by the one producer a served page calls, so they are the page\'s own, in their order, each written only when it has a value: description, og:title, og:description, og:type (website), og:url, og:site_name (the key site.name), og:locale and og:locale:alternate (each language with the territory the site gave it, else its usual one; a language with neither has none), og:image with og:image:width, og:image:height, og:image:type and og:image:alt (Media\'s description of the picture), twitter:card, twitter:site, theme-color. The page\'s value wins, else the site\'s, else what is derived: twitter:card is summary_large_image for a page with a picture and summary without. Each address is full: composed for this request\'s scheme and host and the project\'s /p/<projectId>/ base, or from the address the deployment declares in QS_PUBLIC_BASE_URL (a built site composes its own when served). A placeholder ({{param:NAME}}, {{resolved:NAME}}) in a title or a description stays as written here; a served page fills it. picture.inMedia false names a picture that is no longer in Media: the page writes no og:image. A warning never refuses anything; its code is picture.too_small, picture.small, picture.too_large, picture.format, title.cut or description.cut, judged against each platform\'s figures in platforms (X by the card the page asks for), and a figure a platform does not publish is said so there, with the source of the value used. Each platform\'s row also says how many lines of the title and of the description its card shows on a computer and on a phone (lines; 0: not shown on that device), and which of its picture figures (min, maxBytes, shape) a picture may miss and still be shown small, beside the text (picture.thumbnail); the panel\'s Social previews page draws each card from these figures. territories gives each project language its usual territory (usual, announced when the site gives the language none) and every territory it may be given in setSocialPreview\'s locales (codes, the usual one first): the regions of the language\'s Unicode CLDR locales and its likely one, each an officially assigned ISO 3166-1 alpha-2 code; a language CLDR gives none has usual null and no codes.'
+    ],
+
+    'setSocialPreview' => [
+        'description' => 'Writes what the card a shared link of the site gets is drawn from: the site\'s social values, or one page\'s, and a page\'s description in one language. A served page writes them as its description, Open Graph and X tags.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/setSocialPreview',
+        'parameters' => [
+            'route' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The page whose values are written, by its route path. Omit (or send empty) to write the site\'s values.',
+                'example' => 'about-us',
+                'validation' => 'The rule every page command shares: each segment letters, digits, hyphens and underscores, or ":" and a parameter name; an existing route; at most 200 bytes; no "..", backslash or NUL byte. A special page (404, 500, 403, 401) carries no social tags and is refused.'
+            ],
+            'picture' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The picture of the card, site-wide or the page\'s own: a file of Media\'s images, named as Media\'s list names it. Empty removes it.',
+                'example' => 'images/banner.png',
+                'validation' => 'images/ and a file name not starting with a dot; a file Media holds, of an image type, never SVG'
+            ],
+            'cardType' => [
+                'required' => false,
+                'type' => 'string',
+                'enum' => ['large', 'small'],
+                'description' => 'The card X draws: large (summary_large_image, a wide picture) or small (summary, a square thumbnail). Site-wide or the page\'s own. Empty removes it.',
+                'example' => 'large'
+            ],
+            'xAccount' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Site only: the site\'s X account (twitter:site), with or without its @. Empty removes it.',
+                'example' => '@example',
+                'validation' => '@ (added when left out), then 1 to 15 letters, digits or underscores'
+            ],
+            'themeColor' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Site only: the theme colour (theme-color): the colour bar of a Discord card, and a phone browser\'s bar for a visitor. Empty removes it.',
+                'example' => '#336699',
+                'validation' => '# and 6 hexadecimal digits, or 3, each written twice (#369 is written #336699: Discord reads 6 or 8 digits alone); a colour name or a CSS function is refused'
+            ],
+            'locales' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Site only: each language\'s territory, for og:locale (fr with FR writes fr_FR). Merged language by language; an empty territory removes that language\'s. A language the site gives no territory announces its usual one (getSocialPreview\'s territories), and one CLDR gives none writes no og:locale.',
+                'example' => ['en' => 'GB', 'fr' => 'FR'],
+                'validation' => 'Each key one of the project\'s languages; each territory one of that language\'s territories in Unicode CLDR (written in capitals), the list getSocialPreview answers as territories.<lang>.codes: French takes FR, BE or CA, never AR; a language CLDR gives none (Esperanto) takes none'
+            ],
+            'description' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Page only, with lang: the page\'s description in that language (the key page.descriptions.<route>), for <meta name="description"> and og:description. It takes the title\'s placeholders ({{param:NAME}}, {{resolved:NAME}}). Empty removes it.',
+                'example' => 'Who we are and what we make.',
+                'validation' => 'At most 500 characters'
+            ],
+            'lang' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The language of description; required with it, refused without it.',
+                'example' => 'en',
+                'validation' => 'One of the project\'s languages (getLangList returns them)'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/setSocialPreview with body: {"picture": "images/banner.png", "xAccount": "@example", "themeColor": "#336699", "locales": {"en": "GB", "fr": "FR"}} (the site) or {"route": "about-us", "cardType": "large", "description": "Who we are and what we make.", "lang": "en"} (a page)',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Social values of page \'about-us\' saved',
+            'data' => [
+                'project' => 'h4w8tn3ra',
+                'route' => 'about-us',
+                'values' => ['cardType' => 'large'],
+                'description' => [
+                    'lang' => 'en',
+                    'text' => 'Who we are and what we make.',
+                    'removed' => false,
+                    'translation_key' => 'page.descriptions.about-us'
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'called without the /p/<projectId>/ marker',
+            '400.validation.missing_field' => 'no value to write was sent',
+            '400.validation.invalid_value' => 'a value the command refuses, named by errors[0].field: a picture not in Media, not an image or in SVG, a card type that is neither large nor small, an X account, a colour or a territory not shaped as one (reason invalid_value); a field this target does not hold, such as xAccount with a route or description without one, or lang without description (reason unknown_field)',
+            '400.validation.invalid_type' => 'a value that is not a string, locales that is not an object, or a route that is not a string',
+            '400.validation.invalid_length' => 'a description longer than 500 characters, or a route longer than 200 bytes',
+            '400.validation.invalid_format' => 'a route with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; or the description\'s key collides with a translation of another shape',
+            '400.validation.required' => 'description sent without lang',
+            '400.validation.unsupported_language' => 'lang, or a key of locales, is not one of the project\'s languages; errors[0].allowed lists what it takes',
+            '403.auth.forbidden' => 'the caller\'s role does not grant route.write (a viewer cannot write social values)',
+            '404.route.not_found' => 'the route is not one of the project\'s, or is a special page (errors[0].reason special_page)',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.file_write_failed' => 'the social values or the description could not be written',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
+        ],
+        'notes' => 'Requires route.write (editor and above), beside setSiteMapConfig. The values live in <secure>/projects/<projectId>/data/social-preview.json: the site\'s, and each page\'s picture and card type; a value not sent is kept, a value sent empty is removed, every value is checked before anything is written. The description is a translation key, written as editTitle writes a title (translate/default.json kept in step: a single-language site reads it); removed, it leaves the language\'s file, and default.json when no other language holds it. A page\'s value wins over the site\'s; a built site carries the values (and each picture\'s size, type and description) and writes the same tags. deleteRoute removes a deleted page\'s values. getSocialPreview answers what each page\'s tags will say and the warnings per platform.'
+    ],
+
     'analyzeReachability' => [
         'description' => 'Analyzes route reachability via BFS from the home page. Follows internal links in page structures, menu, and footer to find orphan routes that are not reachable through any navigation path.',
         'method' => 'GET',
@@ -1638,7 +1797,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment.'
+        'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment. Every route\'s title (page.titles.<route>, a nested route\'s included) is required; a page\'s description (page.descriptions.<route>) is optional and never missing.'
     ],
     
     'getUnusedTranslationKeys' => [
@@ -1682,7 +1841,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Identifies orphaned translations not referenced by any page, menu, footer, or component. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys.'
+        'notes' => 'Identifies orphaned translations not referenced by any page, menu, footer, or component. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys. Every route\'s title (page.titles.<route>, a nested route\'s included) and every page description a language holds (page.descriptions.<route>, setSocialPreview) count as used.'
     ],
     
     'analyzeTranslations' => [
@@ -3503,7 +3662,7 @@ $GLOBALS['__help_commands'] = [
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.',
             '400.validation.unsafe_param' => 'A node of the structure about to be written holds an attribute the write gate refuses: a name outside letters, digits, underscore, colon and hyphen, a raw on* handler (use {{call:...}} syntax), a disallowed URL scheme (only http, https, mailto, tel), a data-bind-attr naming an attribute a binding cannot write (an event handler, srcdoc, a name outside those characters, a name starting data-consent-, an iframe\'s src or sandbox, or a meta\'s content or http-equiv), a meta refreshing the page to an address with a disallowed URL scheme (its http-equiv refresh, and the address in its content), or two names that differ only in case. errors[0] names the node and the attribute, and gives the reason. Nothing is written.'
         ],
-        'notes' => 'Creates a deep copy of the node and all children. Generates new unique translation keys for textKey and translatable attributes (alt, placeholder, title, aria-label, aria-placeholder, aria-description). New keys follow pattern {prefix}.item{N+1}. Optionally copies translation values from source keys. Returns rendered HTML for live DOM update. Use in Visual Editor with D key shortcut. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be duplicated). A raw or literal value (__RAW__ / __LIT__) is copied as written: no key is made for it and nothing is translated.'
+        'notes' => 'Creates a deep copy of the node and all children. Generates new unique translation keys for textKey and translatable attributes (alt, placeholder, title, aria-label, aria-placeholder, aria-description). New keys follow pattern {prefix}.item{N+1}. Optionally copies translation values from source keys. Returns rendered HTML for live DOM update. Use in Visual Editor with D key shortcut. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be duplicated). A raw value (__RAW__) is copied as written: no key is made for it and nothing is translated.'
     ],
     
     'editNode' => [
@@ -4052,7 +4211,7 @@ $GLOBALS['__help_commands'] = [
             '507.quota.storage_exceeded' => 'A storage quota is configured and the clone would put the caller over it. A clone is a new project owned by the caller, so it is charged to the caller - as an import is - for everything it copies (the source without its backups). Checked before the clone exists; nothing was written.',
             '400.validation.unsafe_param' => 'A structure file of the source holds an attribute the write gate refuses (see editStructure). errors[0] names the file, the node and the attribute. Nothing is copied.'
         ],
-        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder, the build (qs_build/) and the saved exports (exports/) are skipped: they belong to the source, so a clone starts with no backup history, no build and no saved export. The project\'s OAuth keys (data/oauth-secrets.json, both sets) are never copied either: the clone\'s callback addresses differ from the source\'s, so its sign-in needs keys registered for them, entered on its OAuth providers page; data.oauth_keys_not_copied lists the providers the source had keys for ([] when none), and the message says so when there are any. Everything else, including config, templates, translations, the rest of data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone always gets a new id, drawn like createProject\'s (data.project); its name is stored in its config/project.json. The site itself is copied as it is: its translations, site.name included, are the source\'s. data.files_copied counts the files present in the clone after the copy.'
+        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder, the build (qs_build/) and the saved exports (exports/) are skipped: they belong to the source, so a clone starts with no backup history, no build and no saved export. The project\'s OAuth keys (data/oauth-secrets.json, both sets) are never copied either: the clone\'s callback addresses differ from the source\'s, so its sign-in needs keys registered for them, entered on its OAuth providers page; data.oauth_keys_not_copied lists the providers the source had keys for ([] when none), and the message says so when there are any. Everything else, including config, templates, translations, the rest of data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone always gets a new id, drawn like createProject\'s (data.project); its name is stored in its config/project.json. The site itself is copied as it is: its translations, site.name included, are the source\'s. data.files_copied counts the files present in the clone after the copy.'
     ],
     
     'renameProject' => [
@@ -4137,7 +4296,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.',
             '400.validation.invalid_format' => 'Invalid project name.'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the notice keeps the project\'s name (its id for a self-requester on a private project, who never saw the name); the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat. The project\'s cached space measurement goes with it, so no later project inherits it.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the notice keeps the project\'s name (its id for a self-requester, who never saw the name); the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat. The project\'s cached space measurement goes with it, so no later project inherits it.'
     ],
 
     'listMembers' => [
@@ -4152,7 +4311,6 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'project' => 'h4w8tn3ra',
                 'owner_user_id' => 'usr_...',
-                'visibility' => 'private',
                 'members' => [
                     ['user_id' => 'usr_...', 'name' => 'Dana', 'role' => 'owner', 'rank' => 6, 'is_owner' => true],
                     ['user_id' => 'usr_...', 'name' => 'Alice', 'role' => 'editor', 'rank' => 2, 'is_owner' => false]
@@ -4297,7 +4455,7 @@ $GLOBALS['__help_commands'] = [
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.',
             '400.validation.unencodable' => 'A value could not be stored: the roster would not encode as JSON. The roster on disk is intact.'
         ],
-        'notes' => 'Same-role no-op returns 200 with role_changed=false and writes nothing. No cache touch: the users.php mirror is roleless (the role is authoritative in members.json only).'
+        'notes' => 'Same-role no-op returns 200 with role_changed=false and writes nothing. The role is authoritative in members.json only. The member is told: their own users.php entry gains a role notice (role_change: the role they were last told of, the new role, the account that made the change and the date), which their membership inbox in the admin panel lists - the project, both roles and that account\'s name - until they dismiss it; the membership stays as it is. A second change before they dismiss it keeps the first role and takes the latest new role and account, and a change back to that first role takes the notice away. Writing the notice is secondary: members.json has already changed, and a failure is logged, never answered.'
     ],
 
     'removeMember' => [
@@ -4389,7 +4547,7 @@ $GLOBALS['__help_commands'] = [
             '403.authz.insufficient_rank' => 'Only the current owner can transfer ownership.',
             '400.validation.unencodable' => 'A value could not be stored: the roster would not encode as JSON. The roster on disk is intact.'
         ],
-        'notes' => 'The rotation happens inside one write lock with a fresh read and an invariant backstop (exactly one owner; owner field matches the owner role) - there is no read-back-reverse pass; the atomic temp+rename swap IS the integrity guarantee. No cache touch (both parties remain members).'
+        'notes' => 'The rotation happens inside one write lock with a fresh read and an invariant backstop (exactly one owner; owner field matches the owner role) - there is no read-back-reverse pass; the atomic temp+rename swap IS the integrity guarantee. Both parties remain members. The new owner is told: their own users.php entry gains a role notice (role_change: their old role, owner, the departing owner and the date), which their membership inbox in the admin panel lists until they dismiss it. The departing owner made the change and is told nothing, and a role notice of theirs still waiting goes, since they chose the role they keep. Writing the notice is secondary: members.json has already changed, and a failure is logged, never answered.'
     ],
 
 
@@ -4525,7 +4683,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'The refused notice inherits the privacy-correct display name (a private project\'s notice shows the project id, not the site name). The sponsor of a denied proposal gets no automatic notice (structural: their cache slot holds their membership) - the reason lives in this response and the command history.'
+        'notes' => 'The refused notice shows the project id, never the site\'s name: the requester is not a member. The sponsor of a denied proposal gets no automatic notice (structural: their cache slot holds their membership) - the reason lives in this response and the command history.'
     ],
 
     'setJoinPolicy' => [
@@ -4549,7 +4707,7 @@ $GLOBALS['__help_commands'] = [
                 'join_policy' => 'open',
                 'previous' => 'closed',
                 'changed' => true,
-                'note' => '(a private project with an open policy only) the advisory the notes describe'
+                'note' => '(an open policy only) the advisory the notes describe'
             ]
         ],
         'error_responses' => [
@@ -4563,39 +4721,7 @@ $GLOBALS['__help_commands'] = [
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.',
             '400.validation.unencodable' => 'A value could not be stored: the roster would not encode as JSON. The roster on disk is intact.'
         ],
-        'notes' => 'Same-value calls are a no-op (200, changed=false). PRIVACY TRADE, stated plainly: a PRIVATE project with an open policy is knockable-by-id - any authenticated account that guesses/knows the id can send a request and thereby confirm the project exists (the response carries an advisory note when this combination becomes active). Closed private projects stay indistinguishable from nonexistent ones on the request lane.'
-    ],
-
-    'setProjectVisibility' => [
-        'description' => 'Sets the TARGET project visibility (private|public) in members.json - which decides whether the site is served to the PUBLIC internet or only to authenticated members. Default is private. OWNER-ONLY (project.visibility category): public exposure is the gravest decision a project carries, held at the delete/transfer tier, not the admin-tier project.settings that setJoinPolicy uses.',
-        'method' => 'POST',
-        'parameters' => [
-            'visibility' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => "'private' or 'public'",
-                'example' => 'public'
-            ]
-        ],
-        'example_post' => 'POST /management/p/<projectId>/setProjectVisibility with body: {"visibility": "public"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => "Visibility set to 'public'",
-            'data' => ['project' => 'h4w8tn3ra', 'visibility' => 'public', 'previous' => 'private', 'changed' => true]
-        ],
-        'error_responses' => [
-            '400.project.required' => 'No project targeted',
-            '400.validation.missing_field' => 'visibility is required',
-            '400.validation.invalid_format' => "visibility must be 'private' or 'public'",
-            '403.auth.forbidden' => 'Caller is not the owner of this project (project.visibility category)',
-            '403.authz.insufficient_rank' => 'Caller is no longer the owner between dispatch and the write (re-checked in-lock)',
-            '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the visibility',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.',
-            '400.validation.unencodable' => 'A value could not be stored: the roster would not encode as JSON. The roster on disk is intact.'
-        ],
-        'notes' => 'Same-value calls are a no-op (200, changed=false). Owner-only. Making a project PRIVATE while its join_policy is open re-creates the knockable-by-id state (the response carries the same advisory note setJoinPolicy uses). Flipping to public dissolves that concern (existence is public by design). A visibility change never purges the pending request queue.'
+        'notes' => 'Same-value calls are a no-op (200, changed=false). PRIVACY TRADE, stated plainly: a project with an open policy is knockable-by-id - any authenticated account that guesses/knows the id can send a request and thereby confirm the project exists (the response carries an advisory note whenever the policy it sets is open). A closed project stays indistinguishable from a nonexistent one on the request lane.'
     ],
 
     'reconcileMemberships' => [
@@ -4622,7 +4748,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Could not persist the reconciled cache',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). The approved notice on a member entry (an accepted join request, notice: "approved") is kept while the authority lists the user as a member, never added to an entry that lacks it, and pruned with an entry the authority contradicts; it is not counted apart. A rebuilt entry carries no project name (a name is read from the project when it is shown), so a name an older entry kept is dropped; a tombstone keeps the name it was written with. Aborts on an unreadable authority rather than wipe real memberships.'
+        'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). The approved notice on a member entry (an accepted join request, notice: "approved") is kept while the authority lists the user as a member, never added to an entry that lacks it, and pruned with an entry the authority contradicts; it is not counted apart. The role notice on a member entry (role_change, written when someone else changed the user\'s role: changeMemberRole, transferOwnership) follows the same rule. A rebuilt entry carries no project name (a name is read from the project when it is shown), so a name an older entry kept is dropped; a tombstone keeps the name it was written with. Aborts on an unreadable authority rather than wipe real memberships.'
     ],
 
     'getProjectRoster' => [
@@ -4647,7 +4773,7 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/getProjectRoster',
             '403.auth.forbidden' => 'Caller is not a member of this project (project.roster category)'
         ],
-        'notes' => 'Project-scoped on the URL marker. Same member-row shape as listMembers, minus the queue: no invitations, no visibility/owner metadata. Admin/owner surfaces use listMembers instead. Users are {user_id, name} public references - the PRIVATE username never appears.'
+        'notes' => 'Project-scoped on the URL marker. Same member-row shape as listMembers, minus the queue: no invitations, no owner metadata. Admin/owner surfaces use listMembers instead. Users are {user_id, name} public references - the PRIVATE username never appears.'
     ],
 
 
@@ -4776,14 +4902,14 @@ $GLOBALS['__help_commands'] = [
                 'owner_user_id' => 'usr_0123456789abcdef0123456789abcdef'
             ]
         ],
-        'notes' => 'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG, and for a .css file the stylesheet scan every CSS writer runs — see editStyles). A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create. Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space, and config.json, routes.json, config/project.json and the folders config/, translate/, data/, snippets/, public/ and templates/model/json/ spelled exactly so, in lowercase (CONFIG.JSON or Templates/ is refused). One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it, and a name the engine reads would import differently on a system that tells case apart. Entries outside the project folder are ignored. The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: every language is in this installation\'s language list (getLanguageList), the default language is one of the listed ones, the flags are true or false, the theme default is light, dark or system, the favicon is an image under /assets/images/ with a favicon extension, and the build size limit, which no command writes, is a positive whole number. Language names are not imported: a project stores codes only, and names come from the installation\'s list. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path. An archive names its languages: config.json at the project root, with LANGUAGES_SUPPORTED. An archive with no config.json is refused WHOLE with 400 (reason missing_file, errors[0].file config.json), and so is one whose config.json has no LANGUAGES_SUPPORTED, an empty {} included (reason invalid_setting, errors[0].value LANGUAGES_SUPPORTED); nothing is created. An import never chooses a project\'s languages. A LANGUAGE_DEFAULT the archive leaves out is the first language of its list. Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either. The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule. Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing. The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php. PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner. The storage registry (data/storage.json) takes only what a command could write: every item is checked by the rule addStorageItem applies, and one that breaks it refuses the WHOLE archive with 400 (reason invalid_storage_item). An OAuth key file the archive carries (data/oauth-secrets.json, written as it is) is made readable by the server\'s account only. The imported project always gets a new id, drawn like createProject\'s (data.project): an archive never brings its id, so an import can neither take an id in use nor replace an existing project. Its name is the one sent, else the archive\'s own (the name in its config/project.json, else its project folder\'s name, each only when it follows the name rule); a name file the archive carries is replaced by the project\'s own. An archive that offers no usable name, imported without one, is refused with 400 validation.missing_field and nothing is created. Compatible with exports from exportProject.',
+        'notes' => 'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG, and for a .css file the stylesheet scan every CSS writer runs — see editStyles). A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create. Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space, and config.json, routes.json, config/project.json and the folders config/, translate/, data/, snippets/, public/ and templates/model/json/ spelled exactly so, in lowercase (CONFIG.JSON or Templates/ is refused). One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it, and a name the engine reads would import differently on a system that tells case apart. Entries outside the project folder are ignored. The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: every language is in this installation\'s language list (getLanguageList), the default language is one of the listed ones, the flags are true or false, the theme default is light, dark or system, the favicon is an image under /assets/images/ with a favicon extension, and the build size limit, which no command writes, is a positive whole number. Language names are not imported: a project stores codes only, and names come from the installation\'s list. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path. An archive names its languages: config.json at the project root, with LANGUAGES_SUPPORTED. An archive with no config.json is refused WHOLE with 400 (reason missing_file, errors[0].file config.json), and so is one whose config.json has no LANGUAGES_SUPPORTED, an empty {} included (reason invalid_setting, errors[0].value LANGUAGES_SUPPORTED); nothing is created. An import never chooses a project\'s languages. A LANGUAGE_DEFAULT the archive leaves out is the first language of its list. Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either. The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule. Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing. The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php. PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner. The storage registry (data/storage.json) takes only what a command could write: every item is checked by the rule addStorageItem applies, and one that breaks it refuses the WHOLE archive with 400 (reason invalid_storage_item). The social values (data/social-preview.json) take only what setSocialPreview could write: its two parts (site, pages), the fields of each and the shape of every value, a page named as a route; one that breaks it refuses the WHOLE archive with 400 (reason invalid_social_value). A page or a picture the archive no longer holds is accepted: it writes no tag. An OAuth key file the archive carries (data/oauth-secrets.json, written as it is) is made readable by the server\'s account only. The imported project always gets a new id, drawn like createProject\'s (data.project): an archive never brings its id, so an import can neither take an id in use nor replace an existing project. Its name is the one sent, else the archive\'s own (the name in its config/project.json, else its project folder\'s name, each only when it follows the name rule); a name file the archive carries is replaced by the project\'s own. An archive that offers no usable name, imported without one, is refused with 400 validation.missing_field and nothing is created. Compatible with exports from exportProject.',
         'error_responses' => [
             '413.request.body_too_large' => 'The archive exceeded the server\'s post_max_size, so PHP discarded the request before the command ran. The response carries the real limit.',
             '413.validation.size_limit_exceeded' => 'Archive exceeds an entry-count, size or compression-ratio limit',
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
-            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), missing_file (the project folder has no config.json), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (no LANGUAGES_SUPPORTED in config.json, a setting the command that writes it would refuse, or a language this installation\'s list does not hold — errors[0].value names the setting), invalid_storage_item (an item of data/storage.json that addStorageItem would refuse: a key with whitespace or named __proto__, an unknown scope or category — errors[0].value names the key), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
+            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), missing_file (the project folder has no config.json), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (no LANGUAGES_SUPPORTED in config.json, a setting the command that writes it would refuse, or a language this installation\'s list does not hold — errors[0].value names the setting), invalid_storage_item (an item of data/storage.json that addStorageItem would refuse: a key with whitespace or named __proto__, an unknown scope or category — errors[0].value names the key), invalid_social_value (a value of data/social-preview.json that setSocialPreview would refuse, or a part, a field or a page name it never writes — errors[0].value names it), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
             '400.validation.incomplete_project' => 'Imported project is incomplete.',
             '400.validation.invalid_format' => 'The name holds a control character.',
             '400.validation.invalid_length' => 'The name has more than 60 characters once trimmed.',
@@ -5119,8 +5245,8 @@ $GLOBALS['__help_commands'] = [
                         'type' => 'core'
                     ]
                 ],
-                'count' => 26,
-                'core_count' => 26,
+                'count' => 27,
+                'core_count' => 27,
                 'custom_count' => 0,
                 'names' => ['show', 'hide'],
                 'core_names' => ['show', 'hide'],
@@ -5134,7 +5260,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
         ],
-        'notes' => 'Returns the functions built into the QS namespace, each with its category, signature, arguments, events and an example, from the QS verb catalogue. custom_count is always 0: a site adds no function of its own. Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput.'
+        'notes' => 'Returns the functions built into the QS namespace, each with its category, signature, arguments, events and an example, from the QS verb catalogue; a function that makes a request also carries sends: true. custom_count is always 0: a site adds no function of its own. Use {{call:functionName:arg1,arg2}} syntax in structure params like onclick, oninput. On a submit, the page stays when the chain holds a function marked sends, or when the form has no action of its own: the page writes QS.prevent(event) at the head of the chain. A form with its own action whose chain sends nothing still posts there once the chain has run. validate stops a submit only when the form is invalid, or cannot be found. prevent keeps a link from leaving: {{call:prevent:event}}. A GET or HEAD fetch whose body holds a password field is not sent.'
     ],
 
     'listDataBindings' => [
@@ -7250,7 +7376,7 @@ $GLOBALS['__help_commands'] = [
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.',
             '400.validation.unsafe_param' => 'A node of the structure about to be written holds an attribute the write gate refuses: a name outside letters, digits, underscore, colon and hyphen, a raw on* handler (use {{call:...}} syntax), a disallowed URL scheme (only http, https, mailto, tel), a data-bind-attr naming an attribute a binding cannot write (an event handler, srcdoc, a name outside those characters, a name starting data-consent-, an iframe\'s src or sandbox, or a meta\'s content or http-equiv), a meta refreshing the page to an address with a disallowed URL scheme (its http-equiv refresh, and the address in its content), or two names that differ only in case. errors[0] names the node and the attribute, and gives the reason. Nothing is written.'
         ],
-        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, the key of a translatable attribute — alt, placeholder, title, aria-label, aria-placeholder or aria-description —, a component\'s text variable, typed as listComponents types it) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
+        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, the key of a translatable attribute — alt, placeholder, title, aria-label, aria-placeholder or aria-description —, a component\'s text variable, typed as listComponents types it) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw value (__RAW__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
     ],
 
     'injectSnippetCss' => [
@@ -7541,7 +7667,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                     'designer' => 'Adds styles, CSS variables, animations and theme',
                     'developer' => 'Adds builds and server-side route resolvers',
                     'admin' => 'Adds API config, the project\'s OAuth keys, backups and exports, command history, and managing members below admin (invitations, join requests, join policy)',
-                    'owner' => 'Adds the project\'s visibility, renaming it, deleting it, managing admins and transferring ownership; the single top of the project, who cannot be removed by others'
+                    'owner' => 'Adds renaming the project, deleting it, managing admins and transferring ownership; the single top of the project, who cannot be removed by others'
                 ],
                 'introspection' => 'Your role on each of your projects is my_role in listProjects. The role catalogue is read from the admin panel, not from a command. This response documents every command, whatever your role: one your role on that project does not carry answers 403.',
                 'config_file' => '<secure>/management/config/auth.php (session TTLs, self-registration gate, CORS)',

@@ -24,6 +24,12 @@
  * line, whole, above the search field, and the list under it holds the others:
  * the header's project list, whose badge may cut a long name.
  *
+ * An option whose value is empty is the placeholder: never a row of the list,
+ * and the trigger shows the placeholder while it is chosen. With the option
+ * emptyChoice, it is a choice like the others instead (no picture, no territory,
+ * the whole site): a row of the list, its own text on the trigger, so it can be
+ * chosen again after another.
+ *
  * Its words are the panel's (common.selectPlaceholder, common.search,
  * common.noResults, common.noMatchesFor, common.createFromSearch, which
  * layout.php ships on every page); a caller's own option wins.
@@ -225,7 +231,7 @@
             if (!this.triggerTextEl) return;
             const v = this.nativeSelect.value;
             const opt = Array.from(this.nativeSelect.options).find((o) => o.value === v);
-            const isPlaceholder = !opt || opt.value === '';
+            const isPlaceholder = !opt || !this._isChoice(opt);
             this.triggerTextEl.textContent = isPlaceholder ? this.placeholder : opt.textContent;
             this.triggerTextEl.classList.toggle('qs-searchable-select__text--placeholder', isPlaceholder);
         }
@@ -277,7 +283,7 @@
             }
 
             const chosen = this.options.currentOnTop ? this.nativeSelect.selectedOptions[0] : null;
-            if (chosen && chosen.value !== '') this.dropdownEl.appendChild(this._renderCurrent(chosen));
+            if (chosen && this._isChoice(chosen)) this.dropdownEl.appendChild(this._renderCurrent(chosen));
 
             this.searchInputEl = document.createElement('input');
             this.searchInputEl.type = 'search';
@@ -441,7 +447,7 @@
 
             // With currentOnTop, the chosen option is the line above the search, not a row of the list.
             const current = this.options.currentOnTop ? this.nativeSelect.value : null;
-            const listed = (o) => o.value !== '' && o.value !== current;
+            const listed = (o) => this._isChoice(o) && o.value !== current;
             const children = Array.from(this.nativeSelect.children);
             children.forEach((child) => {
                 if (child.tagName === 'OPTGROUP') {
@@ -571,6 +577,11 @@
 
             this.allItemEls.push(item);
             return item;
+        }
+
+        /** Whether an option is a choice of the list: any with a value, and the empty one under emptyChoice. */
+        _isChoice(optionEl) {
+            return optionEl.value !== '' || !!this.options.emptyChoice;
         }
 
         _selectValue(value) {

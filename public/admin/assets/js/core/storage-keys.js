@@ -67,6 +67,18 @@ window.QuickSiteStorageKeys = Object.freeze({
     addPositionExpanded: 'qs-add-position-expanded',
     addAdvancedExpanded: 'qs-add-advanced-expanded',
 
+    // Visual editor — the Add form's HTML Tag tab: whether a tag's example is
+    // shown as its HTML ('true') or drawn (anything else, or nothing), and the
+    // tags starred as favourites, newest first, as a JSON list of ten at most.
+    // The names predate the registry and stay, so nothing kept is lost.
+    tagShowHtmlCode:     'tagSelector_showHtmlCode',
+    addFavoriteTags:     'qs-add-favorite-tags',
+
+    // Social previews — the device the cards are drawn for: 'phone', or
+    // anything else (or nothing) for a computer. One per browser, for every
+    // project: a way of looking, not the project's.
+    socialPreviewDevice: 'qs_social_preview_device',
+
     // Visual editor — the Workflows panel: the workflows last opened, newest first,
     // and the groups left open once the list folds, as JSON {"recent": ["restyle"],
     // "open": ["look"]}. One per browser, for every project. A missing or malformed

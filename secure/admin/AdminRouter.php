@@ -71,6 +71,7 @@ class AdminRouter {
         'media',       // Media page. ⚠ NOT 'assets' — see the
                        //   reserved-segment note above.
         'sitemap',     // Visual Sitemap & Route Management
+        'social-previews', // Social previews — the card a shared link gets, per platform, and the values it is drawn from
         'builds',      // Builds — build / download / delete the project's single build
         'optimize',    // Optimization Tools
         'logout'       // Logout action — POST only (everywhere=1 ends the account's other sessions too)
@@ -604,6 +605,10 @@ class AdminRouter {
         // because those three live in the `build` category (developer+). A
         // non-member has no role at all and bounces, like every other page.
         'builds'         => ['getBuild'],
+        // Social previews: gated on the READ only, as Builds is. getSocialPreview is content.read,
+        // so every member rank sees the cards and the values; the controls that write
+        // (setSocialPreview, route.write) are hidden in the page from a role without it.
+        'social-previews' => ['getSocialPreview'],
         // The `history` category is granted to admin and owner only, so
         // this is a REAL gate rather than chrome-hiding: a lower rank never
         // receives the page. The nav entry is filtered separately client-side,

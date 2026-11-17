@@ -1,0 +1,308 @@
+/* =============================================================================
+   SOCIAL PREVIEWS — the card a shared link gets, per platform (pages/social-previews.php)
+   No media query here: the panel's three views live in responsive.css alone. A card's width per device is the
+   look-alike's own frame (min(): never wider than its column); every crop, cut and line count is set by the page's
+   script from the engine's platform table, never written here.
+   ============================================================================= */
+
+/* ── the list at the top (the whole site or a page) and the language ─────────── */
+.social-previews__pickers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--space-md);
+}
+
+/* On a computer a field is no wider than its words need; a tablet and a phone give it the whole row (responsive.css). */
+.social-previews__picker {
+    flex: 1 1 14rem;
+    min-width: 0;
+    max-width: 24rem;
+}
+
+/* ── the form ──────────────────────────────────────────────────────────────── */
+
+.social-previews__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: 0 var(--space-lg);
+}
+
+.social-previews__description {
+    min-height: 5em;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.social-previews__title-shown {
+    margin: 0;
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+
+.social-previews__cut {
+    margin: calc(-1 * var(--space-md)) 0 var(--space-lg);
+    font-size: var(--font-size-xs);
+    color: var(--admin-warning);
+}
+
+/* A row that wraps: the missing picture's line and its button, the cards' bar */
+.social-previews__missing,
+.social-previews__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.social-previews__missing {
+    gap: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.social-previews__missing span {
+    flex: 1 1 16rem;
+    overflow-wrap: anywhere;
+}
+
+.social-previews__save {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.social-previews__values {
+    display: grid;
+    gap: var(--space-sm);
+    margin: 0;
+}
+
+.social-previews__value {
+    display: grid;
+    grid-template-columns: minmax(0, 12rem) minmax(0, 1fr);
+    gap: var(--space-md);
+}
+
+.social-previews__value dt {
+    color: var(--admin-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.social-previews__value dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+/* ── the cards' bar: which page, which device ──────────────────────────────── */
+.social-previews__look-alike {
+    margin: 0 0 var(--space-md);
+}
+
+.social-previews__bar {
+    justify-content: space-between;
+    gap: var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-md);
+}
+
+.social-previews__cards-of {
+    margin: 0;
+    font-weight: var(--font-weight-medium);
+    overflow-wrap: anywhere;
+}
+
+.social-previews__device {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+}
+
+.social-previews__device-btn[aria-pressed="true"] {
+    background: var(--admin-accent);
+    color: var(--admin-on-accent);
+    border-color: var(--admin-accent);
+}
+
+.social-previews__cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 33rem), 1fr));
+    gap: var(--space-lg);
+    align-items: start;
+}
+
+.social-previews__cards[data-device="phone"] {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+}
+
+.social-previews__instagram {
+    margin-top: var(--space-lg);
+}
+
+/* ── one platform's card ───────────────────────────────────────────────────── */
+.social-card {
+    min-width: 0;
+    padding: var(--space-md) var(--space-sm);
+    background: var(--admin-card-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-lg);
+}
+
+.social-card__name {
+    margin: 0 0 var(--space-sm);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+}
+
+/* The look-alike's frame: a computer's feed column or a phone's screen. */
+.social-card__frame {
+    box-sizing: border-box;
+    width: min(100%, 31.25rem);
+    padding: var(--space-sm);
+    background: var(--admin-bg-tertiary);
+    border-radius: var(--radius-md);
+}
+
+.social-card__frame--phone {
+    width: min(100%, 22.5rem);
+}
+
+.social-card__frame--bubble {
+    padding: var(--space-xs);
+    background: var(--admin-accent-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) var(--radius-sm);
+}
+
+.social-card__frame--bar {
+    border-left: 4px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+}
+
+.social-card--telegram .social-card__frame--bar {
+    border-left-color: var(--admin-accent);
+}
+
+.social-card__card {
+    overflow: hidden;
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+}
+
+.social-card__frame--bar .social-card__card {
+    background: transparent;
+    border: 0;
+}
+
+.social-card__card--side {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+}
+
+.social-card__body {
+    min-width: 0;
+    flex: 1 1 auto;
+    padding: var(--space-sm) var(--space-md);
+}
+
+.social-card__picture {
+    background: var(--admin-bg-secondary);
+}
+
+.social-card__picture img {
+    display: block;
+    width: 100%;
+}
+
+/* A shape the platform publishes: its box, the picture cropped to it. */
+.social-card__picture--cropped img {
+    height: 100%;
+    object-fit: cover;
+}
+
+/* No shape published: the picture whole, at its own proportions. */
+.social-card__picture--whole img {
+    height: auto;
+}
+
+.social-card__picture--side {
+    flex: 0 0 auto;
+    width: 5rem;
+    margin: var(--space-sm);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.social-card__picture--side.social-card__picture--whole img {
+    max-height: 5rem;
+    object-fit: contain;
+}
+
+.social-card__domain,
+.social-card__siteName {
+    margin: 0 0 var(--space-2xs);
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.social-card--facebook .social-card__domain {
+    text-transform: uppercase;
+}
+
+.social-card__siteName {
+    font-weight: var(--font-weight-semibold);
+}
+
+.social-card__title {
+    margin: 0 0 var(--space-2xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+
+.social-card--discord .social-card__title,
+.social-card--slack .social-card__title {
+    color: var(--admin-accent);
+}
+
+.social-card__description {
+    margin: 0 0 var(--space-2xs);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* The platform's line count for the device (the script sets -webkit-line-clamp from the table). */
+.social-card__clamped {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.social-card__link {
+    margin: var(--space-xs) var(--space-sm) 0;
+    font-size: var(--font-size-sm);
+    color: var(--admin-accent);
+    overflow-wrap: anywhere;
+}
+
+.social-card__warnings {
+    margin: var(--space-sm) 0 0;
+    padding-left: 1.25em;
+    font-size: var(--font-size-xs);
+    color: var(--admin-warning);
+}
+
+.social-card__warning {
+    overflow-wrap: anywhere;
+}
+
+a.social-card__checker,
+.social-card__checker a {
+    color: var(--admin-accent);
+}
+
+.social-card__not-published,
+.social-card__meta {
+    margin: var(--space-sm) 0 0;
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-light);
+    overflow-wrap: anywhere;
+}

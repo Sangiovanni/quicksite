@@ -623,13 +623,13 @@ class JsonToHtmlRenderer {
                 . $textKey . ' params=' . json_encode(array_keys($node['params'])));
         }
 
-        // Raw text (__RAW__) / literal (__LIT__): rendered verbatim, no
-        // translation lookup. In editor mode we STILL wrap it in the
-        // data-qs-textkey span (with a data-qs-raw marker) so the Text tool can
-        // select + edit it — it reads the prefix to edit it as raw rather than
-        // as a translation key. Without this, raw text has no selection handle.
-        if (strpos($textKey, '__RAW__') === 0 || strpos($textKey, '__LIT__') === 0) {
-            $rawText = substr($textKey, 7); // strip the 7-char __RAW__/__LIT__ prefix
+        // Raw text (__RAW__): rendered verbatim, no translation lookup. In
+        // editor mode we STILL wrap it in the data-qs-textkey span (with a
+        // data-qs-raw marker) so the Text tool can select + edit it — it reads
+        // the prefix to edit it as raw rather than as a translation key.
+        // Without this, raw text has no selection handle.
+        if (strpos($textKey, '__RAW__') === 0) {
+            $rawText = substr($textKey, 7); // strip the 7-char __RAW__ prefix
             // Substitute `{{param:NAME}}` placeholders from the
             // captured URL path-params (e.g., :slug from /products/:slug)
             // BEFORE htmlspecialchars so the substituted value gets escaped.
@@ -755,7 +755,8 @@ class JsonToHtmlRenderer {
                     continue;
                 }
                 $html .= $this->renderAttribute($attrName, $attrValue,
-                    $refreshContentKey !== null && (string) $attrName === $refreshContentKey);
+                    $refreshContentKey !== null && (string) $attrName === $refreshContentKey,
+                    is_string($attrValue) && CallTransformer::submitKeepsPage($tag, (string) $attrName, $attrValue, $params));
             }
         }
 
@@ -848,11 +849,7 @@ class JsonToHtmlRenderer {
         if ($contentKey === null || !is_string($httpEquiv)) {
             return null;
         }
-        $drawn = $this->substitutedAttributeValue($httpEquiv);
-        if (strpos($drawn, '__LIT__') === 0) {
-            $drawn = substr($drawn, 7);
-        }
-        return UrlPolicy::isRefresh($drawn) ? $contentKey : null;
+        return UrlPolicy::isRefresh($this->substitutedAttributeValue($httpEquiv)) ? $contentKey : null;
     }
 
     /**
@@ -907,9 +904,11 @@ class JsonToHtmlRenderer {
      * @param mixed $value Attribute value
      * @param bool $refreshContent the content of a meta refresh (refreshContentKey()):
      *                             its address is drawn safe
+     * @param bool $keepPage a submit handler that keeps the page
+     *                       (CallTransformer::submitKeepsPage())
      * @return string Rendered attribute (e.g., ' class="value"')
      */
-    private function renderAttribute(string $name, $value, bool $refreshContent = false): string {
+    private function renderAttribute(string $name, $value, bool $refreshContent = false, bool $keepPage = false): string {
         // Sanitize attribute name. The charset rule is shared with the compiler
         // and the write-side param check so all three make the same decision
         // about the same name (TagRegistry::isRenderableAttributeName).
@@ -924,7 +923,7 @@ class JsonToHtmlRenderer {
             if (is_string($value) && strpos($value, '{{call:') !== false) {
                 // Transform {{call:...}} to QS.* function calls (the shared helper); a target
                 // on this site is composed as a link to it is
-                $transformedValue = CallTransformer::transform($value, fn(string $url, string $kind) => $this->composeCallTarget($url, $kind));
+                $transformedValue = CallTransformer::transform($value, fn(string $url, string $kind) => $this->composeCallTarget($url, $kind), $keepPage);
                 // Double-check the result doesn't contain suspicious patterns
                 if (CallTransformer::isValidHandler($transformedValue)) {
                     $escapedValue = htmlspecialchars($transformedValue, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -968,15 +967,16 @@ class JsonToHtmlRenderer {
             return '';
         }
 
-        // Translatable attributes (TagRegistry's list) - auto-translate if value looks like a translation key
+        // Translatable attributes (TagRegistry's list) - auto-translate if value looks like a translation key.
+        // ⚠ A RAW TEXT IS READ HERE AND ONLY HERE (and in a text node): `__RAW__` says "this is text, not a
+        // key", so it means something only where a value can be a key. Here it is removed and nothing is
+        // translated, before any placeholder is filled. In any other attribute no value is ever translated
+        // and nothing is removed: a `__RAW__` there is part of the value, drawn and checked as written.
+        // JsonToPhpCompiler::attributeValueExpr() reads it at the same place.
         if (in_array($name, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) && is_string($value)) {
             // Check for __RAW__ prefix - use value as-is without translation
             if (strpos($value, '__RAW__') === 0) {
                 $value = substr($value, 7); // Remove __RAW__ prefix
-            }
-            // Check for __LIT__ prefix - same as __RAW__ for translatable attributes
-            elseif (strpos($value, '__LIT__') === 0) {
-                $value = substr($value, 7); // Remove __LIT__ prefix
             }
             // Check if value looks like a translation key (contains dots, alphanumeric/underscore, no spaces)
             elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $value)) {
@@ -1013,18 +1013,16 @@ class JsonToHtmlRenderer {
         // Special handling for URL attributes. Scheme safety is value-based +
         // namespace-aware (covers xlink:href, ping, …) via the shared UrlPolicy
         // (R-6, the same class the compiler uses). BASE_URL/language rewriting
-        // stays scoped to the classic rewritable set.
+        // stays scoped to the classic rewritable set. A `srcset` holds several
+        // files: each file's address is made safe and composed, every one alike,
+        // and the rest of the value is kept as written (UrlPolicy::mapSrcset()).
         if (UrlPolicy::isUrlAttribute($name) && is_string($value) && $value !== '') {
-            $value = UrlPolicy::sanitize($value);
-            if (UrlPolicy::isRewritableUrlAttribute($name)
-                && !$isLanguageSwitch
-                && !preg_match('/^(https?:)?\/\//i', $value)) {
-                $value = $this->processUrl($value);
-            }
-        }
-        // Strip __LIT__ prefix from any attribute value (literal values used as-is everywhere)
-        if (is_string($value) && strpos($value, '__LIT__') === 0) {
-            $value = substr($value, 7);
+            $rewrite = UrlPolicy::isRewritableUrlAttribute($name) && !$isLanguageSwitch;
+            $address = function (string $url) use ($rewrite): string {
+                $url = UrlPolicy::sanitize($url);
+                return $rewrite && !preg_match('/^(https?:)?\/\//i', $url) ? $this->processUrl($url) : $url;
+            };
+            $value = UrlPolicy::isSrcsetAttribute($name) ? UrlPolicy::mapSrcset($value, $address) : $address($value);
         }
 
         // A refresh's address is a URL sink inside text: held to the same
@@ -1147,7 +1145,7 @@ class JsonToHtmlRenderer {
     private function rawifyEmulatedTextKeys(array &$node, array $emulatedValues): void {
         if (isset($node['textKey']) && is_string($node['textKey'])) {
             $tk = $node['textKey'];
-            if ($tk !== '' && strpos($tk, '__RAW__') !== 0 && strpos($tk, '__LIT__') !== 0 && in_array($tk, $emulatedValues, true)) {
+            if ($tk !== '' && strpos($tk, '__RAW__') !== 0 && in_array($tk, $emulatedValues, true)) {
                 $node['textKey'] = '__RAW__' . $tk;
             }
         }
@@ -1380,9 +1378,11 @@ class JsonToHtmlRenderer {
         
         // Remove leading slash from URL (BASE_URL already has trailing slash)
         $url = ltrim($url, '/');
-        
-        // If URL is now empty (was "/" for home), fullUrl already has proper ending
-        if (empty($url)) {
+
+        // If URL is now empty (was "/" for home), fullUrl already has proper ending.
+        // Compared with '' and not empty(): PHP's empty() is true for "0" too, and a
+        // link to /0 is a path, as a built page's processUrl() composes it.
+        if ($url === '') {
             // fullUrl already ends with trailing slash (from BASE_URL or lang/)
             return $fullUrl;
         }

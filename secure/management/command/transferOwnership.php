@@ -13,7 +13,10 @@
  * The target must also still resolve in users.php at transfer time (the
  * cross-file existence check) — ownership never lands on a ghost account.
  *
- * No cache touch: both parties remain members; the mirror is roleless.
+ * Both parties remain members. The new owner is told: a role notice on their own
+ * users.php entry (qs_membership_note_role_change()) names their old role, owner
+ * and who handed it over. The departing owner made the change and is told nothing;
+ * a role notice of theirs still waiting goes, since they chose the role they keep.
  *
  * @method POST
  * @route /management/p/<projectId>/transferOwnership
@@ -90,7 +93,8 @@ function __command_transferOwnership(array $params = [], array $urlParams = []):
 
     $error = null;
     $failure = null;
-    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, $oldOwnerRole, &$error) {
+    $targetRole = null;
+    $written = qs_members_mutate($project, function (array &$m) use ($actorId, $targetId, $oldOwnerRole, &$error, &$targetRole) {
         // In-lock integrity pre-assert: the owner FIELD must match the
         // role-'owner' member — surfaced, never silently repaired.
         $owner = $m['owner'] ?? null;
@@ -108,6 +112,7 @@ function __command_transferOwnership(array $params = [], array $urlParams = []):
             $error = 'member.not_a_member';
             return false;
         }
+        $targetRole = (string)($m['members'][$targetId]['role'] ?? '');
         $m['owner'] = $targetId;
         $m['members'][$targetId]['role'] = 'owner';
         $m['members'][$actorId]['role'] = $oldOwnerRole;
@@ -129,6 +134,15 @@ function __command_transferOwnership(array $params = [], array $urlParams = []):
     if ($written !== true) {
         [$status, $code, $message] = qs_members_failure_http($failure);
         return ApiResponse::create($status, $code)->withMessage($message);
+    }
+
+    // The new owner is told; the departing owner, who made the change, is not. Secondary:
+    // members.json already holds the new roles.
+    if (!qs_membership_note_role_change($targetId, $project, $targetRole, 'owner', $actorId)) {
+        error_log("transferOwnership: the role notice could not be written for '{$targetId}' on '{$project}'");
+    }
+    if (!qs_membership_note_role_change($actorId, $project, 'owner', $oldOwnerRole, null)) {
+        error_log("transferOwnership: a waiting role notice could not be cleared for '{$actorId}' on '{$project}'");
     }
 
     return ApiResponse::create(200, 'operation.success')

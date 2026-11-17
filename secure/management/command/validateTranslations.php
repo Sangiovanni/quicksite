@@ -63,16 +63,13 @@ function extractAllKeys_validate() {
         }
     }
     
-    // Also include page.titles.{route} keys which are used dynamically
+    // Every route's title, read dynamically (qs_page_translation_keys()). A page's description is
+    // optional: it is never a required key, so a page without one is never missing it.
     $routesFile = PROJECT_PATH . '/routes.php';
     if (file_exists($routesFile)) {
         $routes = include $routesFile;
         if (is_array($routes)) {
-            // Flatten nested routes to get all route paths
-            $allRoutes = flattenRoutes($routes);
-            foreach ($allRoutes as $route) {
-                $allKeys[] = 'page.titles.' . $route;
-            }
+            $allKeys = array_merge($allKeys, qs_page_translation_keys($routes, [])['titles']);
         }
     }
     

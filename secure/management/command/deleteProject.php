@@ -195,7 +195,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     // not-yet-validated proposal target was never engaged — never told
     // anything — so the cascade must not conjure a notice for a project they
     // never knew existed. A notice keeps the project's name (nothing is left to
-    // read it from); a self-requester on a PRIVATE project gets its id, the
+    // read it from); a self-requester gets its id, the
     // name never having been theirs to see. Cache failure is silent by design
     // (error_log only): access is already correct — the authority died with the
     // folder.
@@ -217,9 +217,8 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             $engaged
         );
         $memberIds = $cascadeMembers['members'] ?? [];
-        $private = ($cascadeMembers['visibility'] ?? 'private') !== 'public';
         $today = date('Y-m-d');
-        $written = qs_users_mutate(function (array &$cfg) use ($affected, $memberIds, $requesters, $private, $projectName, $cascadeName, $callerId, $today, &$cascade) {
+        $written = qs_users_mutate(function (array &$cfg) use ($affected, $memberIds, $requesters, $projectName, $cascadeName, $callerId, $today, &$cascade) {
             foreach (array_unique($affected) as $uid) {
                 $uid = (string)$uid;
                 if (!isset($cfg['users'][$uid])) {
@@ -231,7 +230,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
                     continue;
                 }
                 $cfg['users'][$uid]['projects'][$projectName] = [
-                    'name'   => ($private && isset($requesters[$uid]) && !isset($memberIds[$uid])) ? $projectName : $cascadeName,
+                    'name'   => (isset($requesters[$uid]) && !isset($memberIds[$uid])) ? $projectName : $cascadeName,
                     'status' => 'deleted',
                     'at'     => $today,
                 ];

@@ -197,9 +197,10 @@ window.QuickSiteUtils = (function() {
      * One string from the `common` sub-tree layout.php mirrors into
      * QUICKSITE_CONFIG, for the panel-wide chrome built in this file.
      *
-     * A name that resolves to nothing returns the FULL dot path. An unset
-     * string has to be visible on screen and findable by a scan, which an
-     * English fallback here would hide.
+     * A name that resolves to nothing returns the FULL dot path. A string no
+     * word file holds (a word a language lacks arrives in English, laid under
+     * it by the server) has to be visible on screen and findable by a scan,
+     * which an English fallback here would hide.
      *
      * @param {string} name  a leaf of `common`, e.g. 'cancel'
      * @returns {string}

@@ -76,7 +76,7 @@ function getCommandCategories(): array {
         'route_management' => [
             'label' => 'Route Management',
             'icon' => 'route',
-            'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver', 'getRoutes', 'getSiteMap', 'setSiteMapConfig', 'analyzeReachability']
+            'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver', 'getRoutes', 'getSiteMap', 'setSiteMapConfig', 'getSocialPreview', 'setSocialPreview', 'analyzeReachability']
         ],
         'structure_management' => [
             'label' => 'Structure Management',
@@ -144,7 +144,7 @@ function getCommandCategories(): array {
         'member_management' => [
             'label' => 'Project Members',
             'icon' => 'users',
-            'commands' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships']
+            'commands' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'reconcileMemberships']
         ],
         // The caller's OWN membership surface used to sit here as a
         // 'my_memberships' section. It is gone — not emptied — because all nine

@@ -251,6 +251,11 @@
     .transition-editor__property-actions {
         display: flex;
     }
+
+    /* Social previews: the list at the top and the language take the whole row, as wide as the page */
+    .social-previews__picker {
+        max-width: none;
+    }
 }
 
 @media (max-width: 40rem) {
@@ -394,6 +399,7 @@
         gap: var(--space-xs);
     }
     #preview-page-title-group,
+    #preview-page-description-group,
     #preview-theme-toggle-group,
     .preview-toolbar__layout-toggles {
         order: 2;
@@ -402,11 +408,12 @@
         border-left: none;
         padding-left: 0;
     }
-    /* A list shows what it holds, and a field does not: only the title keeps its word */
+    /* A list shows what it holds, and a field does not: only the title and the description keep their word */
     .preview-toolbar__label {
         display: none;
     }
-    #preview-page-title-group .preview-toolbar__label {
+    #preview-page-title-group .preview-toolbar__label,
+    #preview-page-description-group .preview-toolbar__label {
         display: inline;
     }
     .preview-toolbar__group,
@@ -417,7 +424,8 @@
     .preview-toolbar__group .qs-searchable-select {
         flex: 1 1 10rem;
     }
-    #preview-page-title-group {
+    #preview-page-title-group,
+    #preview-page-description-group {
         flex: 1 1 100%;
     }
     .preview-toolbar__input {
@@ -680,7 +688,7 @@
     }
 
     /* My memberships and Project members: a row's buttons go under its text, every one in reach;
-       a contact's id has a line of its own */
+       a found person's id has a line of its own */
     /* Project members: a project's line in the notice wraps, its button under its name */
     .api-card__name,
     .api-auth-token,

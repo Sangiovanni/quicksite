@@ -1053,6 +1053,15 @@ function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
                         'message' => $badItem['message']];
             }
         }
+        if (strtolower($relativePath) === 'data/social-preview.json') {
+            // Only as setSocialPreview could have written it: its two parts, each value's shape.
+            require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php';
+            $badSocial = qs_social_import_problem($data);
+            if ($badSocial !== null) {
+                return ['file' => $relativePath, 'reason' => 'invalid_social_value', 'value' => $badSocial['key'],
+                        'message' => $badSocial['message']];
+            }
+        }
         if ($kind === null) {
             continue;
         }

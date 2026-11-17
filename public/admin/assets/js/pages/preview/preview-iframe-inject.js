@@ -19,6 +19,18 @@
     // Security: parent (admin) and this iframe (preview) are same-origin.
     // Use the explicit origin for every postMessage instead of '*'.
     const ALLOWED_ORIGIN = window.location.origin;
+
+    // Every class this script adds to the page's elements: a hover, the selection's outline, an
+    // empty element's hint, a drag's states. A selection reports the author's classes only, so
+    // the panel's element info and the CSS tool's preselection never take one of these. A class an
+    // author writes keeps its name whatever it starts with (a snippet's `qs-snippet-*`).
+    const QS_EDITOR_CLASSES = new Set([
+        'qs-drag-ghost', 'qs-drag-locked', 'qs-drag-over', 'qs-drag-rollback', 'qs-drag-selected',
+        'qs-drag-shifting', 'qs-draggable', 'qs-dragging', 'qs-drop-indicator', 'qs-drop-inside',
+        'qs-drop-target-inside', 'qs-empty-hint', 'qs-has-interaction', 'qs-hover', 'qs-interactable',
+        'qs-interaction-tooltip', 'qs-js-selected', 'qs-selected', 'qs-selector-hover',
+        'qs-selector-selected', 'qs-style-selected', 'qs-styleable', 'qs-text-editable', 'qs-text-editing'
+    ]);
     
     // Safe attribute-selector helper: CSS.escape() guards against quotes
     // or special chars sneaking into struct/nodeId values used in selectors.
@@ -1010,8 +1022,8 @@
         const componentNode = el.getAttribute('data-qs-component-node');
         
         const id = el.id || null;
-        const classes = el.className && typeof el.className === 'string' 
-            ? el.className.replace(/qs-(hover|selected|draggable|dragging|drag-over|text-editable|text-editing)/g, '').trim() 
+        const classes = el.className && typeof el.className === 'string'
+            ? el.className.split(/\s+/).filter(c => c && !QS_EDITOR_CLASSES.has(c)).join(' ')
             : null;
         
         // Get direct text content
@@ -1070,10 +1082,9 @@
         }
 
         // User-authored attributes. Skip editor chrome (data-qs-*,
-        // contenteditable) and clean editor classes off the class attr
-        // the same way the `classes` field above does.
+        // contenteditable) and leave the editor's own classes off the class
+        // attr (QS_EDITOR_CLASSES), the same way the `classes` field above does.
         const params = {};
-        const editorClassRe = /qs-(hover|selected|draggable|dragging|drag-over|text-editable|text-editing)/g;
         for (let i = 0; i < el.attributes.length; i++) {
             const attr = el.attributes[i];
             const name = attr.name;
@@ -1081,7 +1092,7 @@
             if (name === 'contenteditable') continue;
             let value = attr.value;
             if (name === 'class') {
-                value = value.replace(editorClassRe, '').replace(/\s+/g, ' ').trim();
+                value = value.split(/\s+/).filter(c => c && !QS_EDITOR_CLASSES.has(c)).join(' ');
                 if (value === '') continue;
             }
             params[name] = value;
