@@ -11,10 +11,11 @@
  * light theme and its dark theme when it has one: the pages the engine's own build answers
  * for that template with every one of its languages, kept as static files under the panel's
  * assets (template-previews/<template>/<theme>/). A page keeps its markup and its stylesheet;
- * its addresses are made relative, so the files work wherever the installation is mounted;
- * the files it loads as scripts are left out, and of its own scripts only the theme switch's
- * stay. The project's own files it links (a template's photos) are kept once for both themes,
- * beside them, byte for byte. The panel shows a preview in a frame that is given no access to
+ * its addresses are made relative, so the files work wherever the installation is mounted,
+ * and the full address a build writes for a shared link (og:url) is left out, as a preview has
+ * no address of its own; the files it loads as scripts are left out, and of its own scripts
+ * only the theme switch's stay. The project's own files it links (a template's photos) are
+ * kept once for both themes, beside them, byte for byte. The panel shows a preview in a frame that is given no access to
  * the panel.
  *
  * A LINK THAT LEADS OUT OF A PREVIEW. A preview holds its own pages and languages, as the
@@ -427,6 +428,10 @@ function qs_tp_page(string $html, string $projectId, array $langs, array $pages,
         $to = qs_tp_relative(html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'), $langs, $pages, $up, $assets);
         return $to === null ? $m[0] : $m[1] . '="' . htmlspecialchars($to, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
     }, $html);
+    // A preview has no address of its own: the full address a build writes for a shared link names the server this tool
+    // fetched the page from, which is gone once the tool ends and differs from one build to the next. Its line is left out.
+    $html = preg_replace('#^[ \t]*<meta\s+property="og:url"\s[^>]*>[ \t]*\r?\n#mi', '', $html);
+    $html = preg_replace('#<meta\s+property="og:url"\s[^>]*>#i', '', $html);
     // A link that leads out of the preview goes nowhere here; a press on it is stopped and the page tells the panel's dialog,
     // with one fixed message that carries nothing (QS_TP_SCRIPT). The page keeps that script only when it holds such a link.
     if (qs_tp_outside($html) > 0) {
