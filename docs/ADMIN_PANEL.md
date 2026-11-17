@@ -1092,7 +1092,7 @@ One row of *Start a new site* builds a ready-made site: it runs *Fresh Start*, t
 - **Several languages** — shown once a template written in more than one language is picked. Ticked, it shows **Languages**, the template's own, all ticked at first; at least two stay ticked.
 - **Main language** — the language a visitor gets first: one of the template's, or one of those ticked.
 - **Include dark mode** — shown for a template that has dark colours. Ticked, the site gets them and a light/dark button in its menu; a visitor sees the light theme first.
-- **Business name**, **Phone number**, **E-mail address**, **Address**, **Booking or ordering link** — shown only for a template that asks for them (the templates by type of business), all optional. What is typed lands in every place the site shows it, in each language, and in the links that call, write or book. A field left empty keeps the template's sample, which says of itself that it is one. **Run** stays off while a phone number, an e-mail address or a link is not written as one.
+- **Name**, **Phone number**, **E-mail address**, **Address**, **Booking or ordering link** — shown only for a template that asks for them (the templates by type of business), all optional. What is typed lands in every place the site shows it, in each language, and in the links that call, write or book. A field left empty keeps the template's sample, which says of itself that it is one. **Run** stays off while a phone number, an e-mail address or a link is not written as one.
 
 A preview is shown only while it matches its template's file; a template changed since shows no **Preview** button until `<secure>/tools/template-previews.php` has built it again.
 

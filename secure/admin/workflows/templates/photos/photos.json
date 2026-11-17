@@ -374,6 +374,502 @@
                 "negative": "低分辨率，低画质，肢体畸形，手指畸形，画面过饱和，蜡像感，人脸无细节，过度光滑，画面具有AI感。构图混乱。文字模糊，扭曲"
             },
             "terms": "Sangio, 2026-11-16: generated locally with his own ComfyUI (open source), on the model files this entry names (\"I run those locally from the comfy open source I downloaded several month ago\"). Each model's licence read on its own page the same day: Apache-2.0 (see licences). The files' headers read: the diffusion model is an fp8 copy saved by ComfyUI from qwen_image_2512_bf16; QWEN_EDIT_ACTION_V1 is byte for byte the file systms publishes (SHA-256 52287ccc0544b0fa611df7ee15c96f1320548b7eec5feed759f7ffbf7adeae3a)."
+        },
+        "professional-desk.webp": {
+            "template": "professional",
+            "size": [
+                1000,
+                750
+            ],
+            "bytes": 31332,
+            "sha256": "b01a4815d63f9d1949af6925230a7b107825394e4b85ec1dddc676794b1f8420",
+            "quality": 82,
+            "source": "professional-desk.png",
+            "source_size": [
+                1008,
+                752
+            ],
+            "crop": "the centred 1003 x 752 of the source, resized to 1000 x 750",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 833099971512407,
+                "prompt": "A real photograph of a partner's desk in a quiet professional office. On a dark walnut desk: a closed deep burgundy leather folder, a black fountain pen, a pair of folded reading glasses, and a brass desk lamp glowing warm. Behind the desk, a deep burgundy leather armchair and a bookcase of plain cloth-bound books with blank spines, softly out of focus. Warm off-white walls, soft daylight from a window on the left. Quiet, exact, trustworthy. Landscape frame, three-quarter view from slightly above the desk, the desk top filling the lower half, shallow depth of field. Colours: warm off-white, stone, graphite, deep burgundy, brass, walnut. Natural colours, realistic. No people, no hands, no text, no titles on the books, no documents, no diplomas, no screen, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\n\nbook titles, lettering on spines, documents, papers with text, diploma, certificate, framed text, laptop, monitor"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "professional-reception.webp": {
+            "template": "professional",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 39018,
+            "sha256": "3ee41aa718b5e2c4ee74b82af70fdcaeb73daa711f029efd319c9c78d5b8febf",
+            "quality": 82,
+            "source": "professional-reception.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 463939186273966,
+                "prompt": "A real photograph of the waiting area of a small professional office. Two armchairs upholstered in graphite grey wool face a low round walnut table holding a glass carafe of water and two glasses. A tall green plant in a plain stone pot, a deep burgundy rug on an oak floor, a panelled warm off-white wall, a brass floor lamp. Soft daylight from a tall window with a sheer curtain. Calm, tidy, welcoming. Landscape frame, three-quarter view at eye level, the armchairs and the table in the middle. Colours: warm off-white, stone, graphite, deep burgundy, brass, walnut. Natural colours, realistic. No people, no hands, no text, no magazines, no framed pictures with writing, no logos, nothing recognisable outside the window.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "portfolio-vase.webp": {
+            "template": "portfolio",
+            "size": [
+                800,
+                1000
+            ],
+            "bytes": 19464,
+            "sha256": "3bd5219343e4884d6ed07fcdf52f233f186f64654c85d50cc24dc253a4b376fe",
+            "quality": 82,
+            "source": "portfolio-vase.png",
+            "source_size": [
+                800,
+                1008
+            ],
+            "crop": "the centred 800 x 1000 of the source, resized to 800 x 1000",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 386310469461554,
+                "prompt": "A real photograph of one tall, slender handmade ceramic vase with a narrow neck, its lower half dipped in deep cobalt blue glaze, its upper half bare speckled off-white clay. The piece stands alone in the middle of a seamless sheet of warm light-grey paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the piece, very slightly above. Hand-thrown off-white stoneware with fine dark speckles, matte, with a deep cobalt blue glaze. Vertical frame. Colours: light grey, off-white, cobalt blue. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no stamp, no signature, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "portfolio-bowls.webp": {
+            "template": "portfolio",
+            "size": [
+                800,
+                1000
+            ],
+            "bytes": 22036,
+            "sha256": "c8263b7fa978ac5e6b8207c13e22d8a47b1cd5382da4676ad23f976c21ab85f3",
+            "quality": 82,
+            "source": "portfolio-bowls.png",
+            "source_size": [
+                800,
+                1008
+            ],
+            "crop": "the centred 800 x 1000 of the source, resized to 800 x 1000",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 303955912061044,
+                "prompt": "A real photograph of three handmade ceramic bowls of three sizes, nested one inside the other and stacked slightly askew, bare speckled off-white clay outside and deep cobalt blue glaze inside. The piece stands alone in the middle of a seamless sheet of warm light-grey paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the piece, very slightly above. Hand-thrown off-white stoneware with fine dark speckles, matte, with a deep cobalt blue glaze. Vertical frame. Colours: light grey, off-white, cobalt blue. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no stamp, no signature, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "portfolio-jug.webp": {
+            "template": "portfolio",
+            "size": [
+                800,
+                1000
+            ],
+            "bytes": 25990,
+            "sha256": "48f1bd97620a5f92bda3e10c384e4ebedb82ece991527b3145da8984e6b1d77b",
+            "quality": 82,
+            "source": "portfolio-jug.png",
+            "source_size": [
+                800,
+                1008
+            ],
+            "crop": "the centred 800 x 1000 of the source, resized to 800 x 1000",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 573919900077837,
+                "prompt": "A real photograph of one handmade ceramic jug with a rounded belly, a simple pulled handle and a small spout, bare speckled off-white clay with one wide brushed band of deep cobalt blue glaze around its belly. The piece stands alone in the middle of a seamless sheet of warm light-grey paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the piece, very slightly above. Hand-thrown off-white stoneware with fine dark speckles, matte, with a deep cobalt blue glaze. Vertical frame. Colours: light grey, off-white, cobalt blue. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no stamp, no signature, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "portfolio-dish.webp": {
+            "template": "portfolio",
+            "size": [
+                800,
+                1000
+            ],
+            "bytes": 27622,
+            "sha256": "d5b31644a2a44c14533490962c100657fc711479c94e96a073bfa20a6f68c0c7",
+            "quality": 82,
+            "source": "portfolio-dish.png",
+            "source_size": [
+                800,
+                1008
+            ],
+            "crop": "the centred 800 x 1000 of the source, resized to 800 x 1000",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 342822384094288,
+                "prompt": "A real photograph of one wide, shallow handmade ceramic dish lying flat, seen at a low angle so that its inside shows as an oval, speckled off-white clay with one loose brushed circle of deep cobalt blue glaze inside. The piece stands alone in the middle of a seamless sheet of warm light-grey paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the piece, very slightly above. Hand-thrown off-white stoneware with fine dark speckles, matte, with a deep cobalt blue glaze. Vertical frame. Colours: light grey, off-white, cobalt blue. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no stamp, no signature, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "portfolio-cups.webp": {
+            "template": "portfolio",
+            "size": [
+                800,
+                1000
+            ],
+            "bytes": 21366,
+            "sha256": "317e1c8a38c2c4fa14a932a532cbbff2f11ed3a58458cd477f03b890a07ccf46",
+            "quality": 82,
+            "source": "portfolio-cups.png",
+            "source_size": [
+                800,
+                1008
+            ],
+            "crop": "the centred 800 x 1000 of the source, resized to 800 x 1000",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 776541039677059,
+                "prompt": "A real photograph of two handmade ceramic cups without handles standing side by side, bare speckled off-white clay with a band of deep cobalt blue glaze dipped at the rim. The piece stands alone in the middle of a seamless sheet of warm light-grey paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the piece, very slightly above. Hand-thrown off-white stoneware with fine dark speckles, matte, with a deep cobalt blue glaze. Vertical frame. Colours: light grey, off-white, cobalt blue. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no stamp, no signature, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "portfolio-bottles.webp": {
+            "template": "portfolio",
+            "size": [
+                800,
+                1000
+            ],
+            "bytes": 24652,
+            "sha256": "828e8a02c1443e3623955d7f1e94ab075c2be00be4a9a5ae51f7d25add57249f",
+            "quality": 82,
+            "source": "portfolio-bottles.png",
+            "source_size": [
+                800,
+                1008
+            ],
+            "crop": "the centred 800 x 1000 of the source, resized to 800 x 1000",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 626007081364083,
+                "prompt": "A real photograph of three small handmade ceramic bottles with narrow necks, of three different heights, standing close together, fully glazed in deep cobalt blue with bare speckled off-white clay at the foot. The piece stands alone in the middle of a seamless sheet of warm light-grey paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the piece, very slightly above. Hand-thrown off-white stoneware with fine dark speckles, matte, with a deep cobalt blue glaze. Vertical frame. Colours: light grey, off-white, cobalt blue. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no stamp, no signature, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "portfolio-studio.webp": {
+            "template": "portfolio",
+            "size": [
+                1200,
+                800
+            ],
+            "bytes": 48794,
+            "sha256": "c94021ec395ef618c9fc521a64ddbec242e810ecc2a1f6d30da5a0ee239fa98d",
+            "quality": 82,
+            "source": "portfolio-studio.png",
+            "source_size": [
+                1200,
+                800
+            ],
+            "crop": "the centred 1200 x 800 of the source, resized to 1200 x 800",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 579075633243011,
+                "prompt": "A real photograph of a small potter's studio. Along a white wall, plain wooden shelves hold rows of pale unglazed handmade pots, bowls and vases drying. In front, a worn wooden workbench with a glass jar of paintbrushes and two small bowls of deep cobalt blue glaze. A natural linen apron hangs from a hook. Soft daylight from a tall window on the left, a little clay dust, calm and orderly. Landscape frame at eye level, straight on to the shelves, the bench across the lower third. Colours: white, light grey, pale clay, warm wood, cobalt blue. Natural colours, realistic. No people, no hands, no text, no labels, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "stay-house.webp": {
+            "template": "stay",
+            "size": [
+                1584,
+                891
+            ],
+            "bytes": 158020,
+            "sha256": "ff57d1a604853859f011951a5975f9a267739b23a06b5fa8167cb6db49c300e3",
+            "quality": 82,
+            "source": "stay-house.png",
+            "source_size": [
+                1600,
+                896
+            ],
+            "crop": "the centred 1593 x 896 of the source, resized to 1584 x 891",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 44469001786246,
+                "prompt": "A real photograph of an ordinary two-storey country house seen from its garden on a soft summer morning. Pale lime-washed walls, a grey slate roof, dusty blue wooden shutters and a dusty blue front door, a climbing plant beside the door. In front, a gravel path, a mown lawn, a wooden bench, a small round table with two chairs, low hedges and leafy trees behind the house. Soft morning light, a pale sky, rested and welcoming. Wide landscape frame at eye level from the lawn, the house a little off-centre. Colours: pale cream, dusty blue, grey slate, soft green, warm wood. Natural colours, realistic. No people, no cars, no text, no sign, no house number, no logos, not a famous or recognisable building.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\ncar, vehicle, number plate, house number, name plate, mailbox with text, castle, mansion, hotel sign"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "stay-room-garden.webp": {
+            "template": "stay",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 35250,
+            "sha256": "8aaf000a401f2e0c23ac447182bc7260dd924a73b781b22ab84998e42c6349c6",
+            "quality": 82,
+            "source": "stay-room-garden.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 19504930347105,
+                "prompt": "A real photograph of a calm ground-floor bedroom in a country guest house. A double bed with crisp white linen and a dusty blue wool throw folded at its foot, an oak headboard, an oak bedside table with a small lamp, a wicker armchair with a honey-yellow cushion. A glass door stands open to a green garden, with sheer linen curtains moving a little. Sand-coloured walls, an oak floor. Soft morning light, airy and rested. Landscape frame, three-quarter view at eye level, the bed in the middle, the open door on one side. Colours: white, sand, dusty blue, honey yellow, oak, soft green. Natural colours, realistic. No people, no text, no framed pictures, no screen, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "stay-room-loft.webp": {
+            "template": "stay",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 41046,
+            "sha256": "c4fb1ab9d2adb006d3d00b513eb0db41b8faab13e00311e80299fe232aa25a63",
+            "quality": 82,
+            "source": "stay-room-loft.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 557092294829982,
+                "prompt": "A real photograph of a bright bedroom under the roof of a country guest house. A sloping white ceiling with pale wooden beams, a roof window showing only sky. A double bed with crisp white linen and two honey-yellow cushions, a dusty blue woven rug on an oak floor, a small oak writing desk with a chair and a plain ceramic lamp. Sand-coloured walls. Soft morning light from the roof window, airy and quiet. Landscape frame, three-quarter view at eye level, the bed in the middle. Colours: white, sand, dusty blue, honey yellow, oak. Natural colours, realistic. No people, no text, no framed pictures, no screen, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "stay-room-orchard.webp": {
+            "template": "stay",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 49192,
+            "sha256": "5c6fed89f774d8009da88b82b2312a51d6ff1b90110507c6e43bbbac1290a683",
+            "quality": 82,
+            "source": "stay-room-orchard.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 384043509781497,
+                "prompt": "A real photograph of a twin bedroom in a country guest house. Two single beds with crisp white linen and dusty blue and white striped blankets, an oak bedside table between them with a small lamp, an oak wardrobe, an armchair with a honey-yellow throw. A window with linen curtains looks onto leafy apple trees. Sand-coloured walls, an oak floor. Soft morning light, simple and rested. Landscape frame, three-quarter view at eye level, the two beds in the middle. Colours: white, sand, dusty blue, honey yellow, oak, soft green. Natural colours, realistic. No people, no text, no framed pictures, no screen, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "stay-breakfast.webp": {
+            "template": "stay",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 39074,
+            "sha256": "ceef296ea3f7c3578517fb77d51d16d5881fc750510db133d3a61790ae184460",
+            "quality": 82,
+            "source": "stay-breakfast.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 846609652549085,
+                "prompt": "A real photograph of a breakfast table set for two by a window in a country guest house. A natural linen tablecloth, a basket of crusty bread and croissants, two plain glass jars of jam with cloth covers and no labels, butter on a small dish, a plain white coffee pot and two white cups, a bowl of fresh fruit, a small vase of garden flowers with blue and yellow blooms. Soft morning light through the window, generous and unhurried. Landscape frame, three-quarter view from slightly above, the table filling the frame. Colours: linen, white, golden bread, dusty blue, honey yellow, soft green. Natural colours, realistic, shallow depth of field. No people, no hands, no text, no labels on the jars, no logos, nothing printed on the cups.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "event-hall.webp": {
+            "template": "event",
+            "size": [
+                1600,
+                900
+            ],
+            "bytes": 89732,
+            "sha256": "b349a71118761bf83b8bc3de5eaeee9c79f66866c04e20b3121f6c28c5243969",
+            "quality": 82,
+            "source": "event-hall.png",
+            "source_size": [
+                1600,
+                912
+            ],
+            "crop": "the centred 1600 x 900 of the source, resized to 1600 x 900",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 828206738533111,
+                "prompt": "A real photograph of a small event hall, empty, just before the doors open. Rows of plain black chairs on both sides of a centre aisle face a low wooden stage with two armchairs and a small round table. Warm yellow stage lights glow on the stage against a plain dark curtain, the rest of the room dim, a polished wooden floor catching the light. Expectant and warm. Wide landscape frame at eye level from the back of the room, looking down the centre aisle, the stage in the upper middle. Colours: black, warm sun yellow light, wood, dark grey. Natural colours, realistic. No people, no text, no screen, no projection, no banner, no lectern, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "event-break.webp": {
+            "template": "event",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 36534,
+            "sha256": "0b078df9acebe8b0fd03331f9b9f211fc6b695dae327251a85318c09c6c2a201",
+            "quality": 82,
+            "source": "event-break.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-16",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 560400206245348,
+                "prompt": "A real photograph of the coffee table at a conference break. On a black tablecloth with a sun-yellow runner: neat rows of plain white cups on saucers, two plain brushed-steel jugs, plates of small pastries, a bowl of apples and a glass vase of yellow flowers. Behind, an event hall softly out of focus. Bright, warm light, generous and tidy. Landscape frame, three-quarter view from slightly above, the cups in the middle. Colours: black, sun yellow, white, steel, golden pastry. Natural colours, realistic, shallow depth of field. No people, no hands, no text, no name badges, no labels, no logos, nothing printed on the cups.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
         }
     }
 }

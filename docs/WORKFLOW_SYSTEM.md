@@ -373,7 +373,7 @@ a run names a template by its id.
 | Languages | `param.languages` | The template's languages, at least two ticked |
 | Main language | `param.language` | The site's default language, one of the template's |
 | Include dark mode | `param.darkMode` | Runs *Theme Switch Button*; shown only for a template with dark colours |
-| Business name, Phone number, E-mail address, Address, Booking or ordering link | `param.businessName`, `param.phone`, `param.email`, `param.address`, `param.bookingUrl` | Nothing: the template's own steps read them. Each is shown only for a template whose `asks` lists it, and is empty when left empty |
+| Name, Phone number, E-mail address, Address, Booking or ordering link | `param.businessName`, `param.phone`, `param.email`, `param.address`, `param.bookingUrl` | Nothing: the template's own steps read them. Each is shown only for a template whose `asks` lists it, and is empty when left empty |
 
 A run goes through *Fresh Start*, *Setup Languages*, *Update Language Switch* when the site has several
 languages, *Theme Switch Button* when it has a dark mode, then the template's steps. The languages are set

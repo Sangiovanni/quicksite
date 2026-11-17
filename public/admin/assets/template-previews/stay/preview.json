@@ -1,0 +1,41 @@
+{
+    "template": "b6b122d4824af51faf2c149dec353880dead641a1ebc2f37996e572070f24d64",
+    "engine": "33a88921209487d9902838a4a71c5c959ad95020766e5d187140634197b48641",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "rooms"
+    ],
+    "scripts": true,
+    "photos": {
+        "stay-breakfast.webp": "ceef296ea3f7c3578517fb77d51d16d5881fc750510db133d3a61790ae184460",
+        "stay-house.webp": "ff57d1a604853859f011951a5975f9a267739b23a06b5fa8167cb6db49c300e3",
+        "stay-room-garden.webp": "8aaf000a401f2e0c23ac447182bc7260dd924a73b781b22ab84998e42c6349c6",
+        "stay-room-loft.webp": "c4fb1ab9d2adb006d3d00b513eb0db41b8faab13e00311e80299fe232aa25a63",
+        "stay-room-orchard.webp": "5c6fed89f774d8009da88b82b2312a51d6ff1b90110507c6e43bbbac1290a683"
+    },
+    "files": [
+        "assets/images/stay-breakfast.webp",
+        "assets/images/stay-house.webp",
+        "assets/images/stay-room-garden.webp",
+        "assets/images/stay-room-loft.webp",
+        "assets/images/stay-room-orchard.webp",
+        "dark/en/home.html",
+        "dark/en/rooms.html",
+        "dark/fr/home.html",
+        "dark/fr/rooms.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/en/rooms.html",
+        "light/fr/home.html",
+        "light/fr/rooms.html",
+        "light/style/style.css"
+    ]
+}

@@ -1319,6 +1319,22 @@
             "trades": {
                 "title": "Artisans et services à domicile",
                 "description": "Accueil et devis : services, zone desservie, raisons de vous faire confiance, bouton pour demander un devis. Bleu marine et ambre."
+            },
+            "professional": {
+                "title": "Cabinet professionnel",
+                "description": "Pour un comptable, un avocat ou un conseiller : domaines d'activité, équipe, déroulement d'un premier rendez-vous, bouton pour le réserver. Bordeaux."
+            },
+            "portfolio": {
+                "title": "Portfolio",
+                "description": "Vos réalisations d'abord : une grille de pièces avec leurs légendes, une page à propos, un bouton pour vous écrire. Noir et blanc."
+            },
+            "stay": {
+                "title": "Hébergement",
+                "description": "Pour des chambres d'hôtes ou un gîte : les chambres et leurs prix, le petit-déjeuner, les environs, un bouton pour vérifier les disponibilités. Bleu et sable."
+            },
+            "event": {
+                "title": "Événement",
+                "description": "Une page pour une conférence, un festival ou une journée portes ouvertes : la date et le lieu, le programme, les intervenants, la billetterie par un lien. Jaune et noir."
             }
         },
         "specs": {
@@ -1485,8 +1501,8 @@
                         "help": "Ajoute les couleurs sombres du modèle et un bouton clair/sombre dans son menu"
                     },
                     "businessName": {
-                        "label": "Nom de l'entreprise",
-                        "help": "Affiché dans le menu, les titres et le pied de page. Laissé vide, le nom d'exemple du modèle."
+                        "label": "Nom",
+                        "help": "Le nom de votre entreprise, de votre atelier ou de votre événement : affiché dans le menu, les titres et le pied de page. Laissé vide, le nom d'exemple du modèle."
                     },
                     "phone": {
                         "label": "Numéro de téléphone",

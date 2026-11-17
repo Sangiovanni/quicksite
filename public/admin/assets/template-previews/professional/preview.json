@@ -1,0 +1,35 @@
+{
+    "template": "81f5666dfae73ab42da9d0fa521f8710606dbb85858f1f7e165078d96693bc3c",
+    "engine": "33a88921209487d9902838a4a71c5c959ad95020766e5d187140634197b48641",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "expertise"
+    ],
+    "scripts": true,
+    "photos": {
+        "professional-desk.webp": "b01a4815d63f9d1949af6925230a7b107825394e4b85ec1dddc676794b1f8420",
+        "professional-reception.webp": "3ee41aa718b5e2c4ee74b82af70fdcaeb73daa711f029efd319c9c78d5b8febf"
+    },
+    "files": [
+        "assets/images/professional-desk.webp",
+        "assets/images/professional-reception.webp",
+        "dark/en/expertise.html",
+        "dark/en/home.html",
+        "dark/fr/expertise.html",
+        "dark/fr/home.html",
+        "dark/style/style.css",
+        "light/en/expertise.html",
+        "light/en/home.html",
+        "light/fr/expertise.html",
+        "light/fr/home.html",
+        "light/style/style.css"
+    ]
+}

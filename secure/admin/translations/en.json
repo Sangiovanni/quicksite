@@ -1882,6 +1882,22 @@
             "trades": {
                 "title": "Trades and home services",
                 "description": "Home and quote pages: services, the area served, why trust you, a button to ask for a quote. Navy and amber."
+            },
+            "professional": {
+                "title": "Professional office",
+                "description": "For an accountant, a lawyer or an adviser: areas of practice, the team, how a first meeting goes, a button to book one. Burgundy."
+            },
+            "portfolio": {
+                "title": "Portfolio",
+                "description": "Your work first: a grid of pieces with their captions, an about page, a button to write to you. Black and white."
+            },
+            "stay": {
+                "title": "Stay",
+                "description": "For a B&B or a holiday rental: the rooms with their prices, breakfast, what is nearby, a button to check availability. Blue and sand."
+            },
+            "event": {
+                "title": "Event",
+                "description": "One page for a conference, a festival or an open day: the date and the place, the programme, the speakers, tickets by a link. Yellow and black."
             }
         },
         "specs": {
@@ -2078,8 +2094,8 @@
                         "help": "Adds the template's dark colours and a light/dark button in its menu"
                     },
                     "businessName": {
-                        "label": "Business name",
-                        "help": "Shown in the menu, the titles and the footer. Left empty, the template's sample name."
+                        "label": "Name",
+                        "help": "The name of your business, your studio or your event: shown in the menu, the titles and the footer. Left empty, the template's sample name."
                     },
                     "phone": {
                         "label": "Phone number",

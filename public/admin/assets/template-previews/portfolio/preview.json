@@ -1,0 +1,45 @@
+{
+    "template": "14ddba7bb0a670b126c7be2409adc2b48f043984845b2433d9ec19ba4e1e1a0d",
+    "engine": "33a88921209487d9902838a4a71c5c959ad95020766e5d187140634197b48641",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "about"
+    ],
+    "scripts": true,
+    "photos": {
+        "portfolio-bottles.webp": "828e8a02c1443e3623955d7f1e94ab075c2be00be4a9a5ae51f7d25add57249f",
+        "portfolio-bowls.webp": "c8263b7fa978ac5e6b8207c13e22d8a47b1cd5382da4676ad23f976c21ab85f3",
+        "portfolio-cups.webp": "317e1c8a38c2c4fa14a932a532cbbff2f11ed3a58458cd477f03b890a07ccf46",
+        "portfolio-dish.webp": "d5b31644a2a44c14533490962c100657fc711479c94e96a073bfa20a6f68c0c7",
+        "portfolio-jug.webp": "48f1bd97620a5f92bda3e10c384e4ebedb82ece991527b3145da8984e6b1d77b",
+        "portfolio-studio.webp": "c94021ec395ef618c9fc521a64ddbec242e810ecc2a1f6d30da5a0ee239fa98d",
+        "portfolio-vase.webp": "3bd5219343e4884d6ed07fcdf52f233f186f64654c85d50cc24dc253a4b376fe"
+    },
+    "files": [
+        "assets/images/portfolio-bottles.webp",
+        "assets/images/portfolio-bowls.webp",
+        "assets/images/portfolio-cups.webp",
+        "assets/images/portfolio-dish.webp",
+        "assets/images/portfolio-jug.webp",
+        "assets/images/portfolio-studio.webp",
+        "assets/images/portfolio-vase.webp",
+        "dark/en/about.html",
+        "dark/en/home.html",
+        "dark/fr/about.html",
+        "dark/fr/home.html",
+        "dark/style/style.css",
+        "light/en/about.html",
+        "light/en/home.html",
+        "light/fr/about.html",
+        "light/fr/home.html",
+        "light/style/style.css"
+    ]
+}
