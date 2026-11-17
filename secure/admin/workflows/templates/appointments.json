@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.appointments.title",
     "descriptionKey": "workflows.templates.appointments.description",
     "languages": ["en", "fr"],
+    "kind": "services",
     "asks": ["businessName", "phone", "email", "address", "bookingUrl"],
     "steps": [
         {"command":"uploadAsset","params":{"templatePhoto":"appointments-salon.webp"}},

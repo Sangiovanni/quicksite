@@ -360,6 +360,7 @@ a run names a template by its id.
 | `title`, `description` | The name and the line on the template's card, as written. `titleKey` and `descriptionKey` name a translation instead (the shipped templates use them). |
 | `icon` | Shown on the card when the template has no picture |
 | `languages` | The languages the template is written in. A run offers these and no other. |
+| `kind` | The kind of site the template is for, as an id: `services`, `hospitality`, `shops`, `gatherings` or `general` in the shipped row. The picker lists the templates kind by kind. Left out, the template comes last. |
 | `asks` | The optional fields the template asks a run for, by the row's parameter ids: `businessName`, `phone`, `email`, `address`, `bookingUrl`. The form shows a field only for a template that lists it. Left out, the template asks for none. |
 | `steps` | The template's commands, read as any workflow's steps (see *`steps`*): `condition`, `forEach`, `filter`, placeholders and `$if`. |
 | `data` | What the steps read, by key: `{{texts.fr}}`, `{{dark}}`. A template whose `data.dark` is not empty is offered with a dark mode. |
@@ -378,6 +379,13 @@ a run names a template by its id.
 A run goes through *Fresh Start*, *Setup Languages*, *Update Language Switch* when the site has several
 languages, *Theme Switch Button* when it has a dark mode, then the template's steps. The languages are set
 before the template's steps, since a language's texts can only be sent once the language exists.
+
+**The kinds are the picker's own list.** The row's `template` parameter lists them as its `options`, in the order the picker
+shows them: each a kind's id (`value`) and the key of its name (`labelKey`). A template states one of those ids as its `kind`.
+The picker then shows the templates kind by kind, each kind under its name, with a row of buttons above them (**All**, then
+one per kind with the number of its templates) that shows one kind alone. A template whose `kind` is missing, or is no id of
+the list, comes last under **Other**. A new kind is one more entry of `options` and its name in the translations; with no
+`options` the picker shows no kinds.
 
 **A field a template asks for is optional, and the template holds the sample that stands in for it.** The template always sends its
 sample texts; a step under a condition (`"condition": "param.multilingual !== true && param.phone"`) then sends what was typed over
@@ -446,6 +454,11 @@ It builds each template with every one of its languages, in its light theme and 
 has one, and keeps the pages as static files under `public/admin/assets/template-previews/<id>/`. The panel
 shows a preview only while it matches the template's file: change the file, and its card shows no **Preview**
 button until the tool has run again. `--check` builds nothing and says which previews are stale.
+
+**A link that leads out of a preview.** A preview holds the template's own pages, in its own languages, and nothing else:
+that list is the build's, so nothing is written in a template for it. A link to anything else (the sample's booking page, a
+call, a letter, a page the preview does not hold) is switched off in the preview's copy, and a press on it makes the dialog
+say, in the panel's language, that the link works on a real site. The site a run makes keeps every link.
 
 ---
 

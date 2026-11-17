@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.professional.title",
     "descriptionKey": "workflows.templates.professional.description",
     "languages": ["en", "fr"],
+    "kind": "services",
     "asks": ["businessName", "phone", "email", "address", "bookingUrl"],
     "steps": [
         {"command":"addRoute","params":{"name":"expertise"}},

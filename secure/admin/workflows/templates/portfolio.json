@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.portfolio.title",
     "descriptionKey": "workflows.templates.portfolio.description",
     "languages": ["en", "fr"],
+    "kind": "shops",
     "asks": ["businessName", "phone", "email", "address"],
     "steps": [
         {"command":"addRoute","params":{"name":"about"}},

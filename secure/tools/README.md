@@ -100,6 +100,11 @@ template is written in, in its light theme and in its dark theme when it has one
 They are kept as static files under `public/admin/assets/template-previews/`. A
 template's photos are kept once for its two themes, byte for byte.
 
+A preview holds the template's own pages and nothing else. A link that leads out of
+it (a booking page, a call, a letter, a page the preview does not hold) is switched
+off in the preview's copy, and a press on it makes the panel say that the link works
+on a real site. The site a run makes keeps its links.
+
 It touches no account and no project of the installation. It copies QuickSite's own
 files to a temporary folder, serves that copy with PHP's built-in server on a free
 local port, runs each template there as the panel runs it, builds it, fetches every

@@ -115,7 +115,7 @@
           "type": {
             "type": "string",
             "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "template", "hidden"],
-            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc. `template` is a picker of the site templates in templates/: one radio card per file, with its picture, its name and its line, and a Preview button when it has a built preview. Its value is the template's id. The engine lists the choices itself (no `options`): every valid file of the folder, so a file added there is offered with no other change. Another field's `condition` reads the template picked as `chosen.<this parameter's id>` (its `languages`, `dark`, `asks`), and a field whose `optionsFrom.filterFrom` names this parameter is limited to the picked template's languages."
+            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc. `template` is a picker of the site templates in templates/: one radio card per file, with its picture, its name and its line, and a Preview button when it has a built preview. Its value is the template's id. The engine lists the choices itself: every valid file of the folder, so a file added there is offered with no other change. Its `options` are the kinds the picker groups the templates under, in the order it shows them (a kind's id as `value`, and its name): a template states its kind in its own file, and one that states none, or a kind listed nowhere here, comes last under the picker's own word. With no `options` the picker shows no kinds. Another field's `condition` reads the template picked as `chosen.<this parameter's id>` (its `languages`, `dark`, `asks`), and a field whose `optionsFrom.filterFrom` names this parameter is limited to the picked template's languages."
           },
           "searchable": {
             "type": "boolean",
@@ -147,7 +147,7 @@
           },
           "options": {
             "type": "array",
-            "description": "Static options for select type. Each item has a value and either label (direct text) or labelKey (translation key).",
+            "description": "Static options for select type. Each item has a value and either label (direct text) or labelKey (translation key). On a `template` parameter: the kinds its templates are grouped under, in order.",
             "items": {
               "type": "object",
               "required": ["value"],
@@ -484,6 +484,10 @@
           "minItems": 1,
           "items": { "type": "string" },
           "description": "The language codes the template is written in, the first one first in its preview. A run offers these and no other; a language is added by adding its code here and its texts under data."
+        },
+        "kind": {
+          "type": "string",
+          "description": "The kind of site the template is for, as an id (letters, digits, hyphens, underscores): the picker lists the templates kind by kind and filters them by it. The kinds, their order and their names are the `options` of the workflow's `template` parameter (the shipped row lists services, hospitality, shops, gatherings, general). Left out, the template comes last."
         },
         "asks": {
           "type": "array",

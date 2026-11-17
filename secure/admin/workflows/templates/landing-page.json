@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.landingPage.title",
     "descriptionKey": "workflows.templates.landingPage.description",
     "languages": ["en", "fr"],
+    "kind": "general",
     "steps": [
         {"command":"editStructure","params":{"type":"menu","structure":[{"tag":"nav","params":{"class":"landing-nav"},"children":[{"tag":"a","params":{"href":"#hero","class":"nav-logo"},"children":[{"textKey":"site.name"}]},{"tag":"ul","params":{"class":"nav-links"},"children":[{"tag":"li","children":[{"tag":"a","params":{"href":"#features"},"children":[{"textKey":"nav.features"}]}]},{"tag":"li","children":[{"tag":"a","params":{"href":"#contact"},"children":[{"textKey":"nav.contact"}]}]}]},{"$if":"param.darkMode === true","component":"theme-switch","data":{}}]}]}},
         {"command":"editStructure","params":{"type":"footer","structure":[{"tag":"footer","params":{"class":"landing-footer"},"children":[{"tag":"div","params":{"class":"footer-content"},"children":[{"tag":"p","children":[{"textKey":"footer.copyright"}]},{"$if":"param.multilingual === true","tag":"div","params":{"class":"footer-lang"},"children":[{"tag":"span","params":{"class":"lang-label"},"children":[{"textKey":"footer.language"}]},{"component":"lang-switch"}]}]}]}]}},

@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.foodAndDrink.title",
     "descriptionKey": "workflows.templates.foodAndDrink.description",
     "languages": ["en", "fr"],
+    "kind": "hospitality",
     "asks": ["businessName", "phone", "email", "address", "bookingUrl"],
     "steps": [
         {"command":"addRoute","params":{"name":"menu"}},

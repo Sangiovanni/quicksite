@@ -870,6 +870,409 @@
                 "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
             },
             "terms": "Sangio, 2026-11-16: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the first ten photos, with no edit model (\"for the photos, yes all are the same model as the first 10 without the edit model\"). Each model's licence read on its own page on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "club-path.webp": {
+            "template": "club",
+            "size": [
+                1600,
+                900
+            ],
+            "bytes": 179956,
+            "sha256": "c2bf647edf8d760bf14b4a59c83b0fae05088ffe19dd75c22ea48cc2714e98d4",
+            "quality": 76,
+            "source": "club-path.png",
+            "source_size": [
+                1600,
+                912
+            ],
+            "crop": "the centred 1600 x 900 of the source, resized to 1600 x 900",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 601536883402017,
+                "prompt": "A real photograph of a grassy footpath through gentle rolling countryside on a calm autumn morning. The path runs between green hedgerows and a few trees whose leaves are turning orange, passes an open plain wooden field gate, and leads towards low wooded hills in a light mist. Dew on the grass, a pale clear sky, soft low sunlight from the left. Fresh, open, inviting. Wide landscape frame at eye level, the path starting at the lower middle of the frame and leading away into the distance. Colours: pine green, warm orange, cream, bark brown, pale blue. Natural colours, realistic. No people, no animals, no text, no signpost, no waymark, no map board, no fence sign, no buildings, not a famous or recognisable place.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\nsignpost, waymark, trail sign, map board, arrow, car, road, power lines, mountain peak, castle"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "club-boots.webp": {
+            "template": "club",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 58184,
+            "sha256": "279c391868cae95db91f4f7fe99c0fc0aa1ede8ab95ce2fdb9a142289367c4bf",
+            "quality": 82,
+            "source": "club-boots.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 1110860400043896,
+                "prompt": "A real photograph of a weathered wooden bench at the edge of an autumn wood. On the bench: one pair of worn brown leather walking boots with plain laces, a plain pine-green canvas rucksack, and a plain brushed-steel flask. A few fallen orange leaves on the bench and the ground. Behind, tree trunks and orange foliage softly out of focus. Soft morning light, calm and ready. Landscape frame, three-quarter view level with the bench, the boots and the rucksack in the middle, shallow depth of field. Colours: bark brown, pine green, warm orange, steel, cream. Natural colours, realistic. No people, no hands, no feet in the boots, no text, no labels, no logos on the boots, the rucksack or the flask, no map.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\nlegs, feet, logo patch, brand tag, map, compass with numbers, walking poles with text"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "club-meeting.webp": {
+            "template": "club",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 74478,
+            "sha256": "ffe4a9815bb9448172345f53a2c01b83ccaf5ca30b8d40428625ff257600db4a",
+            "quality": 78,
+            "source": "club-meeting.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 809772090419464,
+                "prompt": "A real photograph of a small open timber shelter with a shingle roof at the edge of an autumn wood, a plain wooden picnic table with two benches under it. In front, an empty gravel clearing; at one side, a grassy footpath begins between the trees. Orange and green foliage, a little morning mist, soft low sunlight. Quiet, welcoming, the place where a walk starts. Landscape frame, three-quarter view at eye level, the shelter and the table in the middle. Colours: bark brown, pine green, warm orange, grey gravel, cream sky. Natural colours, realistic. No people, no cars, no bicycles, no text, no notice board, no map, no signpost, no bin with a label, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\ncar, vehicle, bicycle, notice board, information panel, map board, signpost, arrow"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "personal-portrait.webp": {
+            "template": "personal",
+            "size": [
+                600,
+                600
+            ],
+            "bytes": 40980,
+            "sha256": "a45ee96878cadcae1fffc8fdf87cbf0c51cd22439979f4fc841dbb1eed3d81b2",
+            "quality": 82,
+            "source": "personal-portrait.png",
+            "source_size": [
+                608,
+                608
+            ],
+            "crop": "the centred 608 x 608 of the source, resized to 600 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 459065866643591,
+                "prompt": "A real photograph of a straw sun hat with a peony-pink ribbon resting on the seat of a leaf-green painted wooden garden chair, in a sunny garden. Behind, pink and white flowers and green leaves softly out of focus. Warm morning sunlight, gentle shadows. Personal, warm, unhurried. Square frame, the hat exactly in the middle and filling about half of the frame, the chair's back behind it, nothing important in the corners, shallow depth of field. Colours: straw yellow, peony pink, leaf green, cream. Natural colours, realistic. No people, no hands, no text, no label on the hat, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "personal-cover.webp": {
+            "template": "personal",
+            "size": [
+                1200,
+                600
+            ],
+            "bytes": 107718,
+            "sha256": "02bc8cd1345b25e51c2e61ac5e0eb8880218d4f768f4447ee6c89a0c35029690",
+            "quality": 74,
+            "source": "personal-cover.png",
+            "source_size": [
+                1200,
+                608
+            ],
+            "crop": "the centred 1200 x 600 of the source, resized to 1200 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 549190990091772,
+                "prompt": "A real photograph of a garden flower border in full bloom on a June morning. Pink peonies, pink and white cosmos and tall foxgloves among fresh green leaves fill the frame from side to side; a strip of mown lawn runs along the bottom. Soft morning sunlight, a few flowers sharp and the rest gently out of focus. Generous, sunny, alive. Wide panoramic frame, twice as wide as tall, camera level with the flowers. Colours: peony pink, white, leaf green, cream. Natural colours, realistic. No people, no hands, no text, no plant labels, no garden ornaments, no fence, no building.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\nplant label, garden gnome, statue, greenhouse, fence, house, watering hose"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "personal-feature.webp": {
+            "template": "personal",
+            "size": [
+                800,
+                600
+            ],
+            "bytes": 45538,
+            "sha256": "293fcf8b87fdff8f9d9c62c58dd916898ca79aa79e8c90dd3e6b708a0e1705db",
+            "quality": 82,
+            "source": "personal-feature.png",
+            "source_size": [
+                800,
+                608
+            ],
+            "crop": "the centred 800 x 600 of the source, resized to 800 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 277996651053078,
+                "prompt": "A real photograph of a worn wooden potting bench by a sunny window. On the bench: a row of small terracotta pots with young green seedlings, a small trowel with a wooden handle, a ball of natural garden twine, and a plain grey metal watering can. A little spilled soil. Warm morning light from the window, calm and hopeful. Landscape frame, three-quarter view from slightly above, the pots in the middle, shallow depth of field. Colours: terracotta, fresh green, pale wood, straw, cream. Natural colours, realistic. No people, no hands, no gloves, no text, no plant labels, no seed packets, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\ngloves, seed packet, plant label, printed bag, compost bag with text"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "shop-shelves.webp": {
+            "template": "shop",
+            "size": [
+                1000,
+                750
+            ],
+            "bytes": 61172,
+            "sha256": "3fc5106f570c2f5c6dd728509d22e4c7f458e144020a4cd992f3c9ec5ef0351a",
+            "quality": 82,
+            "source": "shop-shelves.png",
+            "source_size": [
+                1008,
+                752
+            ],
+            "crop": "the centred 1003 x 752 of the source, resized to 1000 x 750",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 210655199286765,
+                "prompt": "A real photograph of the inside of a small homeware shop. Pale oak shelves on a cream wall hold neat stacks of folded linen cloths in cream, sage green and terracotta, handwoven wicker baskets, plain beeswax candles, wooden cutting boards and cream enamel mugs. In front, a terracotta-coloured wooden counter with a glass vase of dried flowers. Soft daylight from a shop window on the left, warm and tidy. Landscape frame, three-quarter view at eye level, the shelves filling the frame, the counter across the lower third. Colours: cream, terracotta, natural linen, pale oak, sage green. Natural colours, realistic. No people, no hands, no text, no price tags, no labels, no signs, no till, no screen, no packaging with writing, no logos.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\nprice tag, shelf label, cash register, card reader, screen, shop sign, chalkboard, packaging text, books"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "shop-candles.webp": {
+            "template": "shop",
+            "size": [
+                600,
+                600
+            ],
+            "bytes": 15960,
+            "sha256": "d788ab42b2bf568bfb233672d3d4f92be4b9ee63195a9ed456eb70c875624be6",
+            "quality": 82,
+            "source": "shop-candles.png",
+            "source_size": [
+                800,
+                800
+            ],
+            "crop": "the centred 800 x 800 of the source, resized to 600 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 850166693947551,
+                "prompt": "A real photograph of two hand-dipped honey-yellow beeswax taper candles joined by their shared wick, lying beside one short plain beeswax pillar candle standing upright. The product sits alone in the middle of a seamless sheet of warm sand-coloured paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the product, slightly above. Square frame. Colours: sand, cream, terracotta, natural linen, pale oak, sage green. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no label, no price tag, no stamp, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "shop-board.webp": {
+            "template": "shop",
+            "size": [
+                600,
+                600
+            ],
+            "bytes": 10716,
+            "sha256": "b10d544545aa86ac5cb6e7c2df775f44361fa6802c3466b6f9f549b1f7130d18",
+            "quality": 82,
+            "source": "shop-board.png",
+            "source_size": [
+                608,
+                608
+            ],
+            "crop": "the centred 608 x 608 of the source, resized to 600 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 62835661240818,
+                "prompt": "A real photograph of one plain pale oak cutting board with a rounded handle and a small natural leather loop through a hole in the handle, standing upright and leaning slightly back. The product sits alone in the middle of a seamless sheet of warm sand-coloured paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the product, slightly above. Square frame. Colours: sand, cream, terracotta, natural linen, pale oak, sage green. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no label, no price tag, no stamp, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "shop-linen.webp": {
+            "template": "shop",
+            "size": [
+                600,
+                600
+            ],
+            "bytes": 18542,
+            "sha256": "566b94be3267ba3ac15fe9058ee0bd6da71ec0f529361331c076007197df2af4",
+            "quality": 82,
+            "source": "shop-linen.png",
+            "source_size": [
+                800,
+                800
+            ],
+            "crop": "the centred 800 x 800 of the source, resized to 600 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 432335792070411,
+                "prompt": "A real photograph of a neat stack of three folded washed-linen tea towels, one terracotta, one cream and one sage green, tied together with a single loop of natural twine. The product sits alone in the middle of a seamless sheet of warm sand-coloured paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the product, slightly above. Square frame. Colours: sand, cream, terracotta, natural linen, pale oak, sage green. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no label, no price tag, no stamp, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "shop-mugs.webp": {
+            "template": "shop",
+            "size": [
+                600,
+                600
+            ],
+            "bytes": 11326,
+            "sha256": "a861d1d4cbd5780590d804db2d32dd5d6cfb8c9d57a5bc26327ebcbfcea371ca",
+            "quality": 82,
+            "source": "shop-mugs.png",
+            "source_size": [
+                800,
+                800
+            ],
+            "crop": "the centred 800 x 800 of the source, resized to 600 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 307567016663657,
+                "prompt": "A real photograph of two plain cream-white enamel mugs with a thin terracotta-coloured rim, standing side by side, one handle turned to the left and one to the right. The product sits alone in the middle of a seamless sheet of warm sand-coloured paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the product, slightly above. Square frame. Colours: sand, cream, terracotta, natural linen, pale oak, sage green. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no label, no price tag, no stamp, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "shop-basket.webp": {
+            "template": "shop",
+            "size": [
+                600,
+                600
+            ],
+            "bytes": 26056,
+            "sha256": "39d8c59902318f190da866ccc0ceab89efb45ea84f3e97dcd92d0edb10eea392",
+            "quality": 82,
+            "source": "shop-basket.png",
+            "source_size": [
+                800,
+                800
+            ],
+            "crop": "the centred 800 x 800 of the source, resized to 600 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 212081328094294,
+                "prompt": "A real photograph of one round handwoven natural wicker basket with two short natural leather handles, empty. The product sits alone in the middle of a seamless sheet of warm sand-coloured paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the product, slightly above. Square frame. Colours: sand, cream, terracotta, natural linen, pale oak, sage green. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no label, no price tag, no stamp, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
+        },
+        "shop-soap.webp": {
+            "template": "shop",
+            "size": [
+                600,
+                600
+            ],
+            "bytes": 13686,
+            "sha256": "f4bf99cdbb8f8b58afe3f2a898dd081db9f2bd831a7e68162b7a91abfdd52aa3",
+            "quality": 82,
+            "source": "shop-soap.png",
+            "source_size": [
+                800,
+                800
+            ],
+            "crop": "the centred 800 x 800 of the source, resized to 600 x 600",
+            "made": "2026-11-17",
+            "generation": {
+                "model": "qwen_image_2512_fp8_e4m3fn.safetensors",
+                "text_encoder": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+                "vae": "qwen_image_vae.safetensors",
+                "loras": [],
+                "steps": 50,
+                "cfg": 4,
+                "sampler": "euler",
+                "scheduler": "simple",
+                "seed": 673562609018123,
+                "prompt": "A real photograph of three plain rectangular bars of handmade soap, one cream, one sage green and one pale terracotta, stacked slightly askew and tied together with a single loop of natural twine, with no wrapper and no stamp.  The product sits alone in the middle of a seamless sheet of warm sand-coloured paper that curves up behind it, with empty space all around. Soft daylight from the left, a soft shadow falling to the right. Camera level with the product, slightly above. Square frame. Colours: sand, cream, terracotta, natural linen, pale oak, sage green. Natural colours, realistic, sharp, studio product photograph. No people, no hands, no text, no label, no price tag, no stamp, no logo, no props.",
+                "negative": "people, person, face, hands, fingers, arm, silhouette, reflection of a person, text, letters, words, numbers, writing, sign, label, price tag, book title, document, poster, banner, screen content, logo, brand, watermark, signature, famous landmark, illustration, drawing, painting, 3D render, cartoon, oversaturated, HDR,\nwrapper, packaging, stamp, embossed letters, printed pattern, barcode, ribbon with text"
+            },
+            "terms": "Sangio, 2026-11-17: generated the same day locally with his own ComfyUI (open source), on the model files this entry names, which are those of the twenty-six photos shipped before, with no edit model (\"they all are generated the same way as the other already in that folder\"). Those models' licences were read on their own pages on 2026-11-16: Apache-2.0 (see licences). Each PNG's own graph read on 2026-11-17: Qwen-Image 2512, its text encoder and its VAE, no LoRA on the sampler's path, no edit."
         }
     }
 }

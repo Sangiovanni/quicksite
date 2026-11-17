@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.trades.title",
     "descriptionKey": "workflows.templates.trades.description",
     "languages": ["en", "fr"],
+    "kind": "services",
     "asks": ["businessName", "phone", "email", "address"],
     "steps": [
         {"command":"addRoute","params":{"name":"quote"}},

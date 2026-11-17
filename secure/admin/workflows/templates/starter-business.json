@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.starterBusiness.title",
     "descriptionKey": "workflows.templates.starterBusiness.description",
     "languages": ["en", "fr"],
+    "kind": "general",
     "steps": [
         {"command":"addRoute","params":{"name":"about"}},
         {"command":"addRoute","params":{"name":"services"}},

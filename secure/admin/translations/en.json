@@ -1898,6 +1898,18 @@
             "event": {
                 "title": "Event",
                 "description": "One page for a conference, a festival or an open day: the date and the place, the programme, the speakers, tickets by a link. Yellow and black."
+            },
+            "club": {
+                "title": "Club or association",
+                "description": "For a sports club or an association: the week's sessions, the dates to come, the committee, how to join. Green and orange."
+            },
+            "personal": {
+                "title": "Personal page",
+                "description": "Phone first: one page with your photo, a line about you and your links as large buttons. Pink."
+            },
+            "shop": {
+                "title": "Shop window",
+                "description": "For a shop: the new arrivals with their prices, the shelves, the hours, buttons to order or call. Terracotta."
             }
         },
         "specs": {
@@ -2075,7 +2087,14 @@
                 "description": "Builds a ready-made site from the template you pick: in one language or several, with a dark theme if you want one. It replaces what the project holds.",
                 "params": {
                     "template": {
-                        "label": "Template"
+                        "label": "Template",
+                        "kinds": {
+                            "services": "Services",
+                            "hospitality": "Food and stays",
+                            "shops": "Shops and makers",
+                            "gatherings": "Events and groups",
+                            "general": "General"
+                        }
                     },
                     "multilingual": {
                         "label": "Several languages",
@@ -2095,7 +2114,7 @@
                     },
                     "businessName": {
                         "label": "Name",
-                        "help": "The name of your business, your studio or your event: shown in the menu, the titles and the footer. Left empty, the template's sample name."
+                        "help": "The name of your business, your studio, your club or your event, or your own: shown in the menu, the titles and the footer. Left empty, the template's sample name."
                     },
                     "phone": {
                         "label": "Phone number",
@@ -2111,7 +2130,7 @@
                     },
                     "bookingUrl": {
                         "label": "Booking or ordering link",
-                        "help": "Where the template's Book or Order button leads: the page of the service you use, starting with https://. Left empty, a sample link."
+                        "help": "Where the template's main button leads (book, order, join): the page of the service you use, starting with https://. Left empty, a sample link."
                     }
                 }
             },
@@ -2249,6 +2268,11 @@
         "workflowsTemplateTheme": "Theme",
         "workflowsTemplateThemeLight": "Light",
         "workflowsTemplateThemeDark": "Dark",
+        "workflowsTemplateKinds": "Show",
+        "workflowsTemplateKindAll": "All",
+        "workflowsTemplateKindOther": "Other",
+        "workflowsTemplateKindCount": "{name} ({count})",
+        "workflowsTemplatePreviewOutside": "This link is switched off in the preview. On your site, it works.",
         "workflowsFactNoAi": "No AI",
         "workflowsFactPaste": "No AI: you paste the commands",
         "workflowsFactAiOne": "Uses AI: one request",

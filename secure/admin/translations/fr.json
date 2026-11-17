@@ -1335,6 +1335,18 @@
             "event": {
                 "title": "Événement",
                 "description": "Une page pour une conférence, un festival ou une journée portes ouvertes : la date et le lieu, le programme, les intervenants, la billetterie par un lien. Jaune et noir."
+            },
+            "club": {
+                "title": "Club ou association",
+                "description": "Pour un club sportif ou une association : les séances de la semaine, les dates à venir, le comité, comment adhérer. Vert et orange."
+            },
+            "personal": {
+                "title": "Page personnelle",
+                "description": "Pensé pour le téléphone : une page avec votre photo, une ligne sur vous et vos liens en gros boutons. Rose."
+            },
+            "shop": {
+                "title": "Vitrine de magasin",
+                "description": "Pour un magasin : les nouveautés avec leurs prix, les rayons, les horaires, des boutons pour commander ou appeler. Terre cuite."
             }
         },
         "specs": {
@@ -1482,7 +1494,14 @@
                 "description": "Construit un site prêt à l'emploi à partir du modèle choisi : en une langue ou plusieurs, avec un thème sombre si vous le souhaitez. Il remplace le contenu du projet.",
                 "params": {
                     "template": {
-                        "label": "Modèle"
+                        "label": "Modèle",
+                        "kinds": {
+                            "services": "Services",
+                            "hospitality": "Restauration et séjours",
+                            "shops": "Boutiques et créateurs",
+                            "gatherings": "Événements et associations",
+                            "general": "Généralistes"
+                        }
                     },
                     "multilingual": {
                         "label": "Plusieurs langues",
@@ -1502,7 +1521,7 @@
                     },
                     "businessName": {
                         "label": "Nom",
-                        "help": "Le nom de votre entreprise, de votre atelier ou de votre événement : affiché dans le menu, les titres et le pied de page. Laissé vide, le nom d'exemple du modèle."
+                        "help": "Le nom de votre entreprise, de votre atelier, de votre club ou de votre événement, ou le vôtre : affiché dans le menu, les titres et le pied de page. Laissé vide, le nom d'exemple du modèle."
                     },
                     "phone": {
                         "label": "Numéro de téléphone",
@@ -1518,7 +1537,7 @@
                     },
                     "bookingUrl": {
                         "label": "Lien de réservation ou de commande",
-                        "help": "Là où mène le bouton Réserver ou Commander du modèle : la page du service que vous utilisez, commençant par https://. Laissé vide, un lien d'exemple."
+                        "help": "Là où mène le bouton principal du modèle (réserver, commander, adhérer) : la page du service que vous utilisez, commençant par https://. Laissé vide, un lien d'exemple."
                     }
                 }
             },
@@ -1646,6 +1665,11 @@
         "workflowsTemplateTheme": "Thème",
         "workflowsTemplateThemeLight": "Clair",
         "workflowsTemplateThemeDark": "Sombre",
+        "workflowsTemplateKinds": "Afficher",
+        "workflowsTemplateKindAll": "Tous",
+        "workflowsTemplateKindOther": "Autres",
+        "workflowsTemplateKindCount": "{name} ({count})",
+        "workflowsTemplatePreviewOutside": "Ce lien est désactivé dans l'aperçu. Sur votre site, il fonctionne.",
         "aiToolsSectionYourPrompt": "Votre invite",
         "aiToolsSectionParameters": "Paramètres",
         "aiToolsSectionGeneralPrompt": "Invite générale",

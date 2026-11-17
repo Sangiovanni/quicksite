@@ -5,6 +5,7 @@
     "titleKey": "workflows.templates.event.title",
     "descriptionKey": "workflows.templates.event.description",
     "languages": ["en", "fr"],
+    "kind": "gatherings",
     "asks": ["businessName", "email", "address", "bookingUrl"],
     "steps": [
         {"command":"uploadAsset","params":{"templatePhoto":"event-hall.webp"}},

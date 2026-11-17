@@ -247,7 +247,8 @@ class WorkflowManager {
 
     /**
      * What a template's file says of itself, for a picker: its id, icon, name and line (in the panel's language, from its
-     * keys, else as the file writes them), its languages, whether it holds a dark theme, the fields it asks a run for
+     * keys, else as the file writes them), its kind (an id the picker groups it under, '' when the file states none), its
+     * languages, whether it holds a dark theme, the fields it asks a run for
      * (`asks`: ids of the workflow's parameters, which a field's condition reads to show itself), and its file's hash.
      */
     public function templateChoice(array $template): array {
@@ -266,6 +267,7 @@ class WorkflowManager {
             'icon' => is_string($template['icon'] ?? null) ? $template['icon'] : '',
             'title' => $text('title'),
             'description' => $text('description'),
+            'kind' => is_string($template['kind'] ?? null) && RegexPatterns::match('identifier_alphanum', $template['kind']) ? $template['kind'] : '',
             'languages' => array_values($template['languages']),
             'dark' => is_array($template['data']['dark'] ?? null) && $template['data']['dark'] !== [],
             'asks' => array_values(array_filter(

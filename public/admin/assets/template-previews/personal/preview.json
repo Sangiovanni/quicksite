@@ -1,0 +1,32 @@
+{
+    "template": "41b494c42507868dab28f112f452f5544878501b998e9817969414d2906ae57f",
+    "engine": "f4cdefe13817d0e38a1a22db889b2bd8ddd7b7896c8632c2c365cbb6bf0efadc",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home"
+    ],
+    "scripts": true,
+    "photos": {
+        "personal-cover.webp": "02bc8cd1345b25e51c2e61ac5e0eb8880218d4f768f4447ee6c89a0c35029690",
+        "personal-feature.webp": "293fcf8b87fdff8f9d9c62c58dd916898ca79aa79e8c90dd3e6b708a0e1705db",
+        "personal-portrait.webp": "a45ee96878cadcae1fffc8fdf87cbf0c51cd22439979f4fc841dbb1eed3d81b2"
+    },
+    "files": [
+        "assets/images/personal-cover.webp",
+        "assets/images/personal-feature.webp",
+        "assets/images/personal-portrait.webp",
+        "dark/en/home.html",
+        "dark/fr/home.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/fr/home.html",
+        "light/style/style.css"
+    ]
+}

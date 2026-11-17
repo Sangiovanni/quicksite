@@ -17,6 +17,14 @@
  * beside them, byte for byte. The panel shows a preview in a frame that is given no access to
  * the panel.
  *
+ * A LINK THAT LEADS OUT OF A PREVIEW. A preview holds its own pages and languages, as the
+ * build wrote them, and nothing else. A link to anything else (a booking page, a call, a
+ * letter, a page the preview does not hold) is switched off in the preview's copy: its
+ * address becomes `#` and it is marked. A page that holds such a link keeps one script of
+ * this tool's: a press on a marked link is stopped, and the page tells the panel's dialog
+ * with one fixed message that carries nothing, so the dialog can say the link works on a
+ * real site. The site a run makes keeps its links.
+ *
  * WHY THIS IS A SCRIPT AND NOT A COMMAND. It rewrites files QuickSite itself ships, for
  * the whole installation: no project role can express that, as for the other tools here.
  * It is run by whoever changes a template or releases a version, from a shell.
@@ -64,6 +72,15 @@ const QS_TP_WORKFLOW = 'start-from-template';
 const QS_TP_WORKFLOWS = ['start-from-template', 'fresh-start', 'setup-languages', 'update-lang-switch', 'setup-theme-switch'];
 /** An attribute only the site's runtime serves: a page that carries one cannot be previewed without it. */
 const QS_TP_NEEDS_RUNTIME = '/\s(on[a-z]+|data-bind[a-z-]*|data-list-template|data-(?:state|storage|auth|consent)-[a-z-]+)=/i';
+/** What marks a link of a preview page that leads out of the preview: its address is gone, and a press on it tells the panel's dialog. */
+const QS_TP_OUTSIDE = 'data-preview-outside';
+/**
+ * The script a preview page keeps for those links, the tool's own: a press on one is stopped, and the page tells its parent
+ * with one fixed message, { qsTemplatePreview: "outside-link" }, which carries no address and no text. The dialog that shows
+ * the preview (preview-ai-tools.js, _openTemplatePreview()) expects exactly that shape, from its own frame's window alone.
+ */
+const QS_TP_SCRIPT = '<script>document.addEventListener("click",function(e){var a=e.target&&e.target.closest?e.target.closest("a[' . QS_TP_OUTSIDE . ']"):null;'
+    . 'if(!a)return;e.preventDefault();try{window.parent.postMessage({qsTemplatePreview:"outside-link"},"*");}catch(x){}},true);</script>';
 /** The only widths a template's stylesheet names: QuickSite's two limits, a tablet up to 64rem and a phone up to 40rem, in this order. */
 const QS_TP_TABLET = '(max-width: 64rem)';
 const QS_TP_PHONE = '(max-width: 40rem)';
@@ -373,7 +390,31 @@ function qs_tp_relative(string $target, array $langs, array $pages, string $up, 
     return $up . $lang . $page . '.html' . $hash;
 }
 
-/** A built page as a preview keeps it: relative addresses, no loaded script, the theme switch's own scripts only. */
+/**
+ * Whether a link's address, as a preview keeps it, leads out of the preview: one qs_tp_relative() left as it is that is no
+ * place in the same page (a web address, a call, a letter, a path of the site's host), or the `#` it gives a page the
+ * preview does not hold. The preview's own pages and languages, as the build wrote them, are the only list.
+ */
+function qs_tp_leads_out(string $href): bool {
+    return $href === '#' || preg_match('~^(?:[a-z][a-z0-9+.-]*:|/)~i', $href) === 1;
+}
+
+/**
+ * A page's links, as a preview keeps them: one that leads out of the preview is switched off (its address becomes `#`) and
+ * marked with QS_TP_OUTSIDE, in the preview's copy alone. Returns how many were marked.
+ */
+function qs_tp_outside(string &$html): int {
+    $marked = 0;
+    $html = (string) preg_replace_callback('#<a\b[^>]*>#i', static function (array $m) use (&$marked): string {
+        if (!preg_match('/\bhref="([^"]*)"/', $m[0], $h)) return $m[0];
+        if (!qs_tp_leads_out(html_entity_decode($h[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'))) return $m[0];
+        $marked++;
+        return str_replace($h[0], 'href="#" ' . QS_TP_OUTSIDE, $m[0]);
+    }, $html);
+    return $marked;
+}
+
+/** A built page as a preview keeps it: relative addresses, no loaded script, the theme switch's own scripts only, its outside links switched off. */
 function qs_tp_page(string $html, string $projectId, array $langs, array $pages, string $up, array &$assets, bool &$scripts): string {
     $html = preg_replace('#<script\b[^>]*\bsrc="[^"]*"[^>]*>\s*</script>#i', '', $html);
     $html = preg_replace_callback('#<script\b[^>]*>(.*?)</script>#is', static function (array $m) use (&$scripts): string {
@@ -386,6 +427,15 @@ function qs_tp_page(string $html, string $projectId, array $langs, array $pages,
         $to = qs_tp_relative(html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8'), $langs, $pages, $up, $assets);
         return $to === null ? $m[0] : $m[1] . '="' . htmlspecialchars($to, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
     }, $html);
+    // A link that leads out of the preview goes nowhere here; a press on it is stopped and the page tells the panel's dialog,
+    // with one fixed message that carries nothing (QS_TP_SCRIPT). The page keeps that script only when it holds such a link.
+    if (qs_tp_outside($html) > 0) {
+        $at = strripos($html, '</body>');
+        if ($at !== false) {
+            $html = substr($html, 0, $at) . QS_TP_SCRIPT . "\n" . substr($html, $at);
+            $scripts = true;
+        }
+    }
     // Lines that end with spaces only differ from one build to the next by nothing a browser shows.
     return rtrim(preg_replace('/[ \t]+\n/', "\n", str_replace("\r\n", "\n", $html))) . "\n";
 }

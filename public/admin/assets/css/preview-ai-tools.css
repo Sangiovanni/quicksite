@@ -1403,6 +1403,53 @@
     gap: 8px;
 }
 
+/* The templates by kind: a row of buttons that wraps (All, then a kind each), then each kind's name over its cards.
+   A card or a kind the buttons leave out is not drawn */
+.preview-contextual-ai-tools__template-pick,
+.preview-contextual-ai-tools__template-picker--kinds,
+.preview-contextual-ai-tools__template-kind {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.preview-contextual-ai-tools__template-pick {
+    gap: 10px;
+}
+
+.preview-contextual-ai-tools__template-picker--kinds {
+    gap: 12px;
+}
+
+.preview-contextual-ai-tools__template-kind {
+    gap: 6px;
+}
+
+.preview-contextual-ai-tools__template-kinds {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.preview-contextual-ai-tools__template-kind-name {
+    font-size: 11px;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--admin-text-muted);
+}
+
+.preview-contextual-ai-tools__template-kind-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(9rem, 100%), 1fr));
+    gap: 8px;
+}
+
+.preview-contextual-ai-tools__template-kind[hidden],
+.preview-contextual-ai-tools__template-card[hidden] {
+    display: none;
+}
+
 .preview-contextual-ai-tools__template-card {
     display: flex;
     flex-direction: column;
@@ -1498,7 +1545,8 @@
 }
 
 .preview-contextual-ai-tools__template-preview,
-.preview-contextual-ai-tools__template-theme {
+.preview-contextual-ai-tools__template-theme,
+.preview-contextual-ai-tools__template-kind-btn {
     min-height: 2rem;
     padding: 4px 12px;
     background: transparent;
@@ -1516,12 +1564,14 @@
 }
 
 .preview-contextual-ai-tools__template-preview:hover,
-.preview-contextual-ai-tools__template-theme:hover {
+.preview-contextual-ai-tools__template-theme:hover,
+.preview-contextual-ai-tools__template-kind-btn:hover {
     border-color: var(--admin-accent);
     color: var(--admin-accent);
 }
 
-.preview-contextual-ai-tools__template-theme[aria-pressed="true"] {
+.preview-contextual-ai-tools__template-theme[aria-pressed="true"],
+.preview-contextual-ai-tools__template-kind-btn[aria-pressed="true"] {
     border-color: var(--admin-accent);
     box-shadow: 0 0 0 2px var(--admin-accent-muted);
 }
@@ -1585,6 +1635,24 @@
     font-size: 12px;
     line-height: 1.4;
     color: var(--admin-text-muted);
+}
+
+/* What the dialog says when a link that leads out of the preview is pressed: a line under the note, there only while it has words */
+.preview-contextual-ai-tools__template-dialog-outside {
+    margin: 6px 0 0;
+    padding: 6px 10px;
+    border-left: 3px solid var(--admin-accent);
+    border-radius: 4px;
+    background: var(--admin-accent-muted);
+    color: var(--admin-text);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.preview-contextual-ai-tools__template-dialog-outside:empty {
+    margin: 0;
+    padding: 0;
+    border: 0;
 }
 
 .preview-contextual-ai-tools__template-frame {

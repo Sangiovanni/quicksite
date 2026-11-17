@@ -1,0 +1,37 @@
+{
+    "template": "9900ec7a6c5e8cd489ff7494a352bb00e855ff18c89c0694a2b91d53757f5ba8",
+    "engine": "f4cdefe13817d0e38a1a22db889b2bd8ddd7b7896c8632c2c365cbb6bf0efadc",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "join"
+    ],
+    "scripts": true,
+    "photos": {
+        "club-boots.webp": "279c391868cae95db91f4f7fe99c0fc0aa1ede8ab95ce2fdb9a142289367c4bf",
+        "club-meeting.webp": "ffe4a9815bb9448172345f53a2c01b83ccaf5ca30b8d40428625ff257600db4a",
+        "club-path.webp": "c2bf647edf8d760bf14b4a59c83b0fae05088ffe19dd75c22ea48cc2714e98d4"
+    },
+    "files": [
+        "assets/images/club-boots.webp",
+        "assets/images/club-meeting.webp",
+        "assets/images/club-path.webp",
+        "dark/en/home.html",
+        "dark/en/join.html",
+        "dark/fr/home.html",
+        "dark/fr/join.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/en/join.html",
+        "light/fr/home.html",
+        "light/fr/join.html",
+        "light/style/style.css"
+    ]
+}

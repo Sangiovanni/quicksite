@@ -1,0 +1,45 @@
+{
+    "template": "69db721a780cf0338bba693a480e4f47c55bce948a0881ab6eb9f4bd7c955e02",
+    "engine": "f4cdefe13817d0e38a1a22db889b2bd8ddd7b7896c8632c2c365cbb6bf0efadc",
+    "themes": [
+        "light",
+        "dark"
+    ],
+    "languages": [
+        "en",
+        "fr"
+    ],
+    "pages": [
+        "home",
+        "shelves"
+    ],
+    "scripts": true,
+    "photos": {
+        "shop-basket.webp": "39d8c59902318f190da866ccc0ceab89efb45ea84f3e97dcd92d0edb10eea392",
+        "shop-board.webp": "b10d544545aa86ac5cb6e7c2df775f44361fa6802c3466b6f9f549b1f7130d18",
+        "shop-candles.webp": "d788ab42b2bf568bfb233672d3d4f92be4b9ee63195a9ed456eb70c875624be6",
+        "shop-linen.webp": "566b94be3267ba3ac15fe9058ee0bd6da71ec0f529361331c076007197df2af4",
+        "shop-mugs.webp": "a861d1d4cbd5780590d804db2d32dd5d6cfb8c9d57a5bc26327ebcbfcea371ca",
+        "shop-shelves.webp": "3fc5106f570c2f5c6dd728509d22e4c7f458e144020a4cd992f3c9ec5ef0351a",
+        "shop-soap.webp": "f4bf99cdbb8f8b58afe3f2a898dd081db9f2bd831a7e68162b7a91abfdd52aa3"
+    },
+    "files": [
+        "assets/images/shop-basket.webp",
+        "assets/images/shop-board.webp",
+        "assets/images/shop-candles.webp",
+        "assets/images/shop-linen.webp",
+        "assets/images/shop-mugs.webp",
+        "assets/images/shop-shelves.webp",
+        "assets/images/shop-soap.webp",
+        "dark/en/home.html",
+        "dark/en/shelves.html",
+        "dark/fr/home.html",
+        "dark/fr/shelves.html",
+        "dark/style/style.css",
+        "light/en/home.html",
+        "light/en/shelves.html",
+        "light/fr/home.html",
+        "light/fr/shelves.html",
+        "light/style/style.css"
+    ]
+}

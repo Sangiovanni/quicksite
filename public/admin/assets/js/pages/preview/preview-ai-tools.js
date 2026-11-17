@@ -58,7 +58,8 @@ window.PreviewAiTools = (function () {
     var _activeTemplate = null;
     var _fetchedData = {};
     var _paramValues = {};
-    var _requests = {};                      // "Your prompt" of each AI phase, by its key (_requestKey())
+    var _templateKindShown = {};             // the kind each picker of templates shows, by its parameter's id (none: all); not stored
+    var _requests = {};                    // "Your prompt" of each AI phase, by its key (_requestKey())
     var _generatedPrompt = '';
     var _aiResponseText = '';
     var _aiResponseStatus = { type: 'idle' };  // 'idle'|'ok'|'error', + message + commandCount
@@ -1954,8 +1955,35 @@ window.PreviewAiTools = (function () {
     }
 
     /**
+     * The kinds a picker groups its templates under, in the order its parameter lists them (its `options`: a kind's id
+     * and its name), each with the templates whose file states it. A template that states no kind, or one the parameter
+     * does not list, comes last under the panel's own word. A kind no template states is left out.
+     */
+    function _templateKinds(param, list) {
+        var listed = Array.isArray(param.options) ? param.options : [];
+        var kinds = [];
+        var byValue = {};
+        for (var i = 0; i < listed.length; i++) {
+            var o = listed[i];
+            if (!o || typeof o.value !== 'string' || o.value === '' || byValue[o.value]) continue;
+            byValue[o.value] = { value: o.value, label: o.label || o.value, templates: [] };
+            kinds.push(byValue[o.value]);
+        }
+        if (kinds.length === 0) return [];
+        var other = { value: '', label: _t('templateKindOther', 'Other'), templates: [] };
+        for (var t = 0; t < list.length; t++) {
+            (byValue[list[t].kind] || other).templates.push(list[t]);
+        }
+        kinds = kinds.filter(function (k) { return k.templates.length > 0; });
+        if (other.templates.length > 0) kinds.push(other);
+        return kinds;
+    }
+
+    /**
      * A picker of templates: a group of radio cards the field's label names, one per template (its picture, or its
      * icon when it has none, then its name and its line). A template with a built preview has a Preview button.
+     * When the templates are of several kinds, the cards come kind by kind, each kind under its name, and a row of
+     * buttons above them shows one kind alone.
      */
     function _renderTemplatePicker(param) {
         var list = Array.isArray(param.templates) ? param.templates : [];
@@ -1964,10 +1992,92 @@ window.PreviewAiTools = (function () {
         group.className = 'preview-contextual-ai-tools__template-picker';
         group.setAttribute('role', 'radiogroup');
         group.setAttribute('aria-labelledby', _paramControlId(param.id) + '-label');
-        for (var i = 0; i < list.length; i++) {
-            group.appendChild(_renderTemplateCard(param, list[i], group));
+        var kinds = _templateKinds(param, list);
+        if (kinds.length < 2) {
+            for (var i = 0; i < list.length; i++) {
+                group.appendChild(_renderTemplateCard(param, list[i], group));
+            }
+            return group;
         }
-        return group;
+        group.classList.add('preview-contextual-ai-tools__template-picker--kinds');
+        for (var k = 0; k < kinds.length; k++) {
+            group.appendChild(_renderTemplateKind(param, kinds[k], group));
+        }
+        var pick = document.createElement('div');
+        pick.className = 'preview-contextual-ai-tools__template-pick';
+        pick.appendChild(_renderTemplateKindButtons(param, kinds, list.length, group));
+        pick.appendChild(group);
+        _showTemplateKind(param, group);
+        return pick;
+    }
+
+    /** One kind of a picker: its name, then its templates' cards. */
+    function _renderTemplateKind(param, kind, group) {
+        var section = document.createElement('div');
+        section.className = 'preview-contextual-ai-tools__template-kind';
+        section.dataset.kind = kind.value;
+        var name = document.createElement('div');
+        name.className = 'preview-contextual-ai-tools__template-kind-name';
+        name.textContent = kind.label;
+        section.appendChild(name);
+        var cards = document.createElement('div');
+        cards.className = 'preview-contextual-ai-tools__template-kind-cards';
+        for (var i = 0; i < kind.templates.length; i++) {
+            cards.appendChild(_renderTemplateCard(param, kind.templates[i], group));
+        }
+        section.appendChild(cards);
+        return section;
+    }
+
+    /**
+     * The buttons above a picker's cards: All, then one per kind, each with the number of its templates. The one
+     * pressed is the kind shown; it lasts while the editor's page is open, and nothing of it is stored.
+     */
+    function _renderTemplateKindButtons(param, kinds, total, group) {
+        var row = document.createElement('div');
+        row.className = 'preview-contextual-ai-tools__template-kinds';
+        row.setAttribute('role', 'group');
+        row.setAttribute('aria-label', _t('templateKinds', 'Show'));
+        var word = _t('templateKindCount', '{name} ({count})');
+        var add = function (value, label, count) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'preview-contextual-ai-tools__template-kind-btn';
+            b.dataset.kind = value === null ? '*' : value;
+            b.textContent = word.replace('{name}', label).replace('{count}', String(count));
+            b.addEventListener('click', function () {
+                _templateKindShown[param.id] = value;
+                _showTemplateKind(param, group);
+            });
+            row.appendChild(b);
+        };
+        add(null, _t('templateKindAll', 'All'), total);
+        for (var i = 0; i < kinds.length; i++) add(kinds[i].value, kinds[i].label, kinds[i].templates.length);
+        return row;
+    }
+
+    /**
+     * Shows the cards of the kind a picker's buttons hold (all of them when none is pressed), and says so on the
+     * buttons. The card picked is never hidden, whatever its kind; a kind with no card shown is hidden with its name.
+     */
+    function _showTemplateKind(param, group) {
+        var shown = Object.prototype.hasOwnProperty.call(_templateKindShown, param.id) ? _templateKindShown[param.id] : null;
+        var sections = group.querySelectorAll('.preview-contextual-ai-tools__template-kind');
+        for (var s = 0; s < sections.length; s++) {
+            var cards = sections[s].querySelectorAll('.preview-contextual-ai-tools__template-card');
+            var any = false;
+            for (var c = 0; c < cards.length; c++) {
+                var show = shown === null || sections[s].dataset.kind === shown || cards[c].dataset.template === _paramValues[param.id];
+                cards[c].hidden = !show;
+                any = any || show;
+            }
+            sections[s].hidden = !any;
+        }
+        var row = group.parentNode ? group.parentNode.querySelector('.preview-contextual-ai-tools__template-kinds') : null;
+        var buttons = row ? row.querySelectorAll('.preview-contextual-ai-tools__template-kind-btn') : [];
+        for (var b = 0; b < buttons.length; b++) {
+            buttons[b].setAttribute('aria-pressed', buttons[b].dataset.kind === (shown === null ? '*' : shown) ? 'true' : 'false');
+        }
     }
 
     function _renderTemplateCard(param, template, group) {
@@ -1988,10 +2098,12 @@ window.PreviewAiTools = (function () {
         radio.addEventListener('change', function () {
             if (!radio.checked) return;
             _paramValues[param.id] = template.id;
-            var cards = group.children;
+            var cards = group.querySelectorAll('.preview-contextual-ai-tools__template-card');
             for (var c = 0; c < cards.length; c++) {
                 cards[c].classList.toggle('preview-contextual-ai-tools__template-card--chosen', cards[c] === card);
             }
+            // The card picked before may be of a kind that is not shown: it leaves with its kind.
+            if (group.classList.contains('preview-contextual-ai-tools__template-picker--kinds')) _showTemplateKind(param, group);
             _onParamChanged(param.id);
         });
         choice.appendChild(radio);
@@ -2115,20 +2227,44 @@ window.PreviewAiTools = (function () {
             });
             head.appendChild(themes);
         }
+        // What the dialog says when a link that leads out of the preview is pressed in the frame: a line of the panel's own
+        // words. A preview page tells it so (the previews' tool switches such a link off and has the page say it was pressed).
+        // The dialog hears only its own frame: the message's source is this frame's window, which no other frame, tab or
+        // page is; its origin reads 'null', as a frame with no same-origin does; and its data is the one shape expected.
+        // Nothing of the message is shown, kept or used: anything else changes nothing.
+        var outside = document.createElement('p');
+        outside.className = 'preview-contextual-ai-tools__template-dialog-outside';
+        outside.setAttribute('role', 'status');
+        var onMessage = function (e) {
+            if (e.source !== frame.contentWindow || e.origin !== 'null' || !_isPreviewOutsideMessage(e.data)) return;
+            outside.textContent = _t('templatePreviewOutside', 'This link is switched off in the preview. On your site, it works.');
+        };
+        window.addEventListener('message', onMessage);
+        // The line goes when the frame shows another page (a theme pressed, a page of the preview opened).
+        frame.addEventListener('load', function () { outside.textContent = ''; });
+
         var shown = null;
+        var shut = function () {
+            window.removeEventListener('message', onMessage);
+            if (shown) shown.close();
+        };
         var close = document.createElement('button');
         close.type = 'button';
         close.className = 'preview-contextual-ai-tools__template-close admin-modal__close';
         close.textContent = '×';
         close.setAttribute('aria-label', _commonWord('close'));
-        close.addEventListener('click', function () { if (shown) shown.close(); });
+        close.addEventListener('click', shut);
         head.appendChild(close);
         modal.appendChild(head);
 
+        var notes = document.createElement('div');
+        notes.className = 'preview-contextual-ai-tools__template-dialog-notes';
         var note = document.createElement('p');
         note.className = 'preview-contextual-ai-tools__template-dialog-note';
         note.textContent = _t('templatePreviewNote', "The preview shows every option on: all the template's languages and its light/dark button. A run builds only what you choose.");
-        modal.appendChild(note);
+        notes.appendChild(note);
+        notes.appendChild(outside);
+        modal.appendChild(notes);
         modal.appendChild(frame);
 
         // The frame's page takes the keyboard while the focus is in it; past its last link the focus comes back here.
@@ -2142,8 +2278,19 @@ window.PreviewAiTools = (function () {
         shown = utils.openModal(modal, {
             focusable: function () { return themeButtons.concat([close, frame]); },
             first: close,
-            dismiss: function () { if (shown) shown.close(); }
+            dismiss: shut
         });
+    }
+
+    /**
+     * Whether a message is the one a template's preview page sends when a link that leads out of the preview is pressed
+     * (secure/tools/template-previews.php writes that page's script): an object with the one key and the one value, and
+     * nothing more.
+     */
+    function _isPreviewOutsideMessage(data) {
+        if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+        var keys = Object.keys(data);
+        return keys.length === 1 && keys[0] === 'qsTemplatePreview' && data.qsTemplatePreview === 'outside-link';
     }
 
     function _renderTagSelect(param, options) {

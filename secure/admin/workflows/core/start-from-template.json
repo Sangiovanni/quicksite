@@ -28,7 +28,14 @@
             "id": "template",
             "type": "template",
             "labelKey": "workflows.specs.startFromTemplate.params.template.label",
-            "required": true
+            "required": true,
+            "options": [
+                { "value": "services", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.services" },
+                { "value": "hospitality", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.hospitality" },
+                { "value": "shops", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.shops" },
+                { "value": "gatherings", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.gatherings" },
+                { "value": "general", "labelKey": "workflows.specs.startFromTemplate.params.template.kinds.general" }
+            ]
         },
         {
             "id": "multilingual",
