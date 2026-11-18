@@ -1648,8 +1648,10 @@ function qs_auth_attempt_setup(string $name, string $username, string $password,
 
     // Keyed per CALLER, not per install: a single throttle key would let any
     // stranger lock the deployer out of their own first-run page. Brute force is
-    // not the defence here (256 bits of entropy is) — this is a noise damper.
-    $throttleKey = 'setup:' . qs_client_ip();
+    // not the defence here (256 bits of entropy is) — this is a noise damper. The
+    // caller is its address as every per-address limit counts it (an IPv6 one by
+    // its first 64 bits), and the attempt joins that address's sign-in count too.
+    $throttleKey = 'setup:' . qs_client_address_key();
     $wait = qs_login_throttle_admit($throttleKey, $starts);
     if ($wait > 0) {
         return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
@@ -1944,7 +1946,8 @@ function handleCors(?string $origin): bool {
     // repaired because two request-controlled values should never be compared
     // against each other, not because an exploit was demonstrated. Its scheme is
     // qs_request_is_https()'s, so behind a proxy ending HTTPS the browser's
-    // `Origin: https://<host>` matches it.
+    // `Origin: https://<host>` matches it when the server passes `HTTPS on` or the
+    // deployment declares QS_HTTPS_ONLY; otherwise the panel's own calls are refused.
     require_once __DIR__ . '/projectContext.php';
     $selfOrigin = qs_request_origin();
     if (strcasecmp($origin, $selfOrigin) === 0) {

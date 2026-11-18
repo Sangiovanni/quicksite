@@ -497,6 +497,15 @@ if ($buildPublicSpace !== ''
     );
 }
 
+// The secure folder refuses every request, whatever it is named: nothing in it is
+// served, and this keeps it so where a server's root is set too high.
+if (file_put_contents($buildFullPath . '/' . $buildSecureName . '/.htaccess', qs_site_secure_htaccess()) === false) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the secure folder\'s .htaccess')
+    );
+}
+
 // SECURITY — the PUBLISH boundary. These two copies are the point
 // where a file stops being project data and becomes something a web server
 // hands to the public, so this is where the publish allowlist applies. They
@@ -1276,7 +1285,9 @@ DEPLOYMENT STEPS:
    APACHE — mod_rewrite must be enabled and the document root must allow
    .htaccess to take effect (AllowOverride All, or at least FileInfo +
    Options + Indexes). Without it the request funnel is ignored and every
-   page except the home page answers 404.
+   page except the home page answers 404. {$buildSecureName}/.htaccess
+   refuses every request to that folder, in case a document root is ever
+   set one level too high (AllowOverride AuthConfig, or All, lets it act).
 
    NGINX — .htaccess is not read at all. A snippet describing THIS site is
    included at:

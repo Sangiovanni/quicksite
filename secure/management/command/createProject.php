@@ -131,13 +131,6 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
         }
     }
 
-    // Create index.php for directory listing protection in all asset folders
-    $indexPhpContent = "<?php\n\nif (!defined('BASE_URL')) {\n    \$protocol = (!empty(\$_SERVER['HTTPS']) && \$_SERVER['HTTPS'] !== 'off' || \$_SERVER['SERVER_PORT'] == 443) ? \"https://\" : \"http://\";\n    \$host = \$_SERVER['HTTP_HOST'];\n    define('BASE_URL', \$protocol . \$host);\n}\nheader(\"Location: \".BASE_URL);\n";
-    $assetDirs = ['images', 'font', 'audio', 'videos'];
-    foreach ($assetDirs as $dir) {
-        file_put_contents($projectPath . '/public/assets/' . $dir . '/index.php', $indexPhpContent, LOCK_EX);
-    }
-    
     // Create config.php
     $configContent = createProjectConfig($config);
     if (file_put_contents($projectPath . '/config.php', $configContent, LOCK_EX) === false) {
@@ -347,9 +340,6 @@ function createMenuAndFooter(string $projectPath): void {
  */
 function createEmptyStylesheet(string $projectPath): void {
     file_put_contents($projectPath . '/public/style/style.css', '', LOCK_EX);
-
-    // index.php for style folder
-    file_put_contents($projectPath . '/public/style/index.php', "<?php\n// Directory listing disabled\nhttp_response_code(403);\n", LOCK_EX);
 }
 
 // Execute command if called directly via API (not internal call)

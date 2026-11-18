@@ -18,8 +18,10 @@
  * header on a cross-origin request without a preflight this install refuses.
  * A leaked token alone therefore grants nothing — the old access token did.
  *
- * Cookie: name QSSESSID, HttpOnly, SameSite=Lax, Secure under HTTPS, path '/'
- * so `/p/<id>/` (surface B) receives it on the same origin. Lax rather than
+ * Cookie: name QSSESSID, HttpOnly, SameSite=Lax, path '/' so `/p/<id>/` (surface
+ * B) receives it on the same origin, and Secure whenever the request reached the
+ * site over HTTPS by the one scheme test (qs_request_is_https(): behind a proxy
+ * ending HTTPS, the server's `HTTPS on` or the deployment's QS_HTTPS_ONLY). Lax rather than
  * Strict so arriving from a bookmark or an external link does not look like
  * being signed out; cross-site POSTs carry no cookie, and the Authorization
  * pairing above is the actual CSRF gate.
@@ -55,6 +57,9 @@
  * and they were never part of the token machinery — deleting them with it would
  * remove the only backstop against password guessing.
  */
+
+// The one scheme test (qs_request_is_https()), which every cookie's Secure asks.
+require_once __DIR__ . '/requestRuntime.php';
 
 /** The session cookie name — deliberately not PHP's default. */
 const QS_SESSION_COOKIE = 'QSSESSID';
@@ -295,7 +300,7 @@ function qs_session_cookie_params(int $lifetime): array {
     return [
         'lifetime' => $lifetime,
         'path'     => '/', // surface B lives at /p/<id>/ on the same origin
-        'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure'   => qs_request_is_https(),
         'httponly' => true,
         'samesite' => 'Lax',
     ];
@@ -925,10 +930,12 @@ function qs_session_response_complete(): bool {
 
 // ============================================================================
 // Login throttle (brute-force backoff) — a small state file with flock +
-// temp/rename discipline. Keyed by sha256 of the lowercased login identifier
-// (the USERNAME): the raw identifier never sits in the state file. A plain
-// digest, so it hides a name from a glance, not from enumeration — the file's
-// reader is whoever can already read users.php.
+// temp/rename discipline, holding two counts. One is keyed by sha256 of the
+// lowercased login identifier (the USERNAME): the raw identifier never sits in
+// the state file. A plain digest, so it hides a name from a glance, not from
+// enumeration — the file's reader is whoever can already read users.php. The
+// other is keyed by the caller's ADDRESS (qs_client_address_key(), hashed the
+// same way), so one machine trying many usernames is slowed as well.
 //
 // Independent of the session model: this is what makes password guessing
 // expensive, and every attempt is admitted through it before any credential is
@@ -945,10 +952,24 @@ function qs_login_throttle_path(): string {
 }
 
 /**
- * Shared mutate for the throttle file. $fn(array &$data): mixed — return false
- * to leave the file untouched (nothing to record).
+ * The seconds an attempt waits while its throttle's store cannot be read or
+ * written, the sign-in's before its credential is checked and the
+ * registration's before it runs (qs_throttle_unavailable()). A fixed figure
+ * (ruled with the per-address count): long enough that a broken store is no
+ * open door to guessing or flooding, short enough that a person barely notices.
+ */
+const QS_THROTTLE_BROKEN_WAIT = 2;
+
+/**
+ * The one way a throttle's store changes, the sign-in's and the registration's
+ * alike. $fn(array &$data): mixed — return false to leave the file untouched
+ * (nothing to record); $prune(array &$data): void drops what has expired before
+ * the store is written. Returns what $fn returned, false when it declined, or
+ * null when the store cannot be used: its lock cannot be taken, the file is
+ * there and cannot be read, or the new contents cannot be written (the caller
+ * then hands the attempt to qs_throttle_unavailable()).
  *
- * EVERY READ OF THIS STORE HAPPENS HERE, under its lock, refusals included. A
+ * EVERY READ OF A STORE HAPPENS HERE, under its lock, refusals included. A
  * reader outside the lock holds the file open while a writer swaps it, and on
  * Windows a rename cannot replace a file another process has open: the swap
  * fails, the attempt it was counting goes unrecorded, and the next attempt is
@@ -957,15 +978,25 @@ function qs_login_throttle_path(): string {
  * swaps fail; with no outside reader, none.) A swap that still fails — an
  * antivirus scan holding the file — is retried once, as the users.php writer's is.
  */
-function qs_login_throttle_mutate(callable $fn) {
-    $path = qs_login_throttle_path();
+function qs_throttle_store_mutate(string $path, callable $fn, callable $prune) {
     $lock = @fopen($path . '.lock', 'c');
     if ($lock === false) {
-        return false;
+        return null;
     }
-    flock($lock, LOCK_EX);
+    if (!flock($lock, LOCK_EX)) {
+        fclose($lock);
+        return null;
+    }
     try {
-        $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
+        $data = [];
+        if (is_file($path)) {
+            // There and unreadable is a broken store, never counted over as if empty.
+            $raw = @file_get_contents($path);
+            if ($raw === false) {
+                return null;
+            }
+            $data = json_decode($raw, true);
+        }
         if (!is_array($data)) {
             $data = [];
         }
@@ -973,30 +1004,24 @@ function qs_login_throttle_mutate(callable $fn) {
         if ($result === false) {
             return false;
         }
-        // prune entries idle for a day
-        $cutoff = time() - 86400;
-        foreach ($data as $key => $entry) {
-            if ((int)($entry['last'] ?? 0) < $cutoff) {
-                unset($data[$key]);
-            }
-        }
+        $prune($data);
         $tmp = $path . '.tmp' . getmypid();
         // Encode checked separately from the write: `false . ''` writes an EMPTY
         // file and file_put_contents returns 0, not false, so a check on the
-        // write alone lets a failed encode truncate the store. This file holds
+        // write alone lets a failed encode truncate the store. A store holds
         // only hashed keys and integers, so nothing unrepresentable can reach it
         // today — checked because a throttle store that silently emptied itself
         // would disable brute-force protection without a trace.
         $json = json_encode($data, JSON_PRETTY_PRINT);
-        if ($json === false || file_put_contents($tmp, $json) === false) {
+        if ($json === false || @file_put_contents($tmp, $json) === false) {
             @unlink($tmp);
-            return false;
+            return null;
         }
         if (!@rename($tmp, $path)) {
             usleep(50000);
             if (!@rename($tmp, $path)) {
                 @unlink($tmp);
-                return false;
+                return null;
             }
         }
         return $result;
@@ -1007,26 +1032,68 @@ function qs_login_throttle_mutate(callable $fn) {
 }
 
 /**
+ * The sign-in's store, through qs_throttle_store_mutate(): an entry is pruned
+ * once idle for a day, counted from its last attempt or from the end of the
+ * wait or window it still holds, whichever is later.
+ */
+function qs_login_throttle_mutate(callable $fn) {
+    return qs_throttle_store_mutate(qs_login_throttle_path(), $fn, static function (array &$data): void {
+        $cutoff = time() - 86400;
+        foreach ($data as $key => $entry) {
+            $lastUse = max((int)($entry['last'] ?? 0), (int)($entry['until'] ?? 0), (int)($entry['ends'] ?? 0));
+            if ($lastUse < $cutoff) {
+                unset($data[$key]);
+            }
+        }
+    });
+}
+
+/**
+ * The per-address sign-in limit from auth.php `authentication.login.throttle`
+ * (both optional): at most per_ip_failures failed attempts from one address
+ * (qs_client_address_key()) in per_ip_window_minutes, then refused until that
+ * window ends. Defaults 20 and 15; either at 0 turns the count off. The
+ * username's own count is not configurable (qs_login_throttle_admit()).
+ *
+ * @return array{per_ip_failures:int, per_ip_window_minutes:int}
+ */
+function qs_login_throttle_config(): array {
+    $login = loadAuthConfig()['authentication']['login'] ?? [];
+    $throttle = is_array($login) && is_array($login['throttle'] ?? null) ? $login['throttle'] : [];
+    return [
+        'per_ip_failures'       => max(0, (int)($throttle['per_ip_failures'] ?? 20)),
+        'per_ip_window_minutes' => max(0, (int)($throttle['per_ip_window_minutes'] ?? 15)),
+    ];
+}
+
+/**
  * Admit one attempt for this login identifier, counting it — in ONE locked
  * step, before any credential is checked. Returns 0 when the attempt may go
  * ahead (it is already counted as a failure), or the seconds the caller must
  * still wait (nothing counted).
  *
- * 5 free attempts, then a doubling cooldown (30s, 60s, 120s, … capped at 1h),
- * started by the attempt that crosses the line — which is itself admitted.
+ * TWO COUNTS, ONE STEP. The username's: 5 free attempts, then a doubling
+ * cooldown (30s, 60s, 120s, … capped at 1h), started by the attempt that crosses
+ * the line — which is itself admitted. The address's (qs_login_throttle_config()):
+ * a window opened by its first counted attempt, holding at most per_ip_failures
+ * attempts; past them every attempt from that address is refused until the
+ * window ends, whatever username it names. Either count refusing refuses.
  *
  * WHY COUNT FIRST. A throttle that reads the count, checks the password, and
  * only then records the failure lets through every request that arrives while
  * the others are still checking: K simultaneous guesses are K verifications,
  * whatever the count said. Counted under the store's lock before anything is
  * verified, each attempt sees the ones admitted before it, so a burst gets the
- * attempts that remain and no more. A success gives its attempt back — and
- * every earlier one — through qs_login_throttle_clear().
+ * attempts that remain and no more. A success gives back, through
+ * qs_login_throttle_clear(), its username's every attempt, and to its address
+ * its own attempt alone.
  *
  * A refusal is decided under the same lock and writes nothing (see
  * qs_login_throttle_mutate for why no read of this store may happen outside
- * it). A store that cannot be read or written admits the attempt: a broken
- * throttle file must not lock every account out.
+ * it). A store that cannot be read or written neither refuses nor admits at
+ * once: the attempt waits QS_THROTTLE_BROKEN_WAIT seconds and goes ahead,
+ * logged each time (qs_throttle_unavailable()), since a broken store must not
+ * lock every account out, nor leave guessing unlimited.
  *
  * $starts receives the wait an admitted attempt starts — the seconds its
  * failure leaves the next attempt to wait, 0 when it starts none or nothing
@@ -1035,12 +1102,30 @@ function qs_login_throttle_mutate(callable $fn) {
  */
 function qs_login_throttle_admit(string $identifier, ?int &$starts = null): int {
     $key     = qs_throttle_hash(strtolower($identifier));
+    $cfg     = qs_login_throttle_config();
+    $address = $cfg['per_ip_failures'] > 0 && $cfg['per_ip_window_minutes'] > 0
+        ? ['key'    => 'ip:' . qs_throttle_hash(qs_client_address_key()),
+           'limit'  => $cfg['per_ip_failures'],
+           'window' => $cfg['per_ip_window_minutes'] * 60]
+        : null;
     $wait    = 0; // set inside the lock
     $pending = 0;
-    $recorded = qs_login_throttle_mutate(function (array &$data) use ($key, &$wait, &$pending) {
+    $counted = null; // the address window this attempt was counted in
+    $recorded = qs_login_throttle_mutate(function (array &$data) use ($key, $address, &$wait, &$pending, &$counted) {
         $now   = time();
         $entry = is_array($data[$key] ?? null) ? $data[$key] : [];
         $wait  = max(0, (int)($entry['until'] ?? 0) - $now);
+        $open  = null;
+        if ($address !== null) {
+            $held  = is_array($data[$address['key']] ?? null) ? $data[$address['key']] : [];
+            $start = (int)($held['start'] ?? 0);
+            $open  = $start > 0 && $now < $start + $address['window']
+                ? ['start' => $start, 'fails' => max(0, (int)($held['fails'] ?? 0))]
+                : ['start' => $now, 'fails' => 0];
+            if ($open['fails'] >= $address['limit']) {
+                $wait = max($wait, $open['start'] + $address['window'] - $now);
+            }
+        }
         if ($wait > 0) {
             return false; // refused: nothing to record
         }
@@ -1051,20 +1136,71 @@ function qs_login_throttle_admit(string $identifier, ?int &$starts = null): int 
             'last'  => $now,
             'until' => $pending > 0 ? $now + $pending : 0,
         ];
+        if ($open !== null) {
+            $open['fails']++;
+            $data[$address['key']] = [
+                'fails' => $open['fails'],
+                'start' => $open['start'],
+                'ends'  => $open['start'] + $address['window'],
+                'last'  => $now,
+            ];
+            if ($open['fails'] >= $address['limit']) {
+                $pending = max($pending, $open['start'] + $address['window'] - $now);
+            }
+            $counted = [$address['key'], $open['start']];
+        }
         return true;
     });
+    if ($recorded === null) {
+        qs_throttle_unavailable('login');
+        $GLOBALS['__qs_login_throttle_counted'] = null;
+        $starts = 0;
+        return 0;
+    }
+    $GLOBALS['__qs_login_throttle_counted'] = $recorded === true ? $counted : null;
     $starts = $recorded === true ? $pending : 0;
     return $wait;
 }
 
 /**
+ * A throttle's store cannot be read or written ($store: 'login' or
+ * 'registration'): the attempt goes ahead after a fixed wait
+ * (QS_THROTTLE_BROKEN_WAIT), and each occurrence goes to PHP's error log and
+ * to the security trail (`auth.throttle_unavailable`, its `store` naming
+ * which), so a store left broken is seen.
+ */
+function qs_throttle_unavailable(string $store): void {
+    $registration = $store === 'registration';
+    $what = $registration ? 'registration' : 'sign-in';
+    error_log("QuickSite: the {$what} throttle's store (<secure>/management/config/"
+        . ($registration ? 'registration-throttle.json' : 'login-throttle.json')
+        . ") cannot be read or written: each {$what} attempt waits " . QS_THROTTLE_BROKEN_WAIT
+        . ' seconds until it can be again.');
+    require_once __DIR__ . '/securityLog.php';
+    qs_security_log(QS_SEC_THROTTLE_UNAVAILABLE, ['store' => $registration ? 'registration' : 'login']);
+    sleep(QS_THROTTLE_BROKEN_WAIT);
+}
+
+/**
  * A successful attempt clears the identifier's counter: its own admitted
- * attempt and every failure before it.
+ * attempt and every failure before it. Its address gets back that one attempt
+ * alone, and only inside the window it was counted in: the failures before it
+ * stay counted, so a machine holding one valid account cannot sign in again and
+ * again to wipe its guesses at the others.
  */
 function qs_login_throttle_clear(string $identifier): void {
     $key = qs_throttle_hash(strtolower($identifier));
-    qs_login_throttle_mutate(function (array &$data) use ($key) {
+    $counted = $GLOBALS['__qs_login_throttle_counted'] ?? null;
+    $GLOBALS['__qs_login_throttle_counted'] = null;
+    qs_login_throttle_mutate(function (array &$data) use ($key, $counted) {
         unset($data[$key]);
+        if (is_array($counted)) {
+            [$addressKey, $start] = $counted;
+            $held = $data[$addressKey] ?? null;
+            if (is_array($held) && (int)($held['start'] ?? 0) === $start && (int)($held['fails'] ?? 0) > 0) {
+                $data[$addressKey]['fails'] = (int)$held['fails'] - 1;
+            }
+        }
         return true;
     });
 }
@@ -1101,11 +1237,38 @@ function qs_registration_config(): array {
 /**
  * The caller's network address for rate limiting. Deliberately REMOTE_ADDR
  * only — X-Forwarded-For is caller-controlled (spoofable) and QuickSite does
- * not know which proxies to trust; behind a reverse proxy this rate-limits
- * the proxy address (deploy-time concern).
+ * not know which proxies to trust. Behind a reverse proxy the server restores
+ * the visitor's address from the proxy it trusts (nginx's real_ip module,
+ * Apache's mod_remoteip) before PHP sees it; an installation that cannot sets
+ * the per-address sign-in count to 0, as every visitor would share the proxy's.
  */
 function qs_client_ip(): string {
     return (string)($_SERVER['REMOTE_ADDR'] ?? '');
+}
+
+/**
+ * The address a per-address limit counts (the sign-in's and registration's):
+ * a whole IPv4 address, or the first 64 bits of an IPv6 one, written
+ * `<prefix>::/64` — a single IPv6 machine is usually handed a whole /64 and can
+ * draw a fresh address from it for every attempt. An IPv4 address written as
+ * IPv6 (`::ffff:a.b.c.d`, how a dual-stack server may report one) counts as
+ * that IPv4 address: its first 64 bits are the same for every IPv4 visitor.
+ * Anything that is not an address (none, under the command line) is kept as
+ * it is.
+ */
+function qs_client_address_key(): string {
+    $ip = qs_client_ip();
+    $packed = @inet_pton($ip);
+    if ($packed === false) {
+        return $ip;
+    }
+    if (strlen($packed) === 16) {
+        if (strncmp($packed, str_repeat("\0", 10) . "\xff\xff", 12) === 0) {
+            return (string) inet_ntop(substr($packed, 12));
+        }
+        return inet_ntop(substr($packed, 0, 8) . str_repeat("\0", 8)) . '/64';
+    }
+    return (string) inet_ntop($packed);
 }
 
 function qs_registration_throttle_path(): string {
@@ -1113,60 +1276,25 @@ function qs_registration_throttle_path(): string {
 }
 
 /**
- * Shared mutate for the registration-throttle file. $fn(array &$data): mixed —
- * return false to leave the file untouched (nothing to record).
- * Shape: ['ips' => [sha256(ip) => {minute, count, last}], 'global' => {hour, count}]
+ * The registration's store, through qs_throttle_store_mutate(). Shape:
+ * ['ips' => [sha256(address) => {minute, count, last}], 'global' => {hour, count}]
  * — `global.count` is this hour's successful registrations plus the ones still
- * in flight (see qs_registration_throttle_admit).
- *
- * Every read of this store happens here, under its lock, and a failed swap is
- * retried once — both for the reason qs_login_throttle_mutate gives.
+ * in flight (see qs_registration_throttle_admit). An address entry is pruned
+ * once idle for an hour: its minute window is long over.
  */
 function qs_registration_throttle_mutate(callable $fn) {
-    $path = qs_registration_throttle_path();
-    $lock = @fopen($path . '.lock', 'c');
-    if ($lock === false) {
-        return false;
-    }
-    flock($lock, LOCK_EX);
-    try {
-        $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
-        if (!is_array($data)) {
-            $data = [];
-        }
+    return qs_throttle_store_mutate(qs_registration_throttle_path(), static function (array &$data) use ($fn) {
         $data['ips'] = is_array($data['ips'] ?? null) ? $data['ips'] : [];
         $data['global'] = is_array($data['global'] ?? null) ? $data['global'] : [];
-        $result = $fn($data);
-        if ($result === false) {
-            return false;
-        }
-        // prune IP entries idle for an hour (their minute window is long over)
+        return $fn($data);
+    }, static function (array &$data): void {
         $cutoff = time() - 3600;
         foreach ($data['ips'] as $key => $entry) {
             if ((int)($entry['last'] ?? 0) < $cutoff) {
                 unset($data['ips'][$key]);
             }
         }
-        $tmp = $path . '.tmp' . getmypid();
-        // Encode checked before the write — see qs_login_throttle_mutate above.
-        // Hashed IP keys and integers only, so unreachable; consistent anyway.
-        $json = json_encode($data, JSON_PRETTY_PRINT);
-        if ($json === false || file_put_contents($tmp, $json) === false) {
-            @unlink($tmp);
-            return false;
-        }
-        if (!@rename($tmp, $path)) {
-            usleep(50000);
-            if (!@rename($tmp, $path)) {
-                @unlink($tmp);
-                return false;
-            }
-        }
-        return $result;
-    } finally {
-        flock($lock, LOCK_UN);
-        fclose($lock);
-    }
+    });
 }
 
 /**
@@ -1174,7 +1302,9 @@ function qs_registration_throttle_mutate(callable $fn) {
  * qs_login_throttle_admit gives: a check that only reads, followed by writes
  * made later, lets every simultaneous request through. Returns 0 when admitted,
  * or the seconds the caller must wait (nothing counted). Checks the per-IP
- * minute window, then the install-wide hourly cap.
+ * minute window, then the install-wide hourly cap. The IP is the address as
+ * every per-address limit counts it (qs_client_address_key(): an IPv6 one by
+ * its first 64 bits).
  *
  * Admitting does two things. It counts the attempt against the caller's IP —
  * every attempt counts, whether or not it creates an account. And it RESERVES a
@@ -1186,11 +1316,13 @@ function qs_registration_throttle_mutate(callable $fn) {
  * nothing was).
  *
  * A refusal is decided under the store's lock and writes nothing, and a store
- * that cannot be read or written admits — both as in qs_login_throttle_admit.
+ * that cannot be read or written makes the registration wait
+ * QS_THROTTLE_BROKEN_WAIT seconds before it runs, logged each time
+ * (qs_throttle_unavailable()) — both as in qs_login_throttle_admit.
  */
 function qs_registration_throttle_admit(array $cfg, ?int &$hour = null): int {
     $hour  = null;
-    $ipKey = qs_throttle_hash(qs_client_ip());
+    $ipKey = qs_throttle_hash(qs_client_address_key());
     $wait  = 0; // set inside the lock
     $written = qs_registration_throttle_mutate(function (array &$data) use ($cfg, $ipKey, &$wait, &$hour) {
         $now       = time();
@@ -1212,6 +1344,11 @@ function qs_registration_throttle_admit(array $cfg, ?int &$hour = null): int {
         $hour = $thisHour;
         return true;
     });
+    if ($written === null) {
+        qs_throttle_unavailable('registration');
+        $hour = null;
+        return 0;
+    }
     if ($written !== true) {
         // Refused, or admitted without the store being written: either way no
         // place is on disk, so there is none to hand back — releasing one here

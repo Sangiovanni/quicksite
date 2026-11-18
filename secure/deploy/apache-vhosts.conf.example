@@ -33,6 +33,21 @@
 #                                            separated host[:port]); a request
 #                                            with any other Host composes URLs
 #                                            against the FIRST entry.
+#   SetEnv QS_HTTPS_ONLY       1             optional, off by default: this
+#                                            install is served over HTTPS only.
+#                                            A request that did not arrive over
+#                                            HTTPS is turned away (a GET or HEAD
+#                                            redirected to the same address in
+#                                            https, anything else refused with
+#                                            403), every cookie is Secure, and a
+#                                            proxy's X-Forwarded-Proto: https
+#                                            counts. 1, on, true or yes turn it on;
+#                                            0, off, false, no or nothing leave it
+#                                            off. Set QS_TRUSTED_HOSTS beside it.
+#                                            Once, after turning it on: delete the
+#                                            files in <secure>/tmp/sessions, as a
+#                                            session opened before keeps its cookie
+#                                            without Secure until it ends.
 #   SetEnv QS_ERROR_PAGE_404   /404.html     optional: your own static pages for
 #   SetEnv QS_ERROR_PAGE_403   /403.html     QuickSite's project-less/refused
 #   SetEnv QS_ERROR_PAGE_400   /400.html     statuses. Root-relative, inside the
@@ -48,6 +63,22 @@
 #
 # Shared hosting (no vhost access): every SetEnv above is also legal in a
 # .htaccess file at the document root.
+#
+# ---- BEHIND A PROXY THAT ENDS HTTPS -----------------------------------------
+# When a proxy, a load balancer or a hosting panel ends HTTPS in front of this
+# Apache, PHP sees a plain-HTTP request. Tell QuickSite one of two ways, or the
+# panel's own calls are refused by its cross-origin check (the browser's Origin
+# says https) and OAuth's redirect_uri reads http:
+#   - SetEnv QS_HTTPS_ONLY 1 (above): the proxy's X-Forwarded-Proto: https then
+#     counts, and every other request is turned away;
+#   - or SetEnv HTTPS on, in a vhost that only the proxy reaches.
+# And the visitor's address: QuickSite counts sign-in attempts per address
+# (auth.php, authentication.login.throttle). Have Apache restore the visitor's
+# address from the proxy it trusts, or every visitor shares the proxy's:
+#   LoadModule remoteip_module modules/mod_remoteip.so
+#   RemoteIPHeader       X-Forwarded-For
+#   RemoteIPTrustedProxy 10.0.0.5          # your proxy's own address
+# An install that cannot sets per_ip_failures to 0 in auth.php.
 #
 # VERIFIED ON: Apache 2.4 (WAMP). Needs mod_env for SetEnv; the per-directory
 # .htaccess files QuickSite ships need mod_rewrite.
@@ -87,6 +118,9 @@
 # ---- the install's own hostname — the authoring surface ---------------------
 <VirtualHost *:80>
     ServerName   quicksite.example.internal
+    # The public folder, never the folder above it: the secure folder beside it
+    # holds the engine and every project's data. (Its own .htaccess refuses every
+    # request, a second guard that only holds where AllowOverride allows.)
     DocumentRoot /srv/quicksite/public
 
     # Optional. Declare it when this install generates sitemaps for a site whose
@@ -94,6 +128,7 @@
     # the deployed site is a build living somewhere else.
     # SetEnv QS_PUBLIC_BASE_URL "https://example.com/"
     # SetEnv QS_TRUSTED_HOSTS   "quicksite.example.internal"
+    # SetEnv QS_HTTPS_ONLY      "1"
     # SetEnv QS_ERROR_PAGE_404  "/404.html"
     # SetEnv QS_ERROR_PAGE_403  "/403.html"
 

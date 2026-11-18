@@ -67,13 +67,15 @@ const QS_SEC_ACCOUNT_CREATED  = 'account.created';
 const QS_SEC_PASSWORD_CHANGED = 'account.password_changed';
 const QS_SEC_ACCOUNT_DELETED  = 'account.deleted';
 const QS_SEC_MEMBERSHIP       = 'membership.changed';
+/** A throttle's store (`detail.store`: login or registration) could not be read or written: an attempt waited instead. */
+const QS_SEC_THROTTLE_UNAVAILABLE = 'auth.throttle_unavailable';
 
 /** Every event name this file defines. Used by the probe's non-vacuity control. */
 function qs_security_events(): array {
     return [
         QS_SEC_SIGNIN_SUCCESS, QS_SEC_SIGNIN_FAILURE, QS_SEC_SIGNOUT,
         QS_SEC_UNAUTHENTICATED, QS_SEC_ACCOUNT_CREATED, QS_SEC_PASSWORD_CHANGED,
-        QS_SEC_ACCOUNT_DELETED, QS_SEC_MEMBERSHIP,
+        QS_SEC_ACCOUNT_DELETED, QS_SEC_MEMBERSHIP, QS_SEC_THROTTLE_UNAVAILABLE,
     ];
 }
 

@@ -30,6 +30,10 @@
  * Redirect policy is the CALLER's choice, not this class's: serverFetch and
  * testApiEndpoint do NOT follow redirects (a 3xx is returned as-is), while
  * uploadAsset follows manually and re-runs check() on every hop.
+ *
+ * Certificate checking: tlsOptions() holds the one rule (never off; the list
+ * php.ini names, else on Windows the system's store, else curl's default), and
+ * tlsFailure() says what a refused certificate means. uploadAsset uses them.
  */
 class OutboundUrlPolicy
 {
@@ -104,6 +108,71 @@ class OutboundUrlPolicy
             'ip'      => $pinnedIp,
             'resolve' => $resolve,
         ];
+    }
+
+    /**
+     * The certificate rule of an outbound HTTPS fetch: checking is never switched off.
+     *
+     *   - php.ini names a list of trusted certificate authorities (`curl.cainfo`, else
+     *     `openssl.cafile`): that file is used, as named. A name that is not a readable file makes
+     *     curl fail, and tlsFailure() says which setting to fix; it is never replaced by another list.
+     *   - it names none, on Windows: curl also reads the operating system's own store
+     *     (CURLSSLOPT_NATIVE_CA), since PHP on Windows carries no list of its own.
+     *   - it names none, elsewhere: nothing is set, and curl uses the system's list.
+     *
+     * @return array<int,mixed> options for curl_setopt_array()
+     */
+    public static function tlsOptions(): array
+    {
+        $options = [CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2];
+        $named = self::namedCaList();
+        if ($named !== null) {
+            $options[CURLOPT_CAINFO] = $named;
+        } elseif (PHP_OS_FAMILY === 'Windows' && defined('CURLSSLOPT_NATIVE_CA')) {
+            $options[CURLOPT_SSL_OPTIONS] = CURLSSLOPT_NATIVE_CA;
+        }
+        return $options;
+    }
+
+    /**
+     * What to answer when an HTTPS fetch failed on the address's certificate, or null when it
+     * failed for another reason (a timeout, a refused connection). Asked with curl's error number
+     * and message, OpenSSL's verify result (CURLINFO_SSL_VERIFYRESULT) and the host.
+     *
+     * The setting is named only when the check could not be made at all: the list php.ini names
+     * cannot be read (curl error 77), or no authority in the list curl was given signed the
+     * certificate (error 60 with OpenSSL's result 20, which a server with no list sees for every
+     * address). An expired, self-signed or wrong-host certificate is refused with curl's own
+     * reason: no setting would make it valid.
+     */
+    public static function tlsFailure(int $curlErrno, string $curlError, int $verifyResult, string $host): ?string
+    {
+        if ($curlErrno === 77) {
+            return "the certificate of {$host} could not be checked: the list of trusted certificate authorities"
+                . ' php.ini names (curl.cainfo or openssl.cafile) cannot be read. Set it to a readable CA bundle'
+                . ' file, then restart PHP.';
+        }
+        if ($curlErrno === 60 && $verifyResult === 20) {
+            return "the certificate of {$host} could not be checked: no certificate authority this server trusts"
+                . ' signed it. If this server has no list of trusted certificate authorities, set curl.cainfo in'
+                . ' php.ini to a CA bundle file (the curl project publishes one, cacert.pem), then restart PHP.';
+        }
+        if ($curlErrno === 60) {
+            return "the certificate of {$host} was refused: {$curlError}";
+        }
+        return null;
+    }
+
+    /** The list of trusted certificate authorities php.ini names, or null when it names none. */
+    private static function namedCaList(): ?string
+    {
+        foreach (['curl.cainfo', 'openssl.cafile'] as $setting) {
+            $value = trim((string) ini_get($setting));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+        return null;
     }
 
     /**

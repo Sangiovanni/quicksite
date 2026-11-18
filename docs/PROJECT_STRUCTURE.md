@@ -27,10 +27,11 @@ quicksite/
 │       └── .htaccess             # Routes all /management/* to this index.php
 │
 ├── secure/                       # Backend (outside web root, not publicly accessible)
+│   ├── .htaccess                 # Refuses every request, in case a server's root is set one level too high
 │   ├── management/               # API engine (shared across all projects)
 │   │   ├── command/              # Command handler files (one per command; see COMMAND_API.md)
 │   │   ├── config/               # API configuration
-│   │   │   ├── auth.php          # Session lifetimes, registration policy (self-registration + flood controls), CORS (gitignored)
+│   │   │   ├── auth.php          # Session lifetimes, registration policy (self-registration + flood controls), the sign-in limit per address, CORS (gitignored)
 │   │   │   ├── users.php         # User registry: name + username + password_hash + session generation + per-user project list (gitignored)
 │   │   │   ├── *-throttle.json   # Login, registration and upload backoff counters, hashed keys (machine-written, gitignored)
 │   │   │   ├── roles.php         # Role definitions (gitignored)
@@ -118,7 +119,7 @@ quicksite/
 │   │                             #     name IS the user id, which is minted as usr_ + hex
 │   ├── deploy/                   # Apache + nginx vhost examples for the install
 │   ├── nginx/                    # Auto-generated nginx config, dynamic_routes.conf (gitignored)
-│   ├── cron/                     # Optional cron scripts (nginx reload fallback)
+│   ├── cron/                     # Optional cron scripts (nginx reload fallback: root runs its own copy, installed outside the tree)
 │   ├── tools/                    # The deployer's tools: scripts an operator runs on the machine,
 │   │                             #   not through the API, because they act on the whole
 │   │                             #   installation rather than on one project — session-sweep.php

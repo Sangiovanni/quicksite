@@ -246,7 +246,7 @@ hand to add or remove people.
 <details>
 <summary><strong>Apache with virtual host</strong> (recommended)</summary>
 
-This is the standard setup. Point your document root to `public/`:
+This is the standard setup. Point your document root to `public/`, never to the folder above it: the `secure/` folder beside `public/` holds the engine, its configuration and every project's data. A `.htaccess` inside `secure/` refuses every request in case a root is ever set one level too high, but only Apache reads it, and only where `AllowOverride` allows:
 
 ```apache
 <VirtualHost *:80>
@@ -382,7 +382,7 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    >
    > One server block only? Then there is nothing to do here.
 
-2. **Generate the routing config** — visit any page in your browser. QuickSite detects nginx and auto-generates `secure/nginx/dynamic_routes.conf`, then shows a setup page with both blocks to add. On CloudPanel the usual place for the include is right after the existing `include /etc/nginx/global_settings;` line — that's one example, not a requirement; anywhere inside `server { }` works.
+2. **Generate the routing config** — visit any page in your browser. QuickSite detects nginx and auto-generates `secure/nginx/dynamic_routes.conf`, then shows a setup page with both blocks to add. The page answers every request, the panel included, until you run the command its last step prints on the server (`sudo rm` and the path of `secure/nginx/.setup_pending`); no request to the site can end it. On CloudPanel the usual place for the include is right after the existing `include /etc/nginx/global_settings;` line — that's one example, not a requirement; anywhere inside `server { }` works.
 
    Alternatively, generate it from the command line:
    ```bash
@@ -395,12 +395,18 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    ```
    > **CloudPanel users:** You can also just open the vhost tab in CloudPanel and click Save — it triggers a reload automatically.
 
-4. **(Advanced, optional) Enable auto-reload** — when the setup script changes the URL space, it can reload nginx automatically. This requires a sudoers entry:
+4. **(Advanced, optional) Enable auto-reload** — when the setup script changes the URL space, it can reload nginx automatically. This requires a sudoers entry naming the two nginx commands, and nothing else:
    ```bash
-   echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx' | sudo tee /etc/sudoers.d/quicksite-nginx
+   sudo tee /etc/sudoers.d/quicksite-nginx > /dev/null <<'EOF'
+   www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -t
+   www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -s reload
+   EOF
    sudo chmod 440 /etc/sudoers.d/quicksite-nginx
+   sudo visudo -cf /etc/sudoers.d/quicksite-nginx
    ```
-   Replace `www-data` with your PHP process user. Most users won't need this — reload manually or via your hosting panel.
+   Replace `www-data` with your PHP process user, and `/usr/sbin/nginx` with the path `command -v nginx` prints if it is another. Never shorten the rule to `NOPASSWD: /usr/sbin/nginx`: sudo reads a command without arguments as *any* arguments, and the web account could then start nginx as root with a configuration of its own choosing. Most users won't need this — reload manually or via your hosting panel.
+
+   Where sudo is not possible, `secure/cron/README.md` describes the cron fallback: root runs **its own copy** of `secure/cron/nginx_reload.sh`, installed outside the QuickSite folder (for example `/usr/local/sbin/quicksite-nginx-reload`, owned by root, mode 0755), with the install's secure folder as its argument; root's crontab never names the script inside the folder, which belongs to the web account. **Set up under earlier instructions?** If root's crontab names `…/secure/cron/nginx_reload.sh`, install the copy and point that line at it. Run as root, `setup.sh` warns while such a line is there.
 
 **Renamed the public folder?** Run `setup.sh` — it handles everything. Or manually update `PUBLIC_FOLDER_NAME` in `init.php`.
 
@@ -448,18 +454,62 @@ work of re-reading the page structure on every request, not what the site can do
 > yours carries one, it can be deleted. `QS_PUBLIC_BASE_URL` and
 > `QS_TRUSTED_HOSTS` are unaffected — see below.
 
-Two per-vhost variables remain on the authoring install, and neither picks a
+Three per-vhost variables remain on the authoring install, and none picks a
 project. `QS_PUBLIC_BASE_URL` declares the public base your `sitemap.txt` is
 generated against — a sitemap has to name the URL the built site will live at,
 which the authoring install cannot work out from the request in front of it.
-`QS_TRUSTED_HOSTS` optionally pins the Host header. Complete vhosts for both
-servers are in `secure/deploy/apache-vhosts.conf.example` and
+`QS_TRUSTED_HOSTS` optionally pins the Host header. `QS_HTTPS_ONLY` declares the
+install served over HTTPS only (below). Complete vhosts for both servers are in
+`secure/deploy/apache-vhosts.conf.example` and
 `secure/deploy/nginx-vhosts.conf.example`.
+
+### Behind a proxy that ends HTTPS
+
+QuickSite decides whether a request reached it over HTTPS from what the server
+tells PHP: `HTTPS` on, or port 443. When a proxy, a load balancer or a hosting
+panel ends HTTPS in front of the server (CloudPanel's public block that passes
+requests to its backend block, for one), PHP sees plain HTTP. Tell QuickSite one
+of two ways:
+
+- **Pass `HTTPS on` to PHP** from the server the proxy talks to: on nginx,
+  `fastcgi_param HTTPS on;` in each PHP location (the `location ~ \.php$` block
+  and `location @quicksite_project`); on Apache, `SetEnv HTTPS on` in a vhost that
+  only the proxy reaches.
+- **Or set `QS_HTTPS_ONLY`** (`SetEnv QS_HTTPS_ONLY 1`, or
+  `fastcgi_param QS_HTTPS_ONLY 1;` in each PHP location). QuickSite then also
+  believes the proxy's `X-Forwarded-Proto: https`, sends every cookie it sets
+  with `Secure`, and turns away any request that did not arrive over HTTPS: a
+  `GET` or `HEAD` is redirected to the same address in `https`, anything else is
+  refused with 403. It is off by default. Set `QS_TRUSTED_HOSTS` beside it, so the
+  redirect always names your own host.
+
+Without either, QuickSite reads such a request as plain `http`: the panel's own
+calls are refused by its cross-origin check (the browser says `https`), and an
+OAuth provider is sent an `http` address to return to. An install served over
+plain HTTP needs neither.
+
+**Turning `QS_HTTPS_ONLY` on, once.** It changes the cookies QuickSite sets from
+then on, not the ones browsers already hold: a session opened before keeps its
+cookie without `Secure` until it ends, and such a cookie still travels unencrypted
+on a plain-HTTP request. After turning it on, end those sessions once by deleting
+the files in `secure/tmp/sessions`: everyone signs in again, over HTTPS.
+
+**The visitor's address.** Sign-in attempts are limited per username and per
+address: by default 20 failed attempts from one address in 15 minutes, whatever
+usernames they try (`authentication.login.throttle` in
+`secure/management/config/auth.php`). QuickSite reads the connection's own
+address, so behind a proxy have the server restore the visitor's address from
+the proxy it trusts — on nginx, `set_real_ip_from <the proxy's address>;` and
+`real_ip_header X-Forwarded-For;` (the `real_ip` module); on Apache,
+`mod_remoteip` with `RemoteIPHeader X-Forwarded-For` and
+`RemoteIPTrustedProxy <the proxy's address>`. Otherwise every visitor shares the
+proxy's address, and one person's failed attempts slow everyone; an install that
+cannot restore the address sets `per_ip_failures` to `0`.
 
 ### First load
 
 On first load, QuickSite auto-creates its config files from `.example` templates:
-- `secure/management/config/auth.php` — session TTLs, registration policy, CORS
+- `secure/management/config/auth.php` — session TTLs, registration policy, the sign-in limit per address, CORS
 - `secure/management/config/roles.php` — role definitions
 
 It also mints the setup token, and on nginx it generates the routing config and

@@ -1165,7 +1165,7 @@ echo   ^^! This is NOT a security control. Every command stays reachable
 echo     at /management/ to any caller whose role allows it, and the
 echo     console checks the same permissions. Turning it off removes
 echo     reach and discoverability, not access - do not skip a role
-echo     review because of it. The command history tab stays either way.
+echo     review because of it. The History page stays either way.
 echo.
 
 set "ANSWER="

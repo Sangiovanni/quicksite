@@ -98,32 +98,24 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
             },
         ];
 
-        // Handle SSL certificate verification
-        if ($scheme === 'https') {
-            $caInfo = ini_get('curl.cainfo') ?: ini_get('openssl.cafile');
-            if (!empty($caInfo) && file_exists($caInfo)) {
-                $curlOpts[CURLOPT_CAINFO] = $caInfo;
-            } else {
-                // No CA bundle configured (common on WAMP/local dev)
-                $curlOpts[CURLOPT_SSL_VERIFYPEER] = false;
-                $curlOpts[CURLOPT_SSL_VERIFYHOST] = 0;
-            }
-        }
-
-        curl_setopt_array($ch, $curlOpts);
+        // The certificate is always checked, by the one rule every outbound fetch shares.
+        curl_setopt_array($ch, $curlOpts + OutboundUrlPolicy::tlsOptions());
         if (!empty($ssrf['resolve'])) {
             curl_setopt($ch, CURLOPT_RESOLVE, $ssrf['resolve']); // pin the checked IP
         }
 
         curl_exec($ch);
-        $httpCode  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
+        $httpCode     = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErrno    = curl_errno($ch);
+        $curlError    = curl_error($ch);
+        $verifyResult = (int) curl_getinfo($ch, CURLINFO_SSL_VERIFYRESULT);
         curl_close($ch);
         fclose($fp);
 
-        if (!empty($curlError)) {
+        if ($curlErrno !== 0 || $curlError !== '') {
             @unlink($tmpFile);
-            return ['error' => 'Download failed: ' . $curlError];
+            $certificate = OutboundUrlPolicy::tlsFailure($curlErrno, $curlError, $verifyResult, $host);
+            return ['error' => $certificate ?? ('Download failed: ' . $curlError)];
         }
 
         // Handle redirect — re-validate the next hop
@@ -413,7 +405,7 @@ if ($hasFileUpload) {
 
     // A file name and nothing else: no separator can pass, so no path and no traversal,
     // and only the photo types.
-    if (strlen($templatePhoto) > 100 || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:webp|jpe?g|png|avif)$/', $templatePhoto)) {
+    if (strlen($templatePhoto) > 100 || !preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:webp|jpe?g|png|avif)$/D', $templatePhoto)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('The templatePhoto parameter is the file name of a photo shipped for the site templates: lowercase letters, digits and hyphens, then .webp, .jpg, .jpeg, .png or .avif.')
             ->withErrors([['field' => 'templatePhoto', 'reason' => 'invalid_format']])

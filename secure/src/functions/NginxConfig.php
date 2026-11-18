@@ -135,7 +135,8 @@ function generate_nginx_config(string $publicFolderSpace, string $secureFolderNa
     $config .= "# the public space configuration changes (requires sudoers setup).\n";
     $config .= "#\n";
     $config .= "# Manual reload: nginx -t && nginx -s reload\n";
-    $config .= "# Cron fallback: {$secureFolderName}/cron/nginx_reload.sh (optional)\n";
+    $config .= "# Cron fallback (optional): root's own copy of {$secureFolderName}/cron/nginx_reload.sh,\n";
+    $config .= "# installed outside this folder ({$secureFolderName}/cron/README.md says how)\n";
     $config .= "# ==========================================================\n\n";
 
     // The three JSON front controllers under public/admin/ — see the function
@@ -352,8 +353,12 @@ function qs_server_is_nginx(): bool
  * If shell_exec is disabled or sudo is not configured, this fails silently
  * and sets a .pending_reload flag for the optional cron fallback.
  * 
- * To enable direct reload (recommended, no cron needed):
- *   echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx' | sudo tee /etc/sudoers.d/quicksite-nginx
+ * To enable direct reload (recommended, no cron needed), the web account may run
+ * these two command lines as root and nothing else (/etc/sudoers.d/quicksite-nginx):
+ *   www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -t
+ *   www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -s reload
+ * Never the bare `/usr/sbin/nginx`: sudo reads it as any arguments, so the web
+ * account could start nginx as root with a configuration of its own choosing.
  *
  * THREE OUTCOMES, AND THE CALLER MUST BE ABLE TO TELL THEM APART. Reporting a
  * reload that did not happen is worse than reporting none: the deployer stops

@@ -51,6 +51,22 @@ return [
                 'global_per_hour'   => 1000,   // successful registrations per hour, install-wide
             ],
         ],
+        // Sign-in limit per address, on top of the per-username one (5 free
+        // attempts, then a doubling wait — not configurable). Every sign-in
+        // attempt from one address counts, whatever username it names (the
+        // panel's, the login command's, the first-run page's and My account's
+        // password checks alike); a success gives its own attempt back. Past
+        // per_ip_failures in one window, that address is refused until the
+        // window ends. An IPv6 address counts by its first 64 bits. The
+        // address is the connection's own: behind a reverse proxy, have the
+        // server restore the visitor's address (nginx real_ip, Apache
+        // mod_remoteip), or set per_ip_failures to 0. 0 = no limit.
+        'login' => [
+            'throttle' => [
+                'per_ip_failures'       => 20,  // failed sign-in attempts per address in one window
+                'per_ip_window_minutes' => 15,  // the window, opened by an address's first attempt
+            ],
+        ],
     ],
     // Cross-origin access to /management. Same-origin calls — the admin panel,
     // and any page served by this install — never consult this list: they are

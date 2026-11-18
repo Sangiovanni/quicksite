@@ -562,9 +562,11 @@ class OAuthHandler
     /**
      * Promote a relative URL to absolute against the current request's
      * scheme + host. Pass-through when already absolute (starts with
-     * `http://` or `https://`). Honours `X-Forwarded-Proto` for the common
-     * reverse-proxy case (project-level base-url config is a deferred
-     * escape hatch — see DESIGN_DECISIONS.md "OAuth handleStart shape").
+     * `http://` or `https://`). The scheme is the one scheme test's
+     * (_oauthIsHttps()): behind a proxy ending HTTPS it reads https when the
+     * server says so (`HTTPS on`) or the deployment declares QS_HTTPS_ONLY
+     * (project-level base-url config is a deferred escape hatch — see
+     * DESIGN_DECISIONS.md "OAuth handleStart shape").
      */
     private static function makeAbsoluteUrl(string $url): string
     {
@@ -584,10 +586,9 @@ class OAuthHandler
         // attacker's host. qs_request_host() shape-validates and honours
         // QS_TRUSTED_HOSTS, which closes that.
         //
-        // The scheme deliberately stays with _oauthIsHttps(): it also honours
-        // X-Forwarded-Proto, which the origin helper does not, and taking the
-        // whole origin instead would have downgraded every reverse-proxy
-        // deployment to http.
+        // The scheme is _oauthIsHttps()'s, the one scheme test: behind a proxy
+        // ending HTTPS the deployment passes `HTTPS on` or declares
+        // QS_HTTPS_ONLY, or this address reads http and the provider refuses it.
         
         $scheme = _oauthIsHttps() ? 'https' : 'http';
         $host = qs_request_host();

@@ -76,9 +76,9 @@ function _oauthEnsureSession(): void {
 }
 
 /**
- * Detect whether the current request arrived over HTTPS. Honours the
- * common `X-Forwarded-Proto` reverse-proxy header alongside the direct
- * `$_SERVER['HTTPS']` + port 443 signals.
+ * Detect whether the current request arrived over HTTPS: the direct
+ * `$_SERVER['HTTPS']` + port 443 signals, and a reverse proxy's
+ * `X-Forwarded-Proto: https` only where the deployment declares QS_HTTPS_ONLY.
  *
  * Used to gate the `Secure` cookie attribute — browsers SILENTLY DROP
  * cookies marked `Secure` when the connection is plain HTTP, which

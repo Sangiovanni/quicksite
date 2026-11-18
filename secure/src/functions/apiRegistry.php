@@ -227,7 +227,7 @@ if (!function_exists('qs_api_jar_may_reach')) {
     function qs_api_jar_may_reach(string $apiHost, string $apiScheme): bool
     {
         if (strtolower($apiScheme) !== 'https') {
-            require_once __DIR__ . '/oauthStateStore.php'; // _oauthIsHttps, which also hears a proxy
+            require_once __DIR__ . '/oauthStateStore.php'; // _oauthIsHttps, the one scheme test
             if (_oauthIsHttps()) {
                 return false;
             }

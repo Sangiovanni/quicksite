@@ -162,12 +162,25 @@
 #
 #     include     /srv/quicksite/secure/nginx/dynamic_routes.conf;
 #
-#     # Optional, and neither of these selects a project. Declare
-#     # QS_PUBLIC_BASE_URL when this install generates sitemaps for a site whose
-#     # deployed URL differs from this hostname — the normal case, since the
-#     # deployed site is a build living somewhere else.
-#     # fastcgi_param  QS_PUBLIC_BASE_URL  "https://example.com/";
-#     # fastcgi_param  QS_TRUSTED_HOSTS    "quicksite.example.internal";
+#     # The QS_* variables (optional, and none of them selects a project) go in
+#     # EACH of the two PHP locations below, never here at server level: nginx
+#     # hands a location the server's fastcgi_param lines only when the location
+#     # has none of its own, and both include fastcgi_params. The panel and the
+#     # management API reach PHP through `location ~ \.php$` (the generated
+#     # include's fallbacks), a project's pages through @quicksite_project.
+#     #   QS_PUBLIC_BASE_URL: when this install generates sitemaps for a site
+#     #     whose deployed URL differs from this hostname — the normal case, since
+#     #     the deployed site is a build living somewhere else.
+#     #   QS_TRUSTED_HOSTS: the Host-header pin.
+#     #   QS_HTTPS_ONLY: this install is served over HTTPS only (Apache twin); once,
+#     #     after turning it on, delete the files in <secure>/tmp/sessions.
+#     # Behind a proxy that ends HTTPS, set QS_HTTPS_ONLY or pass HTTPS on, or the
+#     # panel's own calls are refused by its cross-origin check and OAuth's
+#     # redirect_uri reads http; and restore the visitor's address for the
+#     # sign-in limit per address (the real_ip module), or set per_ip_failures to
+#     # 0 in auth.php:
+#     # set_real_ip_from  10.0.0.5;          # your proxy's own address
+#     # real_ip_header    X-Forwarded-For;
 #
 #     location @quicksite_project {
 #         include        fastcgi_params;
@@ -177,6 +190,10 @@
 #         # With a URL space, this becomes $document_root/<space>/p/index.php —
 #         # the generated file prints the exact line for your install.
 #         fastcgi_param  SCRIPT_FILENAME $document_root/p/index.php;
+#         # fastcgi_param  QS_PUBLIC_BASE_URL  "https://example.com/";
+#         # fastcgi_param  QS_TRUSTED_HOSTS    "quicksite.example.internal";
+#         # fastcgi_param  QS_HTTPS_ONLY       1;
+#         # fastcgi_param  HTTPS               on;   # instead, behind a proxy ending HTTPS
 #         fastcgi_pass   php;
 #     }
 #
@@ -189,6 +206,10 @@
 #         try_files      $uri =404;
 #         include        fastcgi_params;
 #         fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+#         # fastcgi_param  QS_PUBLIC_BASE_URL  "https://example.com/";
+#         # fastcgi_param  QS_TRUSTED_HOSTS    "quicksite.example.internal";
+#         # fastcgi_param  QS_HTTPS_ONLY       1;
+#         # fastcgi_param  HTTPS               on;   # instead, behind a proxy ending HTTPS
 #         fastcgi_pass   php;
 #     }
 # }

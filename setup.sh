@@ -213,6 +213,59 @@ if [ "$(whoami)" = "root" ]; then
 fi
 
 # ==========================================================
+# Root's crontab — the nginx reload script must be root's own copy
+# ==========================================================
+# The cron fallback that reloads nginx runs as root. Root must run a root-owned
+# copy kept outside this folder (cron/README.md in the secure folder), never the
+# script inside it: the ownership fix above gives this folder to the web account,
+# which could rewrite that script before root's next run. Nothing is installed
+# or changed here; a line of root's crontab that runs the script inside this
+# folder, by its own path or through a link, is reported.
+ROOT_CRON_LINES=""
+root_cron_tree_lines() {
+    command -v crontab >/dev/null 2>&1 || return 0
+    local tree line trimmed word real
+    local -a words
+    tree="$(cd "$SCRIPT_DIR" && pwd -P)"
+    while IFS= read -r line; do
+        trimmed="${line#"${line%%[![:space:]]*}"}"
+        case "$trimmed" in ''|'#'*) continue ;; esac
+        read -r -a words <<< "$line"
+        for word in "${words[@]}"; do
+            word="${word#[\"\']}"
+            word="${word%[\"\';]}"
+            case "$word" in */*) ;; *) continue ;; esac
+            real="$(realpath -m -- "$word" 2>/dev/null || printf '%s' "$word")"
+            case "$real" in
+                "$tree"/*/cron/nginx_reload.sh) printf '%s\n' "$line"; break ;;
+            esac
+        done
+    done < <(crontab -l 2>/dev/null || true)
+}
+show_root_cron_warning() {
+    echo ""
+    echo -e "  ${RED}${BOLD}⚠ Root's crontab runs the nginx reload script inside this folder:${NC}"
+    while IFS= read -r line; do
+        echo "      $line"
+    done <<< "$ROOT_CRON_LINES"
+    echo -e "  ${RED}This folder belongs to the web account, which could rewrite that${NC}"
+    echo -e "  ${RED}script before root's next run. Install a root-owned copy outside it${NC}"
+    echo -e "  ${RED}and point root's crontab at the copy instead:${NC}"
+    echo ""
+    echo -e "    ${BOLD}install -o root -g root -m 0755 $SECURE_DIR/cron/nginx_reload.sh /usr/local/sbin/quicksite-nginx-reload${NC}"
+    echo -e "    ${BOLD}crontab -e${NC}   then replace that line with:"
+    echo -e "    ${BOLD}* * * * * /usr/local/sbin/quicksite-nginx-reload $SECURE_DIR${NC}"
+    echo ""
+    echo -e "  ${DIM}$SECURE_FOLDER_NAME/cron/README.md has the details.${NC}"
+}
+if [ "$(whoami)" = "root" ]; then
+    ROOT_CRON_LINES="$(root_cron_tree_lines)"
+    if [ -n "$ROOT_CRON_LINES" ]; then
+        show_root_cron_warning
+    fi
+fi
+
+# ==========================================================
 # Landing page — first launch only, and only into an empty root
 # ==========================================================
 # QuickSite serves nothing at the web root by design, so a brand-new install has
@@ -1267,7 +1320,7 @@ item_console() {
     echo -e "  ${DIM}at /management/ to any caller whose role allows it, and the${NC}"
     echo -e "  ${DIM}console checks the same permissions. Turning it off removes${NC}"
     echo -e "  ${DIM}reach and discoverability, not access — do not skip a role${NC}"
-    echo -e "  ${DIM}review because of it. The command history tab stays either way.${NC}"
+    echo -e "  ${DIM}review because of it. The History page stays either way.${NC}"
     echo ""
 
     local ANSWER
@@ -1690,6 +1743,12 @@ echo -e "  Default language:   $(deflang_label)"
 echo -e "  Idle sign-out:      $(idle_label)"
 echo -e "  Embed security:     $(embed_label)"
 echo ""
+
+# Said again last, where it is read: the one warning that names a way to root.
+if [ -n "$ROOT_CRON_LINES" ]; then
+    show_root_cron_warning
+    echo ""
+fi
 
 if [ -n "$OWNERSHIP_WARNING" ]; then
     echo -e "  ${RED}${BOLD}⚠ IMPORTANT: file ownership${NC}"

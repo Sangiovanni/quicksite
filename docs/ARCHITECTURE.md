@@ -265,7 +265,7 @@ Nothing anywhere creates, disables, or deletes an account **for someone else**. 
 
 `login` takes a username and a password, verifies the password against that account's `password_hash`, and exchanges the pair for a **session**: it sets an HttpOnly cookie and returns that session's token. Every later call presents both — the cookie as the credential, the token as `Authorization: Bearer` proving the caller could read a page of the session, which is what keeps a cookie-authenticated API safe from cross-site request forgery.
 
-`auth.php` holds no credential itself. It holds the rules around them — how long a session lives, whether strangers may create accounts at all, and which foreign origins may call the API:
+`auth.php` holds no credential itself. It holds the rules around them — how long a session lives, whether strangers may create accounts at all, how many sign-in attempts one address may make, and which foreign origins may call the API:
 
 | `auth.php` key | Default | Means |
 |---|---|---|
@@ -277,7 +277,11 @@ Nothing anywhere creates, disables, or deletes an account **for someone else**. 
 | `registration.max_users` | 0 | absolute ceiling on accounts; 0 is no ceiling |
 | `registration.throttle.per_ip_per_minute` | 3 | registration attempts per IP |
 | `registration.throttle.global_per_hour` | 1000 | successful registrations per hour, install-wide |
-| `cors.*` | — | which **other** origins may call `/management` from a browser; a same-origin caller is allowed before this list is read (the installation's own origin, its scheme `https` behind a proxy that ends HTTPS, §7) |
+| `login.throttle.per_ip_failures` | 20 | failed sign-in attempts from one address in one window, whatever usernames they name; past them that address is refused until the window ends; 0 turns the count off |
+| `login.throttle.per_ip_window_minutes` | 15 | the window, opened by an address's first counted attempt; 0 turns the count off |
+| `cors.*` | — | which **other** origins may call `/management` from a browser; a same-origin caller is allowed before this list is read (the installation's own origin, its scheme `https` behind a proxy that ends HTTPS when the server passes `HTTPS on` or the deployment declares `QS_HTTPS_ONLY`, §7) |
+
+**Sign-in attempts are counted twice**, each before its password is checked, so simultaneous attempts get no more than what is left: per username (5 free, then a doubling wait up to an hour) and per address (the two `login.throttle` keys above), whatever username an attempt names. A success clears its username's count and gives its address back its own attempt alone. An IPv4 address counts whole and an IPv6 one by its first 64 bits; the first-run page's attempts and My account's two password checks count too, and the registration limit keys its addresses the same way. The address is the connection's own (`REMOTE_ADDR`): behind a reverse proxy the server restores the visitor's address from the proxy it trusts (nginx's `real_ip` module, Apache's `mod_remoteip`), or an installation that cannot sets `per_ip_failures` to 0, as every visitor would share the proxy's. While the store of these counts cannot be read or written, each attempt waits 2 seconds before its password is checked, and each such attempt goes to PHP's error log and the security trail. The registration limit's store is held to the same rule: a registration waits 2 seconds before it runs, logged with its own store.
 
 A session holds five values and nothing more: the user id, the generation stamped at login, the session token, the last-seen time, and whether it was a "remember me". Sessions are PHP's own, stored under `secure/tmp/sessions`.
 
@@ -791,8 +795,8 @@ site (a 404) carries the theme colour alone.
 `qs_full_address()` (`requestRuntime.php`, which a build carries), on `/p/<projectId>/` and in a
 build alike:
 
-- the scheme: `https` when the server says so (`HTTPS`, or port 443) or when a proxy in front says
-  `X-Forwarded-Proto: https`; the forwarded scheme can only upgrade, never downgrade;
+- the scheme: `https` when the server says so (`HTTPS`, or port 443), or, where the deployment
+  declares `QS_HTTPS_ONLY` (§7), when a proxy in front says `X-Forwarded-Proto: https`;
 - the host: the validated one (`qs_request_host()`: its shape check and `QS_TRUSTED_HOSTS`, §7);
 - the base: the address the deployment declares in `QS_PUBLIC_BASE_URL` (§7) when it declares one
   (an absolute address is taken whole, its scheme included; a path is completed with the request's
@@ -840,7 +844,7 @@ pages rather than JSON re-parsed on every request, and it means the authoring in
 projects are not reachable from a production domain at all — there is no path between them to
 secure.
 
-Two per-vhost variables remain, and neither selects a project:
+Three per-vhost variables remain, and none selects a project:
 
 - `QS_PUBLIC_BASE_URL` declares the public base that absolute-by-spec artifacts (`sitemap.txt`)
   are generated against. A sitemap has to name the URL the site will be *deployed* at, which the
@@ -852,13 +856,27 @@ Two per-vhost variables remain, and neither selects a project:
   `/p/<projectId>/` and in a build, which reads it from its own vhost.
 - `QS_TRUSTED_HOSTS` (optional) pins the Host header: a request presenting any other host has
   its URLs composed against the first listed host instead.
+- `QS_HTTPS_ONLY` (optional, off by default) declares the site served over HTTPS only: `1`, `on`,
+  `true` or `yes` turn it on; `0`, `off`, `false`, `no` or nothing leave it off; any other value
+  reads as on, logged.
 
-A proxy that ends HTTPS in front of the server says so with `X-Forwarded-Proto: https`, and the
-full addresses of a page's link-preview tags then start with `https://` (§6.4). The header can
-only upgrade the scheme: no other value of it changes an address. The same scheme is the
-request's origin (`qs_request_origin()`): the installation's own base address, a project's
-`/p/<projectId>/` base, a sitemap's default base, and the origin the CORS check compares a
-browser's `Origin` with.
+**A request's scheme is one test** (`qs_request_is_https()`): `https` when the server says so
+(`HTTPS` on, or port 443). A proxy that ends HTTPS in front of the server is heard in one of two
+ways. The server passes `HTTPS on` to PHP (nginx: `fastcgi_param HTTPS on;`), or the deployment
+declares `QS_HTTPS_ONLY`: then a proxy's `X-Forwarded-Proto: https` counts as well, and every
+request that did not arrive over HTTPS is turned away at the installation's entry points, the
+panel, the management API and `/p/<projectId>/` alike — a `GET` or `HEAD` redirected (302, never
+kept by a cache) to the same address in `https` on the validated host, with its port left out,
+and any other method refused with 403. Without either, `X-Forwarded-Proto` is not read, since any
+sender can write it: behind such a proxy the request reads `http`, the CORS check refuses the
+panel's own calls (their `Origin` is `https://…`) and OAuth's `redirect_uri` reads `http`. No
+`Strict-Transport-Security` header is sent; a deployment that wants one sets it in its server.
+
+That scheme is the request's origin (`qs_request_origin()`): the installation's own base address,
+a project's `/p/<projectId>/` base, a sitemap's default base, and the origin the CORS check
+compares a browser's `Origin` with. The full addresses of a page's link-preview tags (§6.4), OAuth's
+`redirect_uri` and the `Secure` attribute of every cookie QuickSite sets ask the same test. A
+build carries the test and reads the same variable; the refusal is the installation's alone.
 
 Copy-paste vhosts for both servers ship in `secure/deploy/apache-vhosts.conf.example` and
 `secure/deploy/nginx-vhosts.conf.example` (shared hosting can put the same `SetEnv` lines in a
@@ -890,8 +908,8 @@ Other layered protections:
 | Path traversal | All file paths normalised and checked against `..`; whitelisted base directories; helpers in `secure/src/functions/PathManagement.php`. |
 | XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. The two lists answer different questions, and a tag can be on neither: the blacklist names tags that would be a *security* problem, while a tag that is merely unusable is simply absent from the allowlist and refused as unknown. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. A `srcset` is held to it file by file, a refused file drawn `#` in its place, and a structure holding one is refused on write. All attribute values are HTML-escaped, and an attribute *name* must be a well-formed identifier (letters, digits, underscore, colon, hyphen) or the attribute is dropped. The renderer and the compiler enforce all of this identically (`TagRegistry::isRenderable`, `TagRegistry::isRenderableAttributeName`, `UrlPolicy`), so preview and built output agree. A binding (a list item's `data-bind-attr`, an endpoint's response binding) sets an attribute in the browser after the page is served, and `qs.js` holds it to the same rules: a malformed name, an event handler, `srcdoc`, and an iframe's `src` or `sandbox` are not written, and a URL attribute's value keeps to the same allowlist, a refused one written as `#`. Nor does a binding write any `data-consent-*` name, which the consent banner and popup read to decide what a click records, or a `meta`'s `content` or `http-equiv`, which together make a refresh. A `meta` refresh's address (the address its `content` holds when its `http-equiv` is `refresh`, found where a browser finds it) is a URL sink too: it keeps to the same allowlist, a structure holding a refused one is refused on write, and both render paths draw one already stored, or filled in when the page is served, with `#` in its place. |
 | Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §9), transformed to allowlisted `QS.*()` calls (`CallTransformer`); raw JS is rejected. The tag policy is also enforced by the commands that take a tag or a whole structure from the request (`addNode`, `editNode`, `editStructure`, `addComplexElement`, `createSnippet`) and by `importProject` over every structure in an archive, and the attribute-name, URL-scheme and `on*` policies by every command that writes a structure file, so unsafe values are refused on write, not just dropped at render. The write-side check is a second layer, never the only one: projects can already hold structures written before a rule existed, and only the render/compile gate protects a page built from those. The same structure writers refuse a `data-bind-attr` that names what a binding cannot write, and `editApi` refuses a response binding's attribute by the same rule; the browser refuses both again, as the row above says. A `meta` refresh is judged on its `http-equiv` and its `content` together, by the same writers. |
-| File upload | MIME sniffed from content (not extension); per-category size cap; JS uploads disallowed. |
-| AuthN / AuthZ | Username+password login → a PHP session (HttpOnly cookie) plus a per-session token; both are required on every Management call. Role is checked per project on every call, and logged. A session generation counter on the user record ends every session of an account at once. Failed logins are throttled per username. The panel's own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) demand the same pair, through **one** shared gate (`secure/admin/functions/adminJsonEndpoint.php`) rather than a second copy of the check: they run engine code on the caller's behalf, so they must not be reachable on a weaker credential than the commands themselves, and two hand-written gates would drift. |
+| File upload | MIME sniffed from content (not extension); per-category size cap; JS uploads disallowed. A file fetched by link comes over HTTPS only, its certificate always checked: against the list `php.ini` names (`curl.cainfo`, else `openssl.cafile`), else the system's own (on Windows, its certificate store). |
+| AuthN / AuthZ | Username+password login → a PHP session (HttpOnly cookie) plus a per-session token; both are required on every Management call. Role is checked per project on every call, and logged. A session generation counter on the user record ends every session of an account at once. Failed sign-ins are throttled per username and per address, each attempt counted before its password is checked (§3). The panel's own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) demand the same pair, through **one** shared gate (`secure/admin/functions/adminJsonEndpoint.php`) rather than a second copy of the check: they run engine code on the caller's behalf, so they must not be reachable on a weaker credential than the commands themselves, and two hand-written gates would drift. |
 | CSRF on admin | The session cookie alone never authorizes: a call must also carry the per-session token, which is page-embedded and unreadable to another origin. A cross-site request can make the browser send the cookie but cannot supply the token. The same rule covers the panel's own state-changing forms — signing out is a POST carrying that token, not a link. The three pre-session forms (login, register, first-run) have no session to draw a token from, so they use a double-submit pair instead: an HttpOnly, `SameSite=Strict` cookie scoped to the admin path plus a hidden field, accepted only when the two match. |
 | CORS | Configurable per deployment. |
 | What the panel shows | The panel's mode (`panel_mode`, simple or advanced) and the setup switches (`console.php`, `embed-security.php`) decide which entries the menu draws and whether two pages are offered. **None is a permission:** a page left out of the menu opens at its address for anyone whose role allows it, a page switched off says so, and every command answers on `/management/` exactly as before. They remove reach, never access, and nothing that authorizes reads them. |
@@ -1632,6 +1650,7 @@ other, so moving a site between them needs no rebuild.
 |---|---|---|
 | Apache | `<public>/[<space>/].htaccess` | `FallbackResource` into the front controller, `Options -Indexes`, the security headers when `mod_headers` is present |
 | Apache | `<public>/.htaccess` (spaced builds only) | makes the document root unbrowsable; deliberately does **not** funnel, because the root is not the site's |
+| Apache | `<secure>/.htaccess` | `Require all denied`: nothing in the secure folder is ever served, and this keeps it so where a document root is set one level too high |
 | nginx | `<secure>/nginx_routes.conf` | one `location` block the deployer includes in their own `server { }` |
 
 **A build usually serves before the nginx file is included at all**, and an

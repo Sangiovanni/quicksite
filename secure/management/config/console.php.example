@@ -25,8 +25,8 @@
  *   its entry in the panel's navigation. Nothing else. The Management API at
  *   /management/ is untouched: every command stays reachable to every caller
  *   whose role allows it, which is what keeps headless callers, scripts and
- *   the panel's own operation working. The command HISTORY tab on that same
- *   page also stays: it is a record of what ran, not a way to run anything.
+ *   the panel's own operation working. The History page, a page of its own,
+ *   also stays: it is a record of what ran, not a way to run anything.
  *
  * WHY IT IS ON BY DEFAULT
  *   The console writes nothing and grants nothing, so a fresh install that has

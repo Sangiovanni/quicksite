@@ -1,0 +1,5 @@
+# The secure folder holds QuickSite's engine, its configuration and every project's data: nothing
+# in it is ever served. The web server's root is the public folder beside this one; this file refuses
+# every request in case a server's root is set one level too high. Apache reads it wherever
+# AllowOverride permits; nginx reads no .htaccess file, so there the root must be the public folder.
+Require all denied

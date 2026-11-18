@@ -1,67 +1,86 @@
 #!/bin/bash
 # ==========================================================
-# QuickSite — nginx configuration reload script (FALLBACK)
+# QuickSite — nginx configuration reload (cron fallback, run by root)
 # ==========================================================
 #
-# This script is a FALLBACK for when PHP cannot reload nginx
-# directly (e.g., shell_exec disabled, no sudoers configured).
+# A FALLBACK for when PHP cannot reload nginx itself (shell_exec disabled, or
+# no sudoers rule). The recommended way needs no cron: let the web account run
+# the two nginx commands through sudo, and nothing else:
 #
-# RECOMMENDED: Use the sudoers approach instead (no cron needed):
-#   echo 'www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx' \
-#     | sudo tee /etc/sudoers.d/quicksite-nginx
+#   sudo tee /etc/sudoers.d/quicksite-nginx > /dev/null <<'EOF'
+#   www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -t
+#   www-data ALL=(root) NOPASSWD: /usr/sbin/nginx -s reload
+#   EOF
 #   sudo chmod 440 /etc/sudoers.d/quicksite-nginx
+#   sudo visudo -cf /etc/sudoers.d/quicksite-nginx
 #
-# With sudoers, QuickSite reloads nginx instantly from PHP.
-# This script is only needed if that's not possible.
+# Replace www-data with your PHP account, and /usr/sbin/nginx with the path
+# `command -v nginx` prints if it is another. Never name nginx without its
+# arguments: sudo reads that as ANY arguments, and the web account could start
+# nginx as root with a configuration of its own choosing.
 #
-# How it works:
-#   1. QuickSite updates secure/nginx/dynamic_routes.conf
-#   2. QuickSite writes a flag: secure/nginx/.pending_reload
-#   3. This script (running via cron) detects the flag
-#   4. Tests nginx config with 'nginx -t'
-#   5. If valid: reloads nginx, removes flag
-#   6. If invalid: logs error, keeps flag for retry
+# ROOT RUNS ITS OWN COPY, KEPT OUTSIDE THE QUICKSITE FOLDER
 #
-# Setup:
-#   1. Make executable:
-#      chmod +x /path/to/secure/cron/nginx_reload.sh
+#   The file you are reading belongs to the web account (setup.sh gives it the
+#   whole QuickSite folder), which could rewrite it before root's next run:
+#   root's crontab must never name it. Instead, as root:
 #
-#   2. Add to root crontab (runs every minute):
-#      sudo crontab -e
-#      * * * * * /path/to/secure/cron/nginx_reload.sh
+#   1. Install a root-owned copy (again after an update that changes this file):
+#        install -o root -g root -m 0755 /path/to/secure/cron/nginx_reload.sh /usr/local/sbin/quicksite-nginx-reload
 #
-#   3. Ensure your nginx vhost includes the config:
-#      include /path/to/secure/nginx/dynamic_routes.conf;
+#   2. Point root's crontab at the copy (crontab -e), with the install's secure
+#      folder as its argument; it runs every minute:
+#        * * * * * /usr/local/sbin/quicksite-nginx-reload /path/to/secure
 #
-# Logs:
-#   Reload attempts are logged to secure/logs/nginx_reload.log
-#
+# What it does: when QuickSite has left the flag <secure>/nginx/.pending_reload,
+# it tests the configuration (nginx -t). When the test passes it reloads nginx
+# (nginx -s reload) and removes the flag; when it fails, it keeps the flag for
+# the next run. It writes nothing else in the QuickSite folder: every line it
+# logs goes to the system log, tagged quicksite-nginx-reload
+# (journalctl -t quicksite-nginx-reload, or /var/log/syslog).
 # ==========================================================
 
 set -euo pipefail
 
-# Auto-detect paths relative to this script's location
-# Script is at: secure/cron/nginx_reload.sh
-# Secure dir is: secure/
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SECURE_DIR="$(dirname "$SCRIPT_DIR")"
+# nginx itself. If `command -v nginx` prints another path, change it here, in
+# your copy, as in the sudoers lines.
+NGINX=/usr/sbin/nginx
+TAG=quicksite-nginx-reload
 
-FLAG_FILE="$SECURE_DIR/nginx/.pending_reload"
-LOG_FILE="$SECURE_DIR/logs/nginx_reload.log"
+log() {
+    local message="$*"
+    logger -t "$TAG" -- "${message//$'\n'/ | }"
+}
 
-# Exit silently if no pending reload
-[ -f "$FLAG_FILE" ] || exit 0
+SECURE_DIR="${1:-}"
+if [ -z "$SECURE_DIR" ] || [ ! -d "$SECURE_DIR" ]; then
+    log "ERROR: the argument must be the install's secure folder (got '$SECURE_DIR'); nothing done"
+    exit 1
+fi
+if [ -L "$SECURE_DIR/nginx" ]; then
+    log "ERROR: $SECURE_DIR/nginx is a link; nothing done"
+    exit 1
+fi
 
-# Ensure log directory exists
-mkdir -p "$(dirname "$LOG_FILE")"
+FLAG="$SECURE_DIR/nginx/.pending_reload"
 
-# Test nginx configuration before reloading
-if nginx -t 2>>"$LOG_FILE"; then
-    # Config is valid — reload nginx
-    nginx -s reload
-    rm -f "$FLAG_FILE"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] OK: nginx reloaded successfully" >> "$LOG_FILE"
+# Nothing to do unless QuickSite left the flag, as a plain file. A link in its
+# place is refused: root never acts on a file the web account points elsewhere.
+if [ ! -e "$FLAG" ] && [ ! -L "$FLAG" ]; then
+    exit 0
+fi
+if [ -L "$FLAG" ] || [ ! -f "$FLAG" ]; then
+    log "ERROR: $FLAG is not a plain file; nothing done"
+    exit 1
+fi
+
+if OUTPUT="$("$NGINX" -t 2>&1)"; then
+    if OUTPUT="$("$NGINX" -s reload 2>&1)"; then
+        rm -f -- "$FLAG"
+        log "OK: nginx reloaded"
+    else
+        log "ERROR: nginx -s reload failed; the flag is kept for the next run: $OUTPUT"
+    fi
 else
-    # Config test failed — do NOT reload, keep flag for retry after fix
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: nginx -t failed — config NOT reloaded. Fix the nginx config and the next cron run will retry." >> "$LOG_FILE"
+    log "ERROR: nginx -t failed, nginx NOT reloaded; fix the configuration and the next run retries: $OUTPUT"
 fi

@@ -456,10 +456,11 @@ class AdminRouter {
             // folder space (PUBLIC_FOLDER_SPACE) scopes the cookie to its real
             // admin prefix instead of a '/admin' that does not exist there.
             $path = parse_url($this->getBaseUrl(), PHP_URL_PATH);
+            require_once SECURE_FOLDER_PATH . '/src/functions/requestRuntime.php';
             setcookie(self::FORM_TOKEN_COOKIE, $this->formToken, [
                 'expires'  => 0, // dies with the browser session
                 'path'     => is_string($path) && $path !== '' ? $path : '/admin',
-                'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+                'secure'   => qs_request_is_https(), // the one scheme test, as every cookie
                 'httponly' => true,
                 'samesite' => 'Strict',
             ]);

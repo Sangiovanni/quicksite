@@ -184,6 +184,30 @@ HTACCESS;
     }
 }
 
+if (!function_exists('qs_site_secure_htaccess')) {
+    /**
+     * The `.htaccess` for the build's SECURE folder, whatever it is named: one
+     * directive refusing every request, as the installation's own secure folder
+     * carries. Nothing in that folder is ever served — PHP reads it from disk —
+     * so the file only matters where a server's root is set too high, and then
+     * it keeps the site's engine, templates, data and keys from being handed out
+     * as files. Apache reads it wherever AllowOverride permits; nginx reads no
+     * `.htaccess`, so there the root must be the public folder.
+     */
+    function qs_site_secure_htaccess(): string
+    {
+        return <<<HTACCESS
+# QuickSite production build: this folder is the site's private side (its engine,
+# its pages, its data and its configuration). Nothing in it is ever served: the
+# web root is the site's public folder. This file refuses every request in case a
+# server's root is set too high. Apache reads it wherever AllowOverride permits;
+# nginx reads no .htaccess file, so there the root must be the public folder.
+Require all denied
+
+HTACCESS;
+    }
+}
+
 if (!function_exists('qs_site_nginx_config')) {
     /**
      * The nginx equivalent of the funnel, for deployers whose server does not

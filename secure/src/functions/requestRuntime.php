@@ -87,11 +87,12 @@ if (!function_exists('qs_request_origin')) {
     /**
      * The request's scheme + validated host, with no trailing slash.
      *
-     * The scheme is qs_request_is_https()'s, the one scheme test, so behind a proxy
-     * ending HTTPS (`X-Forwarded-Proto: https`) the origin reads https, as every full
-     * address a served page carries does. Its callers: the panel's BASE_URL
-     * (init.php), `/p/`'s absolute base (surfaceB.php), a sitemap's default base
-     * (renderBootstrap.php) and the CORS same-origin test (handleCors()).
+     * The scheme is qs_request_is_https()'s, the one scheme test, as every full address
+     * a served page carries is: behind a proxy ending HTTPS the origin reads https when
+     * the server says so (`HTTPS on`) or the deployment declares `QS_HTTPS_ONLY`. Its
+     * callers: the panel's BASE_URL (init.php), `/p/`'s absolute base (surfaceB.php), a
+     * sitemap's default base (renderBootstrap.php) and the CORS same-origin test
+     * (handleCors()).
      */
     function qs_request_origin(): string
     {
@@ -99,15 +100,49 @@ if (!function_exists('qs_request_origin')) {
     }
 }
 
+if (!function_exists('qs_https_only')) {
+    /**
+     * Whether the deployment declares this site served over HTTPS only: the server variable
+     * `QS_HTTPS_ONLY` (per vhost: SetEnv / fastcgi_param; its `REDIRECT_` form after a rewrite).
+     * Off by default.
+     *
+     * On for `1`, `on`, `true` or `yes`, in any letter case; off when absent or empty, or for `0`,
+     * `off`, `false` or `no`. Any other value reads as on, logged once per request: a mistyped
+     * switch meant to protect the site never leaves it open.
+     *
+     * PRE-INIT SAFE: touches no constants.
+     */
+    function qs_https_only(): bool
+    {
+        static $logged = false;
+        $raw = $_SERVER['QS_HTTPS_ONLY'] ?? $_SERVER['REDIRECT_QS_HTTPS_ONLY'] ?? '';
+        $value = strtolower(trim(is_string($raw) ? $raw : ''));
+        if ($value === '' || in_array($value, ['0', 'off', 'false', 'no'], true)) {
+            return false;
+        }
+        if (!in_array($value, ['1', 'on', 'true', 'yes'], true) && !$logged) {
+            $logged = true;
+            error_log(
+                "QuickSite: QS_HTTPS_ONLY='" . preg_replace('/[^\x20-\x7e]/', '?', substr($value, 0, 40)) . "'"
+                . ' is none of 1, on, true, yes, 0, off, false, no — read as on.'
+            );
+        }
+        return true;
+    }
+}
+
 if (!function_exists('qs_request_is_https')) {
     /**
      * Whether this request reached the site over HTTPS: the server says so (`HTTPS` set to anything
-     * but "off"), the port is 443, or a proxy in front says `X-Forwarded-Proto: https`.
+     * but "off"), or the port is 443. Where the deployment declares `QS_HTTPS_ONLY`, a proxy in front
+     * saying `X-Forwarded-Proto: https` counts too; anywhere else that header is not read, since any
+     * sender can write it.
      *
-     * The forwarded scheme can only UPGRADE: any other value of the header changes nothing, so a
-     * request cannot make a page served over HTTPS name itself `http://`. The one scheme test of a
-     * served page: `_oauthIsHttps()` answers with it, qs_request_origin() takes its scheme from it,
-     * and every full address the page carries is composed with it (qs_full_address()).
+     * Under `QS_HTTPS_ONLY` the installation turns away every request this test answers no for
+     * (httpsOnly.php, at its entry points), so there the forwarded scheme can only confirm what was
+     * served. The one scheme test: `_oauthIsHttps()` answers with it, qs_request_origin() takes its
+     * scheme from it, every full address a page carries is composed with it (qs_full_address()), and
+     * every cookie QuickSite sets asks it for its `Secure` attribute.
      *
      * PRE-INIT SAFE: touches no constants.
      */
@@ -116,10 +151,11 @@ if (!function_exists('qs_request_is_https')) {
         if (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') {
             return true;
         }
-        if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+        if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
             return true;
         }
-        if (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443) {
+        if (qs_https_only() && isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+            && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
             return true;
         }
         return false;
@@ -221,8 +257,8 @@ if (!function_exists('qs_full_address')) {
      *   - it declared a path: this request's scheme and host, that path, then the path;
      *   - it declared nothing: this request's scheme and host, the base this request derives, then the path.
      *
-     * The scheme is qs_request_is_https()'s (a proxy's `X-Forwarded-Proto: https` upgrades it, nothing
-     * downgrades it), the host qs_request_host()'s (its shape check and `QS_TRUSTED_HOSTS`): no request
+     * The scheme is qs_request_is_https()'s (a proxy's `X-Forwarded-Proto: https` counts only under
+     * `QS_HTTPS_ONLY`), the host qs_request_host()'s (its shape check and `QS_TRUSTED_HOSTS`): no request
      * header reaches the address any other way. A declared absolute address is the deployer's word and
      * is taken whole, its scheme included.
      *
