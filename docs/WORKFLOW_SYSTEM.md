@@ -406,14 +406,16 @@ folder holds every template's photos: a photo's name starts with its template's 
 brings each into the project's images with one `uploadAsset` step, before the pages that show it:
 
 ```json
-{ "command": "uploadAsset", "params": { "templatePhoto": "trades-job.webp" } }
+{ "command": "uploadAsset", "params": { "templatePhoto": "trades-job.webp", "alt": "photos.job" } }
 ```
 
 `templatePhoto` reads that folder alone and fetches nothing, so a run brings its photos the same way on a server and on a local
 install; the photo then goes through every check of an upload. A second run on the same project finds the same photo there and
 adds no copy. A page shows a photo as an image (`"tag": "img"`, `"src": "/assets/images/trades-job.webp"`), never as a stylesheet
 background, so an author swaps it in the editor like any image; its `alt` is a key of the template's texts, so it follows the
-language. No text is laid on a photo: words sit beside or under it, so their contrast is the palette's whatever photo an author
+language. The step that brings the photo in passes that same key as `alt` (`photos.job` above), so the project's asset carries
+it: Media shows the photo's text in each of the project's languages, and a text changed there changes every page that places
+the photo. No text is laid on a photo: words sit beside or under it, so their contrast is the palette's whatever photo an author
 puts in its place. The previews' tool keeps a template's photos once for both themes, and a photo that changes makes its
 template's preview stale.
 
