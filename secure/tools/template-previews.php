@@ -1,7 +1,12 @@
 <?php
 /**
  * template-previews.php — builds the previews the panel shows for the site templates of
- * Start from a template. One of the tools in this folder (see its README.md).
+ * Start from a template. One of the tools in this folder (see its README.md); the launcher,
+ * tools.php, lists it by the three lines below.
+ *
+ * @qs-tool   template-previews
+ * @qs-line   Build the site templates' previews that are stale or missing (--check: say which)
+ * @qs-usage  [--all | --check]
  *
  *   php secure/tools/template-previews.php            build the previews that are stale or missing
  *   php secure/tools/template-previews.php --all      build every preview again

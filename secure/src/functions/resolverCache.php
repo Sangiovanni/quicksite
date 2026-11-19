@@ -173,11 +173,33 @@ function clearResolverCacheForApi(string $apiId): int {
 }
 
 /**
+ * THE judge of one cache entry, from what reading its file gave ($content, false
+ * when it could not be read): 'unreadable'; 'malformed' (not a JSON object);
+ * 'expired' (its expires_at, 0 when absent, is past); else 'fresh'. Shared by
+ * the sweep below (cleanResolverCache) and the operator's `cache-prune`, which
+ * acts on the same answer differently: the sweep deletes a malformed entry, and
+ * an unreadable one after a week; the tool removes only an expired entry, and
+ * reports the others.
+ */
+function qs_resolver_cache_entry_state($content, int $now): string {
+    if (!is_string($content)) return 'unreadable';
+    $entry = json_decode($content, true);
+    if (!is_array($entry)) return 'malformed';
+    return (int) ($entry['expires_at'] ?? 0) < $now ? 'expired' : 'fresh';
+}
+
+/** Whether a name in the cache folder is an entry's: its key (_resolverCacheKey()) and `.json`. */
+function qs_resolver_cache_file_is_ours(string $name): bool {
+    return (bool) preg_match('/^[0-9a-f]{64}\.json$/D', $name);
+}
+
+/**
  * Sweep entries based on the criteria:
  *   - $beforeTimestamp !== null → delete entries with stored_at < timestamp
  *   - $beforeTimestamp === null → delete expired entries (default housekeeping)
  *
- * Malformed / unreadable entries get deleted as housekeeping too.
+ * Malformed / unreadable entries get deleted as housekeeping too
+ * (qs_resolver_cache_entry_state()).
  *
  * @return int Number of entries deleted.
  */
@@ -189,29 +211,26 @@ function sweepResolverCache(?int $beforeTimestamp = null): int {
     $count = 0;
     foreach ($files as $file) {
         $content = @file_get_contents($file);
-        if ($content === false) {
+        $state = qs_resolver_cache_entry_state($content, $now);
+        if ($state === 'unreadable') {
             // Unreadable — delete if it's older than a week (best-effort cleanup)
             if (@filemtime($file) < $now - 7 * 86400) {
                 if (@unlink($file)) $count++;
             }
             continue;
         }
-        $entry = json_decode($content, true);
-        if (!is_array($entry)) {
+        if ($state === 'malformed') {
             // Malformed — delete unconditionally
             if (@unlink($file)) $count++;
             continue;
         }
-        $stored  = (int) ($entry['stored_at']  ?? 0);
-        $expires = (int) ($entry['expires_at'] ?? 0);
         if ($beforeTimestamp !== null) {
-            if ($stored < $beforeTimestamp) {
+            $entry = json_decode($content, true);
+            if ((int) ($entry['stored_at'] ?? 0) < $beforeTimestamp) {
                 if (@unlink($file)) $count++;
             }
-        } else {
-            if ($expires < $now) {
-                if (@unlink($file)) $count++;
-            }
+        } elseif ($state === 'expired') {
+            if (@unlink($file)) $count++;
         }
     }
     return $count;

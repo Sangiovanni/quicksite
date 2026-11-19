@@ -122,10 +122,17 @@ quicksite/
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback: root runs its own copy, installed outside the tree)
 │   ├── tools/                    # The deployer's tools: scripts an operator runs on the machine,
 │   │                             #   not through the API, because they act on the whole
-│   │                             #   installation rather than on one project — session-sweep.php
-│   │                             #   tidies the session store, template-previews.php builds the
-│   │                             #   site templates' previews; README.md says how to run each
+│   │                             #   installation rather than on one project — tools.php lists
+│   │                             #   them by their headers and runs one; log-prune.php and
+│   │                             #   cache-prune.php remove what the logs and caches no longer
+│   │                             #   need, session-sweep.php tidies the session store,
+│   │                             #   reconcile-memberships.php brings every account's memberships
+│   │                             #   back to the rosters, template-previews.php builds the site
+│   │                             #   templates' previews; README.md says how to run each
+│   │   └── lib/                  #   what the tools share (not a tool: not listed)
 │   ├── cache/                    # Generated caches, safe to delete (gitignored)
+│   │   ├── membership/           #   each account's last dashboard repair, and the token
+│   │   ├── rate/                 #   each account's write-rate and upload-rate windows
 │   │   ├── resolver/             #   data-resolver responses, held for their TTL
 │   │   └── space/                #   measured per-project disk sizes
 │   ├── tmp/                      # Scratch space (gitignored)

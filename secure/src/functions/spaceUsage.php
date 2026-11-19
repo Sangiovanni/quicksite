@@ -138,14 +138,13 @@ function qs_project_space(string $project, bool $refresh = false): array {
 
     if (!$refresh && is_file($file)) {
         $raw = @file_get_contents($file);
-        if ($raw !== false && $raw !== '') {
+        $state = qs_space_cache_entry_state($raw, time());
+        if ($state === 'fresh') {
             $entry = json_decode($raw, true);
-            if (is_array($entry) && isset($entry['expires_at'], $entry['space'])) {
-                if ((int)$entry['expires_at'] >= time()) {
-                    return $entry['space'] + ['cached' => true, 'measured_at' => (int)($entry['stored_at'] ?? 0)];
-                }
-                @unlink($file); // lazy delete on expired read
-            }
+            return $entry['space'] + ['cached' => true, 'measured_at' => (int)($entry['stored_at'] ?? 0)];
+        }
+        if ($state === 'expired') {
+            @unlink($file); // lazy delete on expired read
         }
     }
 
@@ -199,11 +198,34 @@ function qs_invalidate_space_cache(string $project): void {
  */
 function qs_prune_space_cache(): void {
     foreach (glob(qs_space_cache_path() . '/*.json') ?: [] as $file) {
-        $project = basename($file, '.json');
-        if (!is_dir(SECURE_FOLDER_PATH . '/projects/' . $project)) {
+        if (qs_space_cache_project_gone(basename($file, '.json'))) {
             @unlink($file);
         }
     }
+}
+
+/**
+ * THE judge of one measurement, from what reading its file gave ($raw, false when
+ * it could not be read): 'unreadable'; 'malformed' (empty, or not an entry with
+ * its expires_at and space); 'expired' (its expires_at is past); else 'fresh',
+ * the only one qs_project_space() answers from. The operator's `cache-prune`
+ * removes an expired entry, and the entry of a project that is gone, whatever
+ * it holds.
+ */
+function qs_space_cache_entry_state($raw, int $now): string {
+    if (!is_string($raw)) {
+        return 'unreadable';
+    }
+    $entry = $raw === '' ? null : json_decode($raw, true);
+    if (!is_array($entry) || !isset($entry['expires_at'], $entry['space'])) {
+        return 'malformed';
+    }
+    return (int)$entry['expires_at'] >= $now ? 'fresh' : 'expired';
+}
+
+/** Whether the project a measurement is named after has no folder any more. */
+function qs_space_cache_project_gone(string $project): bool {
+    return !is_dir(SECURE_FOLDER_PATH . '/projects/' . $project);
 }
 
 // qs_format_size() lives in utilsManagement.php (required at the top of this

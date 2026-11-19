@@ -34,8 +34,9 @@ if (!defined('LOGS_PATH')) {
  * commands (account + membership self-service) belong to no project, and there
  * is no operator tier to show them to (superadmin was retired). Recording them
  * keeps the forensic trail for account deletion / invitation acceptance instead
- * of leaving those actions unaudited. Operators manage that directory directly
- * on disk — see docs/ARCHITECTURE.md.
+ * of leaving those actions unaudited. The operator's `log-prune` tool
+ * (secure/tools/) removes its days, and every project's, past an age; see
+ * docs/COMMAND_API.md (The `_global` bucket).
  *
  * `_global` and `p` cannot collide with a project id: is_valid_project_name
  * requires a leading LETTER, so a project can never be named `_global`, and the
@@ -671,6 +672,63 @@ function getLogDates(string $project = ''): array {
     
     // Sort by date descending
     usort($dates, fn($a, $b) => strcmp($b['date'], $a['date']));
-    
+
     return $dates;
+}
+
+// ============================================================================
+// The prune's rules — read by the operator's `log-prune` (secure/tools/), which
+// walks the log folders and removes, each day file under its own lock: a day
+// past its age, a lock left without its day file, and the folder of a project
+// that no longer exists. Nothing here removes anything.
+// ============================================================================
+
+/** How many days of the command log `log-prune` keeps when no --days is given. */
+const QS_LOG_PRUNE_DAYS = 90;
+
+/**
+ * The days on either side of today a prune never touches, whatever its age:
+ * a day file is named by the date of the PHP that writes it, and the command
+ * line's PHP may keep another time zone than the web server's, so "today" can
+ * be either neighbour of the tool's own today.
+ */
+const QS_LOG_PRUNE_MARGIN_DAYS = 1;
+
+/**
+ * The date in a day file's name, or null for any other name: `<kind>_YYYY-MM-DD.json`
+ * (`commands`, `security`), or its lock with `$lock`. A date that is no day of the
+ * calendar is no day file's.
+ */
+function qs_log_day_of(string $name, string $kind, bool $lock = false): ?string {
+    $tail = $lock ? '.json.lock' : '.json';
+    $head = $kind . '_';
+    if (strlen($name) !== strlen($head) + 10 + strlen($tail)
+        || strncmp($name, $head, strlen($head)) !== 0 || substr($name, -strlen($tail)) !== $tail) {
+        return null;
+    }
+    $date = substr($name, strlen($head), 10);
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $date, $m) || !checkdate((int)$m[2], (int)$m[3], (int)$m[1])) {
+        return null;
+    }
+    return $date;
+}
+
+/** The day `$days` before the day of `$now`, in this PHP's time zone: a day file dated before it is past its age. */
+function qs_log_prune_cutoff(int $days, int $now): string {
+    return date('Y-m-d', strtotime(date('Y-m-d', $now) . ' -' . $days . ' days'));
+}
+
+/** Whether a date is within QS_LOG_PRUNE_MARGIN_DAYS of the day of `$now`, on either side, or after it. */
+function qs_log_day_is_recent(string $date, int $now): bool {
+    return $date >= qs_log_prune_cutoff(QS_LOG_PRUNE_MARGIN_DAYS, $now);
+}
+
+/**
+ * Whether a folder of `logs/p/` is the log of a project that no longer exists: a
+ * name a project could have (is_valid_project_name()), with no project folder of
+ * that name. A command of a project that is gone is logged to `_global`
+ * (writeLogEntry()), so nothing writes there again.
+ */
+function qs_log_project_vanished(string $name): bool {
+    return is_valid_project_name($name) && !is_dir(SECURE_FOLDER_PATH . '/projects/' . $name);
 }

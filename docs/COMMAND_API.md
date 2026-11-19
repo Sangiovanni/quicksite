@@ -543,6 +543,11 @@ only by someone who holds the `history` category **on that project**:
   so the directory is purged on `deleteProject`, and a new project is never given an
   id whose log folder exists: no project starts with another's trail. The deletion event itself is
   recorded in `_global`, since the project it refers to no longer exists.
+- **The operator's `log-prune` removes old days.** Run on the server
+  (`secure/tools/`, whose README says how), it removes the day files older than an
+  age, 90 days unless told otherwise, in every project's directory and in `_global`,
+  and the directory of a project that no longer exists. Whether and when it runs is
+  the operator's choice.
 
 **A delete that does not finish says what is left.** `deleteProject` removes the
 whole tree, continuing past a file it cannot remove instead of stopping at the
@@ -623,12 +628,13 @@ in those entries is sensitive. `logoutSession` is absent for a different reason:
 ending a session is an event about an account, so it goes to the security trail
 below rather than being recorded twice in two files with two audiences.
 
-Because nothing serves or rotates it, `_global` still grows and is the operator's
-to manage. Treat it like any other server-side log: archive or delete files on
-whatever schedule your retention policy requires (a scheduled task, a logrotate
-rule, or manual deletion are all fine — the files are plain JSON and nothing
-references them). Credentials are stripped before writing (see above), but the
-entries still describe who did what and when.
+Because nothing serves it, `_global` is the operator's to manage. `log-prune`
+removes its day files older than an age, 90 days unless `--days` says otherwise, as
+it does every project's, and runs from cron (see `secure/tools/README.md`). Treat
+the files like any other server-side log: archive what your retention policy asks
+you to keep longer before that (the files are plain JSON and nothing references
+them). Credentials are stripped before writing (see above), but the entries still
+describe who did what and when.
 
 ## The security trail
 
@@ -677,9 +683,10 @@ trail's files are copied.
 **No command reads this trail**, and none is planned. It is installation-wide,
 and authority in QuickSite is per project — no role could be entitled to it. The
 operator reads the file on the server, the same reasoning that makes the session
-sweeper a script rather than a command. Nothing rotates it either, so treat it
-like any other server-side log and archive or delete files on whatever schedule
-your retention policy requires.
+sweeper a script rather than a command. The operator's `log-prune` removes its day
+files older than an age, 365 days unless `--security-days` says otherwise; treat it
+like any other server-side log, and archive what your retention policy asks you to
+keep longer before that.
 
 ## What is deliberately not a command
 

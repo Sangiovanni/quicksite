@@ -830,14 +830,16 @@ function &qs_small_write_journal(): array
 /**
  * Put every guarded file back as it was before the command (a removed one
  * re-created in its folder), remove the folders the command made, and re-derive
- * what was derived from them.
+ * what was derived from them. A write is taken back when it was refused, or when
+ * it failed (editAsset): in that case the file that cannot be restored may be
+ * the one that could not be written.
  */
 function qs_small_write_rollback(array $journal): void
 {
     foreach ($journal['files'] as $file => $before) {
         if ($before === null) {
             if (is_file($file) && !@unlink($file)) {
-                error_log('quota: could not remove ' . $file . ' while taking back a refused write');
+                error_log('quota: could not remove ' . $file . ' while taking back a refused or failed write');
             }
             continue;
         }
@@ -845,7 +847,7 @@ function qs_small_write_rollback(array $journal): void
             @mkdir(dirname($file), 0755, true);
         }
         if (@file_put_contents($file, $before, LOCK_EX) === false) {
-            error_log('quota: could not restore ' . $file . ' while taking back a refused write');
+            error_log('quota: could not restore ' . $file . ' while taking back a refused or failed write');
         }
         if (function_exists('qs_opcache_invalidate') && substr($file, -4) === '.php') {
             qs_opcache_invalidate($file);
@@ -951,6 +953,13 @@ function qs_rate_store_read(string $userId): array
  * Change one account's rate file under its lock. $fn(array &$data): mixed; its
  * result is returned, or false when the store cannot be written — in which case
  * nothing is enforced rather than everything refused.
+ *
+ * The operator's `cache-prune` removes a file whose windows are all over WITH its
+ * lock, while it holds that lock (qs_rate_file_ended()). A writer that opened the
+ * lock just before would then hold a file no longer at its path, beside a writer
+ * that opens the new one: so once it holds its lock, a writer checks that the
+ * lock is still the file at its path, and opens it again when not
+ * (qs_rate_lock_is_current()).
  */
 function qs_rate_store_mutate(string $userId, callable $fn)
 {
@@ -960,11 +969,28 @@ function qs_rate_store_mutate(string $userId, callable $fn)
         return false;
     }
     $path = $dir . '/' . qs_quota_user_key($userId) . '.json';
-    $lock = @fopen($path . '.lock', 'c');
-    if ($lock === false) {
-        return false;
+    $lock = false;
+    // A prune removes a lock at most once per file and run, so a second open is
+    // enough but for a pathological store: past the tries, the write goes ahead as
+    // before. On Windows a lock removed while held cannot be opened again until it
+    // is let go, so a failed open is tried again too.
+    for ($try = 0; $try < QS_RATE_LOCK_TRIES; $try++) {
+        $last = $try === QS_RATE_LOCK_TRIES - 1;
+        $lock = @fopen($path . '.lock', 'c');
+        if ($lock === false) {
+            if ($last) {
+                return false;
+            }
+            usleep(20000);
+            continue;
+        }
+        flock($lock, LOCK_EX);
+        if ($last || qs_rate_lock_is_current($lock, $path . '.lock')) {
+            break;
+        }
+        flock($lock, LOCK_UN);
+        fclose($lock);
     }
-    flock($lock, LOCK_EX);
     try {
         $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : [];
         if (!is_array($data)) {
@@ -990,6 +1016,73 @@ function qs_rate_store_mutate(string $userId, callable $fn)
     }
 }
 
+/** How many times a writer opens its rate lock before it writes (qs_rate_store_mutate()). */
+const QS_RATE_LOCK_TRIES = 3;
+
+/**
+ * Whether a held lock is still the file at its path: the same file on the same
+ * device. A lock the operator's prune removed (or replaced) while this writer
+ * waited for it is not, and the writer opens the one there now. Both PHP's on
+ * Linux and on Windows know a file by its inode here.
+ *
+ * @param resource $handle the open, locked lock
+ */
+function qs_rate_lock_is_current($handle, string $path): bool
+{
+    clearstatcache(true, $path);
+    $held = @fstat($handle);
+    $there = @stat($path);
+    return $held !== false && $there !== false
+        && $held['ino'] === $there['ino'] && $held['dev'] === $there['dev'];
+}
+
+/** Whether a name in the rate store is an account's rate file: the hash of its id (qs_quota_user_key()) and `.json`. */
+function qs_rate_store_file_is_ours(string $name): bool
+{
+    return (bool) preg_match('/^[0-9a-f]{64}\.json$/D', $name);
+}
+
+/**
+ * Whether the store ignores this rate file now, so the operator's `cache-prune`
+ * may remove it with its lock: every counter in it is over by THE window rule
+ * (qs_rate_window_state(); a counter in another form is no window), the upload
+ * counter by the configured period, each write counter by its own, which is its
+ * key. A file holding anything else, or a write counter under a key that is no
+ * period, is not the store's to judge, and stays.
+ */
+function qs_rate_file_ended(array $data, int $now): bool
+{
+    foreach ($data as $key => $value) {
+        if ($key === 'upload') {
+            if (qs_rate_counter_open($value, qs_quota_config()['rate_period'], $now)) {
+                return false;
+            }
+            continue;
+        }
+        if ($key !== 'write' || !is_array($value)) {
+            return false;
+        }
+        foreach ($value as $period => $counter) {
+            $period = (string) $period;
+            if (!ctype_digit($period) || (int) $period <= 0 || qs_rate_counter_open($counter, (int) $period, $now)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
+ * Whether a stored counter ({start, count}) holds a window open now: it opened at
+ * `start`, no later than now, and its period has not run out. Anything else (no
+ * counter, a window that is over, a counter in another form) holds none.
+ */
+function qs_rate_counter_open($counter, int $period, int $now): bool
+{
+    $start = (is_array($counter) && is_int($counter['start'] ?? null)) ? $counter['start'] : null;
+    return $start !== null && $start <= $now && $now < $start + $period;
+}
+
 /**
  * THE window rule, for the upload rate and the write rate alike: where one
  * window stands now, from its stored counter ({start, count}, or null).
@@ -1003,10 +1096,9 @@ function qs_rate_store_mutate(string $userId, callable $fn)
  */
 function qs_rate_window_state(?array $counter, int $max, int $period, int $now): array
 {
-    $start = (is_array($counter) && is_int($counter['start'] ?? null)) ? $counter['start'] : null;
-    $open  = $start !== null && $start <= $now && $now < $start + $period;
+    $open  = qs_rate_counter_open($counter, $period, $now);
     $used  = $open ? (int)($counter['count'] ?? 0) : 0;
-    $start = $open ? $start : $now;
+    $start = $open ? $counter['start'] : $now;
     return [
         'used'      => $used,
         'remaining' => max(0, $max - $used),

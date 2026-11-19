@@ -56,6 +56,8 @@ The split between `public/` and `secure/` is the **security boundary** (see §8)
 
 `secure/` also gains directories as the engine runs that ship with nothing in them: `logs/`, `cache/`, `tmp/` (the session store) and `nginx/` (the generated routing file).
 
+`secure/tools/` holds the operator's tools, run from a shell on the server and never through the API, because each acts on the whole installation and no project role could authorise it: `php secure/tools/tools.php` lists them, by the header each one carries, and runs one. Three keep the stores above small, each removing only what its store already ignores, under the store's own lock: `log-prune` (log days past an age, 90 days for the command log and 365 for the security trail by default), `cache-prune` (each cache by its own expiry rule) and `session-sweep` (§3); a fourth, `reconcile-memberships`, brings every account's copy of its memberships back to every project's roster. Their `README.md` gives each one's options and cron line.
+
 ---
 
 ## 2. Project layer — data model

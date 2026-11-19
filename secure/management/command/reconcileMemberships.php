@@ -11,6 +11,8 @@
  *
  * Category: project.members (admin + owner) — the same tier that manages the
  * roster; it writes OTHER members' cache entries (only their key for THIS project).
+ * The operator's reconcile-memberships tool (secure/tools/) runs the same reconcile
+ * (qs_membership_reconcile_project()) for every project at once.
  *
  * MERGE-PRESERVE rule (the non-negotiable): `member`, `pending_invite` and
  * `pending_request` are DERIVABLE from members.json and are rebuilt from it; but
@@ -54,88 +56,30 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
             ->withMessage('Authentication required');
     }
 
-    // AUTHORITY snapshot: members.json. If it is missing/unreadable we refuse
-    // rather than guess — reconcile must never invent memberships or, worse,
-    // prune real ones off a failed read. loadProjectMembers returns ['members'=>[]]
-    // for a missing/corrupt file; a WELL-FORMED members.json always has a members
-    // map that is not empty AND an owner (the invariant backstop guarantees exactly
-    // one), so anything else means the authority is unreadable — abort (pruning
-    // every real membership off a failed read would be the bug).
-    $members = loadProjectMembers($project);
-    if (!qs_membership_roster_readable($members)) {
+    // The reconcile itself is shared with the operator's reconcile-memberships tool
+    // (qs_membership_reconcile_project()). Its AUTHORITY is members.json: when that is
+    // missing or unreadable it refuses rather than guess — reconcile must never invent
+    // memberships or, worse, prune real ones off a failed read. A well-formed
+    // members.json always has a members map that is not empty AND an owner (the
+    // invariant backstop guarantees exactly one), so anything else means the
+    // authority is unreadable.
+    //
+    // The DESIRED cache status per user comes from the roster
+    // (qs_membership_desired_statuses()): member, then the engaged pending states. A
+    // SPONSORED proposal target is NOT engaged: it gets NO mirror, and is treated like
+    // any other user the roster does not list (notice kept, stale entry pruned). An
+    // entry carries no project name (qs_membership_mirror_entry): the inbox reads it
+    // when it lists, with the private-project rule.
+    $result = qs_membership_reconcile_project($project);
+    if (!$result['ok'] && $result['error'] === 'members.unreadable') {
         return ApiResponse::create(500, 'members.unreadable')
             ->withMessage('Project membership authority is missing or unreadable — reconcile aborted');
     }
-
-    $today = date('Y-m-d');
-
-    // The DESIRED cache status per user from authority (qs_membership_desired_statuses()):
-    // member, then the engaged pending states. A SPONSORED proposal target is NOT
-    // engaged — it gets NO mirror, so it is absent from $desired and treated like any
-    // other non-listed user (tombstone-preserve or stale-prune). An entry carries no
-    // project name (qs_membership_mirror_entry): the inbox reads it when it lists,
-    // with the private-project rule.
-    $desired = qs_membership_desired_statuses($members);
-
-    $counts = [
-        'members'               => 0,
-        'pending_invites'       => 0,
-        'pending_requests'      => 0,
-        'added'                 => 0,
-        'healed'                => 0,
-        'pruned_stale'          => 0,
-        'preserved_tombstones'  => 0,
-    ];
-
-    $written = qs_users_mutate(function (array &$cfg) use ($project, $desired, $today, &$counts) {
-        foreach ($cfg['users'] as $uid => &$u) {
-            $uid = (string)$uid;
-            $has = isset($u['projects'][$project]);
-            $current = $has ? $u['projects'][$project] : null;
-            // The one rule (qs_membership_reconciled_entry()): an engaged status gets
-            // its mirror entry with the entry's informational date kept (`created`,
-            // `at`) and any name an older entry carried dropped; with no status a
-            // tombstone is preserved and a stale positive is pruned (null).
-            $want = qs_membership_reconciled_entry($current, $desired[$uid] ?? null, $today);
-
-            if (isset($desired[$uid])) {
-                // Authority lists this user in an engaged state — the cache must
-                // match it (heal the status; add if missing).
-                if ($current !== $want) {
-                    if (!$has) {
-                        $counts['added']++;
-                    } else {
-                        $counts['healed']++;
-                    }
-                    $u['projects'][$project] = $want;
-                }
-                if ($want['status'] === 'member')          { $counts['members']++; }
-                elseif ($want['status'] === 'pending_invite') { $counts['pending_invites']++; }
-                elseif ($want['status'] === 'pending_request'){ $counts['pending_requests']++; }
-                continue;
-            }
-
-            // Authority does NOT list this user for this project.
-            if (!$has) {
-                continue; // nothing to do
-            }
-            if ($want !== null) {
-                // Non-derivable terminal notice — PRESERVE (the merge rule).
-                $counts['preserved_tombstones']++;
-            } else {
-                // Stale positive (member/pending_* the authority contradicts) — prune.
-                unset($u['projects'][$project]);
-                $counts['pruned_stale']++;
-            }
-        }
-        unset($u);
-        return true;
-    });
-
-    if ($written !== true) {
+    if (!$result['ok']) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to write reconciled membership cache');
     }
+    $counts = $result['counts'];
 
     $counts['total_changes'] = $counts['added'] + $counts['healed'] + $counts['pruned_stale'];
 

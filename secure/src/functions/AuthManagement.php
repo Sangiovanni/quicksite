@@ -763,8 +763,7 @@ function qs_membership_sync_account(string $userId, ?int $now = null): ?bool {
             $project = (string)$project;
             if (array_key_exists($project, $readable)) {
                 $want = qs_membership_reconciled_entry($current, $readable[$project], $today);
-            } elseif ($project !== '' && strpbrk($project, "/\\") === false && strpos($project, '..') === false
-                && !is_dir(SECURE_FOLDER_PATH . '/projects/' . $project)) {
+            } elseif (qs_membership_project_gone($project)) {
                 // The folder is gone, and the roster with it.
                 $want = qs_membership_reconciled_entry($current, null, $today);
             } else {
@@ -790,6 +789,163 @@ function qs_membership_sync_account(string $userId, ?int $now = null): ?bool {
         return false;
     }
     return $written === true ? true : null;
+}
+
+/**
+ * Whether a key of an account's `projects` cache names a project folder that is gone: a folder name
+ * (one segment, no `..`) with no folder of that name. A key that is no folder name is not judged.
+ */
+function qs_membership_project_gone(string $project): bool {
+    return $project !== '' && strpbrk($project, "/\\") === false && strpos($project, '..') === false
+        && !is_dir(SECURE_FOLDER_PATH . '/projects/' . $project);
+}
+
+/**
+ * The reconcile of ONE project, applied to a users.php array: every account's entry for $project
+ * brought to what its roster gives it ($desired, qs_membership_desired_statuses()), by the one rule
+ * (qs_membership_reconciled_entry()): an engaged status gets its mirror entry (added or healed), a
+ * notice is kept, an entry the roster contradicts is pruned. The rule of reconcileMemberships and of
+ * the operator's `reconcile-memberships`, which calls it for every project.
+ *
+ * @param array $cfg the users.php array, changed in place
+ * @return array{counts: array<string, int>, changes: array<int, array{account: string, project: string, from: ?string, to: ?string, before: mixed, after: ?array}>}
+ *         each change: the entry's status before and after (null: no entry), and the entries themselves
+ */
+function qs_membership_reconcile_users(array &$cfg, string $project, array $desired, string $today): array {
+    $counts = [
+        'members'               => 0,
+        'pending_invites'       => 0,
+        'pending_requests'      => 0,
+        'added'                 => 0,
+        'healed'                => 0,
+        'pruned_stale'          => 0,
+        'preserved_tombstones'  => 0,
+    ];
+    $changes = [];
+    foreach ($cfg['users'] as $uid => &$u) {
+        $uid = (string)$uid;
+        $has = isset($u['projects'][$project]);
+        $current = $has ? $u['projects'][$project] : null;
+        $from = $has ? (is_array($current) ? (string)($current['status'] ?? 'member') : 'member') : null;
+        // The one rule: an engaged status gets its mirror entry with the entry's informational date
+        // kept (`created`, `at`) and any name an older entry carried dropped; with no status a
+        // notice is preserved and a stale positive is pruned (null).
+        $want = qs_membership_reconciled_entry($current, $desired[$uid] ?? null, $today);
+
+        if (isset($desired[$uid])) {
+            // The roster lists this user in an engaged state: the cache must match it (heal the
+            // status; add if missing).
+            if ($current !== $want) {
+                if (!$has) {
+                    $counts['added']++;
+                } else {
+                    $counts['healed']++;
+                }
+                $u['projects'][$project] = $want;
+                $changes[] = ['account' => $uid, 'project' => $project, 'from' => $from, 'to' => $want['status'], 'before' => $current, 'after' => $want];
+            }
+            if ($want['status'] === 'member')          { $counts['members']++; }
+            elseif ($want['status'] === 'pending_invite') { $counts['pending_invites']++; }
+            elseif ($want['status'] === 'pending_request'){ $counts['pending_requests']++; }
+            continue;
+        }
+
+        // The roster does not list this user for this project.
+        if (!$has) {
+            continue;
+        }
+        if ($want !== null) {
+            // A notice no roster can rebuild: preserved.
+            $counts['preserved_tombstones']++;
+        } else {
+            // A stale positive (member or pending the roster contradicts): pruned.
+            unset($u['projects'][$project]);
+            $counts['pruned_stale']++;
+            $changes[] = ['account' => $uid, 'project' => $project, 'from' => $from, 'to' => null, 'before' => $current, 'after' => null];
+        }
+    }
+    unset($u);
+    return ['counts' => $counts, 'changes' => $changes];
+}
+
+/**
+ * Reconcile every account's entry for ONE project against its roster, in one users.php write (the
+ * write is made even when nothing differs, as the command always made it). A roster that cannot be
+ * read is never reconciled against: pruning every membership off a failed read would be the defect.
+ * With $dryRun, users.php is read and nothing is written.
+ *
+ * @return array{ok: bool, error?: string, counts?: array<string, int>, changes?: array}
+ *         `error` is `members.unreadable` or `write_failed`
+ */
+function qs_membership_reconcile_project(string $project, bool $dryRun = false, ?string $today = null): array {
+    $members = loadProjectMembers($project);
+    if (!qs_membership_roster_readable($members)) {
+        return ['ok' => false, 'error' => 'members.unreadable'];
+    }
+    $today = $today ?? date('Y-m-d');
+    $desired = qs_membership_desired_statuses($members);
+    if ($dryRun) {
+        $cfg = loadUsersConfig();
+        return ['ok' => true] + qs_membership_reconcile_users($cfg, $project, $desired, $today);
+    }
+    $result = null;
+    $written = qs_users_mutate(function (array &$cfg) use ($project, $desired, $today, &$result) {
+        $result = qs_membership_reconcile_users($cfg, $project, $desired, $today);
+        return true;
+    });
+    if ($written !== true || $result === null) {
+        return ['ok' => false, 'error' => 'write_failed'];
+    }
+    return ['ok' => true] + $result;
+}
+
+/**
+ * Mark, in every account, the entry of a project whose folder is gone (qs_membership_project_gone())
+ * as deleteProject's cascade marks it: a member or pending entry becomes the `deleted` notice, dated
+ * today. The cascade names the project by its display name, which went with the folder; the id
+ * stands in for it, as the cascade's own does for an account that only asked to join. A notice is
+ * kept as it is. One users.php write, only when something is marked; with $dryRun, none.
+ *
+ * @return array{ok: bool, error?: string, changes: array<int, array{account: string, project: string, from: string, to: string, before: mixed, after: array}>}
+ */
+function qs_membership_mark_vanished(bool $dryRun = false, ?string $today = null): array {
+    $today = $today ?? date('Y-m-d');
+    $mark = static function (array &$cfg) use ($today): array {
+        $changes = [];
+        foreach ($cfg['users'] ?? [] as $uid => $user) {
+            $entries = is_array($user) ? ($user['projects'] ?? null) : null;
+            if (!is_array($entries)) {
+                continue;
+            }
+            foreach ($entries as $project => $entry) {
+                $project = (string)$project;
+                if (!qs_membership_project_gone($project)) {
+                    continue;
+                }
+                $status = is_array($entry) ? (string)($entry['status'] ?? 'member') : 'member';
+                if (!in_array($status, ['member', 'pending_invite', 'pending_request'], true)) {
+                    continue;
+                }
+                $after = ['name' => $project, 'status' => 'deleted', 'at' => $today];
+                $cfg['users'][$uid]['projects'][$project] = $after;
+                $changes[] = ['account' => (string)$uid, 'project' => $project, 'from' => $status, 'to' => 'deleted', 'before' => $entry, 'after' => $after];
+            }
+        }
+        return $changes;
+    };
+    if ($dryRun) {
+        $cfg = loadUsersConfig();
+        return ['ok' => true, 'changes' => $mark($cfg)];
+    }
+    $changes = [];
+    $written = qs_users_mutate(function (array &$cfg) use ($mark, &$changes) {
+        $changes = $mark($cfg);
+        return $changes !== [];
+    });
+    if ($changes === []) {
+        return ['ok' => true, 'changes' => []];
+    }
+    return $written === true ? ['ok' => true, 'changes' => $changes] : ['ok' => false, 'error' => 'write_failed', 'changes' => $changes];
 }
 
 /** How long one dashboard repair of an account's cache stands, in seconds, while no membership changes. */
@@ -864,6 +1020,24 @@ function qs_membership_repair_account(string $userId, ?int $now = null): array {
         }
     }
     return ['scanned' => true, 'written' => $written === true];
+}
+
+/** Whether a name in the repair's cache is an account's file (the hash of its id and `.json`); the `token` never is. */
+function qs_membership_repair_file_is_ours(string $name): bool {
+    return (bool) preg_match('/^[0-9a-f]{64}\.json$/D', $name);
+}
+
+/**
+ * Whether the repair no longer trusts an account's file (qs_membership_repair_account()), so the
+ * operator's `cache-prune` may remove it: its repair was made QS_MEMBERSHIP_REPAIR_TTL or more
+ * seconds ago. Null for a file this cache never wrote, which is not judged.
+ */
+function qs_membership_repair_file_stale(string $content, int $now): ?bool {
+    $seen = json_decode($content, true);
+    if (!is_array($seen) || !is_int($seen['at'] ?? null)) {
+        return null;
+    }
+    return $seen['at'] <= $now && $now - $seen['at'] >= QS_MEMBERSHIP_REPAIR_TTL;
 }
 
 /**

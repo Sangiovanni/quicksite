@@ -1,7 +1,12 @@
 <?php
 /**
  * session-sweep.php — the operator's entry to the session store sweep. One of the
- * deployer's tools in this folder (see its README.md).
+ * deployer's tools in this folder (see its README.md); the launcher, tools.php,
+ * lists it by the three lines below.
+ *
+ * @qs-tool   session-sweep
+ * @qs-line   Remove the sessions the installation already refuses, and empty session files
+ * @qs-usage  [--dry-run] [--quiet]
  *
  *   php secure/tools/session-sweep.php              sweep now
  *   php secure/tools/session-sweep.php --dry-run    report what would go, delete nothing

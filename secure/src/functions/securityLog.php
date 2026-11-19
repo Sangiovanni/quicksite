@@ -26,7 +26,8 @@
  * file on the server; filesystem access IS the credential, the same reasoning
  * that makes session-sweep a script rather than a command — clearing or reading
  * an installation-wide store is not something a per-project role could authorise,
- * and QuickSite has no tier above a project owner.
+ * and QuickSite has no tier above a project owner. The operator's `log-prune`
+ * removes its days past an age (QS_SECURITY_LOG_PRUNE_DAYS by default).
  *
  *   <secure>/logs/_security/security_<YYYY-MM-DD>.json
  *
@@ -54,6 +55,14 @@ require_once __DIR__ . '/LoggingManagement.php'; // qs_log_append, qs_log_redact
 
 /** The bucket, beside `_global` and the `p/` project tree. */
 const QS_SECURITY_LOG_BUCKET = '_security';
+
+/**
+ * How many days of the trail the operator's `log-prune` keeps when no --security-days
+ * is given: longer than the command log's, as a trail is read after the fact, when
+ * something is found. Its day files are pruned by the command log's rules
+ * (LoggingManagement.php, qs_log_day_of() and the margin around today).
+ */
+const QS_SECURITY_LOG_PRUNE_DAYS = 365;
 
 /**
  * Event names. A closed vocabulary, so a reader can grep one string and a probe
