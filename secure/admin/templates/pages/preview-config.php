@@ -905,6 +905,13 @@ window.PreviewConfig = {
             modelLabel: <?= json_encode(__admin('preview.aiToolsModelLabel', 'Model:')) ?>,
             copyHint: <?= json_encode(__admin('preview.aiToolsCopyHint', 'Copy this to your AI assistant, then paste the reply below.')) ?>,
             pasteHint: <?= json_encode(__admin('preview.aiToolsPasteHint', 'Paste the JSON reply here.')) ?>,
+            // The starred pictures to attach to an AI chat (a parameter marked attachStarred), and a run's outside pictures
+            attachTitle: <?= qs_inline_script_json(__admin('preview.aiToolsAttachTitle')) ?>,
+            attachHint: <?= qs_inline_script_json(__admin('preview.aiToolsAttachHint')) ?>,
+            attachDownload: <?= qs_inline_script_json(__admin('preview.aiToolsAttachDownload')) ?>,
+            attachConnection: <?= qs_inline_script_json(__admin('preview.aiToolsAttachConnection')) ?>,
+            outsideTitle: <?= qs_inline_script_json(__admin('preview.aiToolsOutsideTitle')) ?>,
+            outsideLine: <?= qs_inline_script_json(__admin('preview.aiToolsOutsideLine')) ?>,
             stepsReady: <?= json_encode(__admin('preview.aiToolsStepsReady', '{n} commands ready')) ?>,
             stepsParseError: <?= json_encode(__admin('preview.aiToolsStepsParseError', 'No commands available from current response.')) ?>,
             batchTitle: <?= json_encode(__admin('preview.aiToolsBatchTitle', 'Batch')) ?>,

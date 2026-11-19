@@ -54,11 +54,26 @@
             "default": false
         },
         {
+            "id": "darkMode",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.darkMode.label",
+            "helpKey": "ai.specs.shared.params.darkMode.help",
+            "default": false
+        },
+        {
+            "id": "aiPictures",
+            "type": "checkbox",
+            "labelKey": "ai.specs.shared.params.aiPictures.label",
+            "helpKey": "ai.specs.shared.params.aiPictures.help",
+            "default": false
+        },
+        {
             "id": "includeAssets",
             "type": "checkbox",
             "labelKey": "ai.specs.shared.params.includeAssets.label",
             "helpKey": "ai.specs.shared.params.includeAssets.help",
-            "default": false
+            "default": false,
+            "attachStarred": true
         },
         {
             "id": "includeFavicon",
@@ -124,9 +139,19 @@
             "urlParams": ["editFavicon"],
             "extract": "data",
             "condition": "includeAssets === true && includeFavicon === true"
+        },
+        {
+            "id": "helpUploadAsset",
+            "command": "help",
+            "urlParams": ["uploadAsset"],
+            "extract": "data",
+            "condition": "aiPictures === true"
         }
     ],
-    "relatedCommands": ["addRoute", "editStructure", "setTranslationKeys", "editStyles", "editFavicon"],
+    "relatedCommands": [
+        "addRoute", "editStructure", "setTranslationKeys", "editStyles", "editFavicon",
+        { "command": "uploadAsset", "condition": "aiPictures === true" }
+    ],
     "preWorkflows": [
         {
             "id": "fresh-start",
@@ -146,6 +171,10 @@
         {
             "id": "update-lang-switch",
             "condition": "param.multilingual === true"
+        },
+        {
+            "id": "setup-theme-switch",
+            "condition": "param.darkMode === true"
         }
     ],
     "postWorkflows": [
@@ -163,7 +192,20 @@
         },
         {
             "id": "restyle",
-            "request": "parent"
+            "request": "parent",
+            "params": {
+                "darkMode": "{{param.darkMode}}",
+                "includeAssets": "{{param.includeAssets}}"
+            }
+        },
+        {
+            "id": "theme-mode",
+            "condition": "param.darkMode === true",
+            "params": {
+                "enabled": true,
+                "defaultTheme": "light",
+                "userToggle": true
+            }
         }
     ],
     "promptTemplate": "create-website-steps.md"

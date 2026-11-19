@@ -1,0 +1,50 @@
+{
+    "$schema": "../schema.json",
+    "id": "theme-mode",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🌗",
+        "titleKey": "workflows.specs.themeMode.title",
+        "descriptionKey": "workflows.specs.themeMode.description",
+        "category": "look",
+        "tags": ["theme", "dark", "light", "mode", "switch"]
+    },
+    "parameters": [
+        {
+            "id": "enabled",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.themeMode.params.enabled.label",
+            "helpKey": "workflows.specs.themeMode.params.enabled.help",
+            "default": true
+        },
+        {
+            "id": "defaultTheme",
+            "type": "select",
+            "labelKey": "workflows.specs.themeMode.params.defaultTheme.label",
+            "helpKey": "workflows.specs.themeMode.params.defaultTheme.help",
+            "options": [
+                { "value": "light", "labelKey": "workflows.specs.themeMode.params.defaultTheme.options.light" },
+                { "value": "dark", "labelKey": "workflows.specs.themeMode.params.defaultTheme.options.dark" },
+                { "value": "system", "labelKey": "workflows.specs.themeMode.params.defaultTheme.options.system" }
+            ],
+            "default": "light"
+        },
+        {
+            "id": "userToggle",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.themeMode.params.userToggle.label",
+            "helpKey": "workflows.specs.themeMode.params.userToggle.help",
+            "default": true
+        }
+    ],
+    "steps": [
+        {
+            "command": "setThemeMode",
+            "params": {
+                "enabled": "{{param.enabled}}",
+                "default": "{{param.defaultTheme}}",
+                "userToggle": "{{param.userToggle}}"
+            }
+        }
+    ]
+}

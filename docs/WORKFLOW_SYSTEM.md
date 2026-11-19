@@ -139,7 +139,7 @@ why a step never names a project itself.
 
 Have `steps` array, no `promptTemplate`. Steps are predefined API commands with parameter placeholders.
 
-**Example:** `fresh-start.json` — deletes all routes, assets, languages, components, then resets styles. Each step is a concrete command with `forEach` loops over live data.
+**Example:** `fresh-start.json` — deletes all routes, assets, languages, components, then resets styles. Each step is a concrete command with `forEach` loops over live data. Its reset of the texts keeps the words the consent layer and the storage and privacy registries own and, when it keeps the assets (*Keep Assets*, the default), the words of their `alt` keys too: Media's group `alt` and the site templates' group `photos`. Its last step turns the theme mode off, as the switch and the dark colours went with the components and the stylesheet: a run that wants dark mode (a site template's with its dark mode, Create Website's with *Include dark mode*) sets it on again after.
 
 **Use case:** Deterministic operations that don't need AI creativity.
 
@@ -150,6 +150,15 @@ Have `promptTemplate` pointing to a `.md` file. The markdown is rendered with li
 **Example:** `create-website.json` + `create-website.md` — fetches help docs for relevant commands, renders a detailed prompt with conditionals based on whether multilingual is enabled.
 
 **Use case:** Creative operations where AI generates the command sequence (page structures, styles, content).
+
+**Create Website's options.** Both Create Website workflows (one AI request, and in phases) take the same options. Each
+of the three below adds to the prompt only when it is ticked:
+
+| Option | Parameter | What it does |
+|---|---|---|
+| Include dark mode | `param.darkMode` | Runs *Theme Switch Button* before the AI's phase; the prompt explains the `theme-switch` component, which the AI places once where it wants, and the dark palette, the same CSS variables written with `setRootVariables` and `"themeTarget": "dark"` (in phases, by the *Restyle* phase). After the AI's phases, *Theme mode* switches the dark mode on (light first, the visitor's switch on): the AI never sets it. |
+| Let the AI bring its own pictures | `param.aiPictures` | The prompt teaches `uploadAsset` by `url` and its rules: the same link wherever the picture shows, its upload first, a link that stays reachable for at least an hour or no picture, a picture the author may use, its `alt` a key of the group `alt` with its words. Unticked, the prompt does not name the command and an answer's `uploadAsset` is left out. The run then puts the stored file in the link's place (*AI Workflow Execution* below). |
+| Include my starred assets | `param.includeAssets` | The starred assets (at most 15) with their descriptions, the author's own words and the first thing to go by; an asset's `alt` is a key of the site's texts, which the AI writes as the picture's `alt`, its words the author's (which *Fresh Start* keeps); and a note to look at the pictures if the author attached them. The panel lists the starred pictures to attach (`attachStarred`). |
 
 ### Hybrid Workflows
 
@@ -406,16 +415,18 @@ folder holds every template's photos: a photo's name starts with its template's 
 brings each into the project's images with one `uploadAsset` step, before the pages that show it:
 
 ```json
-{ "command": "uploadAsset", "params": { "templatePhoto": "trades-job.webp", "alt": "photos.job" } }
+{ "command": "uploadAsset", "params": { "templatePhoto": "trades-job.webp", "alt": "photos.trades.job" } }
 ```
 
 `templatePhoto` reads that folder alone and fetches nothing, so a run brings its photos the same way on a server and on a local
 install; the photo then goes through every check of an upload. A second run on the same project finds the same photo there and
 adds no copy. A page shows a photo as an image (`"tag": "img"`, `"src": "/assets/images/trades-job.webp"`), never as a stylesheet
 background, so an author swaps it in the editor like any image; its `alt` is a key of the template's texts, so it follows the
-language. The step that brings the photo in passes that same key as `alt` (`photos.job` above), so the project's asset carries
-it: Media shows the photo's text in each of the project's languages, and a text changed there changes every page that places
-the photo. No text is laid on a photo: words sit beside or under it, so their contrast is the palette's whatever photo an author
+language. The step that brings the photo in passes that same key as `alt` (`photos.trades.job` above), so the project's asset
+carries it: Media shows the photo's text in each of the project's languages, and a text changed there changes every page that
+places the photo. Each photo's key is its template's own, `photos.<template>.<photo>`, the template's id written in camelCase
+(`photos.foodAndDrink.room`), as a key is read only when each of its parts holds letters, digits and `_`: on a project that ran
+two templates, each photo keeps its own words. No text is laid on a photo: words sit beside or under it, so their contrast is the palette's whatever photo an author
 puts in its place. The previews' tool keeps a template's photos once for both themes, and a photo that changes makes its
 template's preview stale.
 
@@ -626,6 +637,8 @@ Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. Wit
 
 `"searchable": true` beside the `type` of a `select` or a `tag-select` gives its list a search that matches an option's name and its value: the `select` becomes a dropdown you type in, the `tag-select` gets a search field above its checkboxes that hides the options that do not match but never one already ticked. On any other type it is ignored.
 
+`"attachStarred": true` on a `checkbox` whose prompt sends the starred assets (Create Website's *Include my starred assets*): ticked, the panel lists the project's starred pictures beside the workflow's own prompt, each with its thumbnail and a download, for the person to attach to their AI chat. A prompt sent through an AI connection carries no picture, and the panel says so in their place. On any other type it is ignored.
+
 **Conditional visibility:** `"condition": "multilingual === true"` — references another parameter's ID (not prefixed with `param.`).
 
 **Fields that follow a picked template.** Beside a `template` parameter:
@@ -659,7 +672,16 @@ Hardcoded data available as `data.*` in steps and templates:
 ```
 
 #### `relatedCommands` (array of strings)
-List of API command names. Used for three things:
+List of API command names. An entry may instead be a command with a condition, read as a data requirement's
+condition is (parameter ids, no `param.` prefix):
+
+```json
+"relatedCommands": ["editStructure", "editStyles", { "command": "uploadAsset", "condition": "aiPictures === true" }]
+```
+
+Such a command counts for who sees the workflow whatever the run's options, but only a run whose options meet
+its condition has a prompt that teaches it and an answer that may send it: with the condition unmet, its help is
+not in the prompt and an answer's step sending it is left out. The list is used for three things:
 
 1. **Deciding whether the workflow is listed at all.** The panel hides a workflow
    from anyone whose role does not grant every command in `relatedCommands` — and
@@ -923,6 +945,19 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
    per-row in the Batch panel
 9. Each post-workflow phase runs
 ```
+
+**A picture brought in by its link.** `uploadAsset` names the file it stores itself (after a redirect, with `_1`, `_2`
+when the name is taken), so a step cannot know that name beforehand. In any run, once an `uploadAsset` step with a
+`url` succeeds, the runner writes the stored path it answers wherever that link stands as a whole address in the
+steps still to run: an attribute, a `srcset`'s files, a stylesheet's `url(…)`, a longer address that merely starts
+with it left alone, and the `url` of an `uploadAsset` step left as it is. The Batch's rows show the stored path from
+then on, and a stopped run's kept steps carry it.
+
+**Pictures from outside the site.** When a run ends, finished or stopped, the panel lists every picture address its
+steps placed outside the site, whatever the reason (a download that failed, a use before its upload, an address with
+no upload): an image's or a source's `src` and `srcset`, a video's `poster`, a `url(…)` in a style attribute or a
+stylesheet command, and any link an upload of the run named, wherever it still stands. Each is "not one of your
+assets: replace it, or it may disappear." A run with none shows no list.
 
 ### Manual Workflow Execution
 

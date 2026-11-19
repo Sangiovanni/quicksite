@@ -43,7 +43,15 @@ These are the design tokens currently in use:
 
 {{> styles-order}}
 
----
+---{{#if param.darkMode === true}}
+
+{{> dark-palette-rules}}
+
+---{{/if}}{{#if param.includeAssets === true}}
+
+**If the author attached pictures to this conversation, look at them to match the colours and the mood.**
+
+---{{/if}}
 
 ## Complete Example Output
 

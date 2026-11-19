@@ -1458,6 +1458,12 @@ window.PreviewAiTools = (function () {
         _reviewEl.className = 'preview-contextual-ai-tools__review';
         _reviewEl.hidden = true;
         z.body.appendChild(_reviewEl);
+        // The run's outside pictures, once it ends (_renderOutside()).
+        _outsideEl = document.createElement('div');
+        _outsideEl.className = 'preview-contextual-ai-tools__outside';
+        _outsideEl.setAttribute('role', 'status');
+        _outsideEl.hidden = true;
+        z.body.appendChild(_outsideEl);
         _costEl = document.createElement('div');
         _costEl.className = 'preview-contextual-ai-tools__cost';
         _costEl.hidden = true;
@@ -1495,10 +1501,25 @@ window.PreviewAiTools = (function () {
     function _renderFooter(spec, conn, isAI) {
         var footer = document.createElement('div');
         footer.className = 'preview-contextual-ai-tools__footer';
-        if (Array.isArray(spec.relatedCommands) && spec.relatedCommands.length > 0) {
-            footer.appendChild(_renderFooterItem(_t('footerTouches', 'Touches'), _renderFooterCommands(spec.relatedCommands)));
+        var commands = _relatedCommandNames(spec);
+        if (commands.length > 0) {
+            footer.appendChild(_renderFooterItem(_t('footerTouches', 'Touches'), _renderFooterCommands(commands)));
         }
         return footer;
+    }
+
+    /**
+     * Every command a spec's relatedCommands names, whatever an entry's condition: what a run can touch, as the
+     * server's WorkflowManager::relatedCommands() reads it with no parameters (an entry is a name or {command, condition}).
+     */
+    function _relatedCommandNames(spec) {
+        var list = Array.isArray(spec.relatedCommands) ? spec.relatedCommands : [];
+        var names = [];
+        list.forEach(function (entry) {
+            var name = typeof entry === 'string' ? entry : (entry && typeof entry.command === 'string' ? entry.command : '');
+            if (name) names.push(name);
+        });
+        return names;
     }
 
     function _renderFooterItem(label, valueEl) {
@@ -2408,6 +2429,11 @@ window.PreviewAiTools = (function () {
             hint.textContent = _t('copyHint', 'Copy this to your AI assistant, then paste the reply below.');
             s.body.appendChild(hint);
         }
+        // The starred pictures to attach with this prompt (_renderAttach()).
+        _attachEl = document.createElement('div');
+        _attachEl.className = 'preview-contextual-ai-tools__attach';
+        _attachEl.hidden = true;
+        s.body.appendChild(_attachEl);
         return s.section;
     }
 
@@ -3009,9 +3035,16 @@ window.PreviewAiTools = (function () {
             ok: 0,
             fail: 0,
             ran: false,
-            last: null
+            last: null,
+            // Pictures by link: each link a step downloaded, by the stored path uploadAsset answered (a resumed
+            // run keeps its own); every link an uploadAsset step names; the outside picture addresses placed.
+            swaps: opts.resume && opts.resume.swaps && typeof opts.resume.swaps === 'object' ? Object.assign({}, opts.resume.swaps) : {},
+            links: [],
+            outside: []
         };
         _run = run;
+        _renderOutside([]);
+        _renderAttach(null);
         _lastCost[run.workflowId] = _newCostTally(run.workflowId);
         _exchangePhase = null;
         _renderCost();
@@ -3075,6 +3108,8 @@ window.PreviewAiTools = (function () {
             }
         } finally {
             if (_answerWaiter) _answerWaiter = null;
+            // The run's summary: every picture its steps placed from outside the site, whatever the reason.
+            _renderOutside(run.outside);
             _run = null;
             _continuation = null;
             _answerParts = 0;
@@ -3160,6 +3195,7 @@ window.PreviewAiTools = (function () {
             _generatedPrompt = String(built.prompt || '') + (request ? '\n\n---\n\n**User Request:**\n' + request : '');
             _exchangePhase = k;
             if (_generalPromptTextarea) _generalPromptTextarea.value = _generatedPrompt;
+            _renderAttach(run, phase);
             if (_exchangeHeaderEl) {
                 _exchangeHeaderEl.textContent = _aiPhases().length > 1
                     ? _t('exchangeFor', 'AI exchange — {name}').replace('{name}', phase.title)
@@ -3210,7 +3246,10 @@ window.PreviewAiTools = (function () {
     /** A phase's steps, run; the phase's outcome for the run. */
     async function _runSteps(run, k, phase) {
         if (!phase.steps || phase.steps.length === 0) return {};
-        var res = await _executeSteps(phase.steps, phase.effects || [], { body: _phaseBodies[k] || _stepsBody, name: phase.title });
+        _noteUploadLinks(run, phase.steps);
+        var res = await _executeSteps(phase.steps, phase.effects || [],
+            { body: _phaseBodies[k] || _stepsBody, name: phase.title, swaps: run.swaps });
+        _noteOutside(run, phase.steps, res.ran);
         run.ran = true;
         run.ok += res.ok;
         run.fail += res.fail;
@@ -3254,7 +3293,8 @@ window.PreviewAiTools = (function () {
                 phaseTitle: run.plan[resumeAt].title,
                 steps: steps.length > 0 ? steps : null,
                 effects: steps.length > 0 ? (outcome.phase.effects || []).slice(outcome.from) : null,
-                later: run.plan.slice(resumeAt + 1).map(function (p) { return p.title; })
+                later: run.plan.slice(resumeAt + 1).map(function (p) { return p.title; }),
+                swaps: run.swaps
             });
         }
         var msg;
@@ -3757,7 +3797,10 @@ window.PreviewAiTools = (function () {
         opts = opts || {};
         var toaster = _toaster();
         var api = window.QuickSiteAPI;
-        var out = { ok: 0, fail: 0, stoppedAt: -1, reason: '', command: '' };
+        var out = { ok: 0, fail: 0, stoppedAt: -1, reason: '', command: '', ran: [] };
+        var swaps = opts.swaps || null;
+        // A link the run has downloaded already stands for its stored file in these steps too.
+        if (swaps) _applySwaps(steps, 0, swaps);
 
         // ── Before starting: the counted steps against what is left ──
         var rate = (api && typeof api.getWriteRate === 'function') ? api.getWriteRate() : { windows: [], waitSeconds: 0 };
@@ -3840,7 +3883,9 @@ window.PreviewAiTools = (function () {
             }
             if (result.ok) {
                 out.ok++;
+                out.ran[j] = true;
                 _updateStepRow(rows[j], 'ok', result.message || '');
+                if (swaps) _swapAfterDownload(steps, effects, rows, j, result, swaps);
                 continue;
             }
             out.fail++;
@@ -3941,6 +3986,337 @@ window.PreviewAiTools = (function () {
         return { ok: true, status: res.status, message: data.message || '', data: data };
     }
 
+    // ──────────────────────────── Pictures by link ──────────────────────
+    //
+    // A step that brings a picture in by its link (uploadAsset with url) cannot know the name the picture
+    // gets: uploadAsset names the stored file itself (a name taken, a redirect) and answers its path. Once
+    // the download succeeds, that link, wherever it stands as a whole address in a step still to run,
+    // becomes the stored path. A link left (a download that failed, a use before its upload, a link with no
+    // upload) is an address outside the site: the run's summary lists every one its steps placed.
+
+    /** The link an uploadAsset step downloads, or ''. */
+    function _downloadedLink(step) {
+        var p = step && step.params;
+        return step && step.command === 'uploadAsset' && p && typeof p.url === 'string' ? p.url : '';
+    }
+
+    /** Whether text[at] is where an address may start (the text's start, a space, a quote, `(` or `,`). */
+    function _addressStartsAt(text, at) {
+        return at === 0 || /[\s"'(,]/.test(text.charAt(at - 1));
+    }
+
+    /**
+     * Whether an address ending at text[end] ends there: the text's end, a space, a quote, `)`, or a comma
+     * that a space or the text's end follows (a comma inside an address goes on).
+     */
+    function _addressEndsAt(text, end) {
+        if (end >= text.length) return true;
+        var c = text.charAt(end);
+        if (/[\s"')]/.test(c)) return true;
+        return c === ',' && (end + 1 >= text.length || /\s/.test(text.charAt(end + 1)));
+    }
+
+    /** The text with every whole occurrence of link replaced by path (a longer address that merely starts with it is left). */
+    function _swapLinkIn(text, link, path) {
+        if (!link) return text;
+        var out = '';
+        var from = 0;
+        var at = text.indexOf(link);
+        while (at !== -1) {
+            var end = at + link.length;
+            if (_addressStartsAt(text, at) && _addressEndsAt(text, end)) {
+                out += text.slice(from, at) + path;
+                from = end;
+                at = text.indexOf(link, end);
+            } else {
+                at = text.indexOf(link, at + 1);
+            }
+        }
+        return out + text.slice(from);
+    }
+
+    /** Whether the text holds the link as a whole address (_swapLinkIn()'s reading). */
+    function _hasLink(text, link) {
+        var at = link ? text.indexOf(link) : -1;
+        while (at !== -1) {
+            if (_addressStartsAt(text, at) && _addressEndsAt(text, at + link.length)) return true;
+            at = text.indexOf(link, at + 1);
+        }
+        return false;
+    }
+
+    /** A step's value with every swap made; the same value when none applies. */
+    function _swapValue(value, swaps, links) {
+        if (typeof value === 'string') {
+            var text = value;
+            links.forEach(function (link) { text = _swapLinkIn(text, link, swaps[link]); });
+            return text;
+        }
+        if (Array.isArray(value)) return value.map(function (v) { return _swapValue(v, swaps, links); });
+        if (value && typeof value === 'object') {
+            var copy = {};
+            Object.keys(value).forEach(function (key) { copy[key] = _swapValue(value[key], swaps, links); });
+            return copy;
+        }
+        return value;
+    }
+
+    /**
+     * Every swap made in steps[from..]: each changed step replaced in place by its swapped copy (an uploadAsset
+     * step's own url stays: it is what that step downloads). The changed indexes.
+     */
+    function _applySwaps(steps, from, swaps) {
+        var links = Object.keys(swaps).filter(function (l) { return l && typeof swaps[l] === 'string'; })
+            .sort(function (a, b) { return b.length - a.length; });
+        var changed = [];
+        if (links.length === 0) return changed;
+        for (var i = from; i < steps.length; i++) {
+            var step = steps[i];
+            if (!step || !step.params || typeof step.params !== 'object') continue;
+            var keepUrl = _downloadedLink(step);
+            var params = _swapValue(step.params, swaps, links);
+            if (keepUrl) params.url = keepUrl;
+            if (JSON.stringify(params) === JSON.stringify(step.params)) continue;
+            steps[i] = Object.assign({}, step, { params: params });
+            changed.push(i);
+        }
+        return changed;
+    }
+
+    /** After steps[j] ran: a picture it downloaded by link takes its stored path in the steps still to run, rows redrawn. */
+    function _swapAfterDownload(steps, effects, rows, j, result, swaps) {
+        var link = _downloadedLink(steps[j]);
+        var answer = result && result.data && result.data.data;
+        var path = answer && typeof answer.path === 'string' ? answer.path : '';
+        if (!link || !path) return;
+        swaps[link] = path;
+        _applySwaps(steps, j + 1, swaps).forEach(function (i) {
+            var fresh = _renderStepRow(steps[i], effects[i] || null);
+            if (rows[i] && rows[i].el && rows[i].el.parentNode) rows[i].el.replaceWith(fresh.el);
+            rows[i] = fresh;
+        });
+    }
+
+    /** Every link an uploadAsset step of these steps names, noted on the run once each. */
+    function _noteUploadLinks(run, steps) {
+        (steps || []).forEach(function (s) {
+            var link = _downloadedLink(s);
+            if (link && run.links.indexOf(link) === -1) run.links.push(link);
+        });
+    }
+
+    /** Whether an address leads outside the site: a full one (`https://…`, `http://…`) or one that names its host (`//…`). */
+    function _isOutside(address) {
+        return /^(https?:)?\/\//i.test(String(address).trim());
+    }
+
+    /** The files of a srcset, split as the HTML standard splits one (its descriptors left out). */
+    function _srcsetFiles(value) {
+        var s = String(value);
+        var files = [];
+        var i = 0;
+        while (i < s.length) {
+            while (i < s.length && /[\s,]/.test(s.charAt(i))) i++;
+            if (i >= s.length) break;
+            var start = i;
+            while (i < s.length && !/\s/.test(s.charAt(i))) i++;
+            var file = s.slice(start, i);
+            var ended = /,$/.test(file);
+            file = file.replace(/,+$/, '');
+            if (file) files.push(file);
+            if (ended) continue;
+            var depth = 0;
+            while (i < s.length) {
+                var c = s.charAt(i++);
+                if (c === '(') depth++;
+                else if (c === ')') depth = Math.max(0, depth - 1);
+                else if (c === ',' && depth === 0) break;
+            }
+        }
+        return files;
+    }
+
+    /** The addresses of a stylesheet text's url(…). */
+    function _cssUrls(text) {
+        var out = [];
+        var re = /url\(\s*(['"]?)([^'")]*)\1\s*\)/gi;
+        var m;
+        while ((m = re.exec(String(text))) !== null) out.push(m[2].trim());
+        return out;
+    }
+
+    // The commands whose strings are stylesheet text, where a url(…) is a picture.
+    var CSS_COMMANDS = ['editStyles', 'setRootVariables', 'setStyleRule', 'injectSnippetCss'];
+
+    /**
+     * The outside picture addresses one step places: an img's or a source's src and srcset, a video's poster, a
+     * url(…) in a style attribute or a stylesheet command, and any link an uploadAsset of the run names (a
+     * failed download, a use before its upload) wherever it stands, the uploading step's own url aside.
+     */
+    function _outsideOf(step, links) {
+        var found = [];
+        var add = function (address) {
+            if (_isOutside(address) && found.indexOf(address) === -1) found.push(address);
+        };
+        var css = CSS_COMMANDS.indexOf(step.command) !== -1;
+        var own = _downloadedLink(step);
+        var walk = function (value, key, parent) {
+            if (typeof value === 'string') {
+                if (css) _cssUrls(value).forEach(add);
+                if (!(own && parent === step.params && key === 'url')) {
+                    links.forEach(function (link) { if (_hasLink(value, link)) add(link); });
+                }
+                return;
+            }
+            if (Array.isArray(value)) {
+                value.forEach(function (v, i) { walk(v, i, value); });
+                return;
+            }
+            if (!value || typeof value !== 'object') return;
+            var tag = typeof value.tag === 'string' ? value.tag.toLowerCase() : '';
+            var p = value.params && typeof value.params === 'object' ? value.params : null;
+            if (tag && p) {
+                if ((tag === 'img' || tag === 'source') && typeof p.src === 'string') add(p.src);
+                if ((tag === 'img' || tag === 'source') && typeof p.srcset === 'string') _srcsetFiles(p.srcset).forEach(add);
+                if (tag === 'video' && typeof p.poster === 'string') add(p.poster);
+                if (typeof p.style === 'string') _cssUrls(p.style).forEach(add);
+            }
+            Object.keys(value).forEach(function (k) { walk(value[k], k, value); });
+        };
+        walk(step.params, null, null);
+        return found;
+    }
+
+    /** The outside pictures the steps that ran placed, noted on the run once each. */
+    function _noteOutside(run, steps, ran) {
+        (steps || []).forEach(function (s, j) {
+            if (!ran || !ran[j] || !s || !s.params) return;
+            _outsideOf(s, run.links).forEach(function (address) {
+                if (run.outside.indexOf(address) === -1) run.outside.push(address);
+            });
+        });
+    }
+
+    var _outsideEl = null;
+
+    /** The run's outside pictures under the run's state: hidden when there are none. */
+    function _renderOutside(addresses) {
+        if (!_outsideEl) return;
+        _outsideEl.replaceChildren();
+        _outsideEl.hidden = !addresses || addresses.length === 0;
+        if (_outsideEl.hidden) return;
+        var title = document.createElement('p');
+        title.className = 'preview-contextual-ai-tools__outside-title';
+        title.textContent = _t('outsideTitle', 'Pictures from outside the site');
+        _outsideEl.appendChild(title);
+        var line = document.createElement('p');
+        line.className = 'preview-contextual-ai-tools__outside-line';
+        line.textContent = _t('outsideLine', 'Not one of your assets: replace it, or it may disappear.');
+        _outsideEl.appendChild(line);
+        var list = document.createElement('ul');
+        list.className = 'preview-contextual-ai-tools__outside-list';
+        addresses.forEach(function (address) {
+            var item = document.createElement('li');
+            item.className = 'preview-contextual-ai-tools__outside-address';
+            item.textContent = address;
+            list.appendChild(item);
+        });
+        _outsideEl.appendChild(list);
+    }
+
+    // ──────────────────────────── Starred pictures to attach ────────────
+    //
+    // A checkbox the spec marks attachStarred (Create Website's Include assets) sends the starred assets'
+    // descriptions in the prompt. Ticked, the exchange lists the starred pictures beside the prompt for the
+    // person to attach to their AI chat; a prompt sent through a connection attaches none, and says so.
+
+    var _attachEl = null;
+
+    /** The run's own workflow's parameter marked attachStarred, when the run ticked it; else null. */
+    function _attachParam(run) {
+        var spec = _activeWorkflowSpec;
+        if (!run || !spec) return null;
+        var params = Array.isArray(spec.parameters) ? spec.parameters : [];
+        for (var i = 0; i < params.length; i++) {
+            var p = params[i];
+            if (p && p.attachStarred === true && run.params && run.params[p.id] === true) return p;
+        }
+        return null;
+    }
+
+    /** The address a starred picture is served at to the project's members (the preview's own base). */
+    function _starredUrl(asset) {
+        var base = String((window.PreviewConfig || {}).previewBase || '').replace(/\/+$/, '');
+        return base + '/assets/' + encodeURIComponent(asset.category || 'images') + '/' + encodeURIComponent(asset.filename);
+    }
+
+    /** One starred picture to attach: its thumbnail, its name and its download. */
+    function _renderAttachItem(asset) {
+        var url = _starredUrl(asset);
+        var item = document.createElement('li');
+        item.className = 'preview-contextual-ai-tools__attach-item';
+        var thumb = document.createElement('img');
+        thumb.className = 'preview-contextual-ai-tools__attach-thumb';
+        thumb.src = url;
+        thumb.alt = '';
+        thumb.loading = 'lazy';
+        item.appendChild(thumb);
+        var name = document.createElement('span');
+        name.className = 'preview-contextual-ai-tools__attach-name';
+        name.textContent = asset.filename;
+        item.appendChild(name);
+        var download = document.createElement('a');
+        download.className = 'preview-contextual-ai-tools__attach-download';
+        download.href = url;
+        download.setAttribute('download', asset.filename);
+        download.textContent = _t('attachDownload', 'Download');
+        item.appendChild(download);
+        return item;
+    }
+
+    /**
+     * The attach list for the AI phase whose prompt was just built (null clears it): only the run's own
+     * workflow's phase, with its marked box ticked. Through a connection: the line that nothing is attached.
+     */
+    async function _renderAttach(run, phase) {
+        if (!_attachEl) return;
+        _attachEl.replaceChildren();
+        _attachEl.hidden = true;
+        if (!run || !phase || !_activeWorkflowSpec || phase.workflowId !== _activeWorkflowSpec.id || !_attachParam(run)) return;
+        if (run.send && _getDefaultConnection()) {
+            var line = document.createElement('p');
+            line.className = 'preview-contextual-ai-tools__attach-line';
+            line.textContent = _t('attachConnection', 'Sent through your AI connection: no picture is attached, the AI reads their descriptions only.');
+            _attachEl.appendChild(line);
+            _attachEl.hidden = false;
+            return;
+        }
+        var pictures = [];
+        try {
+            var res = await window.QuickSiteAdmin.apiRequest('listAssets', 'GET', null, ['starred']);
+            var assets = res && res.data && res.data.data && res.data.data.assets;
+            pictures = assets && Array.isArray(assets.images) ? assets.images : [];
+        } catch (_e) {
+            pictures = [];
+        }
+        if (_run !== run || pictures.length === 0) return;
+        var title = document.createElement('p');
+        title.className = 'preview-contextual-ai-tools__attach-title';
+        title.textContent = _t('attachTitle', 'Your starred pictures: attach them to your AI chat with the prompt');
+        _attachEl.appendChild(title);
+        var hint = document.createElement('p');
+        hint.className = 'preview-contextual-ai-tools__hint';
+        hint.textContent = _t('attachHint', 'So the AI can match their colours and mood. Download each one, then attach it in your chat.');
+        _attachEl.appendChild(hint);
+        var list = document.createElement('ul');
+        list.className = 'preview-contextual-ai-tools__attach-list';
+        pictures.forEach(function (asset) {
+            if (asset && typeof asset.filename === 'string') list.appendChild(_renderAttachItem(Object.assign({ category: 'images' }, asset)));
+        });
+        _attachEl.appendChild(list);
+        _attachEl.hidden = false;
+    }
+
     // ──────────────────────────── Kept steps ────────────────────────────
     //
     // What a stopped run did not reach, kept in the browser per account and project: the steps of
@@ -3958,7 +4334,7 @@ window.PreviewAiTools = (function () {
 
     /**
      * The kept rest ({workflowId, label, params, requests, phase, phaseTitle, steps, effects, later,
-     * savedAt}), or null.
+     * swaps, savedAt}), or null.
      */
     function _readKept() {
         var key = _keptKey();

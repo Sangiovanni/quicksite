@@ -10,7 +10,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * @method POST
  * @url    /management/setThemeMode
  * @auth   required
- * @permission admin
+ * @permission style.write (designer and above)
  *
  * Body (all optional):
  * {

@@ -1262,6 +1262,88 @@
     gap: 8px;
 }
 
+/* A run's pictures from outside the site, under its state once it ends: amber, each address whole. */
+.preview-contextual-ai-tools__outside {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 10px;
+    border: 1px solid var(--admin-warning);
+    border-radius: 6px;
+    background: var(--admin-warning-bg);
+}
+.preview-contextual-ai-tools__outside[hidden] {
+    display: none;
+}
+.preview-contextual-ai-tools__outside-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+}
+.preview-contextual-ai-tools__outside-line {
+    margin: 0;
+    font-size: 12px;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-ai-tools__outside-list {
+    margin: 0;
+    padding: 0 0 0 16px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.preview-contextual-ai-tools__outside-address {
+    font-family: var(--font-mono);
+    overflow-wrap: anywhere;
+}
+
+/* The starred pictures to attach to an AI chat with the prompt: a wrapping row of small cards. */
+.preview-contextual-ai-tools__attach {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+.preview-contextual-ai-tools__attach[hidden] {
+    display: none;
+}
+.preview-contextual-ai-tools__attach-title,
+.preview-contextual-ai-tools__attach-line {
+    margin: 0;
+    font-size: 12px;
+    color: var(--admin-text);
+}
+.preview-contextual-ai-tools__attach-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.preview-contextual-ai-tools__attach-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 88px;
+    font-size: 11px;
+}
+.preview-contextual-ai-tools__attach-thumb {
+    width: 88px;
+    height: 66px;
+    object-fit: cover;
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+    background: var(--admin-bg-tertiary);
+}
+.preview-contextual-ai-tools__attach-name {
+    color: var(--admin-text-muted);
+    overflow-wrap: anywhere;
+}
+.preview-contextual-ai-tools__attach-download {
+    color: var(--admin-accent);
+}
+
 /* What a phase deletes (red) and changes (amber), one line per kind of thing. */
 .preview-contextual-ai-tools__effects {
     margin: 0;

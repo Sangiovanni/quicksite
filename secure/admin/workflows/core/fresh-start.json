@@ -159,6 +159,7 @@
         },
         {
             "comment": "=== 6. SET MINIMAL TRANSLATIONS (default language - REPLACE, keeping the words the consent layer and the storage and privacy registries own: they outlive the pages) ===",
+            "condition": "param.keepAssets !== true",
             "command": "setTranslationKeys",
             "params": {
                 "language": "{{langData.default_language}}",
@@ -183,12 +184,65 @@
             }
         },
         {
+            "comment": "=== 6. (KEEPING THE ASSETS) THE SAME RESET, and the words of every kept picture's alt key: Media's alt group and the templates' photos group ===",
+            "condition": "param.keepAssets === true",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "{{langData.default_language}}",
+                "replace": true,
+                "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy", "alt", "photos"],
+                "translations": {
+                    "site": {
+                        "name": "My Website"
+                    },
+                    "page": {
+                        "titles": {
+                            "home": "Home",
+                            "404": "Not Found"
+                        }
+                    },
+                    "404": {
+                        "pageNotFound": "Page Not Found",
+                        "message": "The page you are looking for does not exist.",
+                        "backHome": "Back to Home"
+                    }
+                }
+            }
+        },
+        {
             "comment": "=== 6b. SET MINIMAL TRANSLATIONS (default.json - REPLACE, keeping the same words) ===",
+            "condition": "param.keepAssets !== true",
             "command": "setTranslationKeys",
             "params": {
                 "language": "default",
                 "replace": true,
                 "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy"],
+                "translations": {
+                    "site": {
+                        "name": "My Website"
+                    },
+                    "page": {
+                        "titles": {
+                            "home": "Home",
+                            "404": "Not Found"
+                        }
+                    },
+                    "404": {
+                        "pageNotFound": "Page Not Found",
+                        "message": "The page you are looking for does not exist.",
+                        "backHome": "Back to Home"
+                    }
+                }
+            }
+        },
+        {
+            "comment": "=== 6b. (KEEPING THE ASSETS) THE SAME RESET, and the words of every kept picture's alt key: Media's alt group and the templates' photos group ===",
+            "condition": "param.keepAssets === true",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "default",
+                "replace": true,
+                "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy", "alt", "photos"],
                 "translations": {
                     "site": {
                         "name": "My Website"
@@ -220,6 +274,13 @@
             "command": "editStyles",
             "params": {
                 "css": "/* Fresh start - add your styles here */\n\n:root {\n    --color-primary: #3b82f6;\n    --color-text: #1f2937;\n    --color-bg: #ffffff;\n}\n\nbody {\n    font-family: system-ui, -apple-system, sans-serif;\n    color: var(--color-text);\n    background: var(--color-bg);\n    margin: 0;\n    padding: 0;\n}\n\n.container {\n    max-width: 1200px;\n    margin: 0 auto;\n    padding: 2rem;\n}"
+            }
+        },
+        {
+            "comment": "=== 9. THEME MODE OFF (the switch and the dark colours are gone with the components and the stylesheet; a run that wants dark mode sets it on again after) ===",
+            "command": "setThemeMode",
+            "params": {
+                "enabled": false
             }
         }
     ]

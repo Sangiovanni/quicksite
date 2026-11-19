@@ -657,14 +657,40 @@ class WorkflowManager {
     public function runCommands(array $workflow): array {
         $commands = [];
         foreach ($this->reachableWorkflows($workflow) as $reached) {
-            foreach (($reached['relatedCommands'] ?? []) as $command) {
-                if (is_string($command) && $command !== '') $commands[] = $command;
-            }
+            foreach ($this->relatedCommands($reached) as $command) $commands[] = $command;
             foreach ($this->everyStep($reached) as $step) {
                 if (is_string($step['command'] ?? null) && $step['command'] !== '') $commands[] = $step['command'];
             }
         }
         return array_values(array_unique($commands));
+    }
+
+    /**
+     * The commands a workflow names in relatedCommands: an entry is a command's name, or
+     * {"command": name, "condition": expression}, read as a data requirement's condition is.
+     * With no parameters, every command named, whatever its condition: what a run CAN send (the role
+     * check, the row's facts). With a run's parameters, those whose condition holds for them: what the
+     * prompt teaches and what an answer may send. Anything else in the list is left out.
+     */
+    public function relatedCommands(array $workflow, ?array $params = null): array {
+        $commands = [];
+        foreach (($workflow['relatedCommands'] ?? []) as $entry) {
+            if (is_string($entry)) {
+                if ($entry !== '') $commands[] = $entry;
+                continue;
+            }
+            if (!is_array($entry) || !is_string($entry['command'] ?? null) || $entry['command'] === '') continue;
+            $condition = $entry['condition'] ?? null;
+            if ($params !== null && is_string($condition) && $condition !== '' && !$this->evaluateDataCondition($condition, $params)) continue;
+            $commands[] = $entry['command'];
+        }
+        return $commands;
+    }
+
+    /** The workflow as one run with these parameters reads it: its relatedCommands those whose condition holds. */
+    private function withCommandsFor(array $workflow, array $params): array {
+        if (isset($workflow['relatedCommands'])) $workflow['relatedCommands'] = $this->relatedCommands($workflow, $params);
+        return $workflow;
     }
 
     /**
@@ -689,7 +715,7 @@ class WorkflowManager {
             if ($this->isAiWorkflow($reached)) {
                 if (!empty($reached['pasteOnly'])) $paste = true;
                 if (!empty($reached['answerRules']['anyCommand'])) $any = true;
-                $steps = array_map(static fn($command) => ['command' => $command], array_filter($reached['relatedCommands'] ?? [], 'is_string'));
+                $steps = array_map(static fn($command) => ['command' => $command], $this->relatedCommands($reached));
             } else {
                 $steps = $this->everyStep($reached);
             }
@@ -913,19 +939,21 @@ class WorkflowManager {
             'requestFrom' => $phase['requestFrom'] ?? null,
         ];
         $steps = [];
+        // The phase's parameters: what its parent passed, the workflow's own defaults for the rest.
+        $params = $phase['params'];
+        $fromDefaults = [];
+        foreach (($workflow['parameters'] ?? []) as $param) {
+            $id = $param['id'] ?? null;
+            if (!is_string($id) || array_key_exists($id, $params) || !array_key_exists('default', $param)) continue;
+            $params[$id] = $param['default'];
+            $fromDefaults[] = $id;
+        }
         if ($ai && isset($options['answer']) && is_array($options['answer'])) {
-            [$steps, $resolved['refused']] = $this->answerSteps($options['answer'], $workflow);
+            // An answer may send what the prompt taught for these parameters (relatedCommands()).
+            [$steps, $resolved['refused']] = $this->answerSteps($options['answer'], $this->withCommandsFor($workflow, $params));
         }
         // An AI phase reads its data only for its prompt.
         if (!$ai || !empty($options['prompt'])) {
-            $params = $phase['params'];
-            $fromDefaults = [];
-            foreach (($workflow['parameters'] ?? []) as $param) {
-                $id = $param['id'] ?? null;
-                if (!is_string($id) || array_key_exists($id, $params) || !array_key_exists('default', $param)) continue;
-                $params[$id] = $param['default'];
-                $fromDefaults[] = $id;
-            }
             $data = $this->fetchDataRequirements($workflow, $params);
             // Only the workflow's own defaults are templates: a value its parent passed is a value.
             $context = ['param' => $params, 'data' => $data, 'config' => []];
@@ -994,7 +1022,8 @@ class WorkflowManager {
 
     /**
      * Why a workflow does not let its AI answer hold this step, or null when it may. An answer sends only
-     * the commands its workflow names in relatedCommands, unless answerRules.anyCommand opens that. Where
+     * the commands its workflow names in relatedCommands for the run's parameters (the caller passes the workflow
+     * as withCommandsFor() reads it), unless answerRules.anyCommand opens that. Where
      * a step names a CSS selector, answerRules.selectorStarts holds it to the elements the workflow is about,
      * and answerRules.forbiddenProperties keeps it from declaring what the workflow must not change, or a
      * property whose name the bound cannot read plainly (PLAIN_PROPERTY).
@@ -1777,6 +1806,9 @@ class WorkflowManager {
      * @return string Rendered prompt
      */
     public function renderPrompt(array $workflow, array $userParams, array $fetchedData): string {
+        // The commands this run's prompt teaches: those whose condition holds for its parameters (relatedCommands()).
+        $workflow = $this->withCommandsFor($workflow, $userParams);
+
         // Get the prompt template from workflow
         $template = $workflow['promptTemplate'] ?? '';
         
@@ -2185,6 +2217,16 @@ class WorkflowManager {
             }
         }
         
+        // A related command is a name, or a name with a condition.
+        if (isset($workflow['relatedCommands'])) {
+            foreach ((array) $workflow['relatedCommands'] as $index => $entry) {
+                if (is_string($entry) && $entry !== '') continue;
+                if (is_array($entry) && is_string($entry['command'] ?? null) && $entry['command'] !== ''
+                        && (!array_key_exists('condition', $entry) || is_string($entry['condition']))) continue;
+                $errors[] = "relatedCommands[{$index}] must be a command's name, or an object with a 'command' and an optional 'condition'";
+            }
+        }
+
         // Validate steps if present
         if (isset($workflow['steps'])) {
             foreach ($workflow['steps'] as $index => $step) {

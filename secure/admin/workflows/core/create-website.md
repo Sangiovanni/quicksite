@@ -12,7 +12,7 @@ You are creating a complete multi-page website from a blank QuickSite project.
 
 ## CRITICAL: Command Order Rules
 
-**⚠️ MANDATORY ORDER:**
+**⚠️ MANDATORY ORDER:**{{#if param.aiPictures === true}} each `uploadAsset` of your own pictures comes FIRST, before any step that shows its picture.{{/if}}
 
 {{#if param.multilingual === true}}
 **Note: Languages are already configured.** The project has multilingual mode enabled with these languages: {{data.langData.languages}} (default: {{data.langData.default_language}}).
@@ -31,7 +31,7 @@ You are creating a complete multi-page website from a blank QuickSite project.
 {{/if}}
 
 2. **Structures** (in this order):
-   - `editStructure` type="menu" → navigation (shared across all pages)
+   - `editStructure` type="menu" → navigation (shared across all pages){{#if param.darkMode === true}} **⚠️ the `theme-switch` component goes here or in the footer, once**{{/if}}
    - `editStructure` type="footer" → footer (shared across all pages){{#if param.multilingual === true}} **⚠️ MUST include `{ "component": "lang-switch", "data": {} }`**{{/if}}
 {{#if param.onePage === true}}
    - `editStructure` type="page", name="home" → the page, its sections in order
@@ -60,7 +60,8 @@ You are creating a complete multi-page website from a blank QuickSite project.
 
 4. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
-   - `setRootVariables` → AFTER editStyles (optional)
+   - `setRootVariables` → AFTER editStyles (optional){{#if param.darkMode === true}}
+   - `setRootVariables` with `"themeTarget": "dark"` → the dark palette, LAST{{/if}}
 
 ---
 
@@ -152,7 +153,12 @@ When using a component, the `data` object maps variable names to their values:
 {{> use-lang-switch-component}}
 
 ---
-{{/if}}
+{{/if}}{{#if param.darkMode === true}}
+{{> use-theme-switch-component}}
+---
+
+{{> dark-palette-rules}}
+---{{/if}}
 
 ## Available Commands
 
@@ -445,7 +451,9 @@ Path format: `/assets/{category}/{filename}` (leading slash required).
 
 {{> favicon-asset-rule}}
 {{/if}}
-{{/if}}
+{{/if}}{{#if param.aiPictures === true}}
+
+{{> pictures-by-link}}{{/if}}
 
 ---
 
@@ -458,4 +466,6 @@ Create a complete multi-page website based on the user's requirements.
 {{/if}}
 - If information is missing, **assume reasonable defaults** (don't ask)
 - **Output ONLY the JSON array** - no explanations before or after
-- Ensure ALL textKeys have matching translations
+- Ensure ALL textKeys have matching translations{{#if param.darkMode === true}}
+- Place the `theme-switch` component once, and send the dark palette LAST{{/if}}{{#if param.aiPictures === true}}
+- Your own pictures: each `uploadAsset` first, its link written the same wherever the picture shows{{/if}}

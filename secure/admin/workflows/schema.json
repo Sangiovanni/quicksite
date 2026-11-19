@@ -122,6 +122,11 @@
             "default": false,
             "description": "For `select` and `tag-select`: a search over the list, matching an option's name and its value. A `select` becomes the panel's searchable dropdown; a `tag-select` gets a search field above its list, which hides the options that do not match but never one already ticked. Ignored on any other type."
           },
+          "attachStarred": {
+            "type": "boolean",
+            "default": false,
+            "description": "For a `checkbox` whose prompt sends the starred assets: ticked, the panel lists the project's starred pictures beside the workflow's own prompt, for the person to attach to their AI chat; a prompt sent through an AI connection attaches none, and the panel says so. Ignored on any other type."
+          },
           "labelKey": {
             "type": "string",
             "description": "Translation key for the label"
@@ -270,8 +275,23 @@
     },
     "relatedCommands": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "API commands that will be used in the generated output"
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["command"],
+            "properties": {
+              "command": { "type": "string", "description": "The command's name" },
+              "condition": {
+                "type": "string",
+                "description": "Read as a data requirement's condition (parameter ids, e.g. 'aiPictures === true'). A run whose parameters do not meet it has a prompt that does not teach the command, and its answer may not send it."
+              }
+            }
+          }
+        ]
+      },
+      "description": "API commands that will be used in the generated output: what the prompt's {{> command.$relatedCommands}} teaches and what an AI answer may send. Who sees the workflow counts every one, whatever its condition."
     },
     "pins": {
       "type": "array",

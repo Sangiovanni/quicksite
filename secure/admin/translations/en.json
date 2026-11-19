@@ -1984,9 +1984,17 @@
         "specs": {
             "shared": {
                 "params": {
+                    "aiPictures": {
+                        "label": "Let the AI bring its own pictures",
+                        "help": "The AI gives each picture's link; QuickSite downloads it into Media and puts it in place. A picture that could not be downloaded stays an address outside the site, listed at the end of the run."
+                    },
                     "coloursOnly": {
                         "label": "Colours only",
                         "help": "Sends the site's CSS variables instead of its whole stylesheet: a much shorter prompt, but the AI cannot see the corners, shadows and buttons to match."
+                    },
+                    "darkMode": {
+                        "label": "Include dark mode",
+                        "help": "Adds a light/dark button, which the AI places where it fits, and the dark colours it writes. Dark mode is switched on once its commands have run."
                     },
                     "includeAssets": {
                         "label": "Include my starred assets in the prompt",
@@ -2247,6 +2255,29 @@
             "setupThemeSwitch": {
                 "title": "Theme Switch Button",
                 "description": "Writes a light/dark button as the component theme-switch. Visitors see it only once you place it on a page or in the menu."
+            },
+            "themeMode": {
+                "title": "Theme mode",
+                "description": "Switches the site's dark mode on or off, chooses the theme a visitor sees first, and whether visitors can switch.",
+                "params": {
+                    "enabled": {
+                        "label": "Dark mode on",
+                        "help": "The site offers a dark theme beside its light one."
+                    },
+                    "defaultTheme": {
+                        "label": "Theme shown first",
+                        "help": "What a visitor sees before choosing.",
+                        "options": {
+                            "light": "Light",
+                            "dark": "Dark",
+                            "system": "As the visitor's device is set"
+                        }
+                    },
+                    "userToggle": {
+                        "label": "Visitors can switch",
+                        "help": "A light/dark button on the site (the component theme-switch) changes the theme for the visitor who presses it."
+                    }
+                }
             }
         }
     },
@@ -2532,6 +2563,12 @@
         "aiToolsModelLabel": "Model:",
         "aiToolsCopyHint": "Copy this to your AI assistant, then paste the reply below.",
         "aiToolsPasteHint": "Paste the JSON reply here.",
+        "aiToolsAttachTitle": "Your starred pictures: attach them to your AI chat with the prompt",
+        "aiToolsAttachHint": "So the AI can match their colours and mood. Download each one, then attach it in your chat.",
+        "aiToolsAttachDownload": "Download",
+        "aiToolsAttachConnection": "Sent through your AI connection: no picture is attached, the AI reads their descriptions only.",
+        "aiToolsOutsideTitle": "Pictures from outside the site",
+        "aiToolsOutsideLine": "Not one of your assets: replace it, or it may disappear.",
         "aiToolsStepsReady": "{n} commands ready",
         "aiToolsStepsParseError": "No commands available from current response.",
         "aiToolsBatchTitle": "Batch",
