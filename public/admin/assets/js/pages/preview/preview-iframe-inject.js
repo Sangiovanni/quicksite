@@ -75,10 +75,15 @@
     let dragUndoStack = []; // { element, oldParent, oldNextSibling, newParent, newNextSibling, struct }
     let dragRedoStack = [];
     
-    // Text edit state
+    // Text edit state. A translated text is edited as its word: the sentence the element shows, written back
+    // with its markers by QSTextMarkers (core/text-markers.js, injected beside this script); its list and the
+    // elements that show no formatting come from the panel with each setMode (TagRegistry's TAG_INFO).
     let editingElement = null;
     let editingTextKey = null;
-    let originalText = null;
+    let originalNodes = null;   // the element's nodes when the edit started: Escape and an unchanged save put them back
+    let originalWord = null;    // the word they write
+    let textMarkers = null;     // { name: 'pair' | 'void' }
+    let plainTextTags = [];
     
     // Elements to ignore
     const ignoreTags = ['SCRIPT', 'STYLE', 'META', 'LINK', 'NOSCRIPT', 'BR', 'HR', 'HTML', 'HEAD'];
@@ -108,6 +113,8 @@
         if (e.data && e.data.source === 'quicksite-admin') {
             console.log('[QuickSite] Received message:', e.data.action);
             if (e.data.action === 'setMode') {
+                if (e.data.textMarkers) textMarkers = e.data.textMarkers;
+                if (Array.isArray(e.data.plainTextTags)) plainTextTags = e.data.plainTextTags;
                 setMode(e.data.mode);
             }
             if (e.data.action === 'clearSelection') {
@@ -216,9 +223,10 @@
         
         // Get all elements with class attribute
         document.querySelectorAll('[class]').forEach(el => {
-            // Skip QuickSite internal classes
+            // The editor's own classes left out (QS_EDITOR_CLASSES): an author's keeps its name,
+            // a snippet's qs-snippet-* included
             el.classList.forEach(cls => {
-                if (!cls.startsWith('qs-')) {
+                if (!QS_EDITOR_CLASSES.has(cls)) {
                     classSet.add(cls);
                 }
             });
@@ -748,6 +756,13 @@
     }
     
     /**
+     * The style each empty-element hint wrote (scanEmptyElements()), per element: the properties it set and
+     * whether the element had a style of its own. The element info leaves them out of its Params row
+     * (authorStyle()), and clearing the hint leaves no empty style behind.
+     */
+    var emptyHintStyles = new WeakMap();
+
+    /**
      * Scan all data-qs-node elements and apply min-height/min-width
      * on axes where the element has zero computed dimension.
      */
@@ -759,13 +774,16 @@
             var needH = rect.height < 1;
             var needW = rect.width < 1;
             if (needH || needW) {
-                if (needH) el.style.minHeight = '24px';
-                if (needW) el.style.minWidth = '24px';
+                var props = [];
+                var hadStyle = el.hasAttribute('style');
+                if (needH) { el.style.minHeight = '24px'; props.push('min-height'); }
+                if (needW) { el.style.minWidth = '24px'; props.push('min-width'); }
+                emptyHintStyles.set(el, { props: props, hadStyle: hadStyle });
                 el.classList.add('qs-empty-hint');
             }
         });
     }
-    
+
     /**
      * Remove all empty-element hints previously applied by scanEmptyElements.
      */
@@ -774,8 +792,22 @@
         hinted.forEach(function(el) {
             el.style.minHeight = '';
             el.style.minWidth = '';
+            var hint = emptyHintStyles.get(el);
+            if (hint && !hint.hadStyle && !el.getAttribute('style')) el.removeAttribute('style');
+            emptyHintStyles.delete(el);
             el.classList.remove('qs-empty-hint');
         });
+    }
+
+    /** An element's style as its author wrote it: the empty-element hint's properties left out; null for none. */
+    function authorStyle(el, value) {
+        var hint = emptyHintStyles.get(el);
+        if (!hint) return value;
+        var probe = document.createElement('div');
+        probe.setAttribute('style', value);
+        hint.props.forEach(function(prop) { probe.style.removeProperty(prop); });
+        var left = probe.getAttribute('style') || '';
+        return left.trim() === '' && !hint.hadStyle ? null : left;
     }
     
     function setMode(mode) {
@@ -1094,6 +1126,11 @@
             if (name === 'class') {
                 value = value.split(/\s+/).filter(c => c && !QS_EDITOR_CLASSES.has(c)).join(' ');
                 if (value === '') continue;
+            }
+            // The empty-element hint's min-height / min-width are the editor's, not the author's
+            if (name === 'style') {
+                value = authorStyle(el, value);
+                if (value === null) continue;
             }
             params[name] = value;
         }
@@ -1498,16 +1535,64 @@
         console.log('[QuickSite] Text mode disabled');
     }
     
+    /**
+     * Whether a text is edited with its formatting: a translation's word (a raw text takes no marker), outside any
+     * element that shows no formatting, with the grammar's script and list at hand.
+     */
+    function editsFormatting(el) {
+        if (!window.QSTextMarkers || !textMarkers) return false;
+        if (el.hasAttribute('data-qs-raw')) return false;
+        return !(plainTextTags.length && el.closest(plainTextTags.join(',')));
+    }
+
+    /** The word an edited text holds: its sentence written back with its markers, or its words alone. */
+    function writtenWord(el) {
+        return (editsFormatting(el) ? window.QSTextMarkers.write(el, textMarkers) : el.textContent).trim();
+    }
+
+    /** Show a word in an edited text, as the renderer draws it in this frame. */
+    function showWord(el, word) {
+        if (editsFormatting(el)) {
+            el.replaceChildren(window.QSTextMarkers.read(document, word, textMarkers, { editor: true }));
+        } else {
+            el.textContent = word;
+        }
+    }
+
+    /** A line break where the caret is, inside the text being edited (Shift+Enter). */
+    function insertLineBreak() {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        const range = selection.getRangeAt(0);
+        if (!editingElement.contains(range.commonAncestorContainer)) return;
+        range.deleteContents();
+        const br = document.createElement('br');
+        range.insertNode(br);
+        range.setStartAfter(br);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    /** Bold, italic or underline on the selection of the text being edited (Ctrl+B, Ctrl+I, Ctrl+U). */
+    function applyFormat(command) {
+        // The browser writes the element (<b>, <i>, <u>), not a styled span, where it can; a styled span it
+        // writes anyway is read as the element when the sentence is written back (QSTextMarkers.write()).
+        document.execCommand('styleWithCSS', false, false);
+        document.execCommand(command, false, null);
+    }
+
     function startTextEdit(el) {
         if (editingElement) {
             // Save current edit before starting new one
             finishTextEdit();
         }
-        
+
         editingElement = el;
         editingTextKey = el.getAttribute('data-qs-textkey');
-        originalText = el.textContent;
-        
+        originalNodes = Array.from(el.childNodes, node => node.cloneNode(true));
+        originalWord = writtenWord(el);
+
         el.classList.add('qs-text-editing');
         el.setAttribute('contenteditable', 'true');
         el.focus();
@@ -1554,8 +1639,8 @@
     
     function finishTextEdit() {
         if (!editingElement) return;
-        
-        const newText = editingElement.textContent.trim();
+
+        const newText = writtenWord(editingElement);
         const textKey = editingTextKey;
         const struct = editingElement.closest('[data-qs-struct]')?.getAttribute('data-qs-struct') || '';
         // Node path of the edited text node — needed to update RAW/LIT literals
@@ -1563,48 +1648,52 @@
         const node = editingElement.getAttribute('data-qs-node')
             || editingElement.closest('[data-qs-node]')?.getAttribute('data-qs-node') || '';
 
-        // Clean up editing state. The element is left holding exactly the text that is saved:
-        // whatever else reached it while it was editable (a drop of formatted text, a
-        // bold shortcut) leaves the page now rather than at the next reload.
+        // Clean up editing state. Whether the text changed is decided on the word it writes, so an
+        // unchanged text writes nothing and keeps its nodes. A changed one is left holding exactly
+        // the word that is saved, drawn as the page draws it: whatever else reached it while it
+        // was editable (a dropped picture, a style the sentence cannot hold) leaves the page now
+        // rather than at the next reload.
         editingElement.classList.remove('qs-text-editing');
         editingElement.setAttribute('contenteditable', 'false');
-        editingElement.textContent = newText;
 
-        // Only save if text actually changed
-        if (newText !== originalText) {
-            console.log('[QuickSite] Text changed:', textKey, originalText, '->', newText);
+        if (newText !== originalWord) {
+            showWord(editingElement, newText);
+            console.log('[QuickSite] Text changed:', textKey, originalWord, '->', newText);
 
             window.parent.postMessage({
                 source: 'quicksite-preview',
                 action: 'textEdited',
                 textKey: textKey,
                 newValue: newText,
-                oldValue: originalText,
+                oldValue: originalWord,
                 structure: struct,
                 node: node
             }, ALLOWED_ORIGIN);
         } else {
+            editingElement.replaceChildren(...originalNodes);
             console.log('[QuickSite] Text unchanged, not saving');
         }
-        
+
         editingElement = null;
         editingTextKey = null;
-        originalText = null;
+        originalNodes = null;
+        originalWord = null;
     }
-    
+
     function cancelTextEdit() {
         if (!editingElement) return;
-        
-        // Restore original text
-        editingElement.textContent = originalText;
+
+        // Restore the nodes the text had when the edit started
+        editingElement.replaceChildren(...originalNodes);
         editingElement.classList.remove('qs-text-editing');
         editingElement.setAttribute('contenteditable', 'false');
-        
+
         console.log('[QuickSite] Edit cancelled, restored:', editingTextKey);
-        
+
         editingElement = null;
         editingTextKey = null;
-        originalText = null;
+        originalNodes = null;
+        originalWord = null;
     }
     
     // ===== STYLE MODE FUNCTIONALITY =====
@@ -1628,10 +1717,8 @@
     function getStyleInfo(el) {
         const computed = window.getComputedStyle(el);
         
-        // Get class list (filter out our overlay classes)
-        const classList = Array.from(el.classList).filter(c => 
-            !c.startsWith('qs-')
-        );
+        // Get class list (the editor's own classes left out: QS_EDITOR_CLASSES)
+        const classList = Array.from(el.classList).filter(c => !QS_EDITOR_CLASSES.has(c));
         
         // CSS properties we expose in the simplified panel
         const commonProps = [
@@ -2556,11 +2643,27 @@
             if (e.key === 'Escape') {
                 e.preventDefault();
                 cancelTextEdit();
+                return;
             }
-            // Enter always saves (no newlines - would break JSON translations)
+            const formatting = editsFormatting(editingElement);
+            // Enter saves; Shift+Enter breaks the line in a translated text (written back as <br>)
             if (e.key === 'Enter') {
                 e.preventDefault();
-                finishTextEdit();
+                if (e.shiftKey && formatting && textMarkers.br === 'void') {
+                    insertLineBreak();
+                } else {
+                    finishTextEdit();
+                }
+                return;
+            }
+            // Ctrl+B, Ctrl+I, Ctrl+U (Cmd on a Mac): bold, italic, underline in a translated text. In a
+            // text that takes no formatting they do nothing, rather than show what the save would drop.
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+                const shortcut = { b: ['bold', 'b'], i: ['italic', 'i'], u: ['underline', 'u'] }[String(e.key).toLowerCase()];
+                if (shortcut) {
+                    e.preventDefault();
+                    if (formatting && textMarkers[shortcut[1]] === 'pair') applyFormat(shortcut[0]);
+                }
             }
         }
     }, true);

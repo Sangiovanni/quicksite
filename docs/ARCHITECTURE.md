@@ -128,7 +128,7 @@ Page structure is JSON rather than HTML for a handful of pragmatic reasons:
 | Kind | Shape | Notes |
 |---|---|---|
 | Tag | `{ tag, params?, children? }` | Standard HTML element. |
-| Text | `{ textKey: "…" }` | Resolved through the translator. |
+| Text | `{ textKey: "…" }` | Resolved through the translator; the word may carry formatting markers (below). |
 | Raw text | `{ textKey: "__RAW__…" }` | Literal, never translated. |
 | Component | `{ component, data? }` | Inlines a component's JSON, with `{{var}}` interpolation. The reference is a bare component **name**, never a path — see §4.2. |
 
@@ -138,7 +138,8 @@ An attribute value is a scalar. An array is not a value an attribute can carry: 
 
 A small vocabulary of markers controls rendering. They are described by intent — pick the one that matches what you mean.
 
-- **`__RAW__`** — for **text content**. Marks a `textKey` value as literal: do not look it up in translations, just emit it (escaped). Use this when a textual node really is a fixed string, not a key. It is read where a value can be a translation key and nowhere else: in a text node and in the translatable attributes (below), where it is removed before any placeholder is filled. In any other attribute nothing is translated and nothing is removed: a `__RAW__` there is part of the value, drawn and checked as written. It is the one such marker.
+- **`__RAW__`** — for **text content**. Marks a `textKey` value as literal: do not look it up in translations, just emit it (escaped). Use this when a textual node really is a fixed string, not a key. It is read where a value can be a translation key and nowhere else: in a text node and in the translatable attributes (below), where it is removed before any placeholder is filled. In any other attribute nothing is translated and nothing is removed: a `__RAW__` there is part of the value, drawn and checked as written. It is the one such marker. A raw text takes no formatting marker either.
+- **Formatting markers inside a translated word** — a word may carry its own formatting, so each language's one sentence moves it with its words: English `my very <b>bold words</b>`, French `mes mots <b>vraiment gras</b>`. The markers are `b`, `i`, `u`, `strong` and `em` in pairs, and `br` alone (one engine list, `QS_TEXT_MARKERS` in `textMarkers.php`, not a project setting). A marker is written exactly so: lowercase, with no attribute and no space inside its angle brackets, the pairs properly nested (a closing marker closes the last marker opened and still open) and every one opened closed; anything else, an uppercase or misnested one included, shows as written. A backslash right before a marker keeps it as text and is not shown (a backslash before `<b>` shows `<b>`); backslashes right before a marker count in pairs, each pair showing one backslash, so a backslash can stand before formatted words; every other backslash shows as written. A marker becomes an element only in a text node, inside an element that can show formatting, and only from the translation's own word: the markers are read before any placeholder is filled, and each run of words between them is then filled and escaped, so a value a placeholder brings (an address's part, a resolver's answer, a system value) never becomes one, and a key's missing marker takes none. Everywhere else a word reaches, the markers are removed and the words kept, a line break becoming a space between two words: the translatable attributes, the page's `<title>` and description, the link-preview tags, the words handed to the browser's runtime (a call argument such as a toast, a count sentence), and the text inside an `option`, a `textarea`, a `select`, an `optgroup`, a `datalist`, an `svg` or an `iframe` (`TagRegistry::PLAIN_TEXT_TAGS`), where a marked backslash shows without its backslash. The admin panel shows the stored word, markers included.
 - **`__enums__`** — a root-level metadata block on a component template that derives variables from a single source key. Each entry maps a derived variable name to a value map plus an optional default. Use `listComponents` at runtime to see what a component exposes.
 - **`{{var}}` and `{{$var}}`** — placeholders interpolated from the caller's `data` when a component is inlined. Variable names accept letters, digits, underscores, and hyphens.
 - **`{{__system__}}` placeholders** — request-time values (`{{__lang}}`, `{{__current_page}}`, `{{__current_route}}`, `{{__public_folder}}`, and the language-switch form `{{__current_page;lang=en}}`). Substituted in text AND in attributes, identically on the served site and in a build — see §4.2 for the order and why it matters.
@@ -465,7 +466,7 @@ the rule existed.
 | `true` | the bare attribute name |
 | `false` | attribute dropped — **not** `=""`, which HTML reads as TRUE |
 | an array | attribute dropped, and logged |
-| a translation key in a translatable attribute | the translation |
+| a translation key in a translatable attribute | the translation, its formatting markers removed and its words kept (§2) |
 | a `__RAW__` prefix on a translatable attribute | the prefix stripped, no translation |
 | a `__RAW__` prefix on any other attribute | kept: part of the value |
 
@@ -1502,6 +1503,13 @@ in. Both surfaces substitute through the same two functions, including the rule
 that resolved values are substituted BEFORE params: a param is visitor-supplied,
 and doing params first would let a URL inject a placeholder for the resolved
 pass to expand.
+
+**A translated word's formatting markers (§2) are read by one file a build
+carries, `textMarkers.php`.** A compiled text node calls the function the live
+renderer calls, so a built page draws a marked sentence byte for byte as the
+served one, and every place that shows a word without formatting (an attribute,
+the title, the link-preview tags, a word handed to the browser's runtime) removes
+the markers through the same file.
 
 **A built site is `production` unless the deployment says otherwise.** The
 environment is a property of where a site runs, not of the artifact, so it comes

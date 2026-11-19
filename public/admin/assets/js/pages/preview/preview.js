@@ -2818,7 +2818,7 @@
         // behavior in the iframe (hover highlight + click to select) so
         // the user can pick elements directly while seeing Suggested
         // tools in the panel — without round-tripping through select mode.
-        sendToIframe('setMode', { mode: mode === 'ai-tools' ? 'select' : mode });
+        sendToIframe('setMode', frameModeMessage(mode === 'ai-tools' ? 'select' : mode));
         
         // Store preselection for style mode (for the selector browser)
         if (mode === 'style' && preselect) {
@@ -3909,6 +3909,32 @@
     
     // ==================== Iframe Communication ====================
     
+    /**
+     * The frame's mode, with what its inline edit reads a translated text by: the markers a word may carry and
+     * the elements that show no formatting (TagRegistry, through PreviewConfig.tagInfo: TAG_INFO is declared
+     * further down, and a mode is sent before it is).
+     */
+    function frameModeMessage(mode) {
+        const tagInfo = PreviewConfig.tagInfo || {};
+        return { mode: mode, textMarkers: tagInfo.TEXT_MARKERS || null, plainTextTags: tagInfo.PLAIN_TEXT_TAGS || [] };
+    }
+
+    /**
+     * Show a translation's word in a text of the frame, as the renderer draws it there: its markers elements
+     * (QSTextMarkers, core/text-markers.js), or, inside an element that shows no formatting, its words alone.
+     */
+    function showFrameWord(textEl, word) {
+        const tagInfo = PreviewConfig.tagInfo || {};
+        const plain = (tagInfo.PLAIN_TEXT_TAGS || []).join(',');
+        if (!window.QSTextMarkers || !tagInfo.TEXT_MARKERS) {
+            textEl.textContent = word;
+        } else if (plain && textEl.closest(plain)) {
+            textEl.textContent = window.QSTextMarkers.remove(word, tagInfo.TEXT_MARKERS);
+        } else {
+            textEl.replaceChildren(window.QSTextMarkers.read(textEl.ownerDocument, word, tagInfo.TEXT_MARKERS, { editor: true }));
+        }
+    }
+
     function sendToIframe(action, data) {
         try {
             const iframeWindow = iframe.contentWindow;
@@ -3955,6 +3981,13 @@
             cssLink.href = baseUrl + '/admin/assets/css/preview-iframe-overlay.css';
             iframeDoc.head.appendChild(cssLink);
             
+            // The grammar of a translation's markers, which the inline edit writes a sentence back with
+            const markersScript = iframeDoc.createElement('script');
+            markersScript.id = 'quicksite-text-markers-script';
+            markersScript.async = false;
+            markersScript.src = baseUrl + '/admin/assets/js/core/text-markers.js?v=' + Date.now();
+            iframeDoc.body.appendChild(markersScript);
+
             // Inject script - uses data-qs-* attributes for node info
             const script = iframeDoc.createElement('script');
             script.id = 'quicksite-overlay-script';
@@ -3985,7 +4018,7 @@
                     console.log('[Preview] Sending setMode to iframe:', currentMode);
                     // Use sendToIframe to ensure source is included (required by iframe handler)
                     // AI tools mode reuses select-mode iframe behavior (see setMode comment).
-                    sendToIframe('setMode', { mode: currentMode === 'ai-tools' ? 'select' : currentMode });
+                    sendToIframe('setMode', frameModeMessage(currentMode === 'ai-tools' ? 'select' : currentMode));
                     if (currentMode !== 'select') {
                         sendToIframe('clearSelection', {});
                     }
@@ -4208,10 +4241,11 @@
             showToast(PreviewConfig.i18n.textSaved, 'success');
             console.log('[Preview] Translation saved successfully');
 
-            // Update the span the user just edited — the contenteditable
-            // already shows the new text, no action needed there.
+            // Update the span the user just edited — the frame already
+            // shows the new word there, no action needed.
             // BUT: sweep the iframe for OTHER spans referencing the same
-            // textKey + update their textContent in place. Without this
+            // textKey + show the new word in each, with its formatting, as
+            // the renderer draws it (showFrameWord()). Without this
             // sweep, the editor shows the new text only on the edited
             // span while siblings stay stale (looks like inconsistent
             // state until the iframe reloads). The rendered page is
@@ -4225,7 +4259,7 @@
                         // clobber an in-progress contenteditable cursor
                         // — the user can see their edits already.
                         if (span.getAttribute('contenteditable') === 'true') return;
-                        if (span.textContent !== newValue) span.textContent = newValue;
+                        showFrameWord(span, newValue);
                     });
                 }
             } catch (sweepErr) {
@@ -4245,7 +4279,7 @@
                 const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
                 const textEl = iframeDoc.querySelector(`[data-qs-textkey="${textKey}"]`);
                 if (textEl) {
-                    textEl.textContent = oldValue;
+                    showFrameWord(textEl, oldValue);
                 }
             } catch (e) {
                 console.error('[Preview] Could not restore text:', e);
@@ -5476,7 +5510,8 @@
      */
     function _prepopulateEditForm(params, tag) {
         const mandatoryNames = (TAG_INFO && TAG_INFO.MANDATORY_PARAMS && TAG_INFO.MANDATORY_PARAMS[tag]) || [];
-        const mandatorySet = new Set(mandatoryNames);
+        // A group the tag needs one of (a <source>'s src or srcset) has its rows beside the mandatory ones
+        const mandatorySet = new Set(mandatoryNames.concat(...((TAG_INFO && TAG_INFO.MANDATORY_ONE_OF && TAG_INFO.MANDATORY_ONE_OF[tag]) || [])));
         // For <input> the wizard uses 'type' + always-rendered 'name' as
         // mandatory, even though MANDATORY_PARAMS['input'] only lists 'type'.
         if (tag === 'input') mandatorySet.add('name');
@@ -5778,8 +5813,10 @@
         
         const tag = addTagSelect?.value;
         const mandatoryParams = TAG_INFO?.MANDATORY_PARAMS?.[tag] || [];
-        
-        if (sidebarAddNodeType !== 'tag' || mandatoryParams.length === 0) {
+        // The groups the tag needs one param of (a <source>: src or srcset), each row saying so
+        const oneOfGroups = TAG_INFO?.MANDATORY_ONE_OF?.[tag] || [];
+
+        if (sidebarAddNodeType !== 'tag' || (mandatoryParams.length === 0 && oneOfGroups.length === 0)) {
             addMandatoryParams.style.display = 'none';
             return;
         }
@@ -5796,13 +5833,17 @@
         }
         // --------------------------------------------------------------
 
-        mandatoryParams.forEach(param => {
+        const rows = mandatoryParams.map(param => ({ param: param, group: null }));
+        oneOfGroups.forEach(group => group.forEach(param => rows.push({ param: param, group: group })));
+        rows.forEach(({ param, group }) => {
             const showBrowse = param === 'src' && tag in ASSET_BROWSABLE_TAGS;
             const showRouteList = param === 'href' && tag === 'a';
             const datalistId = showRouteList ? 'add-mandatory-href-routes' : '';
+            const placeholder = group ? PreviewConfig.i18n.oneOfParams.replace('{params}', group.join(', '))
+                : (showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : (PreviewConfig.i18n.required || 'Required'));
             const row = _renderParamRow(param, {
                 id: 'add-mandatory-' + param,
-                placeholder: showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : (PreviewConfig.i18n.required || 'Required')
+                placeholder: placeholder
             }, showBrowse ? (ASSET_BROWSABLE_TAGS[tag] || '') : null, datalistId);
             addMandatoryParamsContainer.appendChild(row);
             
@@ -7143,19 +7184,38 @@
         return value.startsWith('__RAW__') ? value.slice(7) : null;
     }
 
-    /** A key's text in the project's default language, then in English; the key itself when neither has it. */
-    function snippetTranslation(snippetData, key) {
+    /** A key's word in the project's default language, then in English; null when neither has it. */
+    function snippetWord(snippetData, key) {
         const lang = PreviewConfig.defaultLang || 'en';
         return snippetData.translations?.[lang]?.[key] ||
                snippetData.translations?.['en']?.[key] ||
-               key;
+               null;
     }
 
-    /** A text node's text: as stored with "Show keys"; else a raw or literal text as written, a key translated. */
-    function snippetText(snippetData, textKey) {
-        if (snippetPreviewShowKeys) return textKey;
+    /** A key's text in a translatable attribute: its word with its markers removed (no formatting there); the key itself when no language has it. */
+    function snippetTranslation(snippetData, key) {
+        const word = snippetWord(snippetData, key);
+        return word === null ? key : QSTextMarkers.remove(word, TAG_INFO.TEXT_MARKERS || {});
+    }
+
+    /**
+     * A text node's nodes in the frame's document: as stored with "Show keys", a raw text as written and a key
+     * no language has as its name, each one text; a word read as the renderer reads it (QSTextMarkers): its
+     * markers elements, or, inside an element that shows no formatting ($plain), removed.
+     */
+    function snippetTextNodes(doc, snippetData, textKey, plain) {
         const literal = snippetLiteral(textKey);
-        return literal !== null ? literal : snippetTranslation(snippetData, textKey);
+        const word = snippetPreviewShowKeys || literal !== null ? null : snippetWord(snippetData, textKey);
+        if (word === null) {
+            const text = snippetPreviewShowKeys ? textKey : (literal !== null ? literal : textKey);
+            return text === '' ? [] : [doc.createTextNode(text)];
+        }
+        const markers = TAG_INFO.TEXT_MARKERS || {};
+        if (plain) {
+            const text = QSTextMarkers.remove(word, markers);
+            return text === '' ? [] : [doc.createTextNode(text)];
+        }
+        return Array.from(QSTextMarkers.read(doc, word, markers).childNodes);
     }
 
     /**
@@ -7179,23 +7239,25 @@
         return value;
     }
 
-    /** The snippet's structure (a node or a list of nodes) as nodes of the frame's document. */
-    function snippetPreviewNodes(doc, structure, snippetData) {
+    /**
+     * The snippet's structure (a node or a list of nodes) as nodes of the frame's document. $plain: inside an
+     * element that shows no formatting (TagRegistry::PLAIN_TEXT_TAGS), where a word's markers are removed.
+     */
+    function snippetPreviewNodes(doc, structure, snippetData, plain) {
         if (!structure || typeof structure !== 'object') return [];
         if (Array.isArray(structure)) {
-            return structure.flatMap(node => snippetPreviewNodes(doc, node, snippetData));
+            return structure.flatMap(node => snippetPreviewNodes(doc, node, snippetData, plain));
         }
         // A node carrying a text key is a text, whatever else it carries, as the renderer reads it
         if (structure.textKey !== undefined && structure.textKey !== null) {
-            const text = String(snippetText(snippetData, String(structure.textKey)));
-            return text === '' ? [] : [doc.createTextNode(text)];
+            return snippetTextNodes(doc, snippetData, String(structure.textKey), !!plain);
         }
-        const el = _renderSnippetElement(doc, structure, snippetData);
+        const el = _renderSnippetElement(doc, structure, snippetData, plain);
         return el ? [el] : [];
     }
 
     /** One tag node as an element of the frame's document; null for a tag the engine does not render. */
-    function _renderSnippetElement(doc, node, snippetData) {
+    function _renderSnippetElement(doc, node, snippetData, plain) {
         const tag = String(node.tag || 'div').toLowerCase();
         if ((TAG_INFO.BLOCKED_TAGS || []).includes(tag)) return null;
         if (TAG_INFO.ALLOWED_TAGS && !TAG_INFO.ALLOWED_TAGS.includes(tag)) return null;
@@ -7216,7 +7278,8 @@
         });
         // A void element (img, br, input...) takes no children
         if ((TAG_INFO.SELF_CLOSING_TAGS || []).includes(tag)) return el;
-        const children = snippetPreviewNodes(doc, node.children, snippetData);
+        const children = snippetPreviewNodes(doc, node.children, snippetData,
+            plain || (TAG_INFO.PLAIN_TEXT_TAGS || []).includes(tag));
         el.append(...(tag === 'table' ? snippetTableRows(doc, children) : children));
         return el;
     }

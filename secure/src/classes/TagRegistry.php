@@ -120,7 +120,6 @@ class TagRegistry
         'iframe' => ['src'],
         'video' => ['src'],
         'audio' => ['src'],
-        'source' => ['src'],
         'label' => ['for'],
         'select' => ['name'],
         'textarea' => ['name'],
@@ -136,6 +135,16 @@ class TagRegistry
         // with no label renders as an unnamed group in the dropdown.
         'meter' => ['value'],
         'optgroup' => ['label'],
+    ];
+
+    /**
+     * Parameters of which a tag needs ONE, per group: a `<source>` names its file by `src` (in a video or an
+     * audio) or by `srcset` (in a picture), and neither alone is required. A group's params are named, in
+     * order, as the form offers them. addNode refuses a node with none of a group, editNode refuses removing
+     * the last one, and the editor's Add form asks for one of them (TAG_INFO).
+     */
+    const MANDATORY_ONE_OF = [
+        'source' => [['src', 'srcset']],
     ];
 
     /**
@@ -225,6 +234,16 @@ class TagRegistry
      */
     const EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
 
+    /**
+     * Elements whose text cannot show formatting: inside one (at any depth) a translation's markers
+     * (textMarkers.php) are removed and the words kept. An option's and a textarea's text is plain; a select,
+     * an optgroup and a datalist show their text only through their options; an iframe's own text is never
+     * shown; and inside an svg a marker would end the drawing there, the rest of the page drawn outside it.
+     * The renderer, the compiler, the editor's snippet preview and its update of a saved text read this list
+     * (the editor through editorPayload()).
+     */
+    const PLAIN_TEXT_TAGS = ['option', 'textarea', 'select', 'optgroup', 'datalist', 'svg', 'iframe'];
+
     // =========================================================================
     // VOID ELEMENTS (for the renderer)
     // =========================================================================
@@ -291,6 +310,37 @@ class TagRegistry
     public static function isRenderableAttributeName(string $name): bool
     {
         return RegexPatterns::match('html_attribute_name', $name);
+    }
+
+    /**
+     * The groups of MANDATORY_ONE_OF a tag's params hold none of (a param counts when it is set and not empty):
+     * addNode refuses a node with one, editNode a node it would leave with one.
+     */
+    public static function missingOneOf(string $tag, array $params): array
+    {
+        $missing = [];
+        foreach (self::MANDATORY_ONE_OF[$tag] ?? [] as $group) {
+            $held = array_filter($group, static fn($p) => isset($params[$p]) && $params[$p] !== '');
+            if ($held === []) {
+                $missing[] = $group;
+            }
+        }
+        return $missing;
+    }
+
+    /**
+     * Every param a tag needs: its MANDATORY_PARAMS and each MANDATORY_ONE_OF group's. editNode's tag change
+     * takes off the old tag's that the new tag does not need.
+     */
+    public static function neededParams(string $tag): array
+    {
+        $needed = self::MANDATORY_PARAMS[$tag] ?? [];
+        foreach (self::MANDATORY_ONE_OF[$tag] ?? [] as $group) {
+            foreach ($group as $param) {
+                $needed[] = $param;
+            }
+        }
+        return array_values(array_unique($needed));
     }
 
     public static function isSelfClosing(string $tag): bool
@@ -372,17 +422,21 @@ class TagRegistry
      */
     public static function editorPayload(): array
     {
+        require_once __DIR__ . '/../functions/textMarkers.php';
         return [
             'ALLOWED_TAGS'            => self::ALLOWED_TAGS,
             'BLOCKED_TAGS'            => self::BLOCKED_TAGS,
             'SELF_CLOSING_TAGS'       => self::SELF_CLOSING_TAGS,
             'CONTAINER_TAGS'          => self::CONTAINER_TAGS,
             'MANDATORY_PARAMS'        => self::MANDATORY_PARAMS,
+            'MANDATORY_ONE_OF'        => self::MANDATORY_ONE_OF,
             'DEFAULT_PARAMS'          => self::DEFAULT_PARAMS,
             'TRANSLATION_KEY_PARAMS'  => self::TRANSLATION_KEY_PARAMS,
             'RESERVED_PARAMS'         => self::RESERVED_PARAMS,
             'TRANSLATABLE_ATTRIBUTES' => self::TRANSLATABLE_ATTRIBUTES,
             'EMPTY_MEANINGFUL_ATTRIBUTES' => self::EMPTY_MEANINGFUL_ATTRIBUTES,
+            'PLAIN_TEXT_TAGS'         => self::PLAIN_TEXT_TAGS,
+            'TEXT_MARKERS'            => QS_TEXT_MARKERS,
         ];
     }
 
@@ -422,6 +476,9 @@ class TagRegistry
                     'span' => ['desc' => __admin('preview.tagDesc.span') ?? 'Inline container'],
                     'strong' => ['desc' => __admin('preview.tagDesc.strong') ?? 'Strong importance'],
                     'em' => ['desc' => __admin('preview.tagDesc.em') ?? 'Emphasis'],
+                    'b' => ['desc' => __admin('preview.tagDesc.b')],
+                    'i' => ['desc' => __admin('preview.tagDesc.i')],
+                    'u' => ['desc' => __admin('preview.tagDesc.u')],
                     'small' => ['desc' => __admin('preview.tagDesc.small') ?? 'Side comments'],
                     'mark' => ['desc' => __admin('preview.tagDesc.mark') ?? 'Highlighted text'],
                     'blockquote' => ['desc' => __admin('preview.tagDesc.blockquote') ?? 'Block quotation'],

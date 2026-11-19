@@ -646,14 +646,18 @@ function qs_social_report(string $projectPath, ?string $onlyRoute): array
         foreach ($languages as $lang) {
             $rawTitle = qs_social_text($projectPath, $lang, 'page.titles.' . $route);
             $title = qs_page_title($rawTitle ?? (Translator::MISSING_PREFIX . 'page.titles.' . $route . '}'), $routeObject);
+            // The description as stored, markers included (the panel's field shows it); the tags and their
+            // warnings take what the page's tags say: its markers removed (textMarkers.php), as the site name's.
             $description = qs_social_text($projectPath, $lang, 'page.descriptions.' . $route);
+            $tagDescription = $description !== null ? qs_text_markers_remove($description) : null;
+            $siteName = qs_social_text($projectPath, $lang, 'site.name');
             $tags = qs_social_tag_list([
                 'projectPath' => $projectPath,
                 'notFound'    => false,
                 'routePath'   => $route,
                 'title'       => $title,
-                'description' => $description,
-                'siteName'    => qs_social_text($projectPath, $lang, 'site.name'),
+                'description' => $tagDescription,
+                'siteName'    => $siteName !== null ? qs_text_markers_remove($siteName) : null,
                 'lang'        => $lang,
                 'languages'   => $multilingual ? $languages : [],
                 'sitePath'    => qs_social_route_site_path($route, $lang, $multilingual),
@@ -663,7 +667,7 @@ function qs_social_report(string $projectPath, ?string $onlyRoute): array
                 'title'       => $title,
                 'description' => $description,
                 'tags'        => array_map(static fn($t) => ['attribute' => $t[0], 'name' => $t[1], 'content' => $t[2]], $tags),
-                'warnings'    => qs_social_warnings($entry, $title, $description, $cardType),
+                'warnings'    => qs_social_warnings($entry, $title, $tagDescription, $cardType),
             ];
         }
         $pages[$route] = [

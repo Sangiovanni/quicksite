@@ -653,6 +653,8 @@ foreach ($classFiles as $file) {
 // socialPreview.php: the description, Open Graph and X tags every page writes in
 // its head, from the social values compiled below; their addresses are composed
 // per request by requestRuntime.php's qs_full_address().
+// textMarkers.php: the markers a translation's word may carry, read by a compiled
+// text node and removed wherever formatting cannot show, as the renderer does.
 //
 // The rest are the REQUEST-time half of the engine. Each has an authoring
 // counterpart that deliberately does NOT travel: apiRegistry is the read half
@@ -670,6 +672,7 @@ $functionFiles = [
 'apiRegistry.php',
     'resolverRegistry.php',
     'runtimePlaceholders.php',
+    'textMarkers.php',
     'runtimeHandoff.php',
     'resolverCache.php',
     'serverFetch.php',

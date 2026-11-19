@@ -399,6 +399,7 @@ window.PreviewConfig = {
         eventsLessCommon: <?= json_encode(__admin('preview.eventsLessCommon', 'Less common')) ?>,
         functionExample: <?= json_encode(__admin('preview.functionExample', 'Example')) ?>,
         nameRequiredForInput: <?= json_encode(__admin('preview.nameRequiredForInput', 'A name is required so the field is submitted with the form.')) ?>,
+        oneOfParams: <?= json_encode(__admin('preview.oneOfParams')) ?>,
         invalidId: <?= json_encode(__admin('preview.invalidId', 'Invalid ID — start with a letter or underscore; letters, digits, hyphens and underscores only (no spaces).')) ?>,
         optional: <?= json_encode(__admin('preview.optional', 'Optional')) ?>,
         eventTooltips: <?= json_encode(AdminTranslation::getInstance()->getRaw('preview.eventTooltips') ?: new stdClass()) ?>,
@@ -1015,6 +1016,9 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => Ad
 
 <!-- The simple Add (Select → Add in simple mode): its list's sends. Before preview.js, which hands it the target. -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-simple-add.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-simple-add.js') ?>"></script>
+
+<!-- A translation's markers (QSTextMarkers): the snippet preview and the update of a saved text read them; preview.js injects the same file into the frame, whose inline edit writes a sentence back with them -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/core/text-markers.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/text-markers.js') ?>"></script>
 
 <!-- Preview JavaScript (Main) -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview.js') ?>"></script>

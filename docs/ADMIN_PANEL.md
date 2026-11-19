@@ -493,7 +493,9 @@ There is no class, no ID and no key-or-literal choice: each text gets a translat
 
 **Saving a selection as a snippet.** Select mode's *save as snippet* flow asks for a name and offers one checkbox: **"Save to my personal snippets (reusable in all my projects)"**. Leave it unchecked and the snippet belongs to the project you are editing, where every member of that project can use it. Tick it and the snippet goes to your own library instead — it follows you into every project you work on, and nobody else can see it, insert it, or delete it. The Add panel's **Snippet** tab lists all three tiers in one picker — the snippets shipped with the engine, your personal ones, and the current project's — with each entry labelled by the tier it came from. See [COMMAND_API.md](COMMAND_API.md) for how a name that exists in more than one tier resolves.
 
-**The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), a raw text (`__RAW__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
+**The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), with its formatting as a page draws it (a word's `<b>`, `<i>`, `<u>`, `<strong>`, `<em>` and `<br>` markers as elements; removed inside an `option`, a `textarea` or the other elements that show no formatting: [ARCHITECTURE.md](ARCHITECTURE.md) §2), a raw text (`__RAW__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way, their markers removed. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
+
+**The tag picker's Text group** offers Bold (`b`), Italic (`i`) and Underline (`u`) after Strong and Emphasis. A tag that needs one of two params says so in its rows: a `<source>` asks for `src` or `srcset` (*One of: src, srcset*), and `addNode` refuses one with neither.
 
 **The tag preview.** Picking a tag in the **HTML Tag** tab shows a small example of it under the picker, and its **`</>`** button switches to the example's HTML as the page holds it once parsed: a boolean attribute reads `open=""`, a table row sits in the `<tbody>` the browser adds, an `<option>` is closed. A tag that renders nothing visible (`script`, `meta`, `template`…) reads "No visual preview". The examples come with the page, one `<template>` per tag written by `_tag-selector.php` from `_tag-examples.php`, so picking a tag copies its example and parses nothing.
 
@@ -802,6 +804,20 @@ text node in the preview and makes it `contenteditable`. On commit:
 - For a `__RAW__` literal, the new value is saved via `editStructure`
   by updating the node's `textKey` to `"__RAW__"+value` — *not* a translation
   entry (literals don't have one).
+
+**A formatted sentence.** A translation-key text is edited as the sentence the
+page shows, with its formatting, and saved as one word carrying its markers
+([ARCHITECTURE.md](ARCHITECTURE.md) §2): bold, italic, underline, strong and
+emphasis as their markers, a line break as `<br>`, any other formatting as its
+words alone, and a `<b>` typed as text with a backslash before it, so it stays
+text. The keys while a text is edited: **Enter** saves, **Escape** puts the text
+back as it was, **Shift+Enter** breaks the line, and **Ctrl+B**, **Ctrl+I** and
+**Ctrl+U** (Cmd on a Mac) make the selected words bold, italic or underlined; a
+paste arrives as plain text. A sentence saved unchanged writes nothing, and one
+whose formatting nobody touched is written back exactly as it was stored. Every
+other place on the page showing the same key shows the new sentence, with its
+formatting, at once. A `__RAW__` literal takes no formatting: the shortcuts do
+nothing there, and **Shift+Enter** saves as **Enter** does.
 
 In the renderer (`JsonToHtmlRenderer::renderText`), editor mode wraps both
 key-based AND `__RAW__` text in the `data-qs-textkey` selection span

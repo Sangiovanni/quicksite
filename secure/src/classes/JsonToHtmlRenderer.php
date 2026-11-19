@@ -6,6 +6,8 @@ require_once __DIR__ . '/IframeSandbox.php';
 // {{param:}} / {{resolved:}} — request-time placeholders, defined once and
 // shared with the compiler so a built page substitutes them identically.
 require_once __DIR__ . '/../functions/runtimePlaceholders.php';
+// The markers a translation's word may carry (b, i, u, strong, em, br): read in a text node, removed elsewhere.
+require_once __DIR__ . '/../functions/textMarkers.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 // The single point for the project's language set — processUrl() asks it which
@@ -58,6 +60,15 @@ class JsonToHtmlRenderer {
     private $inComponent = false;        // Are we inside a component?
     private $currentComponentName = '';  // Current component name
     private $currentComponentNode = '';  // Node path where component started
+
+    /** How many elements that cannot show formatting (TagRegistry::PLAIN_TEXT_TAGS) hold the node being drawn. */
+    private $plainTextDepth = 0;
+
+    /**
+     * The component preview's emulation: the token rawifyEmulatedTextKeys() writes on each text it filled with an
+     * emulated value, drawn from random bytes per render so no stored node can carry it. Null outside emulation.
+     */
+    private $emulationToken = null;
 
     /**
      * @param Translator $translator Instance of Translator for text resolution
@@ -238,11 +249,16 @@ class JsonToHtmlRenderer {
         
         // In emulation mode, mark resolved textKeys as raw to prevent translation lookup
         if (!empty($emulatedRawValues)) {
+            $this->emulationToken = bin2hex(random_bytes(16));
             $this->rawifyEmulatedTextKeys($processedTemplate, $emulatedRawValues);
         }
-        
+
         // Render the processed template
-        return $this->renderNode($processedTemplate, false);
+        try {
+            return $this->renderNode($processedTemplate, false);
+        } finally {
+            $this->emulationToken = null;
+        }
     }
 
     /**
@@ -641,10 +657,17 @@ class JsonToHtmlRenderer {
             // straight out of the URL, so it is the one visitor-controlled
             // input here; substituting it last means nothing it introduces is
             // ever re-scanned as a placeholder.
-            $rawText = $this->applySystemPlaceholders($rawText);
-            $rawText = $this->applyResolved($rawText);
-            $rawText = $this->applyRouteParams($rawText);
-            $escapedRaw = htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            // A raw text takes no markers; a value the component preview's emulation put here stands for a
+            // word, and is drawn as one (rawifyEmulatedTextKeys()).
+            $emulated = $this->emulationToken !== null && ($node['__qsEmulated'] ?? null) === $this->emulationToken;
+            if ($emulated) {
+                $escapedRaw = $this->wordHtml($rawText, null);
+            } else {
+                $rawText = $this->applySystemPlaceholders($rawText);
+                $rawText = $this->applyResolved($rawText);
+                $rawText = $this->applyRouteParams($rawText);
+                $escapedRaw = htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            }
             if ($this->editorMode) {
                 $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
                 $nodePath = implode('.', $this->currentNodePath);
@@ -677,11 +700,11 @@ class JsonToHtmlRenderer {
         // Also substitute `{{resolved:NAME[.dot.path]}}` from
         // the server-side data resolver, applied first (see applyResolved).
         // Same order as the raw branch above: params last.
-        $translatedRaw = $this->applySystemPlaceholders($this->translator->translate($textKey));
-        $translatedRaw = $this->applyResolved($translatedRaw);
-        $translatedRaw = $this->applyRouteParams($translatedRaw);
-        $translatedText = htmlspecialchars($translatedRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        
+        // The word's markers (textMarkers.php) are read BEFORE any placeholder is filled, and each run of
+        // words between them is filled and escaped (wordHtml()), so no filled value ever becomes one. A key no
+        // language holds takes none: the missing marker's text is the key's, not a translation's.
+        $translatedText = $this->wordHtml($this->translator->translate($textKey), $textKey);
+
         // In editor mode, wrap in span with data-qs-textkey for inline editing
         if ($this->editorMode) {
             $escapedKey = htmlspecialchars($textKey, ENT_QUOTES);
@@ -692,6 +715,26 @@ class JsonToHtmlRenderer {
         }
 
         return $translatedText;
+    }
+
+    /**
+     * A text's placeholders filled, in the order every text of this render takes: the system ones, then what the
+     * resolver fetched, then the route's params, the one input a visitor controls, last.
+     */
+    private function fillText(string $text): string {
+        return $this->applyRouteParams($this->applyResolved($this->applySystemPlaceholders($text)));
+    }
+
+    /**
+     * A word as a text node draws it (qs_text_node_html()): its markers elements, each run of words filled and
+     * escaped (in the editor, a marker kept as text named for the inline edit); inside an element that cannot
+     * show formatting its markers removed. $key: the key it was looked up for (its missing marker takes no
+     * marker), null for the emulation's value. JsonToPhpCompiler::compileTextNode() writes the same call, so a
+     * build draws it byte for byte.
+     */
+    private function wordHtml(string $word, ?string $key): string {
+        return qs_text_node_html($word, $key, $this->plainTextDepth > 0,
+            fn(string $text): string => $this->fillText($text), $this->editorMode);
     }
 
     /**
@@ -811,9 +854,15 @@ class JsonToHtmlRenderer {
         } else {
             $html .= '>';
             
-            // Render children
+            // Render children. Inside an element that cannot show formatting, a word's markers are removed.
             if (is_array($children)) {
-                $html .= $this->renderNodes($children);
+                $plain = in_array(strtolower($tag), TagRegistry::PLAIN_TEXT_TAGS, true);
+                $this->plainTextDepth += $plain ? 1 : 0;
+                try {
+                    $html .= $this->renderNodes($children);
+                } finally {
+                    $this->plainTextDepth -= $plain ? 1 : 0;
+                }
             }
             
             $html .= '</' . htmlspecialchars($tag, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '>';
@@ -980,8 +1029,9 @@ class JsonToHtmlRenderer {
             }
             // Check if value looks like a translation key (contains dots, alphanumeric/underscore, no spaces)
             elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $value)) {
-                // It's a translation key - translate it
-                $value = $this->translator->translate($value);
+                // It's a translation key - translate it. An attribute shows no formatting: the word's markers
+                // are removed and its words kept (textMarkers.php), before any placeholder is filled below.
+                $value = qs_text_word_plain($this->translator->translate($value), $value);
             }
         }
 
@@ -1141,12 +1191,16 @@ class JsonToHtmlRenderer {
     /**
      * In emulation mode, mark resolved textKey values as raw to prevent translation lookup.
      * Only affects textKeys that exactly match an emulated regular variable value.
+     * The value typed stands for the word the page would look up, so the text also carries this render's
+     * emulation token: renderTextNode() reads its markers as it reads a word's (an author's own `__RAW__` text
+     * takes none).
      */
     private function rawifyEmulatedTextKeys(array &$node, array $emulatedValues): void {
         if (isset($node['textKey']) && is_string($node['textKey'])) {
             $tk = $node['textKey'];
             if ($tk !== '' && strpos($tk, '__RAW__') !== 0 && in_array($tk, $emulatedValues, true)) {
                 $node['textKey'] = '__RAW__' . $tk;
+                $node['__qsEmulated'] = $this->emulationToken;
             }
         }
         if (isset($node['children']) && is_array($node['children'])) {
@@ -1443,11 +1497,17 @@ class JsonToHtmlRenderer {
         // Detect component structure (single object with 'tag') vs page structure (array of nodes)
         $isComponent = isset($structure['tag']);
         
-        // Navigate to the node
+        // Navigate to the node, counting the elements around it that cannot show formatting: the node is drawn
+        // as the page draws it (a word's markers removed inside one).
         $node = null;
         $current = $structure;
-        
+        $plainAncestors = 0;
+
         foreach ($indices as $i => $index) {
+            if (($i > 0 || $isComponent) && is_string($current['tag'] ?? null)
+                && in_array(strtolower($current['tag']), TagRegistry::PLAIN_TEXT_TAGS, true)) {
+                $plainAncestors++;
+            }
             if ($i === 0) {
                 if ($isComponent) {
                     // Component: first index is into the root object's children
@@ -1483,9 +1543,15 @@ class JsonToHtmlRenderer {
         
         // Render the node
         $this->currentNodePath[] = end($indices);
-        $html = $this->renderNode($node);
+        $depth = $this->plainTextDepth;
+        $this->plainTextDepth = $plainAncestors;
+        try {
+            $html = $this->renderNode($node);
+        } finally {
+            $this->plainTextDepth = $depth;
+        }
         array_pop($this->currentNodePath);
-        
+
         return $html;
     }
 }

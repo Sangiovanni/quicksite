@@ -291,10 +291,11 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     $finalParams = $currentParams;
     
     // If changing tag, auto-remove params that were mandatory for the OLD tag
-    // but are not relevant to the NEW tag (e.g., src/alt when changing img→div)
+    // but are not relevant to the NEW tag (e.g., src/alt when changing img→div);
+    // a group the old tag needed one of (a <source>'s src or srcset) counts whole
     if ($newTag !== null && $newTag !== $currentTag) {
-        $oldMandatory = TagRegistry::MANDATORY_PARAMS[$currentTag] ?? [];
-        $newMandatory = TagRegistry::MANDATORY_PARAMS[$newTag] ?? [];
+        $oldMandatory = TagRegistry::neededParams((string) $currentTag);
+        $newMandatory = TagRegistry::neededParams((string) $newTag);
         foreach ($oldMandatory as $oldParam) {
             // Remove old mandatory params if they're not mandatory for new tag
             // and were not explicitly added by the user
@@ -333,7 +334,15 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
             unset($finalParams[$param]);
         }
     }
-    
+    // Nor the last param of a group the tag needs one of (a <source>'s src or srcset)
+    foreach (TagRegistry::missingOneOf((string) $finalTag, $finalParams) as $group) {
+        foreach ($group as $param) {
+            if (in_array($param, $removeParams, true)) {
+                $cannotRemove[] = $param;
+            }
+        }
+    }
+
     if (!empty($cannotRemove)) {
         return ApiResponse::create(400, 'validation.invalid_value')
             ->withMessage("Cannot remove mandatory params for <{$finalTag}>: " . implode(', ', $cannotRemove))
@@ -353,7 +362,15 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
             ->withMessage("Tag <{$finalTag}> requires params: " . implode(', ', $mandatoryForTag) . ". Missing: " . implode(', ', $missingMandatory))
             ->withErrors([['field' => 'params', 'missing' => $missingMandatory, 'tag' => $finalTag]]);
     }
-    
+
+    // A tag that needs one param of a group (a <source>: src or srcset, TagRegistry::MANDATORY_ONE_OF)
+    $missingGroups = TagRegistry::missingOneOf((string) $finalTag, $finalParams);
+    if ($missingGroups !== []) {
+        return ApiResponse::create(400, 'validation.required')
+            ->withMessage("Tag <{$finalTag}> requires one of: " . implode(', ', $missingGroups[0]))
+            ->withErrors([['field' => 'params', 'missing' => $missingGroups[0], 'oneOf' => true, 'tag' => $finalTag]]);
+    }
+
     // No auto-generated alt translation key. `alt` is an OPTIONAL
     // translation-key param (TagRegistry::TRANSLATION_KEY_PARAMS) the author
     // picks in the editor, and it arrives in addParams like any other.

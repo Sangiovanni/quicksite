@@ -28,6 +28,9 @@ class JsonToPhpCompiler {
      */
     private bool $needsRuntimeHandoff = false;
 
+    /** How many elements that cannot show formatting (TagRegistry::PLAIN_TEXT_TAGS) hold the node being compiled. */
+    private int $plainTextDepth = 0;
+
     /**
      * The system placeholders a compiled page defines as variables.
      *
@@ -491,9 +494,13 @@ class JsonToPhpCompiler {
             // A TRANSLATED string can carry either kind of placeholder, and
             // which file it comes from depends on the request's language, so
             // both calls are always emitted. Each fast-paths on a strpos.
-            return $prefix . 'htmlspecialchars(qs_apply_system_placeholders(qs_apply_runtime_placeholders($translator->translate('
-                   . var_export($textKey, true)
-                   . '), $__routeParams), [\'lang\' => $lang]), ENT_QUOTES | ENT_HTML5, \'UTF-8\');' . "\n";
+            // The word's markers are read when the page is served, by the call the
+            // renderer makes (qs_text_node_html(), textMarkers.php): before any
+            // placeholder is filled, each run of words between them then filled and
+            // escaped; inside an element that cannot show formatting, removed.
+            return $prefix . 'qs_text_node_html($translator->translate(' . var_export($textKey, true) . '), '
+                   . var_export($textKey, true) . ', ' . ($this->plainTextDepth > 0 ? 'true' : 'false')
+                   . ', static fn(string $t): string => qs_apply_system_placeholders(qs_apply_runtime_placeholders($t, $__routeParams), [\'lang\' => $lang]));' . "\n";
         }
     }
 
@@ -699,10 +706,16 @@ class JsonToPhpCompiler {
         // Void elements don't have children or closing tags: TagRegistry's list, the renderer's
         $isVoid = TagRegistry::isVoidElement($tag);
         
-        // Render children
+        // Render children. Inside an element that cannot show formatting, a word's markers are removed.
         if (!$isVoid && !empty($children)) {
-            foreach ($children as $child) {
-                $output .= $this->compileNode($child, $echo);
+            $plain = in_array(strtolower($tag), TagRegistry::PLAIN_TEXT_TAGS, true);
+            $this->plainTextDepth += $plain ? 1 : 0;
+            try {
+                foreach ($children as $child) {
+                    $output .= $this->compileNode($child, $echo);
+                }
+            } finally {
+                $this->plainTextDepth -= $plain ? 1 : 0;
             }
         }
         
@@ -770,8 +783,11 @@ class JsonToPhpCompiler {
         if ($translatable && !$raw && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
             // A translation KEY in a translatable attribute. Emitted as a
             // runtime lookup for the same reason a text node is: which
-            // translation file answers depends on the request's language.
-            return '$translator->translate(' . var_export($attrValue, true) . ')';
+            // translation file answers depends on the request's language. An
+            // attribute shows no formatting: the word's markers are removed, as the
+            // renderer removes them (qs_text_word_plain()).
+            return 'qs_text_word_plain($translator->translate(' . var_export($attrValue, true) . '), '
+                . var_export($attrValue, true) . ')';
         }
 
         // Static value — the attacker-controlled case. Make it

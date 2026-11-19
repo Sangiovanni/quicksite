@@ -177,6 +177,14 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
                 ->withErrors([['field' => 'params', 'missing' => $missing, 'tag' => $tag]]);
         }
     }
+
+    // A tag that needs one param of a group (a <source>: src or srcset, TagRegistry::MANDATORY_ONE_OF)
+    $missingGroups = is_string($tag) ? TagRegistry::missingOneOf($tag, is_array($nodeParams) ? $nodeParams : []) : [];
+    if ($missingGroups !== []) {
+        return ApiResponse::create(400, 'validation.required')
+            ->withMessage("Tag <{$tag}> requires one of: " . implode(', ', $missingGroups[0]))
+            ->withErrors([['field' => 'params', 'missing' => $missingGroups[0], 'oneOf' => true, 'tag' => $tag]]);
+    }
     
     // No `alt = ''` placeholder. `alt` is an OPTIONAL translation-key param
     // (TagRegistry::TRANSLATION_KEY_PARAMS), chosen by the author through the

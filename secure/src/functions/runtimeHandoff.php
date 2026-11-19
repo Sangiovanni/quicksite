@@ -170,11 +170,14 @@ if (!function_exists('qs_translated_call_argument')) {
      *   positional: a value with no translation passes through unchanged — it is
      *               the author's own text (the "Custom text" choice)
      *   keyword:    written as `name=<translation>`, the missing marker included
+     * qs.js shows these as text: a translation's markers are removed and its words kept
+     * (qs_text_word_plain(), textMarkers.php).
      */
     function qs_translated_call_argument(string $value, ?string $keyword): string
     {
         require_once __DIR__ . '/../classes/Translator.php';
-        $translated = Translator::translate($value);
+        require_once __DIR__ . '/textMarkers.php';
+        $translated = qs_text_word_plain(Translator::translate($value), $value);
         if ($keyword !== null) {
             return qs_call_argument_js($keyword . '=' . $translated);
         }

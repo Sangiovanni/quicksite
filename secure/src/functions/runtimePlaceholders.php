@@ -23,6 +23,8 @@
 
 require_once __DIR__ . '/resolverRegistry.php';
 require_once __DIR__ . '/projectLanguage.php';
+// A translation's markers: read in a text node, removed from a title (qs_page_title()). A build carries both files.
+require_once __DIR__ . '/textMarkers.php';
 
 if (!function_exists('qs_apply_route_params')) {
     /**
@@ -141,6 +143,9 @@ if (!function_exists('qs_page_title')) {
      * ⚠ The fallback is never filled: it comes from the address, and an address carrying
      * `{{resolved:…}}` keeps that text as written.
      *
+     * A title shows no formatting: the title's markers (textMarkers.php) are removed and its words
+     * kept, before its placeholders are filled, so no filled value is ever read as one.
+     *
      * @param string $title The title the page's template passed (usually a translate() answer)
      * @param object|null $route This request's TrimParameters (route(), routeParams(), routeFound())
      */
@@ -149,7 +154,7 @@ if (!function_exists('qs_page_title')) {
         $routeParams = $route !== null ? $route->routeParams() : [];
         require_once __DIR__ . '/../classes/Translator.php';
         if (!Translator::isMissing($title, 'page.titles.')) {
-            return qs_apply_runtime_placeholders($title, $routeParams);
+            return qs_apply_runtime_placeholders(qs_text_markers_remove($title), $routeParams);
         }
         $segments = $route !== null ? $route->route() : [];
         $segment = $segments === [] ? 'home' : (string) $segments[count($segments) - 1];

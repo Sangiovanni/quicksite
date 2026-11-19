@@ -417,10 +417,12 @@ if (!function_exists('qs_api_count_strings')) {
 
         // Lazily: a project with no sentence binding never loads the translator.
         require_once __DIR__ . '/../classes/Translator.php';
+        // qs.js writes a sentence as text: a translation's markers are removed and its words kept.
+        require_once __DIR__ . '/textMarkers.php';
 
         $out = [];
         foreach (array_keys($keys) as $key) {
-            $out[$key] = Translator::translate($key);
+            $out[$key] = qs_text_word_plain(Translator::translate((string) $key), (string) $key);
         }
         return $out;
     }

@@ -26,7 +26,7 @@
  */
 
 require_once __DIR__ . '/requestRuntime.php';      // qs_full_address
-require_once __DIR__ . '/runtimePlaceholders.php'; // qs_apply_runtime_placeholders
+require_once __DIR__ . '/runtimePlaceholders.php'; // qs_apply_runtime_placeholders; qs_text_markers_remove (textMarkers.php)
 require_once __DIR__ . '/projectLanguage.php';     // qs_path_without_base, qs_project_languages, qs_project_is_multilingual
 
 /** The project's social values, relative to its folder (and to a build's secure folder). */
@@ -566,7 +566,8 @@ if (!function_exists('qs_social_picture_alt')) {
             }
             $current = $current[$segment];
         }
-        return is_scalar($current) ? trim((string) $current) : '';
+        // A tag shows no formatting: the word's markers removed, its words kept (textMarkers.php).
+        return is_scalar($current) ? trim(qs_text_markers_remove((string) $current)) : '';
     }
 }
 
@@ -691,10 +692,13 @@ if (!function_exists('qs_social_head_tags')) {
             if ($sitePath !== '' && qs_project_is_multilingual() && in_array($sitePath, qs_project_languages(), true)) {
                 $sitePath .= '/';
             }
+            // A tag shows no formatting: each word's markers removed (textMarkers.php), the description's
+            // before its placeholders are filled.
+            $siteName = Translator::lookup('site.name');
             $in += [
                 'description' => $description !== null
-                    ? qs_apply_runtime_placeholders($description, (array) $route->routeParams()) : null,
-                'siteName'    => Translator::lookup('site.name'),
+                    ? qs_apply_runtime_placeholders(qs_text_markers_remove($description), (array) $route->routeParams()) : null,
+                'siteName'    => $siteName !== null ? qs_text_markers_remove($siteName) : null,
                 'languages'   => qs_project_is_multilingual() ? qs_project_languages() : [],
                 'sitePath'    => qs_social_site_path($sitePath),
             ];
