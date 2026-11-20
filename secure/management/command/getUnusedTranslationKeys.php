@@ -1,10 +1,12 @@
 <?php
 /**
- * getUnusedTranslationKeys - Find translation keys not used in any structure
- * 
- * Identifies orphaned/unused translation keys that exist in translation files
- * but are not referenced by any page, menu, footer, or component structure.
- * 
+ * getUnusedTranslationKeys - Find translation keys nothing on the site names
+ *
+ * Identifies orphaned/unused translation keys: keys a translation file holds that the site does not use
+ * (qs_site_translation_keys(), the one answer every reader of a site's keys takes: its pages, menu, footer,
+ * components, consent layer, page titles and descriptions, translated attributes, call arguments, Media's
+ * pictures, an API's sentences, the site's name and the registries' words).
+ *
  * @method GET
  * @url /management/getUnusedTranslationKeys
  * @url /management/getUnusedTranslationKeys/{lang}
@@ -14,83 +16,11 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
-
-/**
- * Extract all textKeys from all structures
- */
-function extractAllUsedKeys(): array {
-    $allKeys = [];
-    
-    // Scan all pages recursively (supports folder structure)
-    $pageFiles = scanAllPageJsonFiles();
-    foreach ($pageFiles as $pageInfo) {
-        $structure = loadJsonStructure($pageInfo['path']);
-        if (is_array($structure)) {
-            foreach ($structure as $node) {
-                extractTextKeys($node, $allKeys, 0, 20);
-            }
-        }
-    }
-    
-    // Scan menu
-    $menuFile = PROJECT_PATH . '/templates/model/json/menu.json';
-    $menuStructure = loadJsonStructure($menuFile);
-    if (is_array($menuStructure)) {
-        foreach ($menuStructure as $node) {
-            extractTextKeys($node, $allKeys, 0, 20);
-        }
-    }
-    
-    // Scan footer
-    $footerFile = PROJECT_PATH . '/templates/model/json/footer.json';
-    $footerStructure = loadJsonStructure($footerFile);
-    if (is_array($footerStructure)) {
-        foreach ($footerStructure as $node) {
-            extractTextKeys($node, $allKeys, 0, 20);
-        }
-    }
-    
-    // Scan components
-    $componentsDir = PROJECT_PATH . '/templates/model/json/components';
-    if (is_dir($componentsDir)) {
-        foreach (glob($componentsDir . '/*.json') as $file) {
-            $structure = loadJsonStructure($file);
-            if (is_array($structure)) {
-                foreach ($structure as $node) {
-                    extractTextKeys($node, $allKeys, 0, 20);
-                }
-            }
-        }
-    }
-    
-    return array_unique($allKeys);
-}
-
-/**
- * Flatten nested translation array to dot notation keys
- * e.g., {"menu": {"home": "Home"}} → ["menu.home"]
- */
-function flattenTranslationKeys(array $translations, string $prefix = ''): array {
-    $keys = [];
-    
-    foreach ($translations as $key => $value) {
-        $fullKey = $prefix === '' ? $key : $prefix . '.' . $key;
-        
-        if (is_array($value)) {
-            // Recurse into nested structure
-            $keys = array_merge($keys, flattenTranslationKeys($value, $fullKey));
-        } else {
-            // Leaf node - this is an actual translation key
-            $keys[] = $fullKey;
-        }
-    }
-    
-    return $keys;
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
 /**
  * Command function for internal execution via CommandRunner
- * 
+ *
  * @param array $params Body parameters (unused for this command)
  * @param array $urlParams URL segments [lang?]
  * @return ApiResponse
@@ -107,7 +37,7 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
                     ['field' => 'language', 'reason' => 'invalid_type', 'expected' => 'string']
                 ]);
         }
-        
+
         if (strlen($targetLang) > 10) {
             return ApiResponse::create(400, 'validation.invalid_length')
                 ->withMessage('Language code must not exceed 10 characters')
@@ -115,7 +45,7 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
                     ['field' => 'language', 'value' => $targetLang, 'max_length' => 10]
                 ]);
         }
-        
+
         // An EXISTING language: one of the project's, or "default" (see
         // validateTranslations.php for why the Translation Manager sends it).
         if (!qs_project_has_language($targetLang, true)) {
@@ -123,27 +53,19 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
         }
     }
 
-    // Get all keys used in structures
-    $usedKeys = extractAllUsedKeys();
-
-    // The page keys, read dynamically (qs_page_translation_keys()): every route's title, a nested
-    // route's included, and below, per language, each description that language holds.
-    $routesFile = PROJECT_PATH . '/routes.php';
-    $routes = file_exists($routesFile) ? include $routesFile : [];
-    $routes = is_array($routes) ? $routes : [];
-    $usedKeys = array_merge($usedKeys, qs_page_translation_keys($routes, [])['titles']);
-
-    $usedKeys = array_unique($usedKeys);
+    // The keys the site uses: each required one, and each optional one where a language checked holds it.
+    $sites = qs_site_translation_keys(PROJECT_PATH);
 
     // Determine which languages to check
     $languagesToCheck = $targetLang ? [$targetLang] : qs_project_language_codes();
 
     $results = [];
     $totalUnused = 0;
+    $trees = [];
 
     foreach ($languagesToCheck as $lang) {
         $translationFile = PROJECT_PATH . '/translate/' . $lang . '.json';
-        
+
         if (!file_exists($translationFile)) {
             $results[$lang] = [
                 'file_exists' => false,
@@ -152,9 +74,9 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
             ];
             continue;
         }
-        
-        $translations = json_decode(@file_get_contents($translationFile), true);
-        
+
+        $translations = qs_translation_file_tree($translationFile);
+
         if (!is_array($translations)) {
             $results[$lang] = [
                 'file_exists' => true,
@@ -164,16 +86,14 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
             ];
             continue;
         }
-        
-        // Flatten translation keys to dot notation
-        $translationKeys = flattenTranslationKeys($translations);
-        
-        // Find keys that exist in translations but not in structures
-        // A page's description is used where this language holds it.
-        $langUsedKeys = array_values(array_unique(array_merge($usedKeys, qs_page_translation_keys($routes, $translations)['descriptions'])));
+        $trees[] = $translations;
+
+        // The keys this file holds that the site does not use in this language
+        $translationKeys = qs_translation_tree_keys($translations);
+        $langUsedKeys = qs_translation_keys_in_use($sites, [$translations])['used'];
         $unusedKeys = array_values(array_diff($translationKeys, $langUsedKeys));
         sort($unusedKeys);
-        
+
         $results[$lang] = [
             'file_exists' => true,
             'file_valid' => true,
@@ -185,23 +105,26 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
                 ? round((1 - count($unusedKeys) / count($translationKeys)) * 100, 2)
                 : 100
         ];
-        
+
         $totalUnused += count($unusedKeys);
     }
+
+    // Every key the site uses in the languages checked
+    $usedKeys = qs_translation_keys_in_use($sites, $trees)['used'];
 
     // Determine overall status
     $hasUnused = $totalUnused > 0;
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage($hasUnused 
-            ? "Found {$totalUnused} unused translation key(s)" 
+        ->withMessage($hasUnused
+            ? "Found {$totalUnused} unused translation key(s)"
             : 'All translation keys are in use')
         ->withData([
             'results' => $results,
             'total_unused_across_languages' => $totalUnused,
             'used_keys_in_structures' => $usedKeys,
             'total_used_keys' => count($usedKeys),
-            'recommendation' => $hasUnused 
+            'recommendation' => $hasUnused
                 ? 'Consider removing unused keys with deleteTranslationKeys command'
                 : 'Translation files are clean'
         ]);

@@ -1,107 +1,25 @@
 <?php
 /**
  * validateTranslations - Validates translation coverage
- * 
+ *
  * @method GET
  * @url /management/validateTranslations
  * @url /management/validateTranslations/{language}
  * @auth required
  * @permission read
- * 
- * Checks if all required translation keys exist in translation files.
+ *
+ * Checks that every key the site needs in every language (qs_site_translation_keys()'s required keys) has a
+ * word in each translation file. An optional key (a page's description, the site's name, …) is never missing.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
-
-/**
- * Extract all textKeys from structures (uses refactored utility function)
- */
-function extractAllKeys_validate() {
-    $allKeys = [];
-    
-    // Scan all pages recursively (supports folder structure)
-    $pageFiles = scanAllPageJsonFiles();
-    foreach ($pageFiles as $pageInfo) {
-        $structure = loadJsonStructure($pageInfo['path']);
-        if (is_array($structure)) {
-            foreach ($structure as $node) {
-                extractTextKeys($node, $allKeys, 0, 20);
-            }
-        }
-    }
-    
-    // Scan menu
-    $menuFile = PROJECT_PATH . '/templates/model/json/menu.json';
-    $menuStructure = loadJsonStructure($menuFile);
-    if (is_array($menuStructure)) {
-        foreach ($menuStructure as $node) {
-            extractTextKeys($node, $allKeys, 0, 20);
-        }
-    }
-    
-    // Scan footer
-    $footerFile = PROJECT_PATH . '/templates/model/json/footer.json';
-    $footerStructure = loadJsonStructure($footerFile);
-    if (is_array($footerStructure)) {
-        foreach ($footerStructure as $node) {
-            extractTextKeys($node, $allKeys, 0, 20);
-        }
-    }
-    
-    // Scan components
-    $componentsDir = PROJECT_PATH . '/templates/model/json/components';
-    if (is_dir($componentsDir)) {
-        foreach (glob($componentsDir . '/*.json') as $file) {
-            $structure = loadJsonStructure($file);
-            if (is_array($structure)) {
-                foreach ($structure as $node) {
-                    extractTextKeys($node, $allKeys, 0, 20);
-                }
-            }
-        }
-    }
-    
-    // Every route's title, read dynamically (qs_page_translation_keys()). A page's description is
-    // optional: it is never a required key, so a page without one is never missing it.
-    $routesFile = PROJECT_PATH . '/routes.php';
-    if (file_exists($routesFile)) {
-        $routes = include $routesFile;
-        if (is_array($routes)) {
-            $allKeys = array_merge($allKeys, qs_page_translation_keys($routes, [])['titles']);
-        }
-    }
-    
-    return array_unique($allKeys);
-}
-
-/**
- * Check if a key exists in translations AND has a non-empty value (supports dot notation)
- * Empty string values are considered "untranslated"
- */
-function keyExistsInTranslations_validate($key, $translations) {
-    $keys = explode('.', $key);
-    $current = $translations;
-    
-    foreach ($keys as $segment) {
-        if (!is_array($current) || !isset($current[$segment])) {
-            return false;
-        }
-        $current = $current[$segment];
-    }
-    
-    // Empty string is considered as "missing/untranslated"
-    if (is_string($current) && $current === '') {
-        return false;
-    }
-    
-    return true;
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
 /**
  * Command function for internal execution via CommandRunner
- * 
+ *
  * @param array $params Body parameters (unused for this command)
  * @param array $urlParams URL segments - [0] = language code (optional)
  * @return ApiResponse
@@ -119,7 +37,7 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
                     ['field' => 'language', 'reason' => 'invalid_type', 'expected' => 'string']
                 ]);
         }
-        
+
         // Length validation (no language code, and not "default", is longer)
         if (strlen($targetLang) > 10) {
             return ApiResponse::create(400, 'validation.invalid_length')
@@ -128,7 +46,7 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
                     ['field' => 'language', 'value' => $targetLang, 'max_length' => 10]
                 ]);
         }
-        
+
         // An EXISTING language: one of the project's, or "default" — the
         // mono-language translation file, which the Translation Manager asks
         // for on a monolingual site (refusing it would leave missing_keys
@@ -138,8 +56,8 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
         }
     }
 
-    // Get all required keys
-    $requiredKeys = extractAllKeys_validate();
+    // Get all required keys: the keys the site needs in every language
+    $requiredKeys = qs_translation_keys_in_use(qs_site_translation_keys(PROJECT_PATH), [])['required'];
 
     // Determine which languages to validate
     $languagesToValidate = $targetLang ? [$targetLang] : qs_project_language_codes();
@@ -148,7 +66,7 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
 
     foreach ($languagesToValidate as $lang) {
         $translationFile = PROJECT_PATH . '/translate/' . $lang . '.json';
-        
+
         if (!file_exists($translationFile)) {
             $validationResults[$lang] = [
                 'file_exists' => false,
@@ -157,9 +75,9 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
             ];
             continue;
         }
-        
-        $translations = json_decode(@file_get_contents($translationFile), true);
-        
+
+        $translations = qs_translation_file_tree($translationFile);
+
         if (!is_array($translations)) {
             $validationResults[$lang] = [
                 'file_exists' => true,
@@ -169,23 +87,24 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
             ];
             continue;
         }
-        
+
+        // A key is missing where the file gives it no word a page shows (absent, empty, or a group)
         $missingKeys = [];
-        
+
         foreach ($requiredKeys as $key) {
-            if (!keyExistsInTranslations_validate($key, $translations)) {
+            if (!qs_translation_tree_has_word($translations, $key)) {
                 $missingKeys[] = $key;
             }
         }
-        
+
         $validationResults[$lang] = [
             'file_exists' => true,
             'file_valid' => true,
             'required_keys' => count($requiredKeys),
             'missing_keys' => $missingKeys,
             'total_missing' => count($missingKeys),
-            'coverage_percent' => count($requiredKeys) > 0 
-                ? round((1 - count($missingKeys) / count($requiredKeys)) * 100, 2) 
+            'coverage_percent' => count($requiredKeys) > 0
+                ? round((1 - count($missingKeys) / count($requiredKeys)) * 100, 2)
                 : 100
         ];
     }

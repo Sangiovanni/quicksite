@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 
 /**
  * getTranslations - Retrieves all translation files
@@ -93,7 +94,9 @@ function __command_getTranslations(array $params = [], array $urlParams = []): A
         'multilingual_enabled' => $multilingualEnabled,
         'mode' => $multilingualEnabled ? 'multilingual' : 'mono-language',
         'count' => count($translations),
-        'default_language' => $languages[0] ?? 'en'
+        // The project's default language on a multilingual project (getLangList's answer); `default`, the one
+        // file a one-language project's pages read, otherwise.
+        'default_language' => $multilingualEnabled ? qs_project_default_language() : 'default'
     ];
 
     // Add errors if any files failed to load

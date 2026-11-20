@@ -755,7 +755,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.json_encode_failed' => 'Failed to encode translation data.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file, and keeps translate/default.json in step, as setTranslationKeys does: a single-language site reads default.json. Creates nested page.titles object if it doesn\'t exist. A page reads the key page.titles.<route path>, so a nested page and a parameter route\'s page have a title of their own (one title for all of a parameter route\'s values). The route must exist, and the language must be one of the project\'s.'
+        'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file, and keeps translate/default.json in step, as setTranslationKeys does (every write on a one-language project, a write in the default language on a multilingual one): a single-language site reads default.json. Creates nested page.titles object if it doesn\'t exist. A page reads the key page.titles.<route path>, so a nested page and a parameter route\'s page have a title of their own (one title for all of a parameter route\'s values). The route must exist, and the language must be one of the project\'s.'
     ],
     
     'getRoutes' => [
@@ -1320,7 +1320,7 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'No translation files found',
             '500.server.internal_error' => 'Failed to load any translation files.'
         ],
-        'notes' => 'In multilingual mode: returns all language files (en.json, fr.json, etc.). In mono-language mode: returns only default.json, under the key default, with languages ["default"] and default_language "default". Response includes multilingual_enabled flag.'
+        'notes' => 'In multilingual mode: returns all language files (en.json, fr.json, etc.), and default_language is the project\'s default language (getLangList\'s). In mono-language mode: returns only default.json, under the key default, with languages ["default"] and default_language "default". Response includes multilingual_enabled flag.'
     ],
     
     'setTranslationKeys' => [
@@ -1383,7 +1383,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.internal_error' => 'The translation file could not be written for a reason other than a failed write or invalid JSON; the underlying reason is returned in the message.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'SAFE by default: Merges with existing translations. Use language="default" in mono-language mode to edit default.json. New keys are added, existing keys are updated, other keys are preserved. Set replace=true to completely replace the file (used by fresh-start workflow). default_synced says whether translate/default.json was kept in step, as a single-language site reads it.'
+        'notes' => 'SAFE by default: Merges with existing translations. Use language="default" in mono-language mode to edit default.json. New keys are added, existing keys are updated, other keys are preserved. Set replace=true to completely replace the file (used by fresh-start workflow). default_synced says whether translate/default.json was kept in step, as a single-language site reads it: on a one-language project every write is copied there, on a multilingual one a write in the project\'s default language alone. A key may not be both a word and a group: a write that would turn a word into a group or a group into a word, in the language\'s file or in that copy, is refused (400 validation.invalid_format, errors listing each clash with its path) and nothing is written.'
     ],
     
     'deleteTranslationKeys' => [
@@ -1706,7 +1706,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'getTranslationKeys' => [
-        'description' => 'Scans all JSON structures and extracts required translation keys. Optionally includes translation status per key.',
+        'description' => 'Lists the translation keys the site uses, by source. Optionally includes translation status per key.',
         'method' => 'GET',
         'url_structure' => '/management/p/<projectId>/getTranslationKeys/{lang?}',
         'parameters' => [
@@ -1725,9 +1725,11 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Translation keys extracted successfully',
             'data' => [
                 'keys_by_source' => [
-                    'home' => ['home.title', 'home.welcomeMessage'],
+                    'home' => ['home.title', 'home.welcomeMessage', 'page.titles.home'],
                     'menu' => ['menu.home', 'menu.about'],
-                    'footer' => ['footer.privacy', 'footer.terms']
+                    'footer' => ['footer.privacy', 'footer.terms'],
+                    'component:card' => ['card.more'],
+                    'site:media' => ['alt.team_photo_jpg']
                 ],
                 'all_keys' => ['home.title', 'home.welcomeMessage', 'menu.home', '...'],
                 'total_keys' => 15,
@@ -1748,7 +1750,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Recursively scans all page JSONs, menu.json, and footer.json to extract textKey values. Ignores __RAW__ prefixed keys. When language is provided, also checks if each key has a non-empty translation (empty string = untranslated).'
+        'notes' => 'The keys the site uses are one answer that getTranslationKeys, getUnusedTranslationKeys, validateTranslations and analyzeTranslations share, and deleteNode reads: each page (a page in a folder and a special page such as 404 included) with its title (page.titles.<route>), its description (page.descriptions.<route>) and its page events; the menu; the footer; each component; the consent layer once generated; a text of a structure (never a __RAW__ text nor an unfilled slot); a translated attribute (alt, placeholder, title, aria-label, aria-placeholder, aria-description) holding a key; a component\'s data where it lands in a text or a translated attribute, its enum\'s chosen option included; a call argument that is looked up (an event attribute\'s or a page event\'s); an API\'s count sentences; the key each picture\'s description holds in Media; the site\'s name in link previews (site.name); the Storage and Privacy registries\' words. A key is needed in every language where a visitor sees it; a page\'s description, the site\'s name, a call argument that falls back to its own text, a component\'s own words and its enum\'s other options, and the registries\' words are optional: used where a language holds them, never missing. keys_by_source names a page by its route (a page routed menu or footer shares that entry), menu, footer, a component as component:<name>, and the site\'s own sources as site:consent, site:media, site:api, site:link-previews, site:storage and site:privacy; a site: source is listed when it holds a used key. all_keys and keys_by_source hold every needed key and each optional one the language asked holds, or any of the project\'s languages when none is asked. When language is provided, also checks if each key has a non-empty translation (empty string = untranslated).'
     ],
     
     'validateTranslations' => [
@@ -1797,11 +1799,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment. Every route\'s title (page.titles.<route>, a nested route\'s included) is required; a page\'s description (page.descriptions.<route>) is optional and never missing.'
+        'notes' => 'Compares the keys the site needs in every language (the answer getTranslationKeys gives, its notes say what counts) with actual translation files: a key is missing where a file gives it no word a page shows (absent, empty, or a group). Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment. Every page\'s title (page.titles.<route>, a nested route\'s and a special page\'s included), every translated attribute, the consent layer and the key each picture\'s description holds in Media are required; a page\'s description, the site\'s name, a call argument that falls back to its own text and the Storage and Privacy registries\' words are optional and never missing.'
     ],
     
     'getUnusedTranslationKeys' => [
-        'description' => 'Finds translation keys that exist in translation files but are not used in any structure',
+        'description' => 'Finds translation keys that exist in translation files but that nothing on the site uses',
         'method' => 'GET',
         'url_structure' => '/management/p/<projectId>/getUnusedTranslationKeys/{lang?}',
         'parameters' => [
@@ -1841,7 +1843,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Identifies orphaned translations not referenced by any page, menu, footer, or component. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys. Every route\'s title (page.titles.<route>, a nested route\'s included) and every page description a language holds (page.descriptions.<route>, setSocialPreview) count as used.'
+        'notes' => 'Identifies orphaned translations: a key a translation file holds that the site does not use, by the answer getTranslationKeys gives (its notes say what counts: pages, the menu, the footer, components, the consent layer, page titles and descriptions, translated attributes, call arguments, an API\'s sentences, the keys pictures\' descriptions hold in Media, the site\'s name and the Storage and Privacy registries\' words). An optional key counts as used in a language that holds it. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys. used_keys_in_structures lists every key the site uses in the languages checked.'
     ],
     
     'analyzeTranslations' => [
@@ -1892,7 +1894,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
-        'notes' => 'Combines validateTranslations + getUnusedTranslationKeys in one call. Returns health status: healthy, has_unused, incomplete, needs_attention, or critical. Ideal for CI/CD pipelines and dashboard views.'
+        'notes' => 'Combines validateTranslations + getUnusedTranslationKeys in one call, on the same answer of which keys the site uses (getTranslationKeys\' notes say what counts): required_keys are the keys needed in every language. Returns health status: healthy, has_unused, incomplete, needs_attention, or critical. Ideal for CI/CD pipelines and dashboard views.'
     ],
     
     'uploadAsset' => [
@@ -3330,7 +3332,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'deleteNode' => [
-        'description' => 'Deletes a node and all its children from a structure, with automatic cleanup of associated translation keys.',
+        'description' => 'Deletes a node and all its children from a structure, with automatic cleanup of the translation keys nothing else on the site uses.',
         'method' => 'DELETE',
         'parameters' => [
             'type' => [
@@ -3355,7 +3357,7 @@ $GLOBALS['__help_commands'] = [
             'keepTranslationKeys' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'Keep the translation keys the deleted node referenced. By default they are removed from every language along with the node.',
+                'description' => 'Keep every translation key the deleted node referenced. By default each one nothing else on the site uses is removed from every language along with the node; a key the site still uses elsewhere is always kept.',
                 'example' => 'true',
                 'default' => false
             ]
@@ -3375,8 +3377,9 @@ $GLOBALS['__help_commands'] = [
                     'hasChildren' => true
                 ],
                 'file' => 'templates/model/json/pages/home/home.json',
-                'translationKeysRemoved' => 3,
-                'translationKeys' => ['home.item1', 'home.item2', 'home.item3']
+                'translationKeysRemoved' => 2,
+                'translationKeys' => ['home.item1', 'home.item2', 'alt.team_photo_jpg'],
+                'translationKeysKept' => ['alt.team_photo_jpg']
             ]
         ],
         'error_responses' => [
@@ -3394,7 +3397,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
             '400.validation.unsafe_param' => 'A node of the structure about to be written holds an attribute the write gate refuses: a name outside letters, digits, underscore, colon and hyphen, a raw on* handler (use {{call:...}} syntax), a disallowed URL scheme (only http, https, mailto, tel), a data-bind-attr naming an attribute a binding cannot write (an event handler, srcdoc, a name outside those characters, a name starting data-consent-, an iframe\'s src or sandbox, or a meta\'s content or http-equiv), a meta refreshing the page to an address with a disallowed URL scheme (its http-equiv refresh, and the address in its content), or two names that differ only in case. errors[0] names the node and the attribute, and gives the reason. Nothing is written.'
         ],
-        'notes' => 'Recursively deletes all children AND removes associated translation keys from all language files. Collects textKey and translatable attributes (alt, placeholder, title, aria-label, aria-placeholder, aria-description) from deleted node and children. Use in Visual Editor with Del key. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be deleted).'
+        'notes' => 'Recursively deletes all children. translationKeys lists the keys the deleted node and its children name, by the rule getTranslationKeys reads every structure with (a text, a translated attribute — alt, placeholder, title, aria-label, aria-placeholder, aria-description — holding a key, a call argument that is looked up, a placed component\'s data where it lands in one; in a component\'s own file a value still holding a slot names none). Once the structure is written, each of them the site still uses elsewhere (another element, another page, a component, the key a picture\'s description holds in Media, …: getTranslationKeys\' notes say what counts) is kept and named in translationKeysKept; the others are removed from every language file, and translationKeysRemoved counts those removed. keepTranslationKeys keeps every key (translationKeysRemoved 0). Use in Visual Editor with Del key. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be deleted).'
     ],
     
     'addNode' => [

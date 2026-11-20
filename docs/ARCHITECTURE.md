@@ -562,9 +562,15 @@ a separate system — `AdminTranslation`, files under
 Health is checked by dedicated commands — four of the translation set, which [COMMAND_API.md](COMMAND_API.md) lists in full alongside the read/write ones:
 
 - `validateTranslations` — keys missing from a language.
-- `getUnusedTranslationKeys` — keys defined but never referenced.
+- `getUnusedTranslationKeys` — keys defined but that nothing on the site uses.
 - `analyzeTranslations` — full report.
-- `getTranslationKeys` — scans every page / menu / footer / component structure and returns the union grouped by source (`keys_by_source: { 'home': [...], 'menu': [...], 'component:reassurance-item': [...] }`). Drives the Translation Manager's scope picker.
+- `getTranslationKeys` — the keys the site uses, grouped by source (`keys_by_source: { 'home': [...], 'menu': [...], 'component:reassurance-item': [...], 'site:media': [...] }`). Drives the Translation Manager's scope picker.
+
+The four share **one answer to which keys a site uses**, `qs_site_translation_keys()` in `translationHelpers.php`, and `deleteNode` reads it too. A key is used where the engine looks it up for something the site shows, by the renderer's own rule, in these places: each page (a page kept in a folder and a special page such as 404 included) with its title, `page.titles.<route>`, its description, `page.descriptions.<route>`, and its page events; the menu; the footer; each component; the consent layer's banner and popup once generated; a text of any of these structures (never a `__RAW__` text nor an unfilled slot); a translated attribute (`alt`, `placeholder`, `title`, `aria-label`, `aria-placeholder`, `aria-description`) holding a key; a component's data where it lands in a text or a translated attribute, its enum's chosen option included; a call argument that is looked up, in an event attribute or a page event; an API's count sentences; the key each picture's description holds in Media; the site's name in link previews, `site.name`; and the words the Storage and Privacy registries own.
+
+What each one needs follows what a visitor sees. A key a page shows is needed in every language, and a language without its word is missing it: a page's title, every structure's text and translated attribute, the consent layer, a picture's description in Media, an API's sentences. A page's description, the site's name, a call argument that falls back to its own text, a component's own words and its enum's other options, and the registries' words are optional: used where a language holds them, never missing.
+
+`deleteNode` removes a key the deleted element named only when, once the element is gone, nothing else on the site uses it; a key still used elsewhere, such as a picture's description another page or Media holds, is kept in every language and named in its answer.
 
 The admin panel reads the **composed** view via `public/admin/api/index.php` case `'translation-keys-grouped'`, which calls `getTranslation` + `getUnusedTranslationKeys` + `validateTranslations` and partitions the result into `{used, unset, unused}`. See [ADMIN_PANEL.md §8.9](ADMIN_PANEL.md) for the Translation Manager UI.
 

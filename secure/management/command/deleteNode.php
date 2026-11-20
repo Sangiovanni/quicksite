@@ -1,77 +1,30 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
- * Collect all translation keys from a node and its children recursively
- * 
- * @param array $node The node to extract keys from
- * @return array Array of translation keys found
- */
-function collectTranslationKeysFromNode(array $node): array {
-    $keys = [];
-    
-    // Check for textKey (direct text content)
-    if (isset($node['textKey']) && is_string($node['textKey'])) {
-        $keys[] = $node['textKey'];
-    }
-    
-    // Check for translatable attributes in params (TagRegistry's list: the keys addNode's
-    // picker chose, cleaned up on delete)
-    if (isset($node['params']) && is_array($node['params'])) {
-        foreach (TagRegistry::TRANSLATABLE_ATTRIBUTES as $attr) {
-            if (isset($node['params'][$attr]) && is_string($node['params'][$attr])) {
-                // Only add if it looks like a translation key (contains dots)
-                $value = $node['params'][$attr];
-                if (strpos($value, '.') !== false && !preg_match('/^https?:/', $value)) {
-                    $keys[] = $value;
-                }
-            }
-        }
-    }
-    
-    // Recursively collect from children
-    if (isset($node['children']) && is_array($node['children'])) {
-        foreach ($node['children'] as $child) {
-            if (is_array($child)) {
-                $keys = array_merge($keys, collectTranslationKeysFromNode($child));
-            }
-        }
-    }
-    
-    return $keys;
-}
-
-/**
- * Remove translation keys from all language files
- * 
- * NOTE: This does NOT check if keys are used elsewhere in other structures.
- * Auto-generated keys (e.g., "home.item5") are unique by design so this is safe.
- * If users manually share translation keys across nodes, they should be aware
- * that deleting one node may remove the shared key. This is acceptable as:
- * 1. Scanning all structures would be expensive for large projects
- * 2. Shared manual keys are a rare edge case
- * 3. Users manually sharing keys should manage them consciously
- * 
- * @param array $keys Keys to remove
- * @return array Result with removed count and any errors
+ * Remove translation keys from every language file (default.json included), each word and the groups it leaves
+ * empty. deleteNode hands it only the keys the site no longer names (qs_site_translation_keys()).
+ *
+ * @param string[] $keys Keys to remove
+ * @return array{removed: string[], errors: string[]} the keys removed from at least one file
  */
 function removeTranslationKeysFromFiles(array $keys): array {
     if (empty($keys)) {
-        return ['removed' => 0, 'errors' => []];
+        return ['removed' => [], 'errors' => []];
     }
     
     $translateDir = PROJECT_PATH . '/translate';
     if (!is_dir($translateDir)) {
-        return ['removed' => 0, 'errors' => ['Translate directory not found']];
+        return ['removed' => [], 'errors' => ['Translate directory not found']];
     }
     
-    $removed = 0;
+    $removed = [];
     $errors = [];
     
     // Process all JSON files in translate directory
@@ -87,7 +40,7 @@ function removeTranslationKeysFromFiles(array $keys): array {
         foreach ($keys as $key) {
             if (removeNestedKey($translations, $key)) {
                 $modified = true;
-                $removed++;
+                $removed[$key] = true;
             }
         }
         
@@ -101,7 +54,7 @@ function removeTranslationKeysFromFiles(array $keys): array {
         }
     }
     
-    return ['removed' => $removed, 'errors' => $errors];
+    return ['removed' => array_map('strval', array_keys($removed)), 'errors' => $errors];
 }
 
 /**
@@ -149,7 +102,9 @@ function cleanupEmptyParents(array &$arr): void {
  * @auth required
  * @permission editStructure
  * 
- * Removes a node and all its children from the structure.
+ * Removes a node and all its children from the structure, then each translation key the node named that the site
+ * no longer names anywhere (qs_site_translation_keys()), in every language; a key still named elsewhere is kept,
+ * and keepTranslationKeys keeps every key.
  */
 
 /**
@@ -257,8 +212,9 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
         'hasChildren' => isset($node['children']) && !empty($node['children'])
     ];
     
-    // Collect translation keys from the node before deletion
-    $translationKeys = collectTranslationKeysFromNode($node);
+    // The translation keys the node names, by the rule every reader of a site's keys takes (in a component's
+    // file, a value still holding a slot names no key yet)
+    $translationKeys = qs_node_translation_keys($node, PROJECT_PATH, $type === 'component');
     
     // Remove the node from structure (NodeNavigator::removeNode, the removal every command shares)
     $removeResult = NodeNavigator::removeNode($structure, $nodeId);
@@ -295,10 +251,16 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
             ->withMessage("Failed to write structure file");
     }
 
-    // Clean up translation keys from the deleted node (unless keepTranslationKeys is set)
-    $translationCleanup = ['removed' => 0, 'errors' => []];
-    if (!empty($translationKeys) && !$keepTranslationKeys) {
-        $translationCleanup = removeTranslationKeysFromFiles($translationKeys);
+    // The node's keys the site still names elsewhere, read once the structure is written: kept in every case.
+    // The others are removed from every language, unless keepTranslationKeys keeps them all.
+    $stillNamed = [];
+    if (!empty($translationKeys)) {
+        $named = qs_site_translation_keys_named(qs_site_translation_keys(PROJECT_PATH));
+        $stillNamed = array_values(array_filter($translationKeys, static fn(string $key): bool => isset($named[$key])));
+    }
+    $translationCleanup = ['removed' => [], 'errors' => []];
+    if (!$keepTranslationKeys) {
+        $translationCleanup = removeTranslationKeysFromFiles(array_values(array_diff($translationKeys, $stillNamed)));
     }
     
     return ApiResponse::create(200, 'operation.success')
@@ -309,8 +271,9 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
             'nodeId' => $nodeId,
             'deletedNode' => $deletedNodeInfo,
             'file' => $json_file,
-            'translationKeysRemoved' => count($translationKeys),
-            'translationKeys' => $translationKeys
+            'translationKeysRemoved' => count($translationCleanup['removed']),
+            'translationKeys' => $translationKeys,
+            'translationKeysKept' => $stillNamed
         ]);
 }
 

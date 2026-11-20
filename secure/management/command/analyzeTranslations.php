@@ -8,114 +8,16 @@
  * @auth required
  * @permission read
  * 
- * Performs comprehensive analysis of translations:
- * 1. Missing translations (keys in structures but not in translation files)
- * 2. Unused translations (keys in translation files but not in structures)
+ * Performs comprehensive analysis of translations, on the keys the site uses (qs_site_translation_keys()):
+ * 1. Missing translations (keys the site needs in every language, with no word in a translation file)
+ * 2. Unused translations (keys in translation files the site does not use)
  * 3. Coverage statistics per language
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
-
-/**
- * Extract all textKeys from all structures
- */
-function extractRequiredKeys_analyze(): array {
-    $allKeys = [];
-    
-    // Scan pages
-    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
-    if (is_dir($pagesDir)) {
-        foreach (glob($pagesDir . '/*.json') as $file) {
-            $structure = loadJsonStructure($file);
-            if (is_array($structure)) {
-                foreach ($structure as $node) {
-                    extractTextKeys($node, $allKeys, 0, 20);
-                }
-            }
-        }
-    }
-    
-    // Scan menu
-    $menuFile = PROJECT_PATH . '/templates/model/json/menu.json';
-    $menuStructure = loadJsonStructure($menuFile);
-    if (is_array($menuStructure)) {
-        foreach ($menuStructure as $node) {
-            extractTextKeys($node, $allKeys, 0, 20);
-        }
-    }
-    
-    // Scan footer
-    $footerFile = PROJECT_PATH . '/templates/model/json/footer.json';
-    $footerStructure = loadJsonStructure($footerFile);
-    if (is_array($footerStructure)) {
-        foreach ($footerStructure as $node) {
-            extractTextKeys($node, $allKeys, 0, 20);
-        }
-    }
-    
-    // Scan components
-    $componentsDir = PROJECT_PATH . '/templates/model/json/components';
-    if (is_dir($componentsDir)) {
-        foreach (glob($componentsDir . '/*.json') as $file) {
-            $structure = loadJsonStructure($file);
-            if (is_array($structure)) {
-                foreach ($structure as $node) {
-                    extractTextKeys($node, $allKeys, 0, 20);
-                }
-            }
-        }
-    }
-    
-    // Every route's title, read dynamically (qs_page_translation_keys()): a nested route's included.
-    // A page's description is optional, never required: it is counted used where a language holds it (below).
-    $routesFile = PROJECT_PATH . '/routes.php';
-    if (file_exists($routesFile)) {
-        $routes = include $routesFile;
-        if (is_array($routes)) {
-            $allKeys = array_merge($allKeys, qs_page_translation_keys($routes, [])['titles']);
-        }
-    }
-    
-    return array_unique($allKeys);
-}
-
-/**
- * Flatten nested translation array to dot notation keys
- */
-function flattenKeys_analyze(array $arr, string $prefix = ''): array {
-    $keys = [];
-    foreach ($arr as $key => $value) {
-        $fullKey = $prefix === '' ? $key : $prefix . '.' . $key;
-        if (is_array($value)) {
-            $keys = array_merge($keys, flattenKeys_analyze($value, $fullKey));
-        } else {
-            $keys[] = $fullKey;
-        }
-    }
-    return $keys;
-}
-
-/**
- * Check if a key exists in translations AND has a non-empty value (dot notation)
- * Empty string values are considered "untranslated"
- */
-function keyExists_analyze(string $key, array $translations): bool {
-    $segments = explode('.', $key);
-    $current = $translations;
-    foreach ($segments as $segment) {
-        if (!is_array($current) || !isset($current[$segment])) {
-            return false;
-        }
-        $current = $current[$segment];
-    }
-    // Empty string is considered as "missing/untranslated"
-    if (is_string($current) && $current === '') {
-        return false;
-    }
-    return true;
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
 /**
  * Command function for internal execution via CommandRunner
@@ -146,9 +48,9 @@ function __command_analyzeTranslations(array $params = [], array $urlParams = []
         }
     }
 
-    // Get all required keys from structures
-    $requiredKeys = extractRequiredKeys_analyze();
-    sort($requiredKeys);
+    // The keys the site uses, and the keys it needs in every language (sorted)
+    $sites = qs_site_translation_keys(PROJECT_PATH);
+    $requiredKeys = qs_translation_keys_in_use($sites, [])['required'];
 
     // Determine which languages to analyze
     $languagesToAnalyze = $targetLang ? [$targetLang] : qs_project_language_codes();
@@ -179,7 +81,7 @@ function __command_analyzeTranslations(array $params = [], array $urlParams = []
             continue;
         }
         
-        $translations = json_decode(@file_get_contents($translationFile), true);
+        $translations = qs_translation_file_tree($translationFile);
         
         if (!is_array($translations)) {
             $analysis[$lang] = [
@@ -198,17 +100,15 @@ function __command_analyzeTranslations(array $params = [], array $urlParams = []
         // Find missing keys (required but not in translations)
         $missingKeys = [];
         foreach ($requiredKeys as $key) {
-            if (!keyExists_analyze($key, $translations)) {
+            if (!qs_translation_tree_has_word($translations, $key)) {
                 $missingKeys[] = $key;
             }
         }
         
-        // Find unused keys (in translations but not required). A page's description this language holds
-        // is used, never missing where it does not.
-        $translationKeys = flattenKeys_analyze($translations);
-        $routes = is_file(PROJECT_PATH . '/routes.php') ? include PROJECT_PATH . '/routes.php' : [];
-        $heldDescriptions = qs_page_translation_keys(is_array($routes) ? $routes : [], $translations)['descriptions'];
-        $unusedKeys = array_values(array_diff($translationKeys, $requiredKeys, $heldDescriptions));
+        // Find unused keys (in translations, not used by the site in this language). An optional key this
+        // language holds is used, never missing where it does not.
+        $translationKeys = qs_translation_tree_keys($translations);
+        $unusedKeys = array_values(array_diff($translationKeys, qs_translation_keys_in_use($sites, [$translations])['used']));
         
         sort($missingKeys);
         sort($unusedKeys);

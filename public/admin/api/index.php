@@ -504,7 +504,7 @@ switch ($action) {
         $allKeys = flattenTranslationKeysForSelect($translationResult['data']['translations'] ?? []);
 
         // $missingKeys (from validateTranslations) treats
-        // empty-string leaves as "missing" (per keyExistsInTranslations_validate).
+        // empty-string leaves as "missing" (per qs_translation_tree_has_word()).
         // But the same key still appears in $allKeys (flattenTranslationKeysForSelect
         // returns ALL leaves, empty or not). Without this lookup, a key like
         // 'page.titles.test' = "" lands in BOTH $used (because it's not in

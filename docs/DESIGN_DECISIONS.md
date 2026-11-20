@@ -16434,3 +16434,37 @@ it read the language switch its own way).
 `secure/src/functions/runtimePlaceholders.php` (`qs_fill_placeholders()`, `qs_holds_language_switch()`),
 `JsonToHtmlRenderer` (`fillText()`, `substitutedAttributeValue()`), `JsonToPhpCompiler` (`compileTextNode()`,
 `attributeValueExpr()`). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §4.2 (*Render parity*).
+
+### One answer to which keys a site uses, and a deleted element removes only a word nothing else uses (locked 2026-11-20)
+
+**Decision**: One engine function answers which translation keys a site uses, by source, `qs_site_translation_keys()` in
+`translationHelpers.php`: each page by its route (a page in a folder and a special page included) with its title, description and
+page events; the menu; the footer; each component; the consent layer; the key each picture's description holds in Media; an API's
+count sentences; the site's name in link previews; the Storage and Privacy registries' words. It reads a structure by the renderer's
+own rule: a text that is not raw nor an unfilled slot, a translated attribute holding a key, a call argument that is looked up, a
+placed component with its data written in and its enum chosen. Each key carries its need: required where a visitor sees it, optional
+where it may be left out (a description, the site's name, a call argument that falls back to its own text, a component's own words,
+a registry's words), used where a language holds it and never missing. `getTranslationKeys`, `getUnusedTranslationKeys`,
+`validateTranslations` and `analyzeTranslations` read it, their answers keeping their shape; `deleteNode` removes a key the deleted
+element named only when, the element gone, the function no longer finds it anywhere, and names the keys it kept. A census of every
+place the engine looks a key up is kept beside the function, with a probe that fails on a place it does not know.
+
+**Reasoning**: Each of the four commands scanned the site with its own copy of one walk, and none read a translated attribute, the
+consent layer or the keys Media holds; one missed every page kept in a folder, three missed every key inside a component, and the walk
+counted a file name in a component's data as a key. Since a picture's description became a key Media and every placement share, two
+paths deleted words still in use: deleting one placed picture removed its description in every language, and the Translation tool's
+*Remove unused* listed it, with the consent layer's words and the Storage and Privacy descriptions, as unused. One answer makes the
+four agree by construction, and lets a new place where a site names a key be added once. The renderer's rule, rather than a
+heuristic of its own, keeps the answer equal to what a visitor sees.
+
+**Alternatives considered**: each command keeping its own scan, with the missing sources added to each (rejected — four copies to keep
+in step, which is how they drifted); `deleteNode` always removing the keys a deleted element names, as before (rejected — it deletes
+a word another element, another page or Media still shows); `deleteNode` never removing a key (rejected — every deleted element would
+leave its words behind, for *Remove unused* to find later; removing what nothing names keeps the files clean and loses nothing).
+
+**Source**: Sangio's ruling, 2026-11-20, on the manager's flags while checking the Translations page's facts; beta.12. With it, the
+shared translation writer's copy into `default.json` takes the same clash check as the language's file and, on a multilingual
+project, copies a write in the default language alone; `getTranslations` answers the project's default language. Code:
+`secure/src/functions/translationHelpers.php` (`qs_site_translation_keys()`, `qs_translation_keys_in_use()`,
+`writeTranslationsToFile()`), the four commands, `deleteNode`. Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §5,
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §8.9.

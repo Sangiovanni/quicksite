@@ -843,11 +843,13 @@ A sixth editor mode that **manages translation keys site-wide for the current pr
 
 | Status | Definition | Lives where |
 |---|---|---|
-| 🟢 **Used** | Referenced by a page/menu/footer/component structure AND has a non-empty value in this language | translations + structures |
-| 🔴 **Unset** | Referenced by a structure but missing from translations OR has `""` value | structures only |
-| 🟡 **Unused** | In the translation file but no structure references it (orphan) | translations only |
+| 🟢 **Used** | The site uses it AND it has a non-empty value in this language | translations + the site |
+| 🔴 **Unset** | The site needs it in every language but it is missing from translations OR has `""` value | the site only |
+| 🟡 **Unused** | In the translation file but nothing on the site names it (orphan) | translations only |
 
 These three are mutually exclusive — a key never appears in more than one bucket.
+
+**What the site uses** is the engine's one answer, the one the translation commands share ([ARCHITECTURE.md §5](ARCHITECTURE.md)): not only a page's, the menu's, the footer's and a component's texts, but their translated attributes (a picture's `alt`, a `title`, a `placeholder`, …), the consent layer's words, page titles and descriptions, a call argument a page looks up, an API's sentences, the key each picture's description holds in Media, the site's name in link previews and the words the Storage and Privacy pages write. A picture's description is never unused while Media holds it or a page shows the picture. A key that is optional (a page's description, the site's name, the Storage and Privacy words) is used where the language holds it and never unset.
 
 **Coverage math** — `used / (used + unset)`. Unused does NOT distort the denominator; orphaned translations are a clean-up concern, not a "translation done" signal. `0/0 → 100%` (nothing to translate = done).
 
@@ -856,7 +858,7 @@ These three are mutually exclusive — a key never appears in more than one buck
 | Region | What it does |
 |---|---|
 | Toolbar — Language picker | Switches the language file being managed. Hidden when only one language exists (monolingual, or multilingual with a single config'd lang). |
-| Toolbar — Scope picker | "Whole site" / Pages optgroup (page routes) / Layout optgroup (menu, footer) / Components optgroup (`component:<name>`). |
+| Toolbar — Scope picker | "Whole site" / Pages optgroup (page routes) / Layout optgroup (menu, footer) / Components optgroup (`component:<name>`). The site's own sources (`site:consent`, `site:media`, `site:api`, `site:link-previews`, `site:storage`, `site:privacy`) are listed in the Pages optgroup under those names. |
 | Toolbar — Coverage strip | `Coverage: 78% (142/172)` text. Recomputed per-scope. |
 | Filter row — substring | Case-insensitive contains-match on key name. Counts in chips narrow with substring. |
 | Filter row — status chips | 🟢 Used / 🔴 Unset / 🟡 Unused, each with a count + visible label. Toggle to filter rows. Counts are scope-aware (and substring-aware) but NOT status-aware (a chip can't depend on its own checked state). |
@@ -871,7 +873,9 @@ After save success the panel runs `_refetchAndRender()` so the row's status flip
 
 **Per-row delete (list-first confirm, no bare prompt)** — clicking the trash icon expands a red-bordered confirm panel below the row: `Delete {key} from {LANG}.json?` plus a value preview, then Cancel + Delete buttons. Multi-language opt-in checkbox appears beneath when ≥2 languages exist (default OFF — you're usually editing one language). Confirm runs `deleteTranslationKeys` for the target language(s) via `Promise.all`; 404 from a non-current language is treated as success (key already absent in that file).
 
-**Bulk remove-unused** — same list-first pattern applied at scale. Button opens a full-panel confirm that replaces the row list: header `These {n} unused keys will be deleted from {LANG}.json:`, scrollable list of every unused key + truncated value preview, multi-language opt-in (default ON — orphaned keys are orphaned everywhere), then Cancel + Delete-N buttons. Single `deleteTranslationKeys` call per target language, parallel.
+**Bulk remove-unused** — same list-first pattern applied at scale. Button opens a full-panel confirm that replaces the row list: header `These {n} unused keys will be deleted from {LANG}.json:`, scrollable list of every unused key + truncated value preview, multi-language opt-in (default ON — orphaned keys are orphaned everywhere), then Cancel + Delete-N buttons. Single `deleteTranslationKeys` call per target language, parallel. It offers only keys nothing on the site names, so it never removes a word a page, the consent layer, Media or a registry still uses.
+
+**Deleting an element keeps a word something else still uses** — the editor's element delete and its text-only delete (`deleteNode`) remove a word the deleted element named only when nothing else on the site uses it: a text shown by another element, a picture's description another page or Media holds, keep their words in every language. The text-only delete's *Keep translation keys* box keeps every word.
 
 Partial failure (some languages succeed, others fail) is surfaced inline: `Failed for 1/2 languages: FR: <details>`. State stays restorable — user can retry without losing the confirm context.
 
@@ -904,7 +908,7 @@ This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists 
 | i18n keys exposed to JS | `secure/admin/templates/pages/preview-config.php` (`i18nPanels.translation` block) |
 | CSS | `public/admin/assets/admin.css` (`.preview-contextual-translation__*`) |
 | Server: read-side composing helper | `public/admin/api/index.php` case `'translation-keys-grouped'` |
-| Server: scan commands | `getTranslationKeys.php`, `getUnusedTranslationKeys.php`, `validateTranslations.php` |
+| Server: scan commands | `getTranslationKeys.php`, `getUnusedTranslationKeys.php`, `validateTranslations.php`, on `qs_site_translation_keys()` (`translationHelpers.php`) |
 | Server: write commands | `setTranslationKeys.php`, `deleteTranslationKeys.php` |
 | Server: shared key validator | `secure/src/functions/translationHelpers.php` (`isValidTranslationKey`) |
 | Runtime translator | `secure/src/classes/Translator.php` (mono = `default.json`; multi = `{lang}.json`) |
