@@ -18,6 +18,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php'; // QS_SOCIAL_DESCRIPTION_MAX
+require_once SECURE_FOLDER_PATH . '/src/functions/textMarkers.php';          // QS_TEXT_MARKERS
 
 $baseUrl = rtrim(BASE_URL, '/');
 
@@ -55,6 +56,9 @@ window.QS_SOCIAL_CONFIG = <?= json_encode([
     'defaultLang'    => qs_project_default_language($__spConfig),
     // The longest description setSocialPreview writes: the field holds no more.
     'descriptionMax' => QS_SOCIAL_DESCRIPTION_MAX,
+    // The markers a word's formatting is written with: a description typed is judged by its words, these removed,
+    // as the page's tags carry it (core/text-markers.js reads the list; the script holds none).
+    'textMarkers'    => QS_TEXT_MARKERS,
     // The panel's own language, for the lists the page joins in words.
     'panelLang'      => AdminTranslation::getInstance()->getCurrentLanguage(),
 ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>;
@@ -112,4 +116,5 @@ window.QS_SOCIAL_I18N = <?= json_encode($__spWords, JSON_HEX_TAG | JSON_HEX_AMP 
 <script src="<?= $baseUrl ?>/admin/assets/js/components/colorpicker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/components/colorpicker.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/core/media-pictures.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/media-pictures.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/core/social-figures.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/social-figures.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/core/text-markers.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/text-markers.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/social-previews.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/social-previews.js') ?>"></script>

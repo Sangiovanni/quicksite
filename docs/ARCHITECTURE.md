@@ -142,7 +142,7 @@ A small vocabulary of markers controls rendering. They are described by intent �
 - **Formatting markers inside a translated word** — a word may carry its own formatting, so each language's one sentence moves it with its words: English `my very <b>bold words</b>`, French `mes mots <b>vraiment gras</b>`. The markers are `b`, `i`, `u`, `strong` and `em` in pairs, and `br` alone (one engine list, `QS_TEXT_MARKERS` in `textMarkers.php`, not a project setting). A marker is written exactly so: lowercase, with no attribute and no space inside its angle brackets, the pairs properly nested (a closing marker closes the last marker opened and still open) and every one opened closed; anything else, an uppercase or misnested one included, shows as written. A backslash right before a marker keeps it as text and is not shown (a backslash before `<b>` shows `<b>`); backslashes right before a marker count in pairs, each pair showing one backslash, so a backslash can stand before formatted words; every other backslash shows as written. A marker becomes an element only in a text node, inside an element that can show formatting, and only from the translation's own word: the markers are read before any placeholder is filled, and each run of words between them is then filled and escaped, so a value a placeholder brings (an address's part, a resolver's answer, a system value) never becomes one, and a key's missing marker takes none. Everywhere else a word reaches, the markers are removed and the words kept, a line break becoming a space between two words: the translatable attributes, the page's `<title>` and description, the link-preview tags, the words handed to the browser's runtime (a call argument such as a toast, a count sentence), and the text inside an `option`, a `textarea`, a `select`, an `optgroup`, a `datalist`, an `svg` or an `iframe` (`TagRegistry::PLAIN_TEXT_TAGS`), where a marked backslash shows without its backslash. The admin panel shows the stored word, markers included.
 - **`__enums__`** — a root-level metadata block on a component template that derives variables from a single source key. Each entry maps a derived variable name to a value map plus an optional default. Use `listComponents` at runtime to see what a component exposes.
 - **`{{var}}` and `{{$var}}`** — placeholders interpolated from the caller's `data` when a component is inlined. Variable names accept letters, digits, underscores, and hyphens.
-- **`{{__system__}}` placeholders** — request-time values (`{{__lang}}`, `{{__current_page}}`, `{{__current_route}}`, `{{__public_folder}}`, and the language-switch form `{{__current_page;lang=en}}`). Substituted in text AND in attributes, identically on the served site and in a build — see §4.2 for the order and why it matters.
+- **`{{__system__}}` placeholders** — request-time values (`{{__lang}}`, `{{__current_page}}`, `{{__current_route}}`, `{{__public_folder}}`, and the language-switch form `{{__current_page;lang=en}}`, which is read in an attribute alone). Substituted in text AND in attributes, identically on the served site and in a build, in one pass with the other placeholders — see §4.2 for why that matters.
 - **Translatable attributes** (`placeholder`, `title`, `alt`, `aria-label`, `aria-placeholder`, `aria-description`: one list, `TagRegistry::TRANSLATABLE_ATTRIBUTES`, which the renderer, the compiler and the commands that copy or remove a node's keys all read) auto-resolve their value as a translation key when it looks like one — lowercase identifiers separated by dots, e.g. `form.contact.placeholder`. Prefix with `__RAW__` to opt out. Where an attribute is meaningful on a tag, the visual editor offers it as a translation-key picker rather than a text box — `alt` on `img` and `area`, `title` on `iframe`. Both commands that write nodes (`addNode`, `editNode`) treat these as ordinary optional params: whatever the author chose is stored verbatim, and choosing nothing writes no attribute.
 - **URL attributes** (`href`, `src`, `data`, `poster`, `action`, `formaction`, `cite`, `srcset`) get base-URL and language-prefix processing automatically. EVERY placeholder inside them is substituted before the URL policy inspects the value, so the policy sees what the browser will receive (§4.2). A `srcset` is a list of files: each file's address gets the same processing and the same policy, its descriptors (`2x`, `480w`) and the commas and spaces between files kept as written.
 
@@ -368,7 +368,8 @@ for.
 A differential harness holds them to it. Each rule below is shared outright or
 mirrored on both sides, and each says where its single definition lives.
 
-**Placeholders.** Four kinds, and they are substituted in a fixed order.
+**Placeholders.** Four kinds. A translation key is looked up first; the other
+three are then filled together, in one pass.
 
 | Kind | Value known at | Substituted in |
 |---|---|---|
@@ -377,10 +378,16 @@ mirrored on both sides, and each says where its single definition lives.
 | `{{param:NAME}}` | request time (the URL) | text and attributes |
 | a translation key | request time (the language) | text and translatable attributes |
 
-⚠ **The order is a security property.** System placeholders first, resolved
-values second, **params last** — a param comes straight out of the URL, so it is
-the one visitor-controlled input, and substituting it last means nothing it
-introduces is re-scanned as a placeholder.
+⚠ **One pass is a security property.** Every placeholder of a text or an
+attribute is replaced at once, from the value as its author wrote it, and no
+filled value is ever read again: an address's part, a resolver's answer or the
+page's own address that holds placeholder braces is drawn as it is. Filled one
+kind after another, a value filled early would be read by a later kind, and
+whichever kind came first could bring a placeholder in for the next: an address
+carrying `{{resolved:…}}` would show a field of the page's data. One function
+fills them, `qs_fill_placeholders()` in `runtimePlaceholders.php`, which the
+renderer and a built page both call: for a text, a raw text, a translated
+attribute and any attribute that holds a placeholder.
 
 ⚠ **And substitution precedes the URL policy.** `UrlPolicy` has to inspect the
 value the browser will actually receive. Sanitising the literal placeholder and
@@ -392,7 +399,8 @@ which is protection by accident rather than by policy.
 
 The one exception is `{{__current_page;lang=xx}}`, the language switch: it
 resolves to a COMPLETE URL, so both surfaces recognise it *before* substituting
-and exempt the result from being composed against the base a second time.
+and exempt the result from being composed against the base a second time. It is
+read in an attribute alone; in a text it stays as written.
 
 **Component slots.** `{{var}}` and `{{$var}}` are a separate mechanism from the
 four above and are bound earlier — when a component is inlined, from the
@@ -1495,14 +1503,15 @@ files are split along that line so both halves cannot drift:
 The authoring file requires the runtime one, so there is a single definition of
 each and existing callers are unchanged.
 
-**`{{param:NAME}}` and `{{resolved:NAME}}` are request-time placeholders.** Their
-values are not knowable when a page is compiled — a param comes from the URL
-being served, a resolved value from an HTTP call made during that request — so a
-compiled page emits a CALL to `runtimePlaceholders.php` rather than folding them
-in. Both surfaces substitute through the same two functions, including the rule
-that resolved values are substituted BEFORE params: a param is visitor-supplied,
-and doing params first would let a URL inject a placeholder for the resolved
-pass to expand.
+**`{{param:NAME}}`, `{{resolved:NAME}}` and the system placeholders are
+request-time placeholders.** Their values are not knowable when a page is
+compiled — a param comes from the URL being served, a resolved value from an
+HTTP call made during that request, a system value from the request's address
+and language — so a compiled page emits a CALL to `runtimePlaceholders.php`
+rather than folding them in. Both surfaces fill them through the same function,
+`qs_fill_placeholders()`, in one pass from the value as written (§4.2): no
+filled value is read again, so nothing an address or a resolver's answer carries
+can bring a placeholder in.
 
 **A translated word's formatting markers (§2) are read by one file a build
 carries, `textMarkers.php`.** A compiled text node calls the function the live

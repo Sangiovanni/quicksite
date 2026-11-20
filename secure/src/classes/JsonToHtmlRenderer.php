@@ -567,62 +567,6 @@ class JsonToHtmlRenderer {
      * @param array $node Text node with 'textKey'
      * @return string Escaped translated text
      */
-    /**
-     * Substitute `{{param:NAME}}` placeholders with values from
-     * $this->context['routeParams']. Text-level template
-     * substitution for URL path-params (e.g., :slug from /products/:slug).
-     *
-     * - Fast path: returns unchanged when no routeParams in context OR
-     *   when the text doesn't contain '{{param:'.
-     * - Unknown param names: left as the literal placeholder so the
-     *   author can spot the typo.
-     * - Caller is responsible for htmlspecialchars after substitution
-     *   so the substituted value is properly escaped.
-     */
-    /**
-     * System placeholders in a string, from the source both surfaces share.
-     *
-     * Kept as a thin method rather than a direct call so the renderer's context
-     * (its already-resolved language and page) reaches the shared function —
-     * one request must not answer the language question twice.
-     */
-    private function applySystemPlaceholders(string $text): string {
-        return qs_apply_system_placeholders($text, [
-            'lang'  => $this->context['lang'] ?? null,
-            'route' => $this->context['page'] ?? null,
-        ]);
-    }
-
-    private function applyRouteParams(string $text): string {
-        return qs_apply_route_params($text, $this->context['routeParams'] ?? []);
-    }
-
-    /**
-     * Substitute `{{resolved:NAME}}` and `{{resolved:NAME.dot.path}}`
-     * placeholders with values from the server-side data resolver.
-     *
-     * Source resolution order:
-     *   1. $this->context['resolved'] when explicitly passed by the
-     *      page template.
-     *   2. Otherwise getResolvedVars() — populated by public/index.php
-     *      after firing DataResolver for the matched route. Legacy
-     *      templates (those that don't pass 'resolved') still benefit
-     *      via this fallback.
-     *
-     * - Fast path: returns unchanged when the text doesn't contain
-     *   '{{resolved:' OR when no resolved vars exist for this request.
-     * - Dot-path support: 'product.name' walks
-     *   $resolved['product']['name'].
-     * - Unknown names / out-of-range paths leave the literal placeholder
-     *   so the author can spot the typo (mirrors applyRouteParams).
-     * - Array / object values render as compact JSON; primitives cast
-     *   to string. Caller is responsible for htmlspecialchars after
-     *   substitution so the substituted value is properly escaped.
-     */
-    private function applyResolved(string $text): string {
-        return qs_apply_resolved($text, $this->context['resolved'] ?? null);
-    }
-
     private function renderTextNode(array $node): string {
         $textKey = $node['textKey'];
         
@@ -646,26 +590,21 @@ class JsonToHtmlRenderer {
         // Without this, raw text has no selection handle.
         if (strpos($textKey, '__RAW__') === 0) {
             $rawText = substr($textKey, 7); // strip the 7-char __RAW__ prefix
-            // Substitute `{{param:NAME}}` placeholders from the
-            // captured URL path-params (e.g., :slug from /products/:slug)
-            // BEFORE htmlspecialchars so the substituted value gets escaped.
-            // Also substitute `{{resolved:NAME[.dot.path]}}`
-            // from the server-side data resolver. resolved first so a
-            // routeParam value containing a literal {{resolved:...}} can't
-            // accidentally inject a real placeholder.
-            // ⚠ ORDER: system, then resolved, then PARAMS LAST. A param comes
-            // straight out of the URL, so it is the one visitor-controlled
-            // input here; substituting it last means nothing it introduces is
-            // ever re-scanned as a placeholder.
+            // Its placeholders are filled BEFORE htmlspecialchars, so each filled
+            // value is escaped: `{{param:NAME}}` from the captured URL path-params
+            // (e.g., :slug from /products/:slug), `{{resolved:NAME[.dot.path]}}`
+            // from the server-side data resolver, and the system ones.
+            // ⚠ ONE PASS (fillText()): every placeholder is replaced from the text
+            // as written, so nothing a value brings in is ever read as a
+            // placeholder. A param comes straight out of the URL, the one
+            // visitor-controlled input here, and is drawn as it is.
             // A raw text takes no markers; a value the component preview's emulation put here stands for a
             // word, and is drawn as one (rawifyEmulatedTextKeys()).
             $emulated = $this->emulationToken !== null && ($node['__qsEmulated'] ?? null) === $this->emulationToken;
             if ($emulated) {
                 $escapedRaw = $this->wordHtml($rawText, null);
             } else {
-                $rawText = $this->applySystemPlaceholders($rawText);
-                $rawText = $this->applyResolved($rawText);
-                $rawText = $this->applyRouteParams($rawText);
+                $rawText = $this->fillText($rawText);
                 $escapedRaw = htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
             }
             if ($this->editorMode) {
@@ -693,13 +632,10 @@ class JsonToHtmlRenderer {
         }
 
         // Get translated text
-        // Substitute `{{param:NAME}}` placeholders from the
-        // captured URL path-params AFTER translation lookup, BEFORE
-        // htmlspecialchars. Translations can author the placeholder; e.g.
-        // an EN string "Welcome, {{param:slug}}!" renders as the URL value.
-        // Also substitute `{{resolved:NAME[.dot.path]}}` from
-        // the server-side data resolver, applied first (see applyResolved).
-        // Same order as the raw branch above: params last.
+        // Its placeholders are filled AFTER the translation lookup and BEFORE
+        // htmlspecialchars, in one pass as the raw branch's are (fillText()).
+        // Translations can author the placeholder; e.g. an EN string
+        // "Welcome, {{param:slug}}!" renders as the URL value.
         // The word's markers (textMarkers.php) are read BEFORE any placeholder is filled, and each run of
         // words between them is filled and escaped (wordHtml()), so no filled value ever becomes one. A key no
         // language holds takes none: the missing marker's text is the key's, not a translation's.
@@ -718,11 +654,13 @@ class JsonToHtmlRenderer {
     }
 
     /**
-     * A text's placeholders filled, in the order every text of this render takes: the system ones, then what the
-     * resolver fetched, then the route's params, the one input a visitor controls, last.
+     * A text's placeholders filled in one pass, from the text as written (qs_fill_placeholders()): the system ones,
+     * what the resolver fetched and the route's params, the one input a visitor controls, none of them read again.
+     * The language switch, `{{__current_page;lang=xx}}`, is an attribute's: in a text it stays as written.
      */
     private function fillText(string $text): string {
-        return $this->applyRouteParams($this->applyResolved($this->applySystemPlaceholders($text)));
+        return qs_fill_placeholders($text, $this->systemContext(), $this->context['routeParams'] ?? [],
+            $this->context['resolved'] ?? null);
     }
 
     /**
@@ -903,16 +841,13 @@ class JsonToHtmlRenderer {
 
     /**
      * The placeholders in an attribute's value filled, as renderAttribute() fills
-     * them and in its order: the system ones, then what the resolver fetched,
-     * then the route's params, the one input a visitor controls, last, so
-     * nothing it brings in is read again.
+     * them: in one pass, from the value as written (qs_fill_placeholders()), so
+     * nothing a value brings in, a route's param above all, is read again;
+     * `{{__current_page;lang=xx}}` is this page's address in that language.
      */
     private function substitutedAttributeValue(string $value): string {
-        if (strpos($value, '{{__') !== false) {
-            $value = $this->processDataPlaceholders($value);
-        }
-        $value = $this->applyResolved($value);
-        return $this->applyRouteParams($value);
+        return qs_fill_placeholders($value, $this->systemContext(), $this->context['routeParams'] ?? [],
+            $this->context['resolved'] ?? null, fn(string $lang): string => $this->buildLanguageSwitchUrl($lang));
     }
 
     /**
@@ -1046,8 +981,9 @@ class JsonToHtmlRenderer {
         // survive only because the base is prefixed in front of the injected
         // value — luck, not design.
         //
-        // Within the substitutions, PARAMS GO LAST: a param is the one
-        // visitor-controlled input, so nothing it introduces is re-scanned.
+        // The substitutions are ONE PASS over the value as written: a param is
+        // the one visitor-controlled input, and nothing any value brings in is
+        // read again (substitutedAttributeValue()).
         $isLanguageSwitch = false;
         if (is_string($value)) {
             // The language-switch form has to be recognised BEFORE it is
@@ -1055,7 +991,7 @@ class JsonToHtmlRenderer {
             // ordinary root-relative path, and would be composed against the
             // base a second time.
             if (strpos($value, '{{__') !== false) {
-                $isLanguageSwitch = $this->hasLanguageSwitchPlaceholder($value);
+                $isLanguageSwitch = qs_holds_language_switch($value);
             }
             $value = $this->substitutedAttributeValue($value);
         }
@@ -1255,27 +1191,17 @@ class JsonToHtmlRenderer {
 
     /**
      * Process system placeholders in component data
-     * Replaces {{__placeholder}} and {{__placeholder;param=value}} with actual values
-     * 
+     * Replaces {{__placeholder}} and {{__placeholder;param=value}} with actual values, as an attribute's are
+     * (qs_fill_placeholders() given no address or resolver values: those stay as written here, and are filled
+     * where the data lands)
+     *
      * @param mixed $data Component data
      * @return mixed Processed data
      */
     private function processDataPlaceholders($data) {
-        $systemPlaceholders = $this->getSystemPlaceholders();
-        
         if (is_string($data)) {
-            // Replace all {{__placeholder}} or {{__placeholder;params}} occurrences
-            return preg_replace_callback('/\{\{(__\w+)(?:;([^}]+))?\}\}/', function($matches) use ($systemPlaceholders) {
-                $key = $matches[1];
-                $params = isset($matches[2]) ? $this->parseParameters($matches[2]) : [];
-                
-                // Special handling for __current_page with lang parameter
-                if ($this->isLanguageSwitchPlaceholder($key, $params)) {
-                    return $this->buildLanguageSwitchUrl($params['lang']);
-                }
-
-                return $systemPlaceholders[$key] ?? $matches[0];
-            }, $data);
+            return qs_fill_placeholders($data, $this->systemContext(), [], [],
+                fn(string $lang): string => $this->buildLanguageSwitchUrl($lang));
         }
         
         if (is_array($data)) {
@@ -1287,58 +1213,6 @@ class JsonToHtmlRenderer {
         }
         
         return $data;
-    }
-    
-    /**
-     * Parse parameters from placeholder syntax: param1=value1;param2=value2
-     * 
-     * @param string $paramString Parameter string
-     * @return array Parsed parameters
-     */
-    /**
-     * Whether one parsed placeholder is the language switch.
-     *
-     * The single test, so the substitution and the URL-rewrite exemption in
-     * renderAttribute() can never disagree about what a language switch is.
-     *
-     * @param string $key    The placeholder name, e.g. '__current_page'.
-     * @param array  $params Its parsed `;k=v` parameters.
-     */
-    private function isLanguageSwitchPlaceholder(string $key, array $params): bool {
-        return $key === '__current_page' && isset($params['lang']);
-    }
-
-    /**
-     * Whether an attribute value contains a language-switch placeholder.
-     *
-     * Asked BEFORE substitution: the value it resolves to is a complete URL,
-     * and once substituted it looks exactly like an ordinary root-relative
-     * path. Same scan and same predicate as processDataPlaceholders(), so the
-     * two cannot drift.
-     */
-    private function hasLanguageSwitchPlaceholder(string $value): bool {
-        if (!preg_match_all('/\{\{(__\w+)(?:;([^}]+))?\}\}/', $value, $matches, PREG_SET_ORDER)) {
-            return false;
-        }
-        foreach ($matches as $match) {
-            $params = isset($match[2]) ? $this->parseParameters($match[2]) : [];
-            if ($this->isLanguageSwitchPlaceholder($match[1], $params)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function parseParameters(string $paramString): array {
-        $params = [];
-        $pairs = explode(';', $paramString);
-        foreach ($pairs as $pair) {
-            if (strpos($pair, '=') !== false) {
-                list($k, $v) = explode('=', $pair, 2);
-                $params[trim($k)] = trim($v);
-            }
-        }
-        return $params;
     }
     
     /**
@@ -1371,18 +1245,14 @@ class JsonToHtmlRenderer {
     }
 
     /**
-     * Get system placeholder values
-     * 
-     * @return array System placeholders
+     * The system values' context for this render, which qs_fill_placeholders() hands qs_system_placeholders(): the
+     * language this render already resolved, so one request cannot answer the language question twice.
+     *
+     * One source, shared with compiled pages (runtimePlaceholders.php). Two derivations would drift — how the
+     * language prefix is stripped is exactly the kind of detail two copies get differently.
      */
-    private function getSystemPlaceholders(): array {
-        // One source, shared with compiled pages (runtimePlaceholders.php).
-        // Two derivations would drift — how the language prefix is stripped is
-        // exactly the kind of detail two copies get differently.
-        return qs_system_placeholders([
-            'lang'  => $this->context['lang'] ?? null,
-            'route' => $this->context['page'] ?? null,
-        ]);
+    private function systemContext(): array {
+        return ['lang' => $this->context['lang'] ?? null];
     }
 
     /**

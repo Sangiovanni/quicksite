@@ -9201,7 +9201,7 @@ the wrong trade).
 
 ---
 
-### Placeholders are substituted before the URL policy, and params are substituted last (locked 2026-08-23)
+### Placeholders are substituted before the URL policy, and params are substituted last (locked 2026-08-23) (superseded 2026-11-20)
 
 **Decision**: in an attribute, every placeholder is substituted BEFORE
 `UrlPolicy` inspects the value, and within the substitutions the order is system
@@ -16402,3 +16402,35 @@ In a template's preview, a link that leads out of the preview (the sample's book
 **Alternatives considered**: the sentence in pieces per language, mapped to tags by a parameter on the node (rejected — word order differs between languages, so each language would need its own mapping, and one key would no longer be one string); the list as a project setting (rejected — a setting can only widen what a translation turns into elements, and a build would carry it); the markers shown as text where formatting cannot show (rejected — a title or a link preview would show the markup); the runtime's sentence bindings drawing markers (rejected for now — a third copy of the rule, in `qs.js`); a save that backslashes every marker-shaped text instead of the editor's marks (rejected — a sentence with an unclosed marker would gain a backslash its author never typed the first time it is edited).
 
 **Source**: the translation design round, ruled by Sangio on 2026-11-19; beta.12. `secure/src/functions/textMarkers.php`, `public/admin/assets/js/core/text-markers.js`, `JsonToHtmlRenderer::renderTextNode()`, `JsonToPhpCompiler::compileTextNode()`, `preview-iframe-inject.js` (inline edit). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §2 (*Special prefixes & placeholders*).
+
+### Every placeholder of a text is filled in one pass, from the text as written (locked 2026-11-20)
+
+**Supersedes**: [Placeholders are substituted before the URL policy, and params are substituted last](#placeholders-are-substituted-before-the-url-policy-and-params-are-substituted-last-locked-2026-08-23-superseded-2026-11-20)
+
+**Decision**: The system placeholders (`{{__lang}}` and the others), the resolver's (`{{resolved:NAME}}`) and the address's
+(`{{param:NAME}}`) are filled together, in one pass over the text as its author wrote it, by one function both surfaces call,
+`qs_fill_placeholders()` in `runtimePlaceholders.php`: no filled value is ever read again. The served page and a built page call it
+for a text, a raw text, a translated attribute and any attribute that holds a placeholder; a page's title and its description call
+it without the system values, as before. Substitution still comes before the URL policy, as the superseded entry decided, so the
+policy sees the filled value. The language switch (`{{__current_page;lang=xx}}`) is read in an attribute alone, and is recognised
+before the fill by the same file (`qs_holds_language_switch()`).
+
+**Reasoning**: Filled one kind after another, every order reads a value again: whichever kind comes first can bring a placeholder in
+for the next. With the address's values last, a resolver's answer holding `{{param:slug}}` showed the address's value, and the page's
+own address could bring in one of its other values. The two surfaces also had different orders: the renderer filled the system
+values, then the resolver's, then the address's; a built text node filled the resolver's and the address's, then the system values;
+a built attribute holding a system placeholder had it folded when the page was compiled and the other kinds never filled; a built
+translated attribute was not filled at all. So an address carrying `{{__lang}}` was filled in a build and not on the served page. No
+order fixes the first problem; one pass fixes both, because a filled value is never scanned, and the two surfaces draw the same text
+because they call the same function. A value now shows as it is, whatever braces it holds.
+
+**Alternatives considered**: one order on both surfaces, the renderer's (rejected — it still reads a value again: a resolver's answer
+holding an address's placeholder, or the page's own address holding one); escaping placeholder braces in every value before the next
+kind is filled (rejected — a second rule every value would need, and a value would no longer show as it is); keeping the compile-time
+fold of the system placeholders in an attribute (rejected — it could not fill the address's or the resolver's values beside them, and
+it read the language switch its own way).
+
+**Source**: Sangio's ruling, 2026-11-20, on the flags of the translated-word formatting work; beta.12.
+`secure/src/functions/runtimePlaceholders.php` (`qs_fill_placeholders()`, `qs_holds_language_switch()`),
+`JsonToHtmlRenderer` (`fillText()`, `substitutedAttributeValue()`), `JsonToPhpCompiler` (`compileTextNode()`,
+`attributeValueExpr()`). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §4.2 (*Render parity*).

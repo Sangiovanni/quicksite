@@ -584,7 +584,7 @@
         ]);
     }
 
-    /** The platforms a description is longer than, judged by the table's figures as it is typed. */
+    /** The platforms a description is longer than, judged by the table's figures as it is typed (its words, descriptionWords()). */
     function _renderCutList(warnings) {
         return el('span', { text: fmt(T.cutBy, {
             list: joinList(warnings.map(function (w) {
@@ -598,9 +598,18 @@
         var out = document.getElementById('social-page-description-cut');
         var p = pageData();
         if (!area || !out || !p) return;
-        var warnings = F.textWarnings(area.value.trim(), 'description', state.report.platforms, p.cardType && p.cardType.value);
+        var warnings = F.textWarnings(descriptionWords(area.value.trim()), 'description', state.report.platforms, p.cardType && p.cardType.value);
         out.hidden = warnings.length === 0;
         out.replaceChildren(warnings.length ? _renderCutList(warnings) : '');
+    }
+
+    /**
+     * A description's words as a page's tags carry them, the length a platform cuts: its formatting markers removed
+     * and their words kept (QSTextMarkers, with the engine's list from the template), as the page's og:description
+     * is written.
+     */
+    function descriptionWords(text) {
+        return window.QSTextMarkers && CFG.textMarkers ? window.QSTextMarkers.remove(text, CFG.textMarkers) : text;
     }
 
     function mountPageForm(host) {

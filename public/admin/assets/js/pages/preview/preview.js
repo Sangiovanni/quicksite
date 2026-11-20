@@ -2217,11 +2217,17 @@
         pageDescriptionCut.title = descriptionCutSentence(warnings);
     }
 
-    /** The platforms a description would be cut by, by the table's figures (none until the table is read). */
+    /**
+     * The platforms a description would be cut by, by the table's figures (none until the table is read): judged by its
+     * words as the page's tags carry them, its formatting markers removed and their words kept (QSTextMarkers, with the
+     * engine's list), as the Social previews page judges them.
+     */
     function descriptionWarnings(text) {
         const figures = window.QSSocialFigures;
+        const markers = (PreviewConfig.tagInfo || {}).TEXT_MARKERS;
+        const words = window.QSTextMarkers && markers ? window.QSTextMarkers.remove(text, markers) : text;
         return figures && pageDescriptionPlatforms
-            ? figures.textWarnings(text, 'description', pageDescriptionPlatforms, pageDescriptionCardType)
+            ? figures.textWarnings(words, 'description', pageDescriptionPlatforms, pageDescriptionCardType)
             : [];
     }
 

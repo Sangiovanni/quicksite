@@ -1,6 +1,8 @@
 <?php
 /**
- * `{{param:NAME}}` and `{{resolved:NAME}}` — one definition of what they mean.
+ * The placeholders a page fills when it is served — `{{param:NAME}}` (this address's values), `{{resolved:NAME}}`
+ * (what the server-side resolver fetched for this request) and the system ones (`{{__lang}}` and friends, below):
+ * one definition of what they mean, which both surfaces call.
  *
  * ⚠ THESE ARE REQUEST-TIME PLACEHOLDERS, not compile-time ones. Their values
  * are not knowable when a page is compiled: a param comes from the URL that is
@@ -15,7 +17,15 @@
  * literal text. Giving the compiler its own copy would have produced two
  * definitions of a substitution rule that has real subtleties — an unknown name
  * stays literal so a typo is visible, a null ancestor renders empty, an array
- * renders as compact JSON. Both surfaces now call the same two functions.
+ * renders as compact JSON. Both surfaces call the same function.
+ *
+ * ⚠ ONE PASS. Every placeholder of a text is replaced at once, from the text as its
+ * author wrote it (qs_fill_placeholders()), and no value is ever read again: a value
+ * that itself holds placeholder braces (an address's part, a resolver's answer, the
+ * page's own address in a system value) is drawn as it is. Filled one kind after
+ * another, a value filled early is read again by a later pass, and whichever kind
+ * comes first can bring a placeholder in for the next: an address carrying a
+ * resolver's placeholder would show a field of the page's data.
  *
  * ESCAPING IS THE CALLER'S JOB. These return raw substituted text; the caller
  * runs it through htmlspecialchars, exactly as the renderer always did.
@@ -26,107 +36,145 @@ require_once __DIR__ . '/projectLanguage.php';
 // A translation's markers: read in a text node, removed from a title (qs_page_title()). A build carries both files.
 require_once __DIR__ . '/textMarkers.php';
 
-if (!function_exists('qs_apply_route_params')) {
+if (!function_exists('qs_fill_placeholders')) {
     /**
-     * Replace `{{param:NAME}}` with this request's URL path params.
+     * Every placeholder of a text filled in one pass, from the text as written: no value is read again (the
+     * file's header). Both surfaces call it for a text node, a raw text and an attribute.
      *
-     * An unknown name is left as the literal placeholder, on purpose: a
-     * silently-empty value hides a typo, a visible `{{param:slgu}}` does not.
+     *   {{param:NAME}}           this request's address values; an unknown name stays as written, so a
+     *                            typo is visible
+     *   {{resolved:NAME[.path]}} what the resolver fetched (qs_resolved_value())
+     *   {{__name}}               the system values (qs_system_placeholders()); an unknown name stays as written
+     *   {{__name;key=value;…}}   in an attribute alone ($languageSwitch given): {{__current_page;lang=xx}} is
+     *                            this page's address in that language, any other the system value of its name;
+     *                            in a text it stays as written
      *
-     * @param string               $text        Text possibly containing placeholders.
-     * @param array<string,string> $routeParams Matched params, e.g. ['slug' => 'red-vase'].
+     * @param string        $text           the text, as its author wrote it
+     * @param array|null    $system         the system values' context (qs_system_placeholders()), or null:
+     *                                      no system placeholder is filled (a page title, a description)
+     * @param array         $routeParams    this request's address values, e.g. ['slug' => 'red-vase']
+     * @param array|null    $resolved       the resolver's values, or null for the request's stash
+     * @param callable|null $languageSwitch an attribute's: (string $lang) => this page's address in that language
      */
-    function qs_apply_route_params(string $text, array $routeParams): string
+    function qs_fill_placeholders(string $text, ?array $system, array $routeParams, ?array $resolved = null, ?callable $languageSwitch = null): string
     {
-        if (empty($routeParams) || strpos($text, '{{param:') === false) {
+        if (strpos($text, '{{') === false) {
             return $text;
         }
+        $map = null;
         return preg_replace_callback(
-            '/\{\{param:([a-zA-Z_][a-zA-Z0-9_]*)\}\}/',
-            static function ($m) use ($routeParams) {
-                return $routeParams[$m[1]] ?? $m[0];
+            '/\{\{(?:(__\w+)(;[^}]+)?|resolved:([a-zA-Z_][a-zA-Z0-9_.]*)|param:([a-zA-Z_][a-zA-Z0-9_]*))\}\}/',
+            static function (array $m) use ($system, $routeParams, &$resolved, $languageSwitch, &$map): string {
+                if (($m[4] ?? '') !== '') {
+                    return isset($routeParams[$m[4]]) ? (string) $routeParams[$m[4]] : $m[0];
+                }
+                if (($m[3] ?? '') !== '') {
+                    if ($resolved === null) {
+                        $resolved = qs_get_resolved_vars();
+                    }
+                    return qs_resolved_value($resolved, $m[3]) ?? $m[0];
+                }
+                if ($system === null) {
+                    return $m[0];
+                }
+                if (($m[2] ?? '') !== '') {
+                    if ($languageSwitch === null) {
+                        return $m[0];
+                    }
+                    $params = qs_placeholder_params(substr($m[2], 1));
+                    if ($m[1] === '__current_page' && isset($params['lang'])) {
+                        return (string) $languageSwitch($params['lang']);
+                    }
+                }
+                if ($map === null) {
+                    $map = qs_system_placeholders($system);
+                }
+                return isset($map[$m[1]]) ? (string) $map[$m[1]] : $m[0];
             },
             $text
         );
     }
 }
 
-if (!function_exists('qs_apply_resolved')) {
+if (!function_exists('qs_resolved_value')) {
     /**
-     * Replace `{{resolved:NAME}}` and `{{resolved:NAME.dot.path}}` with values
-     * the server-side resolver fetched for this request.
-     *
-     * Source order: an explicit array when the caller has one, otherwise the
-     * per-request stash the resolver lifecycle wrote.
-     *
-     * Rules, all of which the live renderer already established:
-     *   - unknown name or wrong-typed path  → the literal placeholder survives,
-     *     so a typo is visible
-     *   - a NULL ancestor                   → empty string, matching how a
-     *     direct `{{resolved:nullKey}}` renders. This is what makes
-     *     `onMiss: render-empty` produce a blank rather than raw `{{...}}`
-     *     text on the page
-     *   - array / object                    → compact JSON
-     *   - bool                              → `true` / `false`
-     *
-     * @param string     $text     Text possibly containing placeholders.
-     * @param array|null $resolved Explicit values; null falls back to the stash.
+     * What `{{resolved:NAME}}` / `{{resolved:NAME.dot.path}}` shows, from the values the resolver fetched for this
+     * request; null when the placeholder stays as written. The rules, which the live renderer established:
+     *   - no values at all, an unknown name or a wrong-typed path → as written, so a typo is visible
+     *   - a NULL ancestor → '', matching how a direct `{{resolved:nullKey}}` renders: this is what makes
+     *     `onMiss: render-empty` produce a blank rather than raw `{{...}}` text on the page
+     *   - an array or object → compact JSON; a boolean → `true` / `false`
      */
-    function qs_apply_resolved(string $text, ?array $resolved = null): string
+    function qs_resolved_value(array $resolved, string $path): ?string
     {
-        if (strpos($text, '{{resolved:') === false) {
-            return $text;
+        if ($resolved === []) {
+            return null;
         }
-        if ($resolved === null) {
-            $resolved = qs_get_resolved_vars();
+        $cursor = $resolved;
+        foreach (explode('.', $path) as $part) {
+            if ($cursor === null) {
+                return '';
+            }
+            if (!is_array($cursor) || !array_key_exists($part, $cursor)) {
+                return null;
+            }
+            $cursor = $cursor[$part];
         }
-        if (empty($resolved)) {
-            return $text;
+        if (is_array($cursor) || is_object($cursor)) {
+            return (string) json_encode($cursor, JSON_UNESCAPED_SLASHES);
         }
-        return preg_replace_callback(
-            '/\{\{resolved:([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/',
-            static function ($m) use ($resolved) {
-                $cursor = $resolved;
-                foreach (explode('.', $m[1]) as $part) {
-                    if ($cursor === null) {
-                        return '';
-                    }
-                    if (!is_array($cursor) || !array_key_exists($part, $cursor)) {
-                        return $m[0];
-                    }
-                    $cursor = $cursor[$part];
-                }
-                if (is_array($cursor) || is_object($cursor)) {
-                    return json_encode($cursor, JSON_UNESCAPED_SLASHES);
-                }
-                if (is_bool($cursor)) {
-                    return $cursor ? 'true' : 'false';
-                }
-                return (string) ($cursor ?? '');
-            },
-            $text
-        );
+        if (is_bool($cursor)) {
+            return $cursor ? 'true' : 'false';
+        }
+        return (string) ($cursor ?? '');
+    }
+}
+
+if (!function_exists('qs_placeholder_params')) {
+    /** A system placeholder's parameters, `key=value;key=value` (each trimmed; a part without `=` ignored). */
+    function qs_placeholder_params(string $paramString): array
+    {
+        $params = [];
+        foreach (explode(';', $paramString) as $pair) {
+            if (strpos($pair, '=') !== false) {
+                [$k, $v] = explode('=', $pair, 2);
+                $params[trim($k)] = trim($v);
+            }
+        }
+        return $params;
+    }
+}
+
+if (!function_exists('qs_holds_language_switch')) {
+    /**
+     * Whether a value holds a language switch, `{{__current_page;lang=xx}}`: asked BEFORE it is filled, as what it
+     * fills in is a complete address, which a URL attribute must not compose against the site's base again. The
+     * scan qs_fill_placeholders() makes, so the two cannot drift.
+     */
+    function qs_holds_language_switch(string $value): bool
+    {
+        if (!preg_match_all('/\{\{(__\w+)(?:;([^}]+))?\}\}/', $value, $matches, PREG_SET_ORDER)) {
+            return false;
+        }
+        foreach ($matches as $match) {
+            if ($match[1] === '__current_page' && isset(qs_placeholder_params($match[2] ?? '')['lang'])) {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
 if (!function_exists('qs_apply_runtime_placeholders')) {
     /**
-     * Both substitutions, in the order the live renderer applies them.
-     *
-     * ⚠ RESOLVED FIRST, PARAMS SECOND, and the order is load-bearing. A route
-     * param comes straight out of the URL, so it is visitor-controlled; doing
-     * params first would let `/products/{{resolved:secret}}` land a real
-     * placeholder in the text and have the resolved pass expand it. Substituting
-     * resolved values first means anything a param introduces afterwards is
-     * never re-scanned.
-     *
-     * This is the entry point compiled pages call.
+     * The address's values and the resolver's, in one pass, and no system value: what a page title and a
+     * description take (qs_fill_placeholders() with no system context).
      *
      * @param array<string,string> $routeParams
      */
     function qs_apply_runtime_placeholders(string $text, array $routeParams, ?array $resolved = null): string
     {
-        return qs_apply_route_params(qs_apply_resolved($text, $resolved), $routeParams);
+        return qs_fill_placeholders($text, null, $routeParams, $resolved);
     }
 }
 
@@ -177,8 +225,8 @@ if (!function_exists('qs_page_title')) {
  * These REPORT a value; none of them composes a URL. An author who needs a URL
  * writes a root-relative one and lets the URL policy compose it, once.
  *
- * ⚠ ONE SOURCE FOR BOTH SURFACES. The renderer derived these in
- * getSystemPlaceholders(); the compiler GENERATED PHP that re-derived them into
+ * ⚠ ONE SOURCE FOR BOTH SURFACES. The renderer derived these in a method of
+ * its own; the compiler GENERATED PHP that re-derived them into
  * a compiled page, including its own regexes for stripping the URL space and
  * the language prefix. Two derivations of one answer, and they had drifted: the
  * generated language stripper interpolated a language list into a pattern and
@@ -233,35 +281,5 @@ if (!function_exists('qs_system_placeholders')) {
             '__public_folder' => defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public',
             '__current_route' => $route,
         ];
-    }
-}
-
-if (!function_exists('qs_apply_system_placeholders')) {
-    /**
-     * Replace every `{{__name}}` in a string.
-     *
-     * ⚠ THE LANGUAGE-SWITCH FORM IS NOT HANDLED HERE.
-     * `{{__current_page;lang=xx}}` resolves to a COMPLETE URL — base, language
-     * and route already in place — so whoever substitutes it must also know not
-     * to compose it against the base a second time. Both surfaces detect it
-     * before calling this, and both exempt the result from URL rewriting.
-     *
-     * An unrecognised name is left as the literal placeholder, matching how an
-     * unknown `{{param:}}` behaves: a visible `{{__lnag}}` is a typo the author
-     * can see, an empty string is not.
-     */
-    function qs_apply_system_placeholders(string $text, array $ctx = []): string
-    {
-        if (strpos($text, '{{__') === false) {
-            return $text;
-        }
-        $map = qs_system_placeholders($ctx);
-        return preg_replace_callback(
-            '/\{\{(__\w+)\}\}/',
-            static function ($m) use ($map) {
-                return $map[$m[1]] ?? $m[0];
-            },
-            $text
-        );
     }
 }

@@ -6,6 +6,9 @@ require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/UrlPolicy.php';
 require_once __DIR__ . '/CallTransformer.php';
 require_once __DIR__ . '/TagRegistry.php';
+// qs_holds_language_switch(): a language switch is recognised here, before the page fills it, as the renderer
+// recognises it. The page's own fill is the same file's qs_fill_placeholders(), which a build carries.
+require_once __DIR__ . '/../functions/runtimePlaceholders.php';
 
 /**
  * JsonToPhpCompiler
@@ -32,21 +35,6 @@ class JsonToPhpCompiler {
     private int $plainTextDepth = 0;
 
     /**
-     * The system placeholders a compiled page defines as variables.
-     *
-     * Mirrors JsonToHtmlRenderer::getSystemPlaceholders()'s map — the two
-     * writers must recognise the same set or the same page says different
-     * things in preview and in production. Every entry REPORTS a value; none
-     * composes a URL, which is why there is no `__base_url` here.
-     */
-    private const SYSTEM_PLACEHOLDERS = [
-        '__current_page',
-        '__lang',
-        '__public_folder',
-        '__current_route',
-    ];
-
-    /**
      * Compile a full page JSON structure to PHP code
      * 
      * @param array $structure The page JSON structure
@@ -64,10 +52,11 @@ class JsonToPhpCompiler {
         $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';\n";
         $output .= "\$translator = new Translator(\$trimParameters->lang());\n";
         $output .= "\$lang = \$trimParameters->lang();\n";
-        // {{param:}} and {{resolved:}} are REQUEST-time values — the URL being
-        // served, and the data the resolver fetched for it — so a compiled page
-        // cannot fold them in the way it folds a translation key. It calls the
-        // same two functions the live renderer calls, with this request's params.
+        // {{param:}}, {{resolved:}} and the system placeholders are REQUEST-time
+        // values — the URL being served, the data the resolver fetched for it, the
+        // page's own address and language — so a compiled page cannot fold them in
+        // the way it folds a translation key. It calls the function the live
+        // renderer calls (qs_fill_placeholders()), with this request's params.
         $output .= "require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';\n";
         // UrlPolicy vets a URL attribute AFTER its placeholders are
         // substituted, so it has to be present at request time.
@@ -267,10 +256,11 @@ class JsonToPhpCompiler {
         $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';\n";
         $output .= "\$translator = new Translator(\$trimParameters->lang());\n";
         $output .= "\$lang = \$trimParameters->lang();\n";
-        // {{param:}} and {{resolved:}} are REQUEST-time values — the URL being
-        // served, and the data the resolver fetched for it — so a compiled page
-        // cannot fold them in the way it folds a translation key. It calls the
-        // same two functions the live renderer calls, with this request's params.
+        // {{param:}}, {{resolved:}} and the system placeholders are REQUEST-time
+        // values — the URL being served, the data the resolver fetched for it, the
+        // page's own address and language — so a compiled page cannot fold them in
+        // the way it folds a translation key. It calls the function the live
+        // renderer calls (qs_fill_placeholders()), with this request's params.
         $output .= "require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';\n";
         // UrlPolicy vets a URL attribute AFTER its placeholders are
         // substituted, so it has to be present at request time.
@@ -311,7 +301,9 @@ class JsonToPhpCompiler {
     }
 
     /**
-     * Generate PHP code for system variables ({{__placeholder}} support)
+     * The PHP a compiled file starts with for its addresses: the language they are composed in, processUrl() and
+     * buildLanguageSwitchUrl(). The system placeholders themselves ({{__lang}} and friends) are filled where they
+     * stand, in one pass with the others (qs_fill_placeholders()).
      */
     private function generateSystemVariables(): string {
         // ⚠ ASKED AT REQUEST TIME, FROM THE SOURCE THE RENDERER USES.
@@ -325,12 +317,8 @@ class JsonToPhpCompiler {
         //
         // projectLanguage.php travels into a build, so the language question has
         // one answer on both surfaces and there is nothing left to interpolate.
-        $output  = "// System variables for {{__placeholder}} support\n";
-        $output .= "\$__qsSystem = qs_system_placeholders(['lang' => \$lang]);\n";
-        $output .= "\$__current_page  = \$__qsSystem['__current_page'];\n";
-        $output .= "\$__lang          = \$__qsSystem['__lang'];\n";
-        $output .= "\$__public_folder = \$__qsSystem['__public_folder'];\n";
-        $output .= "\$__current_route = \$__qsSystem['__current_route'];\n\n";
+        $output  = "// The language this file's addresses are composed in (processUrl())\n";
+        $output .= "\$__lang = qs_system_placeholders(['lang' => \$lang])['__lang'];\n\n";
         // Add processUrl helper function WITH function_exists check
         $output .= <<<'PHP'
     // Helper function to process URLs (add language prefix, handle absolute URLs)
@@ -474,14 +462,12 @@ class JsonToPhpCompiler {
             // Raw text. A literal is fully known here, so the substitution call
             // is emitted ONLY when the text actually carries a placeholder —
             // most raw text does not, and a built page should not pay for a
-            // scan that can never match.
+            // scan that can never match. Every kind is filled in one pass, as
+            // the renderer fills it (fillCall()).
             $rawText = substr($textKey, 7);
             $expr = var_export($rawText, true);
-            if ($this->hasRuntimePlaceholder($rawText)) {
-                $expr = 'qs_apply_runtime_placeholders(' . $expr . ', $__routeParams)';
-            }
-            if (strpos($rawText, '{{__') !== false) {
-                $expr = 'qs_apply_system_placeholders(' . $expr . ', [\'lang\' => $lang])';
+            if ($this->hasPlaceholder($rawText)) {
+                $expr = $this->fillCall($expr, false);
             }
             return $prefix . 'htmlspecialchars(' . $expr . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\');' . "\n";
         } else {
@@ -489,31 +475,41 @@ class JsonToPhpCompiler {
             // placeholder ("Welcome, {{param:slug}}!"), and which translation
             // file is read depends on the request's language — so unlike raw
             // text this cannot be decided at compile time and the call is
-            // always emitted. qs_apply_runtime_placeholders fast-paths on a
-            // strpos when there is nothing to substitute.
-            // A TRANSLATED string can carry either kind of placeholder, and
-            // which file it comes from depends on the request's language, so
-            // both calls are always emitted. Each fast-paths on a strpos.
+            // always emitted. qs_fill_placeholders() fast-paths on a strpos when
+            // there is nothing to substitute, and fills every kind in one pass.
             // The word's markers are read when the page is served, by the call the
             // renderer makes (qs_text_node_html(), textMarkers.php): before any
             // placeholder is filled, each run of words between them then filled and
             // escaped; inside an element that cannot show formatting, removed.
             return $prefix . 'qs_text_node_html($translator->translate(' . var_export($textKey, true) . '), '
                    . var_export($textKey, true) . ', ' . ($this->plainTextDepth > 0 ? 'true' : 'false')
-                   . ', static fn(string $t): string => qs_apply_system_placeholders(qs_apply_runtime_placeholders($t, $__routeParams), [\'lang\' => $lang]));' . "\n";
+                   . ', static fn(string $t): string => ' . $this->fillCall('$t', false) . ');' . "\n";
         }
     }
 
     /**
-     * Does this literal carry a request-time placeholder?
-     *
-     * Only `{{param:}}` and `{{resolved:}}` count. System placeholders
-     * (`{{__lang}}` and friends) are a different mechanism, folded in at
-     * compile time by convertPlaceholdersToPhp.
+     * Does this literal carry a placeholder a page fills when it is served: an
+     * address's value (`{{param:}}`), the resolver's (`{{resolved:}}`) or a
+     * system one (`{{__lang}}` and friends)? A literal with none is written as
+     * it is, with no call.
      */
-    private function hasRuntimePlaceholder(string $text): bool {
+    private function hasPlaceholder(string $text): bool {
         return strpos($text, '{{param:') !== false
-            || strpos($text, '{{resolved:') !== false;
+            || strpos($text, '{{resolved:') !== false
+            || strpos($text, '{{__') !== false;
+    }
+
+    /**
+     * The call a built page fills a text's or an attribute's placeholders with:
+     * every kind in one pass, from the value as written, no value read again —
+     * the call the renderer makes (qs_fill_placeholders(), runtimePlaceholders.php),
+     * with this request's language, address values and resolver stash. In an
+     * attribute, `{{__current_page;lang=xx}}` is this page's address in that
+     * language (buildLanguageSwitchUrl()); in a text it stays as written.
+     */
+    private function fillCall(string $expr, bool $attribute): string {
+        return 'qs_fill_placeholders(' . $expr . ', [\'lang\' => $lang], $__routeParams'
+            . ($attribute ? ', null, static fn(string $l): string => buildLanguageSwitchUrl($l)' : '') . ')';
     }
     
     /**
@@ -753,52 +749,12 @@ class JsonToPhpCompiler {
             $attrValue = substr($attrValue, 7);
         }
 
-        // Check if value contains system placeholders
-        if (is_string($attrValue) && strpos($attrValue, '{{__') !== false) {
-            // Contains system placeholder - generate dynamic PHP
-            $phpValue = $this->convertPlaceholdersToPhp($attrValue);
-
-            // Check if this is a buildLanguageSwitchUrl() call - these return complete URLs
-            $isLanguageSwitch = strpos($phpValue, 'buildLanguageSwitchUrl(') !== false;
-
-            if ($isSrcset) {
-                // Each file made safe and composed once the page fills it, as the preview does.
-                return 'UrlPolicy::mapSrcset(' . $phpValue . ', ' . $this->srcsetAddressFn($isLanguageSwitch) . ')';
-            }
-            if ($needsRewrite && !$isLanguageSwitch) {
-                // Wrap with processUrl (BASE_URL/lang). Placeholders are
-                // system-generated URLs, not attacker-controlled schemes.
-                return 'processUrl(' . $phpValue . ', $__lang)';
-            }
-            if ($isUrlAttr && !$needsRewrite) {
-                // A URL attribute that is not composed (xlink:href, ping, …) has
-                // no processUrl() in front of its value, so the value is held to
-                // the allowlist once filled, as the preview holds it: the write
-                // gate reads the value as written, where a placeholder can sit
-                // inside the scheme it would refuse.
-                return 'UrlPolicy::sanitize(' . $phpValue . ')';
-            }
-            return $phpValue;
-        }
-        if ($translatable && !$raw && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
-            // A translation KEY in a translatable attribute. Emitted as a
-            // runtime lookup for the same reason a text node is: which
-            // translation file answers depends on the request's language. An
-            // attribute shows no formatting: the word's markers are removed, as the
-            // renderer removes them (qs_text_word_plain()).
-            return 'qs_text_word_plain($translator->translate(' . var_export($attrValue, true) . '), '
-                . var_export($attrValue, true) . ')';
-        }
-
-        // Static value — the attacker-controlled case. Make it
-        // scheme-SAFE at COMPILE time (shared UrlPolicy) so the
-        // deployed literal can never carry a dangerous scheme; this
-        // covers the non-rewritable sinks (xlink:href, …) too.
-        if (is_string($attrValue) && $this->hasRuntimePlaceholder($attrValue)) {
-            // {{param:}} / {{resolved:}} carry REQUEST-time values, so
-            // the substitution is a call, not a fold. Both surfaces
-            // substitute inside attributes; without it a visitor
-            // would be served data-slug="{{param:slug}}" verbatim.
+        if (is_string($attrValue) && $this->hasPlaceholder($attrValue)) {
+            // {{param:}}, {{resolved:}} and the system placeholders carry
+            // REQUEST-time values, so the substitution is a call, not a fold:
+            // every kind filled in one pass from the value as written, as the
+            // renderer fills it (fillCall()). Without it a visitor would be
+            // served data-slug="{{param:slug}}" verbatim.
             //
             // ⚠ THE POLICY MUST SEE THE SUBSTITUTED VALUE. Sanitising
             // the literal placeholder and substituting afterwards would
@@ -806,18 +762,41 @@ class JsonToPhpCompiler {
             // either surface. So UrlPolicy::sanitize wraps the
             // substitution at RUNTIME rather than folding at compile
             // time, and processUrl composes on top of the safe value.
-            $expr = 'qs_apply_runtime_placeholders(' . var_export($attrValue, true) . ', $__routeParams)';
+            //
+            // A language switch (`{{__current_page;lang=xx}}`) fills in a
+            // complete address, made safe and never composed again; once filled
+            // it looks like any address, so it is recognised here, before, as
+            // the renderer recognises it (qs_holds_language_switch()).
+            $isLanguageSwitch = qs_holds_language_switch($attrValue);
+            $expr = $this->fillCall(var_export($attrValue, true), true);
             if ($isSrcset) {
-                return 'UrlPolicy::mapSrcset(' . $expr . ', ' . $this->srcsetAddressFn(false) . ')';
+                // Each file made safe and composed once the page fills it, as the preview does.
+                return 'UrlPolicy::mapSrcset(' . $expr . ', ' . $this->srcsetAddressFn($isLanguageSwitch) . ')';
             }
             if ($isUrlAttr) {
                 $expr = 'UrlPolicy::sanitize(' . $expr . ')';
-                if ($needsRewrite) {
+                if ($needsRewrite && !$isLanguageSwitch) {
                     $expr = 'processUrl(' . $expr . ', $__lang)';
                 }
             }
             return $expr;
         }
+        if ($translatable && !$raw && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
+            // A translation KEY in a translatable attribute. Emitted as a
+            // runtime lookup for the same reason a text node is: which
+            // translation file answers depends on the request's language. An
+            // attribute shows no formatting: the word's markers are removed, as the
+            // renderer removes them (qs_text_word_plain()), and its placeholders
+            // are then filled as the renderer fills them (fillCall()). No
+            // translatable attribute is a URL (TagRegistry::TRANSLATABLE_ATTRIBUTES).
+            return $this->fillCall('qs_text_word_plain($translator->translate(' . var_export($attrValue, true) . '), '
+                . var_export($attrValue, true) . ')', true);
+        }
+
+        // Static value — the attacker-controlled case. Make it
+        // scheme-SAFE at COMPILE time (shared UrlPolicy) so the
+        // deployed literal can never carry a dangerous scheme; this
+        // covers the non-rewritable sinks (xlink:href, …) too.
         if ($isSrcset && is_string($attrValue)) {
             return $this->staticSrcsetExpr($attrValue);
         }
@@ -888,10 +867,7 @@ class JsonToPhpCompiler {
                 return null;
             }
         }
-        if (strpos($attrValue, '{{__') !== false) {
-            return null;
-        }
-        return $this->hasRuntimePlaceholder($attrValue) ? null : $attrValue;
+        return $this->hasPlaceholder($attrValue) ? null : $attrValue;
     }
 
     /**
@@ -1097,7 +1073,8 @@ class JsonToPhpCompiler {
         if (is_string($data)) {
             // Check if contains system placeholders
             if (strpos($data, '{{__') !== false) {
-                // Keep the placeholder - will be converted to PHP in compileTagNode
+                // Keep the placeholder: it is filled where the data lands, when the
+                // page is served (fillCall())
                 return $data;
             }
             return $data;
@@ -1112,53 +1089,6 @@ class JsonToPhpCompiler {
         }
         
         return $data;
-    }
-    
-    /**
-     * Convert system placeholders in string to PHP variable concatenation
-     * Handles both {{__placeholder}} and {{__placeholder;param=value}} syntax
-     * Example: "/en/{{__current_page}}" becomes '"/en/" . $__current_page'
-     * Example: "{{__current_page;lang=en}}" becomes buildLanguageSwitchUrl('en')
-     */
-    private function convertPlaceholdersToPhp(string $value): string {
-        // Split by placeholders (including those with parameters)
-        $parts = preg_split('/(\{\{__\w+(?:;[^}]+)?\}\})/', $value, -1, PREG_SPLIT_DELIM_CAPTURE);
-        $phpParts = [];
-        
-        foreach ($parts as $part) {
-            if (empty($part)) continue;
-            
-            if (preg_match('/\{\{(__\w+)(?:;([^}]+))?\}\}/', $part, $matches)) {
-                // System placeholder
-                $key = $matches[1];
-                $paramString = $matches[2] ?? '';
-                
-                // Special handling for __current_page with lang parameter
-                if ($key === '__current_page' && !empty($paramString) && strpos($paramString, 'lang=') !== false) {
-                    // Parse the lang parameter
-                    preg_match('/lang=(\w+)/', $paramString, $langMatch);
-                    $targetLang = $langMatch[1] ?? 'en';
-                    // Generate call to buildLanguageSwitchUrl function
-                    $phpParts[] = "buildLanguageSwitchUrl(" . var_export($targetLang, true) . ")";
-                } elseif (in_array($key, self::SYSTEM_PLACEHOLDERS, true)) {
-                    // Regular placeholder - convert to PHP variable
-                    $phpParts[] = '$' . $key;
-                } else {
-                    // Not a placeholder this engine defines. Emit the text
-                    // VERBATIM, which is what the renderer does with it
-                    // (getSystemPlaceholders() lookup, `?? $matches[0]`).
-                    // Emitting `$__whatever` instead would put an
-                    // undefined-variable warning and an empty string into a
-                    // built page where the live render shows the literal.
-                    $phpParts[] = var_export($part, true);
-                }
-            } else {
-                // Static string
-                $phpParts[] = var_export($part, true);
-            }
-        }
-
-        return implode(' . ', $phpParts);
     }
 
 
