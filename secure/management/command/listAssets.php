@@ -6,7 +6,7 @@
  * @url /management/listAssets
  * @url /management/listAssets/{category}
  * @auth required
- * @permission read
+ * @permission content.read
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

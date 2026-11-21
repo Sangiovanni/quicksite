@@ -21,7 +21,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * @method POST
  * @url /management/setMultilingual
  * @auth required
- * @permission translation.write (editor and above)
+ * @permission translation.write
  */
 
 $params = $trimParametersManagement->params();

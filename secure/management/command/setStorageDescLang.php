@@ -75,8 +75,12 @@ if (!$confirm) {
         ->send();
 }
 
-// Execute the move + persist the new language.
+// Execute the move + persist the new language. A write the shared writer refuses
+// is answered with every word already moved put back, and the language unchanged.
 $result = storageMoveDescriptions($current, $lang, true);
+if ($result['refused'] !== null) {
+    qs_translation_write_refusal_response($result['refused'])->send();
+}
 qs_small_write_send_refusal();
 $registry['descLang'] = $lang;
 if (!saveStorageRegistry($registry)) {

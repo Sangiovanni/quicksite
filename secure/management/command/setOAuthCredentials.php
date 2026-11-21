@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/p/<projectId>/setOAuthCredentials
  * @auth required
- * @permission oauth.manage (the project's admin and owner)
+ * @permission oauth.manage
  *
  * Body (JSON):
  *   {

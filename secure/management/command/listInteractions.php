@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/listInteractions/{structType}/{nodeId}
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Returns all event→function bindings on the specified node, plus
  * available events filtered by the element's tag type.

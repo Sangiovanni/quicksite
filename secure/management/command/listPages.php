@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/listPages
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Returns all pages from secure/templates/model/json/pages/
  * with their metadata and component usage.

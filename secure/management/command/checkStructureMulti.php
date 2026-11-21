@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/checkStructureMulti
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Scans all JSON structures (pages, menu, footer, components) for patterns
  * that would break in mono-language mode, such as lang= in href attributes.

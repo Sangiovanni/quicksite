@@ -11,7 +11,7 @@
  * @url /management/getUnusedTranslationKeys
  * @url /management/getUnusedTranslationKeys/{lang}
  * @auth required
- * @permission read
+ * @permission content.read
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';

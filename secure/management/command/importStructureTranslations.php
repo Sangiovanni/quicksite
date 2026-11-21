@@ -25,7 +25,7 @@
  * @method POST
  * @url /management/importStructureTranslations
  * @auth required
- * @permission editStructure
+ * @permission translation.write
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -112,9 +112,8 @@ function _measureTableDimensions(array $tableNode): ?array {
     ];
 }
 
-// Translation flat-to-nested + deep-merge plumbing is shared via
-// src/functions/translationHelpers.php. Use
-// convertDotNotationToNested + mergeTranslations directly below.
+// The words are written by the shared translation writer
+// (src/functions/translationHelpers.php writeTranslationsToFile()).
 
 /**
  * @param array $params Body: route, kind, structureId, language, header[], rows[][]
@@ -305,45 +304,13 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
             ->withMessage('Nothing to write — empty grid.');
     }
 
-    // ---- write to the language file --------------------------------------
-    $newNested = convertDotNotationToNested($flat);
-
-    $translationsFile = PROJECT_PATH . '/translate/' . $language . '.json';
-    $existingTranslations = [];
-    if (file_exists($translationsFile)) {
-        $existingJson = @file_get_contents($translationsFile);
-        if ($existingJson !== false) {
-            $decoded = json_decode($existingJson, true);
-            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $existingTranslations = $decoded;
-            }
-        }
-    }
-
-    $merged = mergeTranslations($existingTranslations, $newNested);
-
-    $output = json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($output === false) {
-        return ApiResponse::create(500, 'server.internal_error')
-            ->withMessage('Failed to encode merged translations JSON.');
-    }
-
-    // The size check (qs_small_write_refusal): the translation file's cap, and
-    // growth while the owner is over quota.
-    $refusal = qs_small_write_refusal([$translationsFile => strlen($output)]);
-    if ($refusal !== null) {
-        return $refusal;
-    }
-
-    // Ensure translate directory exists.
-    $translateDir = dirname($translationsFile);
-    if (!is_dir($translateDir)) {
-        @mkdir($translateDir, 0755, true);
-    }
-
-    if (file_put_contents($translationsFile, $output, LOCK_EX) === false) {
-        return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to save translations file.');
+    // ---- write through the shared writer -----------------------------------
+    // Its clash check (a word is never replaced by a group, nor a group by a word), its size check,
+    // and its copy into default.json: every write on a one-language site, whose pages read that file,
+    // and a write in the default language on a multilingual one.
+    $written = writeTranslationsToFile($language, convertDotNotationToNested($flat), false);
+    if (!$written['ok']) {
+        return qs_translation_write_refusal_response($written);
     }
 
     return ApiResponse::create(200, 'operation.success')

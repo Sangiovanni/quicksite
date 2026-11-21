@@ -6,7 +6,7 @@
  * @method DELETE
  * @url /management/cleanOrphanTranslations
  * @auth required
- * @permission write
+ * @permission translation.write
  *
  * Translation files are stored in `<project>/translate/<lang>.json`. The project
  * config (`config.php`) declares which languages are active in

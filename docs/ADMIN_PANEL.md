@@ -551,6 +551,13 @@ editor renumbers the nodes after it **within the same structure only** — the p
 footer each number their nodes from 0, so a change to one never moves the ids of another. When the
 page cannot show an add in place, the editor reloads it.
 
+A duplicate's copy keeps its words in every language: each new key takes the original's word in
+each language that holds one (`duplicateNode`). A key the editor makes for a new text (a component
+placed, an element given its first text) starts with an empty word in the site's default language.
+These words are written as every other word is, through the shared translation writer: a word in
+the way (a word where a group of words must go, or the reverse) refuses the change with the
+server's words, and nothing is written.
+
 **A page with no nodes still has something to click.** Selection is anchored to
 elements carrying `data-qs-node`, so a page whose last element was deleted would
 otherwise render as a blank iframe with nothing selectable — and the add form
@@ -767,7 +774,11 @@ the existing structure's dimensions match the pasted grid exactly
 (returns a 422 with a diff on mismatch — no partial writes) and writes
 the values into the picked language's translation file for every key
 the element references. The page JSON is **not modified** — this is a
-translation-only workflow.
+translation-only workflow. The words go through the shared translation
+writer, as every other word does: on a one-language site they reach
+`default.json` too, the file its pages read, so the import shows on the
+site; a word in the way refuses the import with the server's words, and
+nothing is written.
 
 Today only the Table builder stamps the markers. Future complex
 elements opt in by emitting the same two attributes on their root and
@@ -3421,6 +3432,15 @@ description language moves every description to the new language, keeping the ol
 one as an empty (missing) translation so it can be re-done; it warns before
 overwriting existing values (`setStorageDescLang`).
 
+A save or a language change whose description would not fit the shape of a
+translation file (a word where that file holds a group of words, or a group where
+it holds a word, in the language's own file or in `default.json`) is refused with
+the server's words, the clash's own, as `setTranslationKeys` gives them, and
+changes nothing: the item, its descriptions and the description language stay as
+they were, and a change of language moves no description at all. The warning
+before a change of language counts the descriptions and does not look for a clash:
+the change itself names it.
+
 **Scan / reconcile.** The toolbar's **Scan / reconcile** button runs
 `scanStorageUsage`, which walks the build (structure `data-storage-*` attrs +
 `saveToken` / `store` / `clearToken` chains, page-events handler chains,
@@ -3573,7 +3593,10 @@ turning the switch on or off, **Update** the page.
 
 **Languages.** The banner's, the popup's and the policy pages' texts, the labels a
 screen reader announces included, are written into every translation file the site's
-pages read, only where a key has no text, so an edited text stays. Each language's words
+pages read, only where a key has no text, so an edited text stays. A policy page's
+title is one of them: `page.titles.<route>` takes the policy's own title word
+(*Cookie policy*, *Privacy policy*), and a title you wrote stays through every
+**Update**. Each language's words
 come from `<secure>/src/translations/<lang>.json`, read by key: a language with no file
 there takes English's, and a new language is a new file there, with no code. A language
 added after a generation starts from the default language's texts (`addLang`), which a
@@ -3604,7 +3627,9 @@ a body-bearing endpoint (POST/PUT/PATCH) that declares no fields at all is flagg
 selector, defaulting to the site default) and stored as translation keys, so
 editing is live and other languages translate via the language tool. Commands:
 `setCollectedDatum` / `deleteCollectedDatum`; `setPrivacyDescLang` moves the prose
-to a new authoring language with an overwrite-warning confirm.
+to a new authoring language with an overwrite-warning confirm. A save or a change
+of language that would clash with the shape of a translation file is refused with
+the server's words and changes nothing, as on the storage registry (§9.10).
 
 **Mapping.** Each scanned atom is mapped to a collected datum by clicking it and
 picking from a menu — or creating a new datum from that field in one step;

@@ -6,7 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
  * @method POST
  * @url /management/duplicateComponent
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * Creates a copy of an existing component. The new component is independent
  * and references to the original are NOT updated (it's a true copy).

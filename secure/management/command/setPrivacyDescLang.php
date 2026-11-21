@@ -73,7 +73,12 @@ if (!$confirm) {
         ->send();
 }
 
+// A write the shared writer refuses is answered with every word already moved put
+// back, and the language unchanged.
 $result = privacyMoveDescriptions($current, $lang, true);
+if ($result['refused'] !== null) {
+    qs_translation_write_refusal_response($result['refused'])->send();
+}
 qs_small_write_send_refusal();
 $reg['descLang'] = $lang;
 if (!savePrivacyRegistry($reg)) {

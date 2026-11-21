@@ -15,7 +15,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * @method POST
  * @url /management/addNode
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * Inserts a new tag node at a specified position with:
  * - Tag-specific mandatory parameters (href for <a>, src/alt for <img>, etc.)

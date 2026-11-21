@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/getIframeSandbox
  * @auth required
- * @permission read
+ * @permission content.read
  *
  * Returns the INSTALL-WIDE embed policy that governs every project's iframes.
  * The policy is set at deployment (<secure>/management/config/embed-policy.json)

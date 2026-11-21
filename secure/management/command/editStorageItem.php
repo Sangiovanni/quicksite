@@ -34,9 +34,12 @@ if (!is_string($id) || $id === '') {
 
 $registry = loadStorageRegistry();
 
-// Converge any not-yet-keyed descriptions into translate/ before writing.
-storageMigrateInlineDescriptions($registry);
-qs_small_write_send_refusal();
+// Converge any not-yet-keyed descriptions into translate/ before writing. A refused
+// write is answered with everything it wrote put back.
+$migrated = storageMigrateInlineDescriptions($registry);
+if ($migrated['refused'] !== null) {
+    qs_translation_write_refusal_response($migrated['refused'])->send();
+}
 
 if (!isset($registry['items'][$id])) {
     ApiResponse::create(404, 'storage.not_found')
@@ -81,12 +84,16 @@ if (!saveStorageRegistry($registry)) {
 // Persist the description into translate/ (keyed). Replace-all semantic: a
 // missing/empty description clears the key. On rename the old key is left to
 // the orphan-translation cleanup (the new key carries the submitted copy). A
-// refused write takes back the registry above too (qs_small_write_guard).
+// refused write takes back the registry above too, and every word written or
+// cleared.
 if ($targetId !== $id) {
     storageClearDescription($id);
 }
 if (!empty($result['description'])) {
-    storageWriteDescription($targetId, $result['description']);
+    $refused = storageWriteDescription($targetId, $result['description']);
+    if ($refused !== null) {
+        qs_translation_write_refusal_response($refused)->send();
+    }
 } else {
     storageClearDescription($targetId);
 }

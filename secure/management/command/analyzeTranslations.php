@@ -6,7 +6,7 @@
  * @url /management/analyzeTranslations
  * @url /management/analyzeTranslations/{language}
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Performs comprehensive analysis of translations, on the keys the site uses (qs_site_translation_keys()):
  * 1. Missing translations (keys the site needs in every language, with no word in a translation file)

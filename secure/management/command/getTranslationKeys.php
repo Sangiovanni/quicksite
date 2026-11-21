@@ -12,7 +12,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
  * @url /management/getTranslationKeys
  * @url /management/getTranslationKeys/{language}
  * @auth required
- * @permission read
+ * @permission content.read
  *
  * The keys come from qs_site_translation_keys(), the one answer every reader of a site's keys takes: each
  * required key, and each optional one (a page's description, the site's name, …) where a word file holds it —

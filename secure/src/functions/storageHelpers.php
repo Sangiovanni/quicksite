@@ -108,15 +108,20 @@ function storageDescLang(?array $registry = null): string {
  * translate files (true move — the source value is removed). When $execute is
  * false, nothing is written; the return only reports what WOULD happen.
  *
- * @return array{moved:int, overwrites:int} moved = items with a $from value;
- *               overwrites = of those, how many already had a $to value.
+ * A write the shared writer refuses stops the move there: that item's source is
+ * not emptied, and `refused` holds the writer's answer, which the command answers
+ * with qs_translation_write_refusal_response() (putting back every word already
+ * moved).
+ *
+ * @return array{moved:int, overwrites:int, refused:?array} moved = items with a
+ *               $from value; overwrites = of those, how many already had a $to value.
  */
 function storageMoveDescriptions(string $from, string $to, bool $execute = true): array {
     $registry = loadStorageRegistry();
     $moved = 0;
     $overwrites = 0;
     if ($from === $to) {
-        return ['moved' => 0, 'overwrites' => 0];
+        return ['moved' => 0, 'overwrites' => 0, 'refused' => null];
     }
     foreach (array_keys($registry['items']) as $id) {
         $key = storageDescKey((string) $id);
@@ -130,7 +135,10 @@ function storageMoveDescriptions(string $from, string $to, bool $execute = true)
         }
         $moved++;
         if ($execute) {
-            writeTranslationsToFile($to, convertDotNotationToNested([$key => $val]), false);
+            $written = writeTranslationsToFile($to, convertDotNotationToNested([$key => $val]), false);
+            if (!$written['ok']) {
+                return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => $written];
+            }
             // Empty the source key, don't delete it: keeping it present (as "")
             // makes the translate tooling flag the old language as a MISSING
             // translation (the desired re-translation signal) and avoids leaving
@@ -138,7 +146,7 @@ function storageMoveDescriptions(string $from, string $to, bool $execute = true)
             _storageSetTranslationKey($from, $key, '');
         }
     }
-    return ['moved' => $moved, 'overwrites' => $overwrites];
+    return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => null];
 }
 
 /** consentRequired is derived — essential never needs consent. */
@@ -194,13 +202,22 @@ function storageItemDescription(string $id, array $item, string $lang): string {
     return '';
 }
 
-/** Write an item's description (a {lang: text} map) into the translate files. */
-function storageWriteDescription(string $id, array $descMap): void {
+/**
+ * Write an item's description (a {lang: text} map) into the translate files.
+ * Null once every language is written; else the shared writer's refusal, at the
+ * first language it refused (the languages after it are not written), for the
+ * command to answer with qs_translation_write_refusal_response().
+ */
+function storageWriteDescription(string $id, array $descMap): ?array {
     $key = storageDescKey($id);
     foreach ($descMap as $lang => $text) {
         if (!is_string($lang) || $lang === '' || !is_string($text) || $text === '') continue;
-        writeTranslationsToFile($lang, convertDotNotationToNested([$key => $text]), false);
+        $written = writeTranslationsToFile($lang, convertDotNotationToNested([$key => $text]), false);
+        if (!$written['ok']) {
+            return $written;
+        }
     }
+    return null;
 }
 
 /** Remove an item's description key from every project language. */
@@ -213,21 +230,29 @@ function storageClearDescription(string $id): void {
 
 /**
  * One-time convergence: move any inline item descriptions into translate/ under
- * storageDescKey() and strip the inline copy. Returns true if it changed the
+ * storageDescKey() and strip the inline copy. `changed` is true if it changed the
  * registry (caller persists). Idempotent — a no-op once every item is keyed.
+ * A write the shared writer refuses stops it there, that item's inline copy kept:
+ * `refused` holds the writer's answer, and the command answers it with
+ * qs_translation_write_refusal_response() and saves nothing.
+ *
+ * @return array{changed: bool, refused: ?array}
  */
-function storageMigrateInlineDescriptions(array &$registry): bool {
-    if (!isset($registry['items']) || !is_array($registry['items'])) return false;
+function storageMigrateInlineDescriptions(array &$registry): array {
+    if (!isset($registry['items']) || !is_array($registry['items'])) return ['changed' => false, 'refused' => null];
     $changed = false;
     foreach ($registry['items'] as $id => $item) {
         if (!is_array($item) || !array_key_exists('description', $item)) continue;
         if (is_array($item['description']) && !empty($item['description'])) {
-            storageWriteDescription((string) $id, $item['description']);
+            $refused = storageWriteDescription((string) $id, $item['description']);
+            if ($refused !== null) {
+                return ['changed' => $changed, 'refused' => $refused];
+            }
         }
         unset($registry['items'][$id]['description']);
         $changed = true;
     }
-    return $changed;
+    return ['changed' => $changed, 'refused' => null];
 }
 
 /**

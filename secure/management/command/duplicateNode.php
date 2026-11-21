@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/duplicateNode
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * Creates a deep copy of a node and all its children, generating new
  * translation keys for all textKey and translatable attributes (alt, title, etc).
@@ -22,6 +22,8 @@ require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php'; // writeTranslationsToFile, qs_translation_write_empty_words
 
 /**
  * Get all existing translation keys from default.json
@@ -65,7 +67,9 @@ function flattenKeysRecursive(array $arr, string $prefix = ''): array {
  * Generate a new unique text key based on prefix
  */
 function generateNextTextKey(string $prefix, array &$existingKeys): string {
-    $pattern = '/^' . preg_quote($prefix, '/') . '\.item(\d+)$/';
+    // A number held as a group counts as taken too (a copied attribute's `<prefix>.itemN.alt`):
+    // the next word must not land where a group of words is.
+    $pattern = '/^' . preg_quote($prefix, '/') . '\.item(\d+)(?:\.|$)/D';
     $maxN = 0;
     
     foreach ($existingKeys as $key) {
@@ -82,71 +86,79 @@ function generateNextTextKey(string $prefix, array &$existingKeys): string {
 }
 
 /**
- * Get translation value for a key
+ * The copies' words, written through the shared translation writer (its clash check, its size check, its copy
+ * into default.json) once the structure has passed its checks and before it is written. With copyTranslations,
+ * each new key takes the original's word in every project language that holds one, read where that language's
+ * pages read it (its own file on a multilingual site, else default.json), the default language first; a new key
+ * the default language holds no word for gets an empty one there, so default.json, which the next numbers are
+ * read from, holds every key this command makes. Without copyTranslations, an empty word in the default language,
+ * as editNode and addComponentToNode give theirs. A language with no file of its own on a multilingual site reads
+ * default.json, so no file is made for it.
+ *
+ * @param list<array{0: string, 1: string}> $pairs each original key and the key of its copy, in order
+ * @return ApiResponse|null the refusal to answer (every word written taken back), or null once every word is written
  */
-function getTranslationValue(string $key): ?string {
-    $translationFile = PROJECT_PATH . '/translate/default.json';
-    if (!file_exists($translationFile)) {
+function duplicateNodeWriteWords(array $pairs, bool $copyValues): ?ApiResponse {
+    if ($pairs === []) {
         return null;
     }
-    
-    $content = @file_get_contents($translationFile);
-    if ($content === false) {
-        return null;
+    if (!$copyValues) {
+        $empty = qs_translation_write_empty_words(array_map(static fn(array $pair) => $pair[1], $pairs));
+        return $empty['refused'] !== null ? qs_translation_write_refusal_response($empty['refused']) : null;
     }
-    
-    $translations = json_decode($content, true);
-    if (!is_array($translations)) {
-        return null;
-    }
-    
-    $parts = explode('.', $key);
-    $ref = $translations;
-    foreach ($parts as $part) {
-        if (!isset($ref[$part])) {
-            return null;
+    $default = qs_project_default_language();
+    $multilingual = qs_project_is_multilingual();
+    $languages = [$default];
+    if ($multilingual) {
+        foreach (qs_project_language_codes() as $code) {
+            if ($code !== $default && RegexPatterns::match('language_code', $code) && is_file(PROJECT_PATH . "/translate/$code.json")) {
+                $languages[] = $code;
+            }
         }
-        $ref = $ref[$part];
     }
-    
-    return is_string($ref) ? $ref : null;
+    foreach ($languages as $lang) {
+        $source = ($multilingual && is_file(PROJECT_PATH . "/translate/$lang.json")) ? $lang : 'default';
+        $flat = [];
+        foreach ($pairs as [$oldKey, $newKey]) {
+            $word = translationGetKey($source, $oldKey);
+            if ($word !== null) {
+                $flat[$newKey] = $word;
+            } elseif ($lang === $default) {
+                $flat[$newKey] = '';
+            }
+        }
+        if ($flat === []) {
+            continue;
+        }
+        $written = writeTranslationsToFile($lang, convertDotNotationToNested($flat), false);
+        if (!$written['ok']) {
+            return qs_translation_write_refusal_response($written);
+        }
+    }
+    return null;
 }
 
 /**
- * Set a translation key with a value
+ * Write a duplicate, for both of its paths (a node, a component's root): the copies' words first
+ * (duplicateNodeWriteWords(): a refusal leaves every file as it was), then the structure under the size
+ * check (qs_small_write_guard), whose refusal takes the words back too, as a failed structure write does.
+ *
+ * @return ApiResponse|null the answer when something was refused or failed (every file as it was), or null once written
  */
-function setTranslationKey(string $key, string $value): bool {
-    $translationFile = PROJECT_PATH . '/translate/default.json';
-    
-    $translations = [];
-    if (file_exists($translationFile)) {
-        $content = @file_get_contents($translationFile);
-        if ($content !== false) {
-            $translations = json_decode($content, true) ?? [];
-        }
+function duplicateNodeWrite(string $jsonFile, string $jsonContent, array $pairs, bool $copyValues): ?ApiResponse {
+    $wordsRefused = duplicateNodeWriteWords($pairs, $copyValues);
+    if ($wordsRefused !== null) {
+        return $wordsRefused;
     }
-    
-    $parts = explode('.', $key);
-    $ref = &$translations;
-    foreach ($parts as $i => $part) {
-        if ($i === count($parts) - 1) {
-            $ref[$part] = $value;
-        } else {
-            if (!isset($ref[$part]) || !is_array($ref[$part])) {
-                $ref[$part] = [];
-            }
-            $ref = &$ref[$part];
-        }
+    if (!qs_small_write_guard($jsonFile, strlen($jsonContent))) {
+        return qs_small_write_refused();
     }
-    unset($ref);
-
-    // The size check, write by write (qs_small_write_guard): the command answers
-    // qs_small_write_refused(), and a refusal takes back the keys written before.
-    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-    if (!qs_small_write_guard($translationFile, qs_json_size($translations, $flags))) {
-        return false;
+    if (file_put_contents($jsonFile, $jsonContent, LOCK_EX) === false) {
+        qs_small_write_rollback(qs_small_write_journal());
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write structure file');
     }
-    return qs_json_write($translationFile, $translations, $flags, LOCK_EX);
+    return null;
 }
 
 /**
@@ -155,16 +167,16 @@ function setTranslationKey(string $key, string $value): bool {
  * @param array $node The node to process
  * @param string $prefix The key prefix for this structure
  * @param array &$existingKeys Reference to existing keys (updated as new keys are created)
- * @param bool $copyValues Whether to copy translation values
  * @param array &$keyMappings Track old->new key mappings for reporting
+ * @param array &$pairs Every original key and its copy's key, in order (duplicateNodeWriteWords() writes their words)
  * @return array The processed node with new keys
  */
 function processNodeTranslationKeys(
-    array $node, 
-    string $prefix, 
-    array &$existingKeys, 
-    bool $copyValues,
-    array &$keyMappings
+    array $node,
+    string $prefix,
+    array &$existingKeys,
+    array &$keyMappings,
+    array &$pairs
 ): array {
     // Process textKey. A raw or literal text is copied as written: no key is made for it
     // and nothing is translated (qs_is_literal_text()).
@@ -172,11 +184,7 @@ function processNodeTranslationKeys(
         $oldKey = $node['textKey'];
         $newKey = generateNextTextKey($prefix, $existingKeys);
         $node['textKey'] = $newKey;
-        
-        // Copy translation value if requested
-        $oldValue = $copyValues ? getTranslationValue($oldKey) : '';
-        setTranslationKey($newKey, $oldValue ?? '');
-        
+        $pairs[] = [$oldKey, $newKey];
         $keyMappings[$oldKey] = $newKey;
     }
     
@@ -194,11 +202,7 @@ function processNodeTranslationKeys(
                     $newKey .= '.' . $attr;
                     $existingKeys[] = $newKey; // Also track the suffixed key
                     $node['params'][$attr] = $newKey;
-                    
-                    // Copy translation value if requested
-                    $oldValue = $copyValues ? getTranslationValue($oldKey) : '';
-                    setTranslationKey($newKey, $oldValue ?? '');
-                    
+                    $pairs[] = [$oldKey, $newKey];
                     $keyMappings[$oldKey] = $newKey;
                 }
             }
@@ -210,7 +214,7 @@ function processNodeTranslationKeys(
         foreach ($node['children'] as $i => $child) {
             if (is_array($child)) {
                 $node['children'][$i] = processNodeTranslationKeys(
-                    $child, $prefix, $existingKeys, $copyValues, $keyMappings
+                    $child, $prefix, $existingKeys, $keyMappings, $pairs
                 );
             }
         }
@@ -327,6 +331,7 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
         $keyPrefix = 'component.' . $name;
         $existingKeys = getExistingTranslationKeys();
         $totalKeyMappings = [];
+        $pairs = [];
         $clonedChildren = [];
         
         foreach ($children as $child) {
@@ -334,7 +339,7 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             if (is_array($cloned)) {
                 removeNodeIdFields($cloned);
                 $keyMappings = [];
-                $processed = processNodeTranslationKeys($cloned, $keyPrefix, $existingKeys, $copyTranslations, $keyMappings);
+                $processed = processNodeTranslationKeys($cloned, $keyPrefix, $existingKeys, $keyMappings, $pairs);
                 $clonedChildren[] = $processed;
                 $totalKeyMappings = array_merge($totalKeyMappings, $keyMappings);
                 // Update existing keys with newly created ones to avoid conflicts
@@ -369,14 +374,9 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             return ApiResponse::create(500, 'server.internal_error')
                 ->withMessage('Failed to encode structure to JSON');
         }
-        // The size check, as the copied keys' translations had it (qs_small_write_guard):
-        // a refusal here takes them back too.
-        if (qs_small_write_refused() !== null || !qs_small_write_guard($json_file, strlen($json_content))) {
-            return qs_small_write_refused();
-        }
-        if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
-            return ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage('Failed to write structure file');
+        $failed = duplicateNodeWrite($json_file, $json_content, $pairs, (bool) $copyTranslations);
+        if ($failed !== null) {
+            return $failed;
         }
         
         $newNodeId = (string)$firstNewIndex;
@@ -419,13 +419,14 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
     // Get existing keys and process the cloned node
     $existingKeys = getExistingTranslationKeys();
     $keyMappings = [];
-    
+    $pairs = [];
+
     $processedNode = processNodeTranslationKeys(
-        $clonedNode, 
-        $keyPrefix, 
-        $existingKeys, 
-        $copyTranslations,
-        $keyMappings
+        $clonedNode,
+        $keyPrefix,
+        $existingKeys,
+        $keyMappings,
+        $pairs
     );
     
     // Insert the processed node after the source (NodeNavigator::insertAt, the rule
@@ -457,15 +458,9 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             ->withMessage("Failed to encode structure to JSON");
     }
 
-    // The size check, as the copied keys' translations had it (qs_small_write_guard):
-    // a refusal here takes them back too.
-    if (qs_small_write_refused() !== null || !qs_small_write_guard($json_file, strlen($json_content))) {
-        return qs_small_write_refused();
-    }
-
-    if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
-        return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to write structure file");
+    $failed = duplicateNodeWrite($json_file, $json_content, $pairs, (bool) $copyTranslations);
+    if ($failed !== null) {
+        return $failed;
     }
     
     $newNodeId = $insertResult['newNodeId'];

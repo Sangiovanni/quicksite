@@ -129,14 +129,22 @@ function privacyDatumPurpose(string $id, string $lang): ?string {
     return translationGetKey($lang, privacyPurposeKey($id));
 }
 
-/** Write a datum's label + purpose into translate/<lang> (skips empty values). */
-function privacyWriteDatumText(string $id, string $lang, ?string $label, ?string $purpose): void {
+/**
+ * Write a datum's label + purpose into translate/<lang> (skips empty values). Null
+ * once written; else the shared writer's refusal, for the command to answer with
+ * qs_translation_write_refusal_response().
+ */
+function privacyWriteDatumText(string $id, string $lang, ?string $label, ?string $purpose): ?array {
     $flat = [];
     if (is_string($label) && $label !== '')     $flat[privacyLabelKey($id)] = $label;
     if (is_string($purpose) && $purpose !== '') $flat[privacyPurposeKey($id)] = $purpose;
     if (!empty($flat)) {
-        writeTranslationsToFile($lang, convertDotNotationToNested($flat), false);
+        $written = writeTranslationsToFile($lang, convertDotNotationToNested($flat), false);
+        if (!$written['ok']) {
+            return $written;
+        }
     }
+    return null;
 }
 
 /** Remove a datum's label + purpose keys from every project language. */
@@ -209,12 +217,15 @@ function privacyHostKind(array $reg, string $baseUrl): ?string {
  * Move every datum's label + purpose from language $from to $to in the translate
  * files. EMPTIES the source key (keeps it as "") so the old language is flagged
  * as a missing translation rather than deleted (locked rule, shared with storage).
+ * A write the shared writer refuses stops the move there, that key's source not
+ * emptied: `refused` holds the writer's answer, which the command answers with
+ * qs_translation_write_refusal_response() (putting back every word already moved).
  *
- * @return array{moved:int, overwrites:int}
+ * @return array{moved:int, overwrites:int, refused:?array}
  */
 function privacyMoveDescriptions(string $from, string $to, bool $execute = true): array {
     if ($from === $to) {
-        return ['moved' => 0, 'overwrites' => 0];
+        return ['moved' => 0, 'overwrites' => 0, 'refused' => null];
     }
     $reg = loadPrivacyRegistry();
     $moved = 0;
@@ -227,10 +238,13 @@ function privacyMoveDescriptions(string $from, string $to, bool $execute = true)
             if ($existing !== null && $existing !== '') $overwrites++;
             $moved++;
             if ($execute) {
-                writeTranslationsToFile($to, convertDotNotationToNested([$key => $val]), false);
+                $written = writeTranslationsToFile($to, convertDotNotationToNested([$key => $val]), false);
+                if (!$written['ok']) {
+                    return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => $written];
+                }
                 translationSetKey($from, $key, '');
             }
         }
     }
-    return ['moved' => $moved, 'overwrites' => $overwrites];
+    return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => null];
 }

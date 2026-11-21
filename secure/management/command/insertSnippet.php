@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/insertSnippet
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * @param string $type Required - Structure type: 'page', 'menu', 'footer', 'component'
  * @param string $name Required for page/component - Route name or component name

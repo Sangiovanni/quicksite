@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/getStateStores
  * @auth required
- * @permission read
+ * @permission content.read
  *
  * Body (JSON): { "route": "home" }   // optional; omit for all routes
  */

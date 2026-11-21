@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/addComplexElement
  * @auth required
- * @permission editStructure
+ * @permission content.write
  *
  * Body (JSON): {
  *   "kind": "form-scaffold",           // Required: which builder to dispatch to.

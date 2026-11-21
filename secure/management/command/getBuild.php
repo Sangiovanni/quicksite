@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/getBuild
  * @auth required
- * @permission read
+ * @permission content.read
  *
  * Takes no parameters. Retention is N = 1, so a project has one build or none,
  * and this command reports whichever it is. It replaces the old listBuilds:

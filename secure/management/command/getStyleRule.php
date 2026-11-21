@@ -6,7 +6,7 @@
  * @url /management/getStyleRule/{selector}
  * @url /management/getStyleRule/{selector}/{mediaQuery}
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Note: Selector should be URL-encoded if it contains special characters
  * Example: /management/getStyleRule/.btn-primary

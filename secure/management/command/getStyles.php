@@ -7,7 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
  * @method GET
  * @url /management/getStyles
  * @auth required
- * @permission read
+ * @permission content.read
  */
 
 /**

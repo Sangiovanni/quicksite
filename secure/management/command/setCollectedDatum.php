@@ -61,11 +61,14 @@ if (!savePrivacyRegistry($reg)) {
 }
 
 // Prose into translate/ (description language). Empty purpose clears its key.
-privacyWriteDatumText($id, $descLang, $label, $purpose !== '' ? $purpose : null);
+// A refused write takes back the registry above too.
+$refused = privacyWriteDatumText($id, $descLang, $label, $purpose !== '' ? $purpose : null);
+if ($refused !== null) {
+    qs_translation_write_refusal_response($refused)->send();
+}
 if ($purpose === '') {
     translationUnsetKey($descLang, privacyPurposeKey($id));
 }
-// A refused write takes back the registry above too (qs_small_write_guard).
 qs_small_write_send_refusal();
 
 ApiResponse::create($isNew ? 201 : 200, $isNew ? 'created' : 'success')

@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/getCommandHistory
  * @auth required
- * @permission read
+ * @permission history
  * 
  * Retrieves command execution history with optional filtering and pagination.
  * Useful for audit trails, debugging, and AI context.

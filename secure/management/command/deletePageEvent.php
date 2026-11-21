@@ -7,7 +7,7 @@
  * @method DELETE
  * @url /management/deletePageEvent
  * @auth required
- * @permission editStructure
+ * @permission interaction.write
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

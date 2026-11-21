@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/findComponentUsages/{componentName}
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Scans all pages, menu, footer, and other components to find where a specific
  * component is used. Essential for:

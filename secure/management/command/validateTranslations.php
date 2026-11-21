@@ -6,7 +6,7 @@
  * @url /management/validateTranslations
  * @url /management/validateTranslations/{language}
  * @auth required
- * @permission read
+ * @permission content.read
  *
  * Checks that every key the site needs in every language (qs_site_translation_keys()'s required keys) has a
  * word in each translation file. An optional key (a page's description, the site's name, …) is never missing.

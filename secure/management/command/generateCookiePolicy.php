@@ -56,7 +56,11 @@ $segments = $valid['segments'];
 // Ensure every item's description is keyed in translate/ before the page
 // references storageDescKey() — converges any not-yet-migrated inline copies.
 $registry = loadStorageRegistry();
-if (storageMigrateInlineDescriptions($registry)) {
+$migrated = storageMigrateInlineDescriptions($registry);
+if ($migrated['refused'] !== null) {
+    qs_translation_write_refusal_response($migrated['refused'])->send();
+}
+if ($migrated['changed']) {
     saveStorageRegistry($registry);
 }
 // Every write of this command passes the size check as it happens
@@ -101,10 +105,12 @@ if (!policyWriteLeaf($segments, $structure)) {
 saveConsentConfig(array_merge(loadConsentConfig(), ['policyRoute' => '/' . $route]));
 qs_small_write_send_refusal();
 
-// Seed the page's words where a key has none, in every language the pages read (qs_starting_words_seed()).
-// Per-item descriptions are NOT seeded here: they live independently in translate/ under
-// storageDescKey(), authored via the storage registry and resolved live.
-$seeded = qs_starting_words_seed(['consent.policy', 'consent.category']);
+// Seed the page's words where a key has none, in every language the pages read (qs_starting_words_seed()),
+// its title (page.titles.<route>) from the policy's own title word. Per-item descriptions are NOT seeded
+// here: they live independently in translate/ under storageDescKey(), authored via the storage registry
+// and resolved live.
+$seeded = qs_starting_words_seed(['consent.policy', 'consent.category'],
+    [['key' => 'page.titles.' . $route, 'word' => 'consent.policy.title']]);
 
 $answer = [
     'route'           => '/' . $route,

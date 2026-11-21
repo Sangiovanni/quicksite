@@ -44,9 +44,12 @@ if (!is_string($id) || $id === '') {
 
 $registry = loadStorageRegistry();
 
-// Converge any not-yet-keyed descriptions into translate/ before writing.
-storageMigrateInlineDescriptions($registry);
-qs_small_write_send_refusal();
+// Converge any not-yet-keyed descriptions into translate/ before writing. A refused
+// write is answered with everything it wrote put back.
+$migrated = storageMigrateInlineDescriptions($registry);
+if ($migrated['refused'] !== null) {
+    qs_translation_write_refusal_response($migrated['refused'])->send();
+}
 
 if (isset($registry['items'][$id])) {
     ApiResponse::create(409, 'storage.duplicate')
@@ -72,10 +75,12 @@ if (!saveStorageRegistry($registry)) {
 }
 
 // Persist the description (if any) into translate/, keyed — not inline. A
-// refused write takes back the registry above too (qs_small_write_guard).
+// refused write takes back the registry above too, and every word written.
 if (!empty($result['description'])) {
-    storageWriteDescription($id, $result['description']);
-    qs_small_write_send_refusal();
+    $refused = storageWriteDescription($id, $result['description']);
+    if ($refused !== null) {
+        qs_translation_write_refusal_response($refused)->send();
+    }
 }
 
 $stored = $result['item'];

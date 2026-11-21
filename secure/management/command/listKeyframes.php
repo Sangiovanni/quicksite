@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/listKeyframes
  * @auth required
- * @permission read
+ * @permission content.read
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';

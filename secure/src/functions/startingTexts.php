@@ -223,12 +223,17 @@ function qs_starting_texts_write(array $plan): array
  * check first (qs_small_write_guard()), and a refusal is answered here. default.json counts under the
  * default language when no file of that language did, as it is what a monolingual site reads.
  *
+ * $others are single keys whose word is read under another name, written by the same rule: a generated
+ * page's title (`page.titles.<route>`) takes its policy's own title word (`consent.policy.title`). Each
+ * key written counts in languagesSeeded, a title included.
+ *
  * @param list<string> $trees dot paths in the word files: consent.banner, privacy.policy
+ * @param list<array{key: string, word: string}> $others a site key and the word-file key of its word
  * @return array{languagesSeeded: array<string, int>, languagesFailed: string[]}
  */
-function qs_starting_words_seed(array $trees): array
+function qs_starting_words_seed(array $trees, array $others = []): array
 {
-    $entries = [];
+    $entries = $others;
     $walk = static function (array $node, string $path) use (&$walk, &$entries): void {
         foreach ($node as $name => $value) {
             if (is_array($value)) {

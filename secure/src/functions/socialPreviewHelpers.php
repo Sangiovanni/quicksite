@@ -448,15 +448,17 @@ function qs_social_description_unset(string $file, string $route): string
 
 /**
  * Write or remove a page's description in one language, as editTitle writes a title: through the shared
- * translation writer, which keeps default.json in step (the file a one-language site's pages read). An empty
- * text removes it: from the language's file, and from default.json on a one-language site, or on a
- * multilingual one when no other language still holds it (default.json holds the union of the languages).
+ * translation writer, which copies into default.json a write on a one-language site and a write in the
+ * default language on a multilingual one. An empty text removes it the same way: from the language's file,
+ * and from default.json on a one-language site or when it is the default language's; removing another
+ * language's leaves default.json as it is.
  *
  * @return array{ok: bool, reason?: string, response?: ?ApiResponse, collisions?: array, removed?: bool}
  */
 function qs_social_write_description(string $projectPath, string $route, string $lang, string $text): array
 {
     require_once __DIR__ . '/translationHelpers.php';
+    require_once __DIR__ . '/projectLanguage.php';   // qs_project_is_multilingual, qs_project_default_language
     if ($text !== '') {
         $result = writeTranslationsToFile($lang, ['page' => ['descriptions' => [$route => $text]]]);
         if ($result['ok']) {
@@ -467,17 +469,7 @@ function qs_social_write_description(string $projectPath, string $route, string 
     }
     $outcome = qs_social_description_unset($projectPath . '/translate/' . $lang . '.json', $route);
     if ($outcome === 'removed' || $outcome === 'absent') {
-        $keepInDefault = false;
-        if (qs_project_is_multilingual()) {
-            foreach (qs_project_language_codes() as $code) {
-                $other = json_decode((string) @file_get_contents($projectPath . '/translate/' . $code . '.json'), true);
-                if ($code !== $lang && is_array($other) && isset($other['page']['descriptions'][$route])) {
-                    $keepInDefault = true;
-                    break;
-                }
-            }
-        }
-        if (!$keepInDefault) {
+        if (!qs_project_is_multilingual() || $lang === qs_project_default_language()) {
             $fromDefault = qs_social_description_unset($projectPath . '/translate/default.json', $route);
             if ($fromDefault !== 'absent') {
                 $outcome = $fromDefault;

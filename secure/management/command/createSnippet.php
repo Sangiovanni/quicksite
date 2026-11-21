@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/createSnippet
  * @auth required
- * @permission edit
+ * @permission content.write
  * @param string $id Required - Unique snippet ID
  * @param string $name Required - Display name
  * @param string $category Optional - Category: one of qs_snippet_categories() (default other)

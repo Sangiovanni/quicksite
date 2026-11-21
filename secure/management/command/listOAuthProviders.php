@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/p/<projectId>/listOAuthProviders
  * @auth required
- * @permission config.read (editor and above)
+ * @permission config.read
  *
  * The providers come from the installation's list — one file its operator edits, which no command
  * writes (see oauthProviderHelpers.php). For each one the answer says whether this project has

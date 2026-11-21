@@ -6,7 +6,7 @@
  * @url /management/getSiteMap
  * @url /management/getSiteMap/{format}
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Supports two output formats:
  * - text: Plain text URLs (for sitemap.txt generation)

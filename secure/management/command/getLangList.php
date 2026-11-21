@@ -8,7 +8,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
  * @method GET
  * @url /management/getLangList
  * @auth required
- * @permission read
+ * @permission content.read
  */
 
 /**

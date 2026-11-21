@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/addInteraction
  * @auth required
- * @permission editStructure
+ * @permission interaction.write
  * 
  * Adds a {{call:function:params}} to the specified event attribute.
  * If the event already has interactions, appends to existing value.

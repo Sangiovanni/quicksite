@@ -114,8 +114,9 @@ $reg['privacyRoute'] = '/' . $route;
 savePrivacyRegistry($reg);
 qs_small_write_send_refusal();
 
-// Where a key has none, in every language the pages read (qs_starting_words_seed()).
-$seeded = qs_starting_words_seed(['privacy.policy']);
+// Where a key has none, in every language the pages read (qs_starting_words_seed()), the page's title
+// (page.titles.<route>) from the policy's own title word.
+$seeded = qs_starting_words_seed(['privacy.policy'], [['key' => 'page.titles.' . $route, 'word' => 'privacy.policy.title']]);
 
 $answer = [
     'route'           => '/' . $route,

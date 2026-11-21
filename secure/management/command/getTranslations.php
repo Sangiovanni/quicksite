@@ -10,7 +10,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
  * @method GET
  * @url /management/getTranslations
  * @auth required
- * @permission read
+ * @permission content.read
  */
 
 /**

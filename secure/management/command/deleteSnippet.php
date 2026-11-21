@@ -6,7 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_pa
  * @method DELETE
  * @url /management/deleteSnippet
  * @auth required
- * @permission edit
+ * @permission content.write
  * @param string $id Required - Snippet ID to delete
  * @param string $project Optional - Project name (defaults to active project)
  * 

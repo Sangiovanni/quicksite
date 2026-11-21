@@ -5,7 +5,7 @@
  * @method DELETE
  * @url /management/deleteInteraction
  * @auth required
- * @permission editStructure
+ * @permission interaction.write
  * 
  * Removes an interaction at a specific index, or all interactions from an event
  * if no index is provided.

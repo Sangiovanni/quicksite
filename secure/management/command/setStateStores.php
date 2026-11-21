@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/setStateStores
  * @auth required
- * @permission editStructure
+ * @permission interaction.write
  *
  * Body (JSON): {
  *   "route": "home",

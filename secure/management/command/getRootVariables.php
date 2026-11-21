@@ -6,7 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_pa
  * @method GET
  * @url /management/getRootVariables
  * @auth required
- * @permission read
+ * @permission content.read
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';

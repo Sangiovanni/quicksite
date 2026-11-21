@@ -7,7 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
  * @method GET
  * @url /management/getComponent
  * @auth required
- * @permission read
+ * @permission content.read
  * @param string $name Required - Component name (filename without .json)
  * 
  * Returns full component data including structure, variables, and

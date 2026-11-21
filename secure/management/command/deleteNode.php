@@ -100,7 +100,7 @@ function cleanupEmptyParents(array &$arr): void {
  * @method DELETE
  * @url /management/deleteNode
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * Removes a node and all its children from the structure, then each translation key the node named that the site
  * no longer names anywhere (qs_site_translation_keys()), in every language; a key still named elsewhere is kept,

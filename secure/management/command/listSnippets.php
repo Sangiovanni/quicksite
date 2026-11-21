@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/listSnippets
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Returns all snippets visible to the caller (core + their own personal +
  * the marker project's) organized by category.

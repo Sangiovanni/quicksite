@@ -7,7 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
  * @method GET
  * @url /management/getSnippet
  * @auth required
- * @permission read
+ * @permission content.read
  * @param string $id Required - Snippet ID
  * @param string $project Optional - Project name (defaults to active project)
  * 

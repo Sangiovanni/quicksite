@@ -6,7 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_pa
  * @method POST
  * @url /management/duplicateSnippet
  * @auth required
- * @permission edit
+ * @permission content.write
  * @param string $id Required - Source snippet ID to duplicate
  * @param string $newId Optional - New snippet ID (defaults to original-copy)
  * @param string $newName Optional - New display name (defaults to "Copy of [original]")

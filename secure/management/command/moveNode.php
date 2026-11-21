@@ -12,7 +12,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * @method PATCH
  * @url /management/moveNode
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * Atomically moves a node to a new position. Handles:
  * - Same-level moves (reordering siblings)

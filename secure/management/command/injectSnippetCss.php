@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/injectSnippetCss
  * @auth required
- * @permission edit
+ * @permission style.write
  * @param string $id Required - Snippet ID to read CSS from
  * @param string $mode Required - "missing" (add only missing selectors) or "replace" (overwrite all)
  * @param string $project Optional - Target project name (defaults to active project)

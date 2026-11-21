@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/listComponents
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Returns all components from secure/templates/model/json/components/
  * with their structure, metadata, and variable type detection.

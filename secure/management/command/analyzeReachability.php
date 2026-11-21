@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/analyzeReachability
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Performs a BFS traversal starting from the home route, following internal
  * links found in page structures, menu, and footer. Routes not visited

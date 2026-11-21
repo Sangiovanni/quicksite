@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/testApiEndpoint
  * @auth required
- * @permission admin (api.manage)
+ * @permission api.manage
  * 
  * Body (JSON): {
  *     "endpointId": "contact-submit",    // Required: Endpoint to test

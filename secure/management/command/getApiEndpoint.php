@@ -6,7 +6,7 @@
  * @url /management/getApiEndpoint/{endpointId}
  * @url /management/getApiEndpoint/{apiId}/{endpointId}
  * @auth required
- * @permission editor
+ * @permission config.read
  * 
  * URL Parameters:
  *     endpointId - The endpoint ID to retrieve

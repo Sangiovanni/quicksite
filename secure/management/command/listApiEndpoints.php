@@ -7,7 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_pa
  * @url /management/listApiEndpoints
  * @url /management/listApiEndpoints/{apiId}
  * @auth required
- * @permission editor
+ * @permission config.read
  * 
  * URL Parameters (optional):
  *     apiId - Filter endpoints by API group

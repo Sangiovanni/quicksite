@@ -15,7 +15,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * @method POST
  * @url /management/editComponentToNode
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * Edits the data bindings of an existing component node.
  * 

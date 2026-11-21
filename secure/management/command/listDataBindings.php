@@ -16,7 +16,7 @@
  * @url /management/listDataBindings/all       (also include editor-chrome
  *                                              entries — `internal: true`)
  * @auth required
- * @permission read
+ * @permission content.read
  *
  * @return ApiResponse
  */

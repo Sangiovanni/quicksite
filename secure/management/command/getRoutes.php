@@ -8,7 +8,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
  * @method GET
  * @url /management/getRoutes
  * @auth required
- * @permission read
+ * @permission content.read
  */
 
 /**

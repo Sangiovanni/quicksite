@@ -6,7 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
  * @method POST
  * @url /management/renameComponent
  * @auth required
- * @permission editStructure
+ * @permission content.write
  * 
  * Renames a component file and updates all references in:
  * - Pages (all JSON files in pages/)

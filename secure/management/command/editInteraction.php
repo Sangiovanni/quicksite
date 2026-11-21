@@ -5,7 +5,7 @@
  * @method PUT
  * @url /management/editInteraction
  * @auth required
- * @permission editStructure
+ * @permission interaction.write
  * 
  * Replaces an interaction at a specific index within an event.
  */

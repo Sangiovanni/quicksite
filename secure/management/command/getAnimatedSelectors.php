@@ -5,7 +5,7 @@
  * @method GET
  * @url /management/getAnimatedSelectors
  * @auth required
- * @permission read
+ * @permission content.read
  * 
  * Returns selectors grouped by base selector with pseudo-states:
  * - transitions: selectors with transition property, grouped with :hover/:active/:focus states

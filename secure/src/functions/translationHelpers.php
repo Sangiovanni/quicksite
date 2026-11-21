@@ -389,6 +389,72 @@ function writeTranslationsToFile(string $language, array $newNested, bool $repla
 }
 
 /**
+ * The answer to a write writeTranslationsToFile() refused, for a command that writes other files around it
+ * (a registry, the words of a move): every file the command wrote through the size check is put back first
+ * (qs_small_write_rollback(), as editAsset takes back a failed write), so a refused command changes nothing.
+ * A size refusal is answered as itself, its files already put back by qs_small_write_guard(); a clash as
+ * setTranslationKeys answers it: 400 validation.invalid_format, the first collision's suggestion as the
+ * message, the collisions in errors and in data; a failed encode or write a 500.
+ *
+ * @param array $result writeTranslationsToFile()'s answer, ok false
+ */
+function qs_translation_write_refusal_response(array $result): ApiResponse {
+    require_once __DIR__ . '/quota.php';
+    require_once __DIR__ . '/../classes/ApiResponse.php';
+    $reason = (string) ($result['reason'] ?? '');
+    if ($reason === 'refused') {
+        $response = $result['response'] ?? qs_small_write_refused();
+        if ($response instanceof ApiResponse) {
+            return $response;
+        }
+    }
+    qs_small_write_rollback(qs_small_write_journal());
+    if ($reason === 'collisions' && !empty($result['collisions'])) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage((string) ($result['collisions'][0]['suggestion'] ?? ''))
+            ->withErrors($result['collisions'])
+            ->withData(['collisions' => $result['collisions']]);
+    }
+    if ($reason === 'json_encode_failed') {
+        return ApiResponse::create(500, 'server.internal_error')
+            ->withMessage((string) ($result['message'] ?? 'Failed to encode translations to JSON'));
+    }
+    return ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage((string) ($result['message'] ?? 'Failed to write translation file'));
+}
+
+/**
+ * A generated key's empty word: what editNode, addComponentToNode and duplicateNode (without copyTranslations) give a key
+ * they make. Written in the project's default language through the shared writer (its clash check, and its copy into
+ * default.json, which a write in the default language always takes), only where neither that language's file nor
+ * default.json holds a text at the key: a word already there is kept. A key whose place holds a group, or under a
+ * parent that holds a word, is refused by the writer's clash check, as any other write is.
+ *
+ * @param list<string> $keys the keys the command generated
+ * @return array{refused: ?array, created: list<string>} refused: writeTranslationsToFile()'s answer when it refused, for
+ *         qs_translation_write_refusal_response(); created: the keys given an empty word, in their order
+ */
+function qs_translation_write_empty_words(array $keys): array {
+    require_once __DIR__ . '/projectLanguage.php';
+    $lang = qs_project_default_language();
+    $flat = [];
+    foreach ($keys as $key) {
+        if (!is_string($key) || !isValidTranslationKey($key) || array_key_exists($key, $flat)) {
+            continue;
+        }
+        if (translationGetKey($lang, $key) !== null || translationGetKey('default', $key) !== null) {
+            continue;
+        }
+        $flat[$key] = '';
+    }
+    if ($flat === []) {
+        return ['refused' => null, 'created' => []];
+    }
+    $written = writeTranslationsToFile($lang, convertDotNotationToNested($flat), false);
+    return $written['ok'] ? ['refused' => null, 'created' => array_keys($flat)] : ['refused' => $written, 'created' => []];
+}
+
+/**
  * Read a single dot-notation key from translate/<lang>.json. Returns null if the
  * file is missing/invalid, the key is absent, or the value isn't a string. Reads
  * ONLY that language file (no fallback) — callers layer their own fallback.
