@@ -397,8 +397,9 @@ function writeTranslationsToFile(string $language, array $newNested, bool $repla
  * message, the collisions in errors and in data; a failed encode or write a 500.
  *
  * @param array $result writeTranslationsToFile()'s answer, ok false
+ * @param array $data   what the command adds to its answer's data beside the collisions (its language, say)
  */
-function qs_translation_write_refusal_response(array $result): ApiResponse {
+function qs_translation_write_refusal_response(array $result, array $data = []): ApiResponse {
     require_once __DIR__ . '/quota.php';
     require_once __DIR__ . '/../classes/ApiResponse.php';
     $reason = (string) ($result['reason'] ?? '');
@@ -413,14 +414,42 @@ function qs_translation_write_refusal_response(array $result): ApiResponse {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage((string) ($result['collisions'][0]['suggestion'] ?? ''))
             ->withErrors($result['collisions'])
-            ->withData(['collisions' => $result['collisions']]);
+            ->withData(['collisions' => $result['collisions']] + $data);
     }
     if ($reason === 'json_encode_failed') {
-        return ApiResponse::create(500, 'server.internal_error')
+        $response = ApiResponse::create(500, 'server.internal_error')
             ->withMessage((string) ($result['message'] ?? 'Failed to encode translations to JSON'));
+        return $data !== [] ? $response->withData($data) : $response;
     }
-    return ApiResponse::create(500, 'server.file_write_failed')
+    $response = ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage((string) ($result['message'] ?? 'Failed to write translation file'));
+    return $data !== [] ? $response->withData($data) : $response;
+}
+
+/**
+ * The project's languages a write of a site's words reaches, the default language first, each with the word file its pages
+ * read (where a word to copy is read from). On a multilingual project: the default language, and every other listed language
+ * that has a file of its own, each reading its own (a listed language with none reads default.json, which the default
+ * language's write is copied into, so no file is made for it). On a one-language project: its language, read from
+ * default.json. duplicateNode and insertSnippet write their words language by language through it.
+ *
+ * @return list<array{lang: string, source: string}> source: a language code, or 'default' for default.json
+ */
+function qs_translation_write_languages(): array {
+    require_once __DIR__ . '/projectLanguage.php';
+    require_once __DIR__ . '/../classes/RegexPatterns.php';
+    $default = qs_project_default_language();
+    if (!qs_project_is_multilingual()) {
+        return [['lang' => $default, 'source' => 'default']];
+    }
+    $dir = PROJECT_PATH . '/translate';
+    $languages = [['lang' => $default, 'source' => is_file("$dir/$default.json") ? $default : 'default']];
+    foreach (qs_project_language_codes() as $code) {
+        if ($code !== $default && RegexPatterns::match('language_code', $code) && is_file("$dir/$code.json")) {
+            $languages[] = ['lang' => $code, 'source' => $code];
+        }
+    }
+    return $languages;
 }
 
 /**

@@ -89,11 +89,10 @@ function generateNextTextKey(string $prefix, array &$existingKeys): string {
  * The copies' words, written through the shared translation writer (its clash check, its size check, its copy
  * into default.json) once the structure has passed its checks and before it is written. With copyTranslations,
  * each new key takes the original's word in every project language that holds one, read where that language's
- * pages read it (its own file on a multilingual site, else default.json), the default language first; a new key
- * the default language holds no word for gets an empty one there, so default.json, which the next numbers are
- * read from, holds every key this command makes. Without copyTranslations, an empty word in the default language,
- * as editNode and addComponentToNode give theirs. A language with no file of its own on a multilingual site reads
- * default.json, so no file is made for it.
+ * pages read it (qs_translation_write_languages()), the default language first; a new key the default language
+ * holds no word for gets an empty one there, so default.json, which the next numbers are read from, holds every
+ * key this command makes. Without copyTranslations, an empty word in the default language, as editNode and
+ * addComponentToNode give theirs.
  *
  * @param list<array{0: string, 1: string}> $pairs each original key and the key of its copy, in order
  * @return ApiResponse|null the refusal to answer (every word written taken back), or null once every word is written
@@ -107,17 +106,7 @@ function duplicateNodeWriteWords(array $pairs, bool $copyValues): ?ApiResponse {
         return $empty['refused'] !== null ? qs_translation_write_refusal_response($empty['refused']) : null;
     }
     $default = qs_project_default_language();
-    $multilingual = qs_project_is_multilingual();
-    $languages = [$default];
-    if ($multilingual) {
-        foreach (qs_project_language_codes() as $code) {
-            if ($code !== $default && RegexPatterns::match('language_code', $code) && is_file(PROJECT_PATH . "/translate/$code.json")) {
-                $languages[] = $code;
-            }
-        }
-    }
-    foreach ($languages as $lang) {
-        $source = ($multilingual && is_file(PROJECT_PATH . "/translate/$lang.json")) ? $lang : 'default';
+    foreach (qs_translation_write_languages() as ['lang' => $lang, 'source' => $source]) {
         $flat = [];
         foreach ($pairs as [$oldKey, $newKey]) {
             $word = translationGetKey($source, $oldKey);

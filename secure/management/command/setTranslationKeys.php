@@ -142,27 +142,9 @@ $newTranslations = sanitizePlaceholderKeys($newTranslations);
 // translation-writing commands get the same plumbing for free.
 $writeResult = writeTranslationsToFile($language, $newTranslations, $replaceMode, $keep);
 
+// A refusal is answered by the one answer every caller of the writer gives (qs_translation_write_refusal_response()).
 if (!$writeResult['ok']) {
-    if ($writeResult['reason'] === 'refused') {
-        $writeResult['response']->send();
-    }
-    if ($writeResult['reason'] === 'collisions') {
-        ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage($writeResult['collisions'][0]['suggestion'])
-            ->withErrors($writeResult['collisions'])
-            ->withData(['collisions' => $writeResult['collisions']])
-            ->send();
-    }
-    if ($writeResult['reason'] === 'json_encode_failed') {
-        ApiResponse::create(500, 'server.internal_error')
-            ->withMessage($writeResult['message'])
-            ->send();
-    }
-    if ($writeResult['reason'] === 'file_write_failed') {
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage($writeResult['message'])
-            ->send();
-    }
+    qs_translation_write_refusal_response($writeResult)->send();
 }
 
 ApiResponse::create(200, 'operation.success')

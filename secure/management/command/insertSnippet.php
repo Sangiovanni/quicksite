@@ -18,7 +18,8 @@
  *   several, in order, at the position asked
  * - Auto-generated unique textKeys for all translatable content; a raw
  *   value (`__RAW__`) is kept as written, with no key
- * - Translations copied to project's translation files
+ * - Translations copied to the project's languages through the shared
+ *   translation writer, before the structure (a refused word changes nothing)
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -33,6 +34,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php'; // writeTranslationsToFile, qs_translation_write_languages
 
 /**
  * Generate a unique text key prefix based on structure type and name
@@ -88,19 +90,6 @@ function flattenKeys(array $arr, string $prefix = ''): array {
         }
     }
     return $keys;
-}
-
-/**
- * Get a nested value from an array using dot notation
- */
-function getNestedValue(array $arr, string $key) {
-    $parts = explode('.', $key);
-    $current = $arr;
-    foreach ($parts as $part) {
-        if (!is_array($current) || !isset($current[$part])) return null;
-        $current = $current[$part];
-    }
-    return $current;
 }
 
 /**
@@ -209,94 +198,45 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
 }
 
 /**
- * Add translations to project translation files
+ * Write a snippet's words for the keys it places, through the shared translation writer (its clash check, its
+ * size check, its copy into default.json), in the project's languages, the default first
+ * (qs_translation_write_languages(): never a file of a language the project does not list). A key's word in a
+ * language: the snippet's own in that language, else its English, else the word the project holds for the
+ * snippet's key there (a component's data remapped), else the key's last part, readable. A refusal stops the
+ * writing there; the command answers it with qs_translation_write_refusal_response(), which takes back the
+ * languages already written.
  *
  * @param array $keySources new key => the snippet's key its value is read from
  *                          (processSnippetStructure()): one value per new key, so
  *                          two copies of one key both get it
+ * @return array{added: list<string>, refused: ?array} the keys given a word; the writer's refusal, when it refused
  */
 function addSnippetTranslations(array $keySources, array $snippetTranslations): array {
     $addedKeys = [];
-    
-    // Get all language files
-    $translatePath = PROJECT_PATH . '/translate';
-    if (!is_dir($translatePath)) {
-        return $addedKeys;
-    }
-    
-    $langFiles = glob($translatePath . '/*.json');
-    
-    foreach ($langFiles as $langFile) {
-        $filename = basename($langFile, '.json');
-        
-        // Skip certain files
-        if (in_array($filename, ['home', 'translations_index'])) {
-            continue;
-        }
-        
-        $content = @file_get_contents($langFile);
-        $translations = $content ? json_decode($content, true) : [];
-        if (!is_array($translations)) {
-            $translations = [];
-        }
-        
-        // Add each mapped translation
+    foreach (qs_translation_write_languages() as ['lang' => $lang, 'source' => $source]) {
+        $flat = [];
         foreach ($keySources as $newKey => $oldKey) {
-            // Find translation value from snippet
-            $value = '';
-            
-            // Check snippet translations for this language
-            if (isset($snippetTranslations[$filename][$oldKey])) {
-                $value = $snippetTranslations[$filename][$oldKey];
+            if (isset($snippetTranslations[$lang][$oldKey])) {
+                $value = $snippetTranslations[$lang][$oldKey];
             } elseif (isset($snippetTranslations['en'][$oldKey])) {
-                // Fallback to English
                 $value = $snippetTranslations['en'][$oldKey];
             } else {
-                // Fallback: look up old key in project translations (for component data remapping)
-                $existingValue = getNestedValue($translations, $oldKey);
-                if ($existingValue !== null && is_string($existingValue)) {
-                    $value = $existingValue;
-                } else {
-                    // Last resort: formatted key name
-                    $value = ucwords(str_replace(['.', '_', '-'], ' ', basename($oldKey)));
-                }
+                // The word the project holds for the snippet's key (a component's data remapped), else the key's name.
+                $value = translationGetKey($source, (string) $oldKey)
+                    ?? ucwords(str_replace(['.', '_', '-'], ' ', basename((string) $oldKey)));
             }
-            
-            // Set nested key
-            setNestedKey($translations, $newKey, $value);
+            $flat[$newKey] = (string) $value;
             $addedKeys[$newKey] = true;
         }
-        
-        // Write back, after the size check (qs_small_write_guard): a refusal
-        // stops here, takes back the files written before, and the command
-        // answers qs_small_write_refused().
-        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-        if (!qs_small_write_guard($langFile, qs_json_size($translations, $flags))) {
-            break;
+        if ($flat === []) {
+            continue;
         }
-        qs_json_write($langFile, $translations, $flags, LOCK_EX);
-    }
-    
-    return array_keys($addedKeys);
-}
-
-/**
- * Set a nested key in an array using dot notation
- */
-function setNestedKey(array &$arr, string $key, $value): void {
-    $parts = explode('.', $key);
-    $current = &$arr;
-    
-    foreach ($parts as $i => $part) {
-        if ($i === count($parts) - 1) {
-            $current[$part] = $value;
-        } else {
-            if (!isset($current[$part]) || !is_array($current[$part])) {
-                $current[$part] = [];
-            }
-            $current = &$current[$part];
+        $written = writeTranslationsToFile($lang, convertDotNotationToNested($flat), false);
+        if (!$written['ok']) {
+            return ['added' => [], 'refused' => $written];
         }
     }
+    return ['added' => array_keys($addedKeys), 'refused' => null];
 }
 
 /**
@@ -467,20 +407,25 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
-    // The snippet's translations, once nothing can refuse the insert: a refused
-    // insert writes nothing at all.
+    // The snippet's words, once nothing else can refuse the insert, through the shared
+    // writer: a refused word leaves every file as it was, the structure included.
     $addedTranslations = [];
     if (!empty($keySources)) {
-        $addedTranslations = addSnippetTranslations($keySources, $snippet['translations'] ?? []);
+        $snippetWords = addSnippetTranslations($keySources, $snippet['translations'] ?? []);
+        if ($snippetWords['refused'] !== null) {
+            return qs_translation_write_refusal_response($snippetWords['refused']);
+        }
+        $addedTranslations = $snippetWords['added'];
     }
 
-    // Save structure, after the size check the translations had
-    // (qs_small_write_guard): a refusal takes them back too.
+    // Save structure, after the size check the words had (qs_small_write_guard): a
+    // refusal takes them back too, as a failed write does.
     $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-    if (qs_small_write_refused() !== null || !qs_small_write_guard($json_file, qs_json_size($structure, $jsonFlags))) {
+    if (!qs_small_write_guard($json_file, qs_json_size($structure, $jsonFlags))) {
         return qs_small_write_refused();
     }
     if (!qs_json_write($json_file, $structure, $jsonFlags, LOCK_EX)) {
+        qs_small_write_rollback(qs_small_write_journal());
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to write structure file');
     }

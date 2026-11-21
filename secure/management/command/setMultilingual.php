@@ -5,6 +5,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php'; // writeTranslationsToFile, the clash check
 
 /**
  * setMultilingual - Enable or disable multilingual support
@@ -12,11 +13,15 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * When disabling (switching to mono-language):
  * - Sets MULTILINGUAL_SUPPORT = false in config.php
  * - Syncs missing keys from LANGUAGE_DEFAULT to default.json
- * 
+ *
  * When enabling (switching to multilingual):
  * - Sets MULTILINGUAL_SUPPORT = true in config.php
  * - Syncs missing keys from default.json to LANGUAGE_DEFAULT file
- * - Requires at least 2 languages configured
+ *
+ * The sync adds only the words the receiving file lacks, through the shared
+ * translation writer. A key that is a word in one file and a group of words in
+ * the other refuses the switch with the clash's words, and nothing is changed,
+ * the configuration included.
  * 
  * @method POST
  * @url /management/setMultilingual
@@ -124,20 +129,49 @@ if (file_exists($defaultLangFile)) {
 }
 
 /**
- * Deep merge arrays - adds missing keys from source to target
+ * The words $source holds that $target lacks, as a tree: what a switch carries over (nothing $target
+ * holds is in it, so the writer adds and never replaces). $added counts the keys and groups it adds.
+ * Called once setMultilingualClash() found no key that is a word in one file and a group in the other.
  */
-function deepMergeTranslations(array $target, array $source): array {
+function missingTranslations_setMultilingual(array $target, array $source, int &$added): array {
+    $missing = [];
     foreach ($source as $key => $value) {
         if (!array_key_exists($key, $target)) {
-            // Key doesn't exist in target, add it
-            $target[$key] = $value;
+            $missing[$key] = $value;
+            $added += 1 + (is_array($value) ? countKeys($value) : 0);
         } elseif (is_array($value) && is_array($target[$key])) {
-            // Both are arrays, recurse
-            $target[$key] = deepMergeTranslations($target[$key], $value);
+            $sub = missingTranslations_setMultilingual($target[$key], $value, $added);
+            if ($sub !== []) {
+                $missing[$key] = $sub;
+            }
         }
-        // If key exists and isn't an array-to-array case, keep target's value
     }
-    return $target;
+    return $missing;
+}
+
+/**
+ * The refusal of a switch whose sync meets a key that is a word in one file and a group of words in the
+ * other (detectTranslationCollisions()), as the shared writer answers a clash; null when there is none.
+ */
+function setMultilingualClash(array $target, array $source, string $from, string $to): ?array {
+    $collisions = detectTranslationCollisions($target, $source);
+    if ($collisions === []) {
+        return null;
+    }
+    foreach ($collisions as &$collision) {
+        $collision['suggestion'] = "The switch carries the words of $from into $to, which holds another shape at this key: "
+            . $collision['suggestion'];
+    }
+    unset($collision);
+    return ['ok' => false, 'reason' => 'collisions', 'collisions' => $collisions];
+}
+
+/** Answer a refused switch (the lock released first): nothing was changed. */
+function setMultilingualRefuse(array $result, $lockHandle, string $lockFile): void {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
+    qs_translation_write_refusal_response($result)->send();
 }
 
 $syncedKeys = 0;
@@ -153,22 +187,18 @@ if ($enabled) {
     // Add missing keys from default.json to the default language file
     if (!empty($defaultTranslations)) {
         $syncDirection = "default.json → {$defaultLang}.json";
-        $beforeCount = countKeys($langTranslations);
-        $langTranslations = deepMergeTranslations($langTranslations, $defaultTranslations);
-        $afterCount = countKeys($langTranslations);
-        $syncedKeys = $afterCount - $beforeCount;
-        
-        // Save updated language file, after the size check (qs_small_write_guard)
-        if (!qs_small_write_guard($defaultLangFile, qs_json_size($langTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
-            flock($lockHandle, LOCK_UN);
-            fclose($lockHandle);
-            @unlink($lockFile);
-            qs_small_write_send_refusal();
+        $clash = setMultilingualClash($langTranslations, $defaultTranslations, 'default.json', "{$defaultLang}.json");
+        if ($clash !== null) {
+            setMultilingualRefuse($clash, $lockHandle, $lockFile);
         }
-        if (!qs_json_write($defaultLangFile, $langTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
-            ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage("Failed to update {$defaultLang}.json")
-                ->send();
+        // The words the language file lacks, through the shared writer (its size check; its copy
+        // into default.json adds nothing, as the words come from there).
+        $missing = missingTranslations_setMultilingual($langTranslations, $defaultTranslations, $syncedKeys);
+        if ($missing !== []) {
+            $written = writeTranslationsToFile($defaultLang, $missing, false);
+            if (!$written['ok']) {
+                setMultilingualRefuse(array_merge($written, ['message' => "Failed to update {$defaultLang}.json"]), $lockHandle, $lockFile);
+            }
         }
     }
 } else {
@@ -177,22 +207,17 @@ if ($enabled) {
     // Add missing keys from default language to default.json
     if (!empty($langTranslations)) {
         $syncDirection = "{$defaultLang}.json → default.json";
-        $beforeCount = countKeys($defaultTranslations);
-        $defaultTranslations = deepMergeTranslations($defaultTranslations, $langTranslations);
-        $afterCount = countKeys($defaultTranslations);
-        $syncedKeys = $afterCount - $beforeCount;
-        
-        // Save updated default file, after the size check (qs_small_write_guard)
-        if (!qs_small_write_guard($defaultFile, qs_json_size($defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
-            flock($lockHandle, LOCK_UN);
-            fclose($lockHandle);
-            @unlink($lockFile);
-            qs_small_write_send_refusal();
+        $clash = setMultilingualClash($defaultTranslations, $langTranslations, "{$defaultLang}.json", 'default.json');
+        if ($clash !== null) {
+            setMultilingualRefuse($clash, $lockHandle, $lockFile);
         }
-        if (!qs_json_write($defaultFile, $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
-            ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage('Failed to update default.json')
-                ->send();
+        // The words default.json lacks, through the shared writer (its size check).
+        $missing = missingTranslations_setMultilingual($defaultTranslations, $langTranslations, $syncedKeys);
+        if ($missing !== []) {
+            $written = writeTranslationsToFile('default', $missing, false);
+            if (!$written['ok']) {
+                setMultilingualRefuse(array_merge($written, ['message' => 'Failed to update default.json']), $lockHandle, $lockFile);
+            }
         }
     }
 }
@@ -237,6 +262,8 @@ fclose($lockHandle);
 @unlink($lockFile);
 
 if ($result === false) {
+    // The words the sync wrote are taken back: the switch did not happen.
+    qs_small_write_rollback(qs_small_write_journal());
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage('Failed to update config.php')
         ->send();

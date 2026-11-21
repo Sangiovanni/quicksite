@@ -24,6 +24,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';      // qs_page_name_refusal, SPECIAL_PAGES
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';     // qs_project_has_language
 require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';   // qs_translation_write_refusal_response
 
 /**
  * A refused value, named: 400 validation.invalid_value.
@@ -217,17 +218,9 @@ function __command_setSocialPreview(array $params = [], array $urlParams = []): 
     if ($description !== null) {
         $written = qs_social_write_description(PROJECT_PATH, $route, (string) $lang, $description);
         if (!$written['ok']) {
-            if (($written['reason'] ?? '') === 'refused' && ($written['response'] ?? null) !== null) {
-                return $written['response'];
-            }
-            if (($written['reason'] ?? '') === 'collisions') {
-                return ApiResponse::create(400, 'validation.invalid_format')
-                    ->withMessage((string) ($written['collisions'][0]['suggestion'] ?? 'The description\'s key collides with a text of the translation file'))
-                    ->withErrors($written['collisions']);
-            }
-            return ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage('Failed to write the description')
-                ->withData(['language' => $lang]);
+            // A refused description takes back the social values written above: the command changes nothing.
+            return qs_translation_write_refusal_response(array_merge($written, ['message' => 'Failed to write the description']),
+                ['language' => $lang]);
         }
         $data['description'] = [
             'lang'            => $lang,

@@ -182,26 +182,9 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 // default.json, so a title written to <lang>.json alone never reached its pages.
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 $writeResult = writeTranslationsToFile($lang, ['page' => ['titles' => [$route => $title]]]);
+// A refusal is answered by the one answer every caller of the writer gives (qs_translation_write_refusal_response()).
 if (!$writeResult['ok']) {
-    if ($writeResult['reason'] === 'refused') {
-        $writeResult['response']->send();
-    }
-    if ($writeResult['reason'] === 'collisions') {
-        ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage($writeResult['collisions'][0]['suggestion'])
-            ->withErrors($writeResult['collisions'])
-            ->send();
-    }
-    if ($writeResult['reason'] === 'json_encode_failed') {
-        ApiResponse::create(500, 'server.json_encode_failed')
-            ->withMessage('Failed to encode translation data')
-            ->withData(['language' => $lang])
-            ->send();
-    }
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage('Failed to write translation file')
-        ->withData(['language' => $lang])
-        ->send();
+    qs_translation_write_refusal_response($writeResult, ['language' => $lang])->send();
 }
 
 // Success response
