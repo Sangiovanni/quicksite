@@ -1169,12 +1169,8 @@
     // language pre-filled with the current value (empty when missing).
     // Save writes only the languages the user actually changed.
 
-    // Module-scoped cache of full per-language translation trees. Keyed
-    // by language code. Populated lazily on first modal open, reused on
-    // subsequent opens within the same page session. Invalidated locally
-    // after a successful save so re-opening the same route shows the
-    // just-written values.
-    const _editTitleTranslationsCache = {};
+    // The titles come from the panel's one list of the site's words (QSSiteWords), read again each time the dialog
+    // opens: a read that fails caches nothing, and a title written elsewhere since (the editor, another tab) shows.
 
     // DOM refs cached on first call.
     let _editTitleRefs = null;
@@ -1230,26 +1226,6 @@
         return (typeof cursor === 'string') ? cursor : null;
     }
 
-    async function _fetchLanguageTranslations(lang) {
-        if (_editTitleTranslationsCache[lang] !== undefined) {
-            return _editTitleTranslationsCache[lang];
-        }
-        try {
-            const res = await QuickSiteAdmin.apiRequest('getTranslation', 'GET', null, [lang]);
-            // apiRequest returns {ok, status, data:envelope}; envelope is
-            // {status, code, data:{language, translations, file}}. Use the
-            // defensive unwrap pattern that other admin code uses.
-            const payload = (res && res.data && (res.data.data || res.data)) || {};
-            const tree = (payload && typeof payload.translations === 'object') ? payload.translations : {};
-            _editTitleTranslationsCache[lang] = tree;
-            return tree;
-        } catch (err) {
-            console.warn('[sitemap] getTranslation failed for', lang, err);
-            _editTitleTranslationsCache[lang] = {};
-            return {};
-        }
-    }
-
     async function openEditTitleModal(route) {
         const refs = _ensureEditTitleRefs();
         if (!refs.modal) {
@@ -1269,8 +1245,14 @@
         refs.save.disabled = true;
         refs.modal.style.display = '';
 
-        // Fetch every language's tree in parallel (cached after first call).
-        const trees = await Promise.all(langs.map(_fetchLanguageTranslations));
+        // Every language's words, from the one list: on a one-language site default.json, the file its pages read.
+        const list = await QSSiteWords.read({ fresh: true });
+        if (!list) {
+            refs.status.textContent = 'The titles could not be read — close and try again.';
+            refs.status.style.color = 'var(--admin-error)';
+            return;
+        }
+        const trees = langs.map((lang) => list.words[QSSiteWords.shownLanguage(list, lang)] || {});
 
         // Build one input row per language. Marked --missing when the
         // key resolves to null/empty in that language so the user
@@ -1299,7 +1281,7 @@
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'admin-input sitemap-edit-title-row__input';
-            input.setAttribute('data-lang', lang);
+            input.setAttribute('data-title-lang', lang);
             input.setAttribute('data-original', hasValue ? value : '');
             input.value = hasValue ? value : '';
             input.placeholder = 'Title in ' + lang + '…';
@@ -1344,7 +1326,7 @@
         // (keeps the translation files clean).
         const changes = [];
         inputs.forEach(input => {
-            const lang = input.getAttribute('data-lang');
+            const lang = input.getAttribute('data-title-lang');
             const original = input.getAttribute('data-original') || '';
             const value = input.value;
             if (value !== original) changes.push({ lang, value });
@@ -1359,40 +1341,28 @@
         refs.status.textContent = 'Saving (' + changes.length + ' language' + (changes.length === 1 ? '' : 's') + ')…';
         refs.status.style.color = '';
 
-        // Build the nested translation tree for `page.titles.<route>`
-        // once per language and dispatch setTranslationKeys in parallel.
+        // Each changed language through the one list of the site's words (QSSiteWords.write(): its answer checked,
+        // a refusal's words shown), one after another.
         const titleKey = 'page.titles.' + route;
-        const parts = titleKey.split('.');
-        const promises = changes.map(({ lang, value }) => {
-            // Build a fresh nested object per call (don't share refs).
-            const translations = {};
-            let cursor = translations;
-            for (let i = 0; i < parts.length - 1; i++) {
-                cursor[parts[i]] = {};
-                cursor = cursor[parts[i]];
-            }
-            cursor[parts[parts.length - 1]] = value;
-            return QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', {
-                language: lang,
-                translations,
-            });
-        });
-
+        const failures = [];
         try {
-            const results = await Promise.all(promises);
-            const failures = results.filter(r => !(r && r.ok));
+            for (const { lang, value } of changes) {
+                const words = {};
+                words[titleKey] = value;
+                const done = await QSSiteWords.write(lang, words);
+                if (!done.ok) failures.push(lang + ': ' + done.message);
+            }
             if (failures.length > 0) {
-                refs.status.textContent = 'Saved ' + (results.length - failures.length) + '/' + results.length + ' — see console.';
+                refs.status.textContent = 'Saved ' + (changes.length - failures.length) + '/' + changes.length + ' — ' + failures.join(' | ');
                 refs.status.style.color = 'var(--admin-warning, #b3691e)';
-                console.warn('[sitemap] Some edit-title saves failed:', failures);
                 refs.save.disabled = false;
+                if (failures.length < changes.length) await refreshAll();
                 return;
             }
-            // Success — invalidate the cache for changed langs so a
-            // subsequent re-open of the same route shows fresh values.
-            changes.forEach(({ lang }) => { delete _editTitleTranslationsCache[lang]; });
             refs.status.textContent = '✓ Saved ' + changes.length + ' translation' + (changes.length === 1 ? '' : 's') + '.';
             refs.status.style.color = 'var(--admin-success, #2c7a3f)';
+            // The coverage badges count the titles: they follow the save.
+            await refreshAll();
             // Close after a short pause so the user sees the confirmation.
             setTimeout(closeEditTitleModal, 700);
         } catch (err) {

@@ -8,9 +8,11 @@
  *
  * Every item goes through the Add the advanced form already uses: `addNode`, and for the List the Complex
  * list (`addComplexElement`, kind `list`), which writes the whole list or nothing. No class, no ID, no
- * key-or-literal choice: each text gets a translation key of its own, written in every language (the text in
- * the language being edited, empty in the others, as the Add form's key picker does), named as the engine names
- * the keys it generates (<page>.item<N>, menu.item<N>, footer.item<N>, component.<name>.item<N>).
+ * key-or-literal choice: each text gets a translation key of its own, its word written in the language being
+ * edited through the panel's one list of the site's words (QSSiteWords), the other languages showing a gap until
+ * it is translated, as the panel's Create leaves them; named as the engine names the keys it generates
+ * (<page>.item<N>, menu.item<N>, footer.item<N>, component.<name>.item<N>), after every number any language
+ * holds, as a word or as a group.
  *
  * Order: the keys first, then the element. When the element is refused, the keys this Add wrote are deleted
  * again, so a refused Add leaves nothing behind.
@@ -140,43 +142,20 @@ window.PreviewSimpleAdd = (function () {
         return structInfo.type;
     }
 
-    /** `count` new key names after the highest <prefix>.item<N> among the existing keys. */
+    /**
+     * `count` new key names after the highest <prefix>.item<N> among the existing keys: a number held as a group of
+     * words (<prefix>.item<N>.<more>) is taken too, as the engine's own key numbers count it.
+     */
     function nextKeys(prefix, existing, count) {
         const head = prefix + '.item';
         let max = 0;
         (existing || []).forEach(k => {
             if (k.indexOf(head) !== 0) return;
-            const rest = k.slice(head.length);
-            if (/^[0-9]+$/.test(rest)) max = Math.max(max, parseInt(rest, 10));
+            const number = /^([0-9]+)(\.|$)/.exec(k.slice(head.length));
+            if (number) max = Math.max(max, parseInt(number[1], 10));
         });
         const out = [];
         for (let i = 1; i <= count; i++) out.push(head + (max + i));
-        return out;
-    }
-
-    /** A nested translations object from dot-separated keys: {a: {b: value}}. */
-    function nested(pairs) {
-        const out = {};
-        pairs.forEach(p => {
-            const parts = p.key.split('.');
-            let ref = out;
-            for (let i = 0; i < parts.length - 1; i++) {
-                if (typeof ref[parts[i]] !== 'object' || ref[parts[i]] === null) ref[parts[i]] = {};
-                ref = ref[parts[i]];
-            }
-            ref[parts[parts.length - 1]] = p.value;
-        });
-        return out;
-    }
-
-    /** Every key of a translations object, dot-joined. */
-    function flatKeys(obj, prefix, out) {
-        if (!obj || typeof obj !== 'object') return out;
-        Object.keys(obj).forEach(k => {
-            const full = prefix ? prefix + '.' + k : k;
-            if (obj[k] && typeof obj[k] === 'object') flatKeys(obj[k], full, out);
-            else out.push(full);
-        });
         return out;
     }
 
@@ -452,12 +431,6 @@ window.PreviewSimpleAdd = (function () {
         return null;
     }
 
-    async function languages() {
-        const res = await QuickSiteAdmin.apiRequest('getLangList', 'GET');
-        const data = (res && res.data && (res.data.data || res.data)) || {};
-        const list = Array.isArray(data.languages) ? data.languages : [];
-        return list.length ? list : [ctx.editedLanguage()];
-    }
 
     /**
      * The picked picture's alt in Media, as listAssets answers it (Media's key, or a text written before the alt had
@@ -475,42 +448,33 @@ window.PreviewSimpleAdd = (function () {
         }
     }
 
-    async function existingKeys(lang) {
-        const res = await QuickSiteAdmin.apiRequest('getTranslations', 'GET', null, [lang]);
-        if (!res || !res.ok) throw new Error(res?.data?.message || 'getTranslations');
-        const data = (res.data && (res.data.data || res.data)) || {};
-        // The keys come under their language file: {translations: {<lang>: {...}}}, and on a one-language site under `default`
-        // (its one file, default.json, which setTranslationKeys writes whatever language it is given there).
-        const all = data.translations || {};
-        const tree = all[lang] && typeof all[lang] === 'object' ? all[lang]
-            : (all.default && typeof all.default === 'object' ? all.default : all);
-        return flatKeys(tree, '', []);
+    /**
+     * The keys taken: every key any language holds, from the one list of the site's words, read again now (a key
+     * made in another tab is seen). A list that cannot be read adds nothing.
+     */
+    async function existingKeys() {
+        const list = await QSSiteWords.read({ fresh: true });
+        if (!list || QSSiteWords.readFailed()) {
+            throw new Error(word('keysFailed', 'The text could not be saved, so nothing was added.'));
+        }
+        return QSSiteWords.keys(list);
     }
 
-    /** Write the texts in every language (the text in the edited one, empty in the others). */
-    async function writeKeys(texts, langs, edited) {
-        const done = [];
-        for (const lang of langs) {
-            const res = await QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', {
-                language: lang,
-                translations: nested(texts.map(t => ({ key: t.key, value: lang === edited ? t.value : '' }))),
-            });
-            if (!res || !res.ok) {
-                await deleteKeys(texts.map(t => t.key), done);
-                throw new Error(res?.data?.message || word('keysFailed', 'The text could not be saved, so nothing was added.'));
-            }
-            done.push(lang);
+    /** Write the texts in the language being edited; answers the language they were written in. */
+    async function writeKeys(texts, edited) {
+        const words = {};
+        texts.forEach(t => { words[t.key] = t.value; });
+        const done = await QSSiteWords.write(edited, words);
+        if (!done.ok) {
+            throw new Error(done.message || word('keysFailed', 'The text could not be saved, so nothing was added.'));
         }
+        return done.language;
     }
 
-    async function deleteKeys(keys, langs) {
-        for (const lang of langs) {
-            try {
-                await QuickSiteAdmin.apiRequest('deleteTranslationKeys', 'POST', { language: lang, keys: keys });
-            } catch (e) {
-                console.warn('[SimpleAdd] could not take back the keys in ' + lang, e);
-            }
-        }
+    /** Take back the keys this Add wrote, the element being refused. */
+    async function deleteKeys(keys, language) {
+        const done = await QSSiteWords.remove([language], keys);
+        if (!done.ok) console.warn('[SimpleAdd] could not take back the keys:', done.failures);
     }
 
     /**
@@ -534,11 +498,9 @@ window.PreviewSimpleAdd = (function () {
         if (current === 'image' && v.alt === '') v.mediaAlt = await mediaAlt(v.file);
 
         const count = textCount(current, v);
-        let langs = [];
         let keys = [];
         if (count > 0) {
-            langs = await languages();
-            keys = nextKeys(keyPrefix(info), await existingKeys(langs[0]), count);
+            keys = nextKeys(keyPrefix(info), await existingKeys(), count);
         }
         const p = plan(current, v, keys, env);
 
@@ -553,10 +515,10 @@ window.PreviewSimpleAdd = (function () {
             if (info.name) body.name = info.name;
         }
 
-        if (p.texts.length) await writeKeys(p.texts, langs, ctx.editedLanguage());
+        const written = p.texts.length ? await writeKeys(p.texts, ctx.editedLanguage()) : null;
         const res = await QuickSiteAdmin.apiRequest(p.command, 'POST', body);
         if (!res || !res.ok) {
-            if (p.texts.length) await deleteKeys(p.texts.map(x => x.key), langs);
+            if (written) await deleteKeys(p.texts.map(x => x.key), written);
             throw new Error(res?.data?.message || word('addFailed', 'The element could not be added.'));
         }
         ctx.finish({ command: p.command, data: (res.data && res.data.data) || {}, position: position, target: t });
@@ -574,7 +536,7 @@ window.PreviewSimpleAdd = (function () {
     return {
         init, open, close, isOpen, pick, refresh, submit, hasInput,
         // For the probes: what an item sends, and how its keys are named.
-        plan, textCount, keyPrefix, nextKeys, nested,
+        plan, textCount, keyPrefix, nextKeys,
         TITLE_TAGS, PRESETS,
     };
 })();

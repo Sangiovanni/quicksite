@@ -3,40 +3,33 @@
  *
  * Mounted as a sibling to PreviewJsInteractions. Manages the in-editor
  * Translation Manager panel: per-language view, scope filter (whole site /
- * page / component), status chips (used / unset / unused), substring
- * filter, inline value editor, delete + bulk-remove-unused.
+ * page / layout / component / the site's own texts), status chips (used /
+ * unset / unused), substring filter, inline value editor, delete +
+ * bulk-remove-unused.
  *
  * Activation surface: sidebar "Translations" tool → setMode('translation')
  * in preview.js shows #contextual-translation and calls
- * PreviewTranslation.enter(), which fetches the data again on every entry.
+ * PreviewTranslation.enter(), which reads the data again on every entry.
  *
- * Data sources (no new commands — reuses existing):
- *   - QuickSiteAdmin.fetchHelperData('translation-keys-grouped', [lang]):
- *     { used[], unused[], unset[] } per lang
- *   - getTranslationKeys: { keys_by_source } map for the scope picker
- *   - getTranslation/<lang>: full translations for the value column
- *   - setTranslationKeys: write a key's value (per lang)
- *   - deleteTranslationKeys: delete one or many keys
+ * It reads and writes through the panel's one list of a site's words,
+ * QSSiteWords (js/core/site-words.js), as the Translations page does: the
+ * languages, each language's words, the keys' sources and their states per
+ * language come from one reading, so a language switch reads nothing; a
+ * write goes through QSSiteWords.write() / remove(), and every write of the
+ * site's words announced (quicksite:translations-changed) redraws the panel
+ * while it is open.
+ *
+ * One editing language: the panel opens on the toolbar's language and keeps
+ * its own picker; a change in either moves both (preview.js connect()).
  */
 window.PreviewTranslation = (function () {
     'use strict';
 
-    // The /admin/api helper endpoint is project-scoped: it authorizes each
-    // arm against the marker project and binds that context. QuickSiteAPI.helperPath
-    // is the single owner of the marker convention; this delegates so the URL shape
-    // lives in ONE place. Falls back to the bare action if core/api.js is absent —
-    // the server then answers 400 rather than silently reading another project.
-    function _helperPath(action) {
-        return (window.QuickSiteAPI && typeof window.QuickSiteAPI.helperPath === 'function')
-            ? window.QuickSiteAPI.helperPath(action)
-            : action;
-    }
-
     // ──────────────────────────── State ─────────────────────────────────
 
-    // Module-scope cache. Fetched again on every enter(), so a key written
-    // elsewhere shows at the next opening; refetched on a language switch;
-    // updated in place after the panel's own writes.
+    // What the panel shows of the one list (QSSiteWords): read again on every
+    // enter() and on every change announced while it is open; a language
+    // switch takes the language from the list as it stands.
     var _grouped = null;       // { used: [...], unset: [...], unused: [...] } for current lang
     var _translations = null;  // full translations object for current lang
     var _keysBySource = null;  // { 'page:home': ['home.title', ...], 'component:card': [...], ... }
@@ -62,6 +55,9 @@ window.PreviewTranslation = (function () {
     var _bulkDeleteAllLangs = true;
     var _entered = false;      // set by the first enter(): only that one shows the loading state
     var _loadSeq = 0;          // the latest load; an older load's answer is dropped
+    var _active = false;       // between enter() and leave(): a change announced redraws the panel
+    var _pendingReload = false; // a change announced while a word was edited: read once the editor closes
+    var _hooks = { language: null, setLanguage: null };   // the toolbar's language (connect())
 
     // DOM refs — bound on init().
     var _section = null;
@@ -103,7 +99,9 @@ window.PreviewTranslation = (function () {
         if (_langSelect) {
             _langSelect.addEventListener('change', function () {
                 _currentLang = _langSelect.value || _currentLang;
-                _refetchAndRender();
+                _applyLanguage();
+                // One editing language: the toolbar follows, and the frame shows this language.
+                if (_hooks.setLanguage) _hooks.setLanguage(_currentLang);
             });
         }
         if (_scopeSelect) {
@@ -129,6 +127,18 @@ window.PreviewTranslation = (function () {
         if (_removeUnusedBtn) {
             _removeUnusedBtn.addEventListener('click', _handleRemoveUnused);
         }
+        // A write of the site's words anywhere (this panel, a picker's Create, inline edit, another tab):
+        // the panel shows the words as they are now, a word being edited kept until its editor closes.
+        if (window.QSSiteWords) {
+            window.addEventListener(QSSiteWords.EVENT, function () {
+                if (!_active) return;
+                if (_busyKey || _bulkBusy || (_expandedKey && _expandedMode === 'edit')) {
+                    _pendingReload = true;
+                    return;
+                }
+                _load(true);
+            });
+        }
     }
 
     // ──────────────────────────── Public API ────────────────────────────
@@ -142,6 +152,7 @@ window.PreviewTranslation = (function () {
      */
     function enter() {
         if (!_section) return;
+        _active = true;
         var quiet = _entered;
         _entered = true;
         _load(quiet);
@@ -149,78 +160,102 @@ window.PreviewTranslation = (function () {
 
     /**
      * Called by preview.js when leaving translation mode. Nothing to tear
-     * down: the rows stay on screen at the next entry while enter() fetches.
+     * down: the rows stay on screen at the next entry while enter() reads.
      */
     function leave() {
+        _active = false;
+    }
+
+    /**
+     * preview.js hands over the toolbar's language: hooks.language() reads it,
+     * hooks.setLanguage(code) moves it (and the frame) when this panel's own
+     * picker changes.
+     */
+    function connect(hooks) {
+        _hooks.language = hooks && typeof hooks.language === 'function' ? hooks.language : null;
+        _hooks.setLanguage = hooks && typeof hooks.setLanguage === 'function' ? hooks.setLanguage : null;
+    }
+
+    /** The toolbar's language changed while the panel is open: the panel shows it. */
+    function setLanguage(code) {
+        if (!code || code === _currentLang || _availableLangs.indexOf(code) === -1) return;
+        _currentLang = code;
+        if (_langSelect) _langSelect.value = code;
+        _expandedKey = null;
+        _expandedMode = null;
+        _actionError = null;
+        _applyLanguage();
     }
 
     // ──────────────────────────── Data fetch ────────────────────────────
 
     /**
-     * The data load of every enter(). Fetches the language list + the
-     * site-wide keys_by_source map in parallel (neither depends on a
-     * language), then the language-dependent data. Caches the results so
-     * language switches only refetch the language-dependent data. `quiet`
-     * keeps the rows on screen instead of the loading state.
+     * The data load of every enter() and of every change announced while the
+     * panel is open: the one list of the site's words (QSSiteWords), with the
+     * keys' sources and their states per language. A language switch reads
+     * nothing more (_applyLanguage()). `quiet` keeps the rows on screen
+     * instead of the loading state.
+     *
+     * On a one-language site the only file the pages read is default.json,
+     * so that is the one the panel shows (the list's `default`); on a
+     * multilingual one, each language's own file.
      */
     async function _load(quiet) {
         var seq = ++_loadSeq;
-        try {
-            var results = await Promise.all([
-                QuickSiteAdmin.apiRequest('getLangList', 'GET'),
-                QuickSiteAdmin.apiRequest('getTranslationKeys', 'GET')
-            ]);
-            if (seq !== _loadSeq) return;  // a newer load answers instead
-            var langData = _unwrap(results[0]);
-            var keysData = _unwrap(results[1]);
-
-            // For monolingual sites, Translator.php loads default.json
-            // exclusively (LANGUAGES_SUPPORTED entries are ignored at
-            // render time). So the only file worth managing IS default.json
-            // — surface that single source instead of pretending the
-            // configured "default language" file is what's being shipped.
-            var multilingual = langData.multilingual_enabled !== false;
-            if (multilingual) {
-                _availableLangs = Array.isArray(langData.languages) ? langData.languages : [];
-                // In multilingual mode, default.json is plumbing — hide it
-                // from the picker per design lock Q.
-                _availableLangs = _availableLangs.filter(function (l) { return l !== 'default'; });
-            } else {
-                _availableLangs = ['default'];
-            }
-
-            _keysBySource = keysData.keys_by_source || {};
-            // Defensive: PHP's array_unique() leaves gappy indices which
-            // json_encode emits as {"0":"a","2":"b"} (object) instead of
-            // an array. The server now wraps array_unique in array_values,
-            // but coerce here too so a stale OPcache copy doesn't break
-            // the panel.
-            Object.keys(_keysBySource).forEach(function (k) {
-                if (!Array.isArray(_keysBySource[k]) && _keysBySource[k] && typeof _keysBySource[k] === 'object') {
-                    _keysBySource[k] = Object.values(_keysBySource[k]);
-                }
-            });
-            _populateLangSelect();
-            _populateScopeSelect();
-            // Hide the language selector + label when there's no real
-            // choice (monolingual, or multilingual with a single lang).
-            _setLangPickerVisible(_availableLangs.length > 1);
-
-            if (_availableLangs.length === 0) {
-                _showLoading(false);
-                _showEmpty(true);
-                return;
-            }
-            // Pick a default: previously-selected, or first.
-            _currentLang = _currentLang && _availableLangs.indexOf(_currentLang) !== -1
-                ? _currentLang
-                : _availableLangs[0];
-            if (_langSelect) _langSelect.value = _currentLang;
-            await _refetchAndRender(quiet);
-        } catch (e) {
-            console.error('[PreviewTranslation] initial load failed:', e);
-            _showLoading(false);
+        if (!quiet) {
+            _showLoading(true);
+            _showEmpty(false);
         }
+        var list = window.QSSiteWords ? await QSSiteWords.read({ states: true }) : null;
+        if (seq !== _loadSeq) return;  // a newer load answers instead
+        var states = list ? QSSiteWords.currentStates() : null;
+        if (!list || !states) {
+            _showLoading(false);
+            _showReadFailed();
+            return;
+        }
+        _availableLangs = list.languages.slice();
+        _keysBySource = states.sources || {};
+        _populateLangSelect();
+        _populateScopeSelect();
+        // Hide the language selector + label when there's no real
+        // choice (monolingual, or multilingual with a single lang).
+        _setLangPickerVisible(_availableLangs.length > 1);
+
+        if (_availableLangs.length === 0) {
+            _showLoading(false);
+            _showEmpty(true);
+            return;
+        }
+        // The toolbar's language, which is the one remembered for the project; the default language
+        // where it names none the site has.
+        var wanted = list.multilingual ? (_hooks.language ? _hooks.language() : _currentLang) : 'default';
+        _currentLang = wanted && _availableLangs.indexOf(wanted) !== -1 ? wanted
+            : (_availableLangs.indexOf(list.defaultLanguage) !== -1 ? list.defaultLanguage : _availableLangs[0]);
+        if (_langSelect) _langSelect.value = _currentLang;
+        _applyLanguage();
+    }
+
+    /** The list could not be read and nothing was read before: the panel says so instead of a stale view. */
+    function _showReadFailed() {
+        if (!_rowsContainer) return;
+        _showEmpty(false);
+        var p = document.createElement('p');
+        p.className = 'preview-contextual-translation__no-matches';
+        p.textContent = (window.PreviewConfig && PreviewConfig.i18n
+            && PreviewConfig.i18n.translationReadFailed) || 'The site\'s words could not be read.';
+        _rowsContainer.replaceChildren(p);
+    }
+
+    /** Show the current language from the list as it stands (no read). */
+    function _applyLanguage() {
+        var list = window.QSSiteWords ? QSSiteWords.current() : null;
+        var states = window.QSSiteWords ? QSSiteWords.currentStates() : null;
+        if (!list || !states || !_currentLang) return;
+        var g = (states.byLanguage && states.byLanguage[_currentLang]) || { used: [], unset: [], unused: [] };
+        _grouped = { used: g.used, unset: g.unset, unused: g.unused };
+        _translations = list.words[_currentLang] || {};
+        _render();
     }
 
     function _setLangPickerVisible(visible) {
@@ -229,17 +264,6 @@ window.PreviewTranslation = (function () {
             var label = _section.querySelector('label[for="translation-lang"]');
             if (label) label.style.display = visible ? '' : 'none';
         }
-    }
-
-    /**
-     * Defensive unwrap — QuickSiteAdmin.apiRequest returns
-     * {ok, status, data: <ApiResponse envelope>} where the envelope wraps
-     * the payload again in `.data`. So actual payload sits at
-     * res.data.data. Mirrors the unwrap pattern in route-input.js +
-     * text-key-picker.js (they all use `(res.data && (res.data.data || res.data))`).
-     */
-    function _unwrap(res) {
-        return (res && res.data && (res.data.data || res.data)) || {};
     }
 
     function _populateLangSelect() {
@@ -273,131 +297,34 @@ window.PreviewTranslation = (function () {
             && PreviewConfig.i18n.translationScopeSite) || 'Whole site';
         _scopeSelect.appendChild(siteOpt);
 
-        // The getTranslationKeys command's keys_by_source shape is:
-        //   - 'menu' / 'footer' → literal layout sources
-        //   - 'component:<name>' → a component (prefixed because pages and
-        //     components share a flat namespace)
-        //   - any other key → a page route (raw, no 'page:' prefix)
-        var pageGroup = document.createElement('optgroup');
-        pageGroup.label = (window.PreviewConfig && PreviewConfig.i18n
-            && PreviewConfig.i18n.translationScopePages) || 'Pages';
-        var layoutGroup = document.createElement('optgroup');
-        layoutGroup.label = (window.PreviewConfig && PreviewConfig.i18n
-            && PreviewConfig.i18n.translationScopeLayout) || 'Layout';
-        var componentGroup = document.createElement('optgroup');
-        componentGroup.label = (window.PreviewConfig && PreviewConfig.i18n
-            && PreviewConfig.i18n.translationScopeComponents) || 'Components';
-
-        var LAYOUT_SOURCES = { menu: 1, footer: 1 };
-        var sources = Object.keys(_keysBySource).sort();
-        sources.forEach(function (source) {
-            var opt = document.createElement('option');
-            opt.value = source;
-            if (source.indexOf('component:') === 0) {
-                // Strip the prefix in the display — user sees the bare component name.
-                opt.textContent = source.slice('component:'.length);
-                componentGroup.appendChild(opt);
-            } else if (LAYOUT_SOURCES[source]) {
-                opt.textContent = source;
-                layoutGroup.appendChild(opt);
-            } else {
-                // Default: treat as a page route.
-                opt.textContent = source;
-                pageGroup.appendChild(opt);
-            }
+        // The sources where the site names keys, grouped as the Translations page groups them
+        // (QSSiteWords.sourceGroups()): the pages by their routes, the layout (menu, footer), the
+        // components (their bare names), and the site's own texts (site:<name>), each named by its words.
+        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
+        var groupLabels = {
+            pages: i18n.translationScopePages || 'Pages',
+            layout: i18n.translationScopeLayout || 'Layout',
+            components: i18n.translationScopeComponents || 'Components',
+            site: i18n.translationScopeSiteSources || 'Site'
+        };
+        var sourceNames = i18n.translationSourceNames || {};
+        QSSiteWords.sourceGroups(_keysBySource).forEach(function (group) {
+            var optgroup = document.createElement('optgroup');
+            optgroup.label = groupLabels[group.group];
+            group.sources.forEach(function (source) {
+                var opt = document.createElement('option');
+                opt.value = source.id;
+                opt.textContent = group.group === 'site' && sourceNames[source.name] ? sourceNames[source.name] : source.name;
+                optgroup.appendChild(opt);
+            });
+            _scopeSelect.appendChild(optgroup);
         });
-        if (pageGroup.children.length) _scopeSelect.appendChild(pageGroup);
-        if (layoutGroup.children.length) _scopeSelect.appendChild(layoutGroup);
-        if (componentGroup.children.length) _scopeSelect.appendChild(componentGroup);
 
         // A reload keeps the scope chosen, unless its source is gone (then the whole site).
         if (_currentScope !== 'site' && !Object.prototype.hasOwnProperty.call(_keysBySource, _currentScope)) {
             _currentScope = 'site';
         }
         _scopeSelect.value = _currentScope;
-    }
-
-    /**
-     * Refetch the language-dependent data (grouped keys + values), then
-     * render. Called by every load, on a language switch and after the
-     * panel's own writes; `quiet` keeps the rows on screen meanwhile.
-     *
-     * Each call is isolated: one failing sub-call doesn't crash the whole
-     * panel. We render whatever data we have (empty fallbacks), and the
-     * console log identifies the offending endpoint for root-cause.
-     */
-    async function _refetchAndRender(quiet) {
-        if (!_currentLang) return;
-        var seq = ++_loadSeq;
-        if (!quiet) {
-            _showLoading(true);
-            _showEmpty(false);
-        }
-
-        var grouped = await _fetchGroupedSafe(_currentLang);
-        var translations = await _fetchTranslationsSafe(_currentLang);
-        if (seq !== _loadSeq) return;  // a newer load answers instead
-
-        _grouped = grouped || { used: [], unused: [], unset: [] };
-        _translations = translations || {};
-        _render();
-    }
-
-    /**
-     * Safe-fetch the translation-keys-grouped helper. Returns the data
-     * payload on success, null on any failure. We bypass
-     * QuickSiteAdmin.fetchHelperData here because it calls response.json()
-     * directly and throws on empty body, masking the real cause. Reading
-     * response.text() first lets us log the body excerpt for diagnosis.
-     */
-    async function _fetchGroupedSafe(lang) {
-        var adminBase = (QuickSiteAdmin.config && QuickSiteAdmin.config.adminBase) || '/admin';
-        var url = adminBase + '/api/' + _helperPath('translation-keys-grouped') + '/' + encodeURIComponent(lang);
-        var token = QuickSiteAdmin.getToken && QuickSiteAdmin.getToken();
-        try {
-            var resp = await fetch(url, {
-                headers: token ? { Authorization: 'Bearer ' + token } : {}
-            });
-            var text = await resp.text();
-            if (!resp.ok) {
-                console.error('[PreviewTranslation] grouped helper HTTP', resp.status, url,
-                    'body[0..200]:', text.slice(0, 200));
-                return null;
-            }
-            if (text === '' || text == null) {
-                console.error('[PreviewTranslation] grouped helper returned EMPTY body', url,
-                    'status:', resp.status);
-                return null;
-            }
-            var json;
-            try {
-                json = JSON.parse(text);
-            } catch (e) {
-                console.error('[PreviewTranslation] grouped helper returned non-JSON', url,
-                    'length:', text.length, 'body[0..200]:', text.slice(0, 200));
-                return null;
-            }
-            if (!json || json.success !== true) {
-                console.error('[PreviewTranslation] grouped helper returned error',
-                    (json && json.error) || json);
-                return null;
-            }
-            return json.data;
-        } catch (e) {
-            console.error('[PreviewTranslation] grouped helper fetch threw', url, e);
-            return null;
-        }
-    }
-
-    async function _fetchTranslationsSafe(lang) {
-        try {
-            var res = await QuickSiteAdmin.apiRequest('getTranslation', 'GET', null, [lang]);
-            var trData = _unwrap(res);
-            return trData.translations || {};
-        } catch (e) {
-            console.error('[PreviewTranslation] getTranslation failed', lang, e);
-            return null;
-        }
     }
 
     /**
@@ -554,24 +481,14 @@ window.PreviewTranslation = (function () {
      * Build a unified entry list — { key, status, value } — across all
      * three groups. Used + unused get their value from _translations
      * (dot-notation lookup); unset get an empty string. Sorted
-     * alphabetically by key name.
-     *
-     * The translation-keys-grouped helper returns each entry as a
-     * { value, label } object (see admin/api/index.php case
-     * 'translation-keys-grouped'). We extract `.value` but tolerate a
-     * bare string too in case the shape changes.
+     * alphabetically by key name. The groups hold the keys themselves
+     * (QSSiteWords' states).
      */
     function _buildEntries() {
         var entries = [];
-        function pullKey(item) {
-            if (typeof item === 'string') return item;
-            if (item && typeof item.value === 'string') return item.value;
-            return null;
-        }
         function push(items, status) {
-            (items || []).forEach(function (item) {
-                var key = pullKey(item);
-                if (key === null) return;
+            (items || []).forEach(function (key) {
+                if (typeof key !== 'string') return;
                 var value = status === 'unset' ? '' : (_resolveTranslation(key) || '');
                 entries.push({ key: key, status: status, value: value });
             });
@@ -812,12 +729,18 @@ window.PreviewTranslation = (function () {
         _expandedKey = null;
         _expandedMode = null;
         _actionError = null;
+        if (_pendingReload) {
+            _pendingReload = false;
+            _load(true);
+            return;
+        }
         _renderRows();
     }
 
     /**
-     * Save a single translation value. Sends dot-notation; the server
-     * normalises to nested. On success we refetch grouped+translations
+     * Save a single translation value, through the one list of the site's
+     * words (QSSiteWords.write(): the answer checked, a refusal's words
+     * shown and nothing changed). On success the panel reads the list again,
      * so the row's status flips (e.g. unset → used) and counts update.
      */
     async function _handleSaveKey(key, value) {
@@ -826,35 +749,21 @@ window.PreviewTranslation = (function () {
         _actionError = null;
         _renderRows();
 
-        try {
-            var body = {
-                language: _currentLang,
-                translations: {}
-            };
-            body.translations[key] = value;
-            var res = await QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', body);
-            var ok = res && res.ok;
-            var envelope = res && res.data;
-            if (!ok) {
-                var msg = (envelope && envelope.message)
-                    || (envelope && envelope.error)
-                    || ('HTTP ' + (res && res.status));
-                throw new Error(msg);
-            }
-        } catch (e) {
-            _actionError = { key: key, message: _formatSaveError(e) };
+        var words = {};
+        words[key] = value;
+        var done = await QSSiteWords.write(_currentLang, words);
+        if (!done.ok) {
+            _actionError = { key: key, message: _formatSaveError(new Error(done.message)) };
             _busyKey = null;
             _renderRows();
             return;
         }
 
-        // Success: refetch + close editor. The refetch repopulates _grouped
-        // so the just-saved key flips groups naturally (the "stale-sibling
-        // sweep").
         _busyKey = null;
         _expandedKey = null;
         _expandedMode = null;
-        await _refetchAndRender();
+        _pendingReload = false;
+        await _load(true);
         _reloadPreviewIframe();
     }
 
@@ -977,17 +886,9 @@ window.PreviewTranslation = (function () {
             ? _availableLangs.slice()
             : [_currentLang];
 
-        var results = await Promise.all(targetLangs.map(function (lang) {
-            return _deleteKeysForLang(lang, [key]);
-        }));
-
-        var failures = [];
-        results.forEach(function (r, i) {
-            if (!r.ok) failures.push({ lang: targetLangs[i], error: r.error });
-        });
-
-        if (failures.length > 0) {
-            _actionError = { key: key, message: _formatMultiLangDeleteError(failures, results.length) };
+        var done = await _deleteKeys(targetLangs, [key]);
+        if (!done.ok) {
+            _actionError = { key: key, message: _formatMultiLangDeleteError(done.failures, done.total) };
             _busyKey = null;
             _renderRows();
             return;
@@ -997,32 +898,22 @@ window.PreviewTranslation = (function () {
         _expandedKey = null;
         _expandedMode = null;
         _deleteAllLangs = false;
-        await _refetchAndRender();
+        await _load(true);
         _reloadPreviewIframe();
     }
 
     /**
-     * Single-language delete API call. Returns {ok: true} on 200 OR 404
-     * (404 = "no keys found" — acceptable in multi-lang mode because the
-     * key might not exist in every file, and the desired end state is
-     * "key absent" either way).
+     * Delete keys in each language given, through the one list of the site's
+     * words (QSSiteWords.remove(): a language that does not hold them is no
+     * failure). Answers {ok, failures: [{lang, error}], total}.
      */
-    async function _deleteKeysForLang(lang, keys) {
-        try {
-            var res = await QuickSiteAdmin.apiRequest('deleteTranslationKeys', 'POST', {
-                language: lang,
-                keys: keys
-            });
-            if (!res) return { ok: false, error: PreviewConfig.i18n.translationNoResponse };
-            if (res.status === 200 || res.status === 404) return { ok: true };
-            var envelope = res.data;
-            var msg = (envelope && envelope.message)
-                || (envelope && envelope.error)
-                || ('HTTP ' + res.status);
-            return { ok: false, error: msg };
-        } catch (e) {
-            return { ok: false, error: (e && e.message) || String(e) };
-        }
+    async function _deleteKeys(langs, keys) {
+        var done = await QSSiteWords.remove(langs, keys);
+        return {
+            ok: done.ok,
+            total: done.done.length + done.failures.length,
+            failures: done.failures.map(function (f) { return { lang: f.language, error: f.message }; })
+        };
     }
 
     function _formatMultiLangDeleteError(failures, total) {
@@ -1086,17 +977,9 @@ window.PreviewTranslation = (function () {
             ? _availableLangs.slice()
             : [_currentLang];
 
-        var results = await Promise.all(targetLangs.map(function (lang) {
-            return _deleteKeysForLang(lang, keys);
-        }));
-
-        var failures = [];
-        results.forEach(function (r, i) {
-            if (!r.ok) failures.push({ lang: targetLangs[i], error: r.error });
-        });
-
-        if (failures.length > 0) {
-            _bulkError = _formatMultiLangDeleteError(failures, results.length);
+        var done = await _deleteKeys(targetLangs, keys);
+        if (!done.ok) {
+            _bulkError = _formatMultiLangDeleteError(done.failures, done.total);
             _bulkBusy = false;
             _renderRows();
             return;
@@ -1104,7 +987,7 @@ window.PreviewTranslation = (function () {
 
         _bulkBusy = false;
         _bulkConfirm = false;
-        await _refetchAndRender();
+        await _load(true);
         _reloadPreviewIframe();
     }
 
@@ -1120,19 +1003,9 @@ window.PreviewTranslation = (function () {
         }
     }
 
-    /**
-     * Extract the unused keys for the bulk confirm. Uses the same shape
-     * tolerance as _buildEntries (helper returns {value,label} objects).
-     */
+    /** The unused keys, for the bulk confirm. */
     function _bulkUnusedKeys() {
-        var keys = [];
-        (_grouped && _grouped.unused || []).forEach(function (item) {
-            var k = (typeof item === 'string') ? item
-                : (item && typeof item.value === 'string') ? item.value
-                : null;
-            if (k !== null) keys.push(k);
-        });
-        return keys;
+        return ((_grouped && _grouped.unused) || []).filter(function (k) { return typeof k === 'string'; });
     }
 
     /**
@@ -1236,5 +1109,7 @@ window.PreviewTranslation = (function () {
     return {
         enter: enter,
         leave: leave,
+        connect: connect,
+        setLanguage: setLanguage,
     };
 })();

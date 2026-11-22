@@ -48,7 +48,7 @@
                 <span class="preview-contextual-translation__chip-count" id="translation-count-unset">0</span>
             </label>
             <label class="preview-contextual-translation__chip"
-                   title="<?= __admin('preview.translationStatusUnusedHint', 'Keys translated for this language but no longer referenced by any page or component.') ?>">
+                   title="<?= __admin('preview.translationStatusUnusedHint', 'Keys this language holds that nothing on the site names.') ?>">
                 <input type="checkbox" checked data-status="unused">
                 <span class="preview-contextual-translation__chip-dot">🟡</span>
                 <span class="preview-contextual-translation__chip-label"><?= __admin('preview.translationStatusUnused', 'Unused') ?></span>

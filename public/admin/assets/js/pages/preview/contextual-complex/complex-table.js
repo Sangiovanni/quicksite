@@ -439,46 +439,14 @@
             return 'en';
         }
 
-        // Per-wizard-instance cache for the project's lang list. Fetched
-        // lazily on first Translatable-mode paste; reused on subsequent
-        // pastes within the same wizard session.
-        var _langsCache = null;
+        // The project's languages, from the panel's one list of the site's words (QSSiteWords), read when the
+        // wizard mounts: on a one-language site its one language, whose write the shared writer keeps in step with
+        // default.json.
         function _fetchLangs() {
-            if (_langsCache) return Promise.resolve(_langsCache);
-            var api = window.QuickSiteAdmin;
-            if (!api) return Promise.resolve([_getCurrentLang()]);
-            // QuickSiteAdmin.apiRequest returns {ok, status, data: <envelope>}
-            // where the ApiResponse envelope wraps the payload again in `.data`.
-            // So the languages array sits at res.data.data.languages. Use the
-            // defensive `(payload.data || payload)` unwrap pattern from
-            // text-key-picker.js loadKeysOnce() in case any future apiRequest
-            // refactor smooths the double-wrap.
-            return api.apiRequest('getLangList', 'GET').then(function (res) {
-                var payload = (res && res.data && (res.data.data || res.data)) || {};
-                var langs = Array.isArray(payload.languages) ? payload.languages : [];
-                if (langs.length === 0) langs = [_getCurrentLang()];
-                _langsCache = langs;
-                return langs;
-            }).catch(function () {
-                // Degrade gracefully — write only to current lang if we can't
-                // discover the full set.
-                _langsCache = [_getCurrentLang()];
-                return _langsCache;
+            return window.QSSiteWords.read().then(function (list) {
+                if (!list) return [_getCurrentLang()];
+                return list.multilingual ? list.codes.slice() : [list.defaultLanguage];
             });
-        }
-
-        // Build a nested object from a dot-shaped key + value, mirroring
-        // text-key-picker.js's nestedFromKey. Composed via _mergeTranslations
-        // so many keys land in one tree.
-        function _setNested(tree, dotKey, value) {
-            var parts = String(dotKey).split('.');
-            var node = tree;
-            for (var i = 0; i < parts.length - 1; i++) {
-                var k = parts[i];
-                if (!node[k] || typeof node[k] !== 'object') node[k] = {};
-                node = node[k];
-            }
-            node[parts[parts.length - 1]] = value;
         }
 
         function _currentPasteMode() {
@@ -616,24 +584,16 @@
             pasteApply.disabled = true;
             pasteStatus.textContent = 'Writing translations to "' + targetLang + '"…';
 
-            var api = window.QuickSiteAdmin;
-            if (!api) {
-                pasteStatus.textContent = 'Admin API unavailable.';
-                pasteApply.disabled = false;
-                return;
-            }
-
-            // Single request to the target language only. We deliberately
-            // do NOT write empty stubs to other languages here — that's
-            // the cross-language CSV workflow's job. Other-language render-time
-            // lookups will warn for keys missing in those languages — that
-            // matches user intent ("I only translated this one language").
-            var tree = {};
-            Object.keys(flat).forEach(function (k) { _setNested(tree, k, flat[k]); });
-            api.apiRequest('setTranslationKeys', 'POST', {
-                language: targetLang,
-                translations: tree,
-            }).then(function () {
+            // Single request to the target language only, through the one list of the site's words
+            // (QSSiteWords.write(): its answer checked). We deliberately do NOT write empty stubs to
+            // other languages here — that's the cross-language CSV workflow's job: the others show a gap
+            // until translated, which matches user intent ("I only translated this one language").
+            // A refusal writes nothing and leaves the pickers as they were.
+            window.QSSiteWords.write(targetLang, flat).then(function (done) {
+                if (!done.ok) {
+                    pasteStatus.textContent = 'Not written: ' + done.message;
+                    return;
+                }
                 _applyGridToPickers(headerKeysT, bodyKeysT, maxCols);
                 pasteStatus.textContent = 'Wrote ' + Object.keys(flat).length + ' translation key(s) for "' + tableId + '" (' + targetLang + ').';
             }).catch(function (err) {

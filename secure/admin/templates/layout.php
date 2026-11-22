@@ -179,6 +179,7 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/members-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/builds-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/social-previews.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/translations-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/bubble.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
@@ -188,6 +189,8 @@ $langNames = [
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
     <!-- Shared DOM factory — must load before any page script that references QSDom -->
     <script src="<?= $versionedAsset('/js/core/dom.js') ?>"></script>
+    <!-- The one list of a site's words: every surface that offers a site's keys reads it, every write updates it -->
+    <script src="<?= $versionedAsset('/js/core/site-words.js') ?>"></script>
     <!-- Reusable searchable combobox. Wraps a native <select> — page scripts construct QSSearchableSelect after locating their select element. -->
     <script src="<?= $versionedAsset('/js/core/searchable-select.js') ?>"></script>
     <!-- The panel's hover bubble: every title shows through it. Listens on the document; builds its element on first use. -->
@@ -341,7 +344,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                     <span><?= __admin('nav.account') ?></span>
                 </a>
 
-                <!-- The panel's language, the current one marked; the script below answers any [data-lang] click. -->
+                <!-- The panel's language, the current one marked; the script below answers these buttons' clicks alone. -->
                 <div class="admin-account__lang">
                     <span class="admin-account__lang-label"><?= __admin('footer.language') ?>:</span>
                     <?php foreach ($availableLangs as $langCode): ?>
@@ -722,9 +725,9 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
             // Store current language in localStorage for persistence
             localStorage.setItem(STORAGE_KEY, QUICKSITE_CONFIG.adminLang);
             
-            // Handle language switch buttons
+            // The account menu's language buttons, and nothing else that carries data-lang
             document.addEventListener('click', function(e) {
-                const langBtn = e.target.closest('[data-lang]');
+                const langBtn = e.target.closest('.admin-account__lang-btn[data-lang]');
                 if (langBtn) {
                     const newLang = langBtn.dataset.lang;
                     localStorage.setItem(STORAGE_KEY, newLang);

@@ -84,6 +84,9 @@
     let originalWord = null;    // the word they write
     let textMarkers = null;     // { name: 'pair' | 'void' }
     let plainTextTags = [];
+    // The words of the language shown, by key, as they are stored (placeholders unfilled), sent by the panel with text
+    // mode: an edited text starts from its stored word, never from the page's drawing of it. Null until sent.
+    let storedWords = null;
     
     // Elements to ignore
     const ignoreTags = ['SCRIPT', 'STYLE', 'META', 'LINK', 'NOSCRIPT', 'BR', 'HR', 'HTML', 'HEAD'];
@@ -116,6 +119,9 @@
                 if (e.data.textMarkers) textMarkers = e.data.textMarkers;
                 if (Array.isArray(e.data.plainTextTags)) plainTextTags = e.data.plainTextTags;
                 setMode(e.data.mode);
+            }
+            if (e.data.action === 'storedWords') {
+                storedWords = e.data.words && typeof e.data.words === 'object' ? e.data.words : null;
             }
             if (e.data.action === 'clearSelection') {
                 clearSelection();
@@ -1591,6 +1597,14 @@
         editingElement = el;
         editingTextKey = el.getAttribute('data-qs-textkey');
         originalNodes = Array.from(el.childNodes, node => node.cloneNode(true));
+        // The stored word, where the page drew it otherwise (a placeholder it filled: {{__lang}}, a parameter, a
+        // resolved value): the text is edited as it is written. A raw text is its own word, and a key the panel
+        // sent no word for is edited as drawn. Escape and an unchanged save put the drawing back.
+        const stored = storedWords && !el.hasAttribute('data-qs-raw')
+            && Object.prototype.hasOwnProperty.call(storedWords, editingTextKey) ? storedWords[editingTextKey] : null;
+        if (typeof stored === 'string' && stored !== writtenWord(el)) {
+            showWord(el, stored);
+        }
         originalWord = writtenWord(el);
 
         el.classList.add('qs-text-editing');

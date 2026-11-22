@@ -2825,6 +2825,7 @@
         // the user can pick elements directly while seeing Suggested
         // tools in the panel — without round-tripping through select mode.
         sendToIframe('setMode', frameModeMessage(mode === 'ai-tools' ? 'select' : mode));
+        if (mode === 'text') sendStoredWords();
         
         // Store preselection for style mode (for the selector browser)
         if (mode === 'style' && preselect) {
@@ -3926,6 +3927,26 @@
     }
 
     /**
+     * The words of the language shown, by key, as they are stored (placeholders unfilled, markers written), from the
+     * one list of the site's words (QSSiteWords): inline edit starts a text from its stored word, so a sentence holding
+     * {{__lang}} or a parameter is edited and saved as written, never as the page filled it. Sent to the frame with
+     * text mode, after each reload in it, and when the site's words change; the frame keeps the last it was sent.
+     */
+    function sendStoredWords() {
+        if (!window.QSSiteWords) return;
+        QSSiteWords.read().then(function (list) {
+            if (currentMode !== 'text' || !list) return;
+            const lang = QSSiteWords.shownLanguage(list, getCurrentLang());
+            const words = {};
+            QSSiteWords.leafKeys(list.words[lang] || {}).forEach(function (key) {
+                const word = QSSiteWords.word(list, lang, key);
+                if (word !== null) words[key] = word;
+            });
+            sendToIframe('storedWords', { words: words });
+        });
+    }
+
+    /**
      * Show a translation's word in a text of the frame, as the renderer draws it there: its markers elements
      * (QSTextMarkers, core/text-markers.js), or, inside an element that shows no formatting, its words alone.
      */
@@ -4025,6 +4046,7 @@
                     // Use sendToIframe to ensure source is included (required by iframe handler)
                     // AI tools mode reuses select-mode iframe behavior (see setMode comment).
                     sendToIframe('setMode', frameModeMessage(currentMode === 'ai-tools' ? 'select' : currentMode));
+                    if (currentMode === 'text') sendStoredWords();
                     if (currentMode !== 'select') {
                         sendToIframe('clearSelection', {});
                     }
@@ -4214,38 +4236,23 @@
 
         // Get current language from the preview selector
         const lang = getCurrentLang();
-        
+
         try {
-            // Call setTranslationKeys API
-            // The API expects 'language' and 'translations' (nested object, not JSON string)
-            // Format: { language: 'en', translations: { key.path: 'value' } }
-            // But the API actually expects nested structure, so we need to build it
-            
-            // Parse the textKey path into nested structure
-            // e.g., "home.hero.title" -> { home: { hero: { title: "value" } } }
-            const parts = textKey.split('.');
-            let translations = {};
-            let current = translations;
-            for (let i = 0; i < parts.length - 1; i++) {
-                current[parts[i]] = {};
-                current = current[parts[i]];
+            // The word as written, in the language shown, through the one list of the site's words
+            // (QSSiteWords.write(): the answer checked, a refusal's words shown and nothing changed).
+            const words = {};
+            words[textKey] = newValue;
+            const done = await QSSiteWords.write(lang, words);
+            if (!done.ok) {
+                throw new Error(done.message);
             }
-            current[parts[parts.length - 1]] = newValue;
-            
-            const params = {
-                language: lang,
-                translations: translations
-            };
-            
-            console.log('[Preview] Saving translation:', params);
-            const result = await QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', params);
-            
-            if (!result.ok) {
-                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to save text');
-            }
-            
+
             showToast(PreviewConfig.i18n.textSaved, 'success');
-            console.log('[Preview] Translation saved successfully');
+            // A word holding a placeholder ({{__lang}}, a parameter) shows filled once the page draws it again.
+            if (newValue.indexOf('{{') !== -1) {
+                reloadPreview();
+                return;
+            }
 
             // Update the span the user just edited — the frame already
             // shows the new word there, no action needed.
@@ -4578,8 +4585,7 @@
         
         if (langSelect) {
             langSelect.addEventListener('change', function() {
-                // Reload with current edit target
-                navigateTo(currentEditType, currentEditName);
+                setEditingLanguage(langSelect.value, 'toolbar');
             });
         }
 
@@ -8837,36 +8843,9 @@
     let variablesPanelStructure = null;
     // The struct it was read from, which the frame names a card's node by
     let variablesPanelStruct = null;
-    // Cached flat list of translation key names
-    let variablesPanelTranslationKeys = [];
-    // Cached map of translation key → first-language value (for preview)
-    let variablesPanelTranslationValues = {};
-    // Cached list of available language codes
-    let variablesPanelLanguages = [];
     // Cached list of enum variable names (keys from __enums__)
     let variablesPanelEnumVarNames = [];
     
-    /**
-     * Flatten nested translation object into dot-notation keys
-     * e.g. { home: { title: "x" } } → ["home.title"]
-     * Also populates valueMap with key → value mappings
-     */
-    function flattenTranslationKeys(obj, prefix, valueMap) {
-        const keys = [];
-        if (!obj || typeof obj !== 'object') return keys;
-        for (const key of Object.keys(obj)) {
-            const fullKey = prefix ? prefix + '.' + key : key;
-            if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-                keys.push(...flattenTranslationKeys(obj[key], fullKey, valueMap));
-            } else {
-                keys.push(fullKey);
-                if (valueMap) {
-                    valueMap[fullKey] = (obj[key] != null) ? String(obj[key]) : '';
-                }
-            }
-        }
-        return keys;
-    }
     
     /**
      * Detect textKey type from its value
@@ -9051,21 +9030,15 @@
         if (variablesPanelFooter) variablesPanelFooter.style.display = 'none';
         
         try {
-            // Fetch component structure AND translation keys in parallel
+            // The component's structure; the translation-key fields read the site's words themselves when they
+            // open (the shared text-key picker, through QSSiteWords).
             variablesPanelStruct = selectedStruct || ('component-' + currentEditName);
             const structInfo = parseStruct(variablesPanelStruct);
             if (!structInfo) throw new Error('Invalid struct');
-            
             const urlParams = [structInfo.type];
             if (structInfo.name) urlParams.push(structInfo.name);
-            
-            const [resp, transResp] = await Promise.all([
-                QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams),
-                QuickSiteAdmin.apiRequest('getTranslations', 'GET')
-            ]);
-            
+            const resp = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
             if (!resp.ok || !resp.data?.data?.structure) throw new Error('Failed to get structure');
-            
             variablesPanelStructure = JSON.parse(JSON.stringify(resp.data.data.structure));
             
             // Extract available enum variable names from __enums__
@@ -9075,19 +9048,7 @@
                 variablesPanelEnumVarNames = Object.keys(enums);
             }
             
-            // Extract flat translation key list from first available language
-            variablesPanelTranslationKeys = [];
-            variablesPanelTranslationValues = {};
-            variablesPanelLanguages = [];
-            if (transResp.ok && transResp.data?.data?.translations) {
-                const allTranslations = transResp.data.data.translations;
-                variablesPanelLanguages = transResp.data.data.languages || Object.keys(allTranslations);
-                const firstLang = Object.keys(allTranslations)[0];
-                if (firstLang) {
-                    variablesPanelTranslationValues = {};
-                    variablesPanelTranslationKeys = flattenTranslationKeys(allTranslations[firstLang], '', variablesPanelTranslationValues).sort();
-                }
-            }
+
             
             // Navigate to the selected node (fallback to root)
             const nodeId = (selectedNode != null) ? selectedNode : '';
@@ -9135,207 +9096,14 @@
         wrapper.className = 'preview-variable-card__editor';
 
         if (type === 'translation') {
-            // Searchable combo: text input + dropdown list + create form
-            let selectedKey = currentValue || '';
-            
-            const combo = document.createElement('div');
-            combo.className = 'preview-variable-combo';
-            
-            // Search input
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'preview-variable-combo__input';
-            input.placeholder = PreviewConfig.i18n?.variablesPlaceholderTranslation || 'Search or type a translation key';
-            input.value = selectedKey;
-            input.autocomplete = 'off';
-            combo.appendChild(input);
-            
-            // Dropdown list
-            const dropdown = document.createElement('div');
-            dropdown.className = 'preview-variable-combo__dropdown';
-            dropdown.style.display = 'none';
-            combo.appendChild(dropdown);
-            
-            // Truncate helper
-            function truncateValue(val, max) {
-                if (!val) return '';
-                return val.length > max ? val.substring(0, max) + '…' : val;
-            }
-            
-            // Build filtered option list
-            function buildDropdown(query) {
-                dropdown.replaceChildren();
-                const q = (query || '').toLowerCase();
-                let hasExact = false;
-                let count = 0;
-                
-                variablesPanelTranslationKeys.forEach(key => {
-                    if (q && !key.toLowerCase().includes(q)) return;
-                    if (key.toLowerCase() === q) hasExact = true;
-                    if (count >= 80) return; // Limit visible options for performance
-                    count++;
-                    
-                    const item = document.createElement('div');
-                    item.className = 'preview-variable-combo__item';
-                    if (key === selectedKey) item.classList.add('preview-variable-combo__item--selected');
-                    item.dataset.key = key;
-                    
-                    const keySpan = document.createElement('span');
-                    keySpan.className = 'preview-variable-combo__item-key';
-                    keySpan.textContent = key;
-                    item.appendChild(keySpan);
-                    
-                    const val = variablesPanelTranslationValues[key];
-                    if (val) {
-                        const valSpan = document.createElement('span');
-                        valSpan.className = 'preview-variable-combo__item-value';
-                        valSpan.textContent = truncateValue(val, 30);
-                        valSpan.title = val;
-                        item.appendChild(valSpan);
-                    }
-                    
-                    item.addEventListener('mousedown', (e) => {
-                        e.preventDefault(); // Prevent blur
-                        selectedKey = key;
-                        input.value = key;
-                        dropdown.style.display = 'none';
-                        createForm.style.display = 'none';
-                    });
-                    
-                    dropdown.appendChild(item);
-                });
-                
-                // Show "create" form when query doesn't match any exact key
-                if (q && !hasExact) {
-                    createForm.style.display = '';
-                    const resolvedKey = q.startsWith('.') || q.startsWith('#') ? q : q;
-                    createKeyLabel.textContent = (PreviewConfig.i18n?.variablesCreateKey || 'Create') + ' "' + query.trim() + '"';
-                } else {
-                    createForm.style.display = 'none';
-                }
-                
-                dropdown.style.display = (count > 0 || (q && !hasExact)) ? '' : 'none';
-            }
-            
-            // Create new key form
-            const createForm = document.createElement('div');
-            createForm.className = 'preview-variable-combo__create';
-            createForm.style.display = 'none';
-            
-            const createKeyLabel = document.createElement('div');
-            createKeyLabel.className = 'preview-variable-combo__create-label';
-            createForm.appendChild(createKeyLabel);
-            
-            const createValueRow = document.createElement('div');
-            createValueRow.className = 'preview-variable-combo__create-row';
-            
-            const createValueLabel = document.createElement('label');
-            createValueLabel.className = 'preview-variable-combo__create-value-label';
-            createValueLabel.textContent = PreviewConfig.i18n?.variablesCreateKeyValue || 'Value';
-            createValueRow.appendChild(createValueLabel);
-            
-            const createValueInput = document.createElement('input');
-            createValueInput.type = 'text';
-            createValueInput.className = 'preview-variable-combo__create-value';
-            createValueInput.placeholder = 'e.g. My text content';
-            createValueRow.appendChild(createValueInput);
-            
-            createForm.appendChild(createValueRow);
-            
-            const createBtn = document.createElement('button');
-            createBtn.type = 'button';
-            createBtn.className = 'admin-btn admin-btn--success';
-            createBtn.textContent = PreviewConfig.i18n?.variablesCreateKey || 'Create';
-            
-            createBtn.addEventListener('click', async () => {
-                const newKey = input.value.trim();
-                const newValue = createValueInput.value.trim() || newKey;
-                if (!newKey) return;
-                
-                createBtn.disabled = true;
-                try {
-                    // Create for all languages; only current language gets the provided value.
-                    const currentLang = getCurrentLang();
-                    const targetLanguages = variablesPanelLanguages.length > 0
-                        ? variablesPanelLanguages
-                        : [currentLang];
-
-                    const promises = targetLanguages.map(lang => {
-                        const valueForLang = (lang === currentLang) ? newValue : '';
-                        // Build nested object from dot-notation key
-                        const translations = {};
-                        const parts = newKey.split('.');
-                        let obj = translations;
-                        for (let i = 0; i < parts.length - 1; i++) {
-                            obj[parts[i]] = {};
-                            obj = obj[parts[i]];
-                        }
-                        obj[parts[parts.length - 1]] = valueForLang;
-                        
-                        return QuickSiteAdmin.apiRequest('setTranslationKeys', 'POST', {
-                            language: lang,
-                            translations: translations
-                        });
-                    });
-                    
-                    await Promise.all(promises);
-                    
-                    // Add to local cache
-                    variablesPanelTranslationKeys.push(newKey);
-                    variablesPanelTranslationKeys.sort();
-                    variablesPanelTranslationValues[newKey] = newValue;
-                    
-                    // Select it
-                    selectedKey = newKey;
-                    input.value = newKey;
-                    dropdown.style.display = 'none';
-                    createForm.style.display = 'none';
-                    
-                    if (typeof showToast === 'function') {
-                        showToast(PreviewConfig.i18n?.variablesKeyCreated || 'Translation key created', 'success');
-                    }
-                } catch (err) {
-                    console.error('[Variables] Create translation key error:', err);
-                    if (typeof showToast === 'function') {
-                        showToast(PreviewConfig.i18n?.variablesKeyCreateError || 'Failed to create translation key', 'error');
-                    }
-                } finally {
-                    createBtn.disabled = false;
-                }
+            // The shared text-key picker: the site's keys from the one list (QSSiteWords), each language's words
+            // under its language, and the panel's one Create (the word in the language being edited only).
+            const picker = QSComplexWizard.createTextKeyPicker({
+                container: wrapper,
+                value: currentValue || '',
+                placeholder: PreviewConfig.i18n?.variablesPlaceholderTranslation || undefined,
             });
-            
-            createForm.appendChild(createBtn);
-            combo.appendChild(createForm);
-            
-            // Events
-            input.addEventListener('focus', () => {
-                buildDropdown(input.value);
-            });
-            
-            input.addEventListener('input', () => {
-                buildDropdown(input.value);
-                // Update selectedKey to raw input for freeform typing
-                selectedKey = input.value.trim();
-            });
-            
-            input.addEventListener('blur', () => {
-                // Delay to allow mousedown on dropdown items
-                setTimeout(() => {
-                    dropdown.style.display = 'none';
-                    // Don't hide create form on blur — user may be typing in value input
-                }, 200);
-            });
-            
-            // Allow Enter in create value input to trigger create
-            createValueInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    createBtn.click();
-                }
-            });
-            
-            wrapper.appendChild(combo);
-            return { container: wrapper, getValue: () => selectedKey, el: input };
+            return { container: wrapper, getValue: () => picker.getValue().trim(), el: picker.input };
         }
 
         if (type === 'enum') {
@@ -9842,24 +9610,17 @@
             const urlParams = [structInfo.type];
             if (structInfo.name) urlParams.push(structInfo.name);
             
-            const [resp, transResp] = await Promise.all([
+            const [resp, words] = await Promise.all([
                 QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams),
-                QuickSiteAdmin.apiRequest('getTranslations', 'GET')
+                window.QSSiteWords ? QSSiteWords.read() : Promise.resolve(null)
             ]);
-            
+
             if (!resp.ok || !resp.data?.data?.structure) throw new Error('Failed to get structure');
-            
+
             enumsPanelStructure = JSON.parse(JSON.stringify(resp.data.data.structure));
-            
-            // Extract flat translation key list from first available language
-            enumsPanelTranslationKeys = [];
-            if (transResp.ok && transResp.data?.data?.translations) {
-                const allTranslations = transResp.data.data.translations;
-                const firstLang = Object.keys(allTranslations)[0];
-                if (firstLang) {
-                    enumsPanelTranslationKeys = flattenTranslationKeys(allTranslations[firstLang], '').sort();
-                }
-            }
+
+            // The site's keys, every language's, from the one list of the site's words
+            enumsPanelTranslationKeys = words ? QSSiteWords.keys(words) : [];
             
             const enums = enumsPanelStructure.__enums__ || {};
             
@@ -11377,6 +11138,36 @@
         broadcastStructureChanged();
     }
 
+    /**
+     * One editing language: the toolbar's, the Translation tool's and the Translations page's, remembered for the
+     * project in this browser (QSSiteWords). A change reloads the frame in the language; the Translation tool stays
+     * open and shows it, every other tool returns to Select as a move to another page does.
+     */
+    function setEditingLanguage(code, from) {
+        if (!langSelect || !code) return;
+        if (langSelect.value !== code) langSelect.value = code;
+        if (window.QSSiteWords) QSSiteWords.rememberLanguage(code);
+        if (from !== 'tool' && currentMode === 'translation' && window.PreviewTranslation) {
+            PreviewTranslation.setLanguage(code);
+        }
+        navigateTo(currentEditType, currentEditName, { keepMode: currentMode === 'translation' });
+    }
+
+    if (window.PreviewTranslation && PreviewTranslation.connect) {
+        PreviewTranslation.connect({
+            language: () => (multilingual ? getCurrentLang() : null),
+            setLanguage: (code) => setEditingLanguage(code, 'tool')
+        });
+    }
+
+    // The site's words changed (here or in another tab of this project): a text being edited starts from the word as
+    // it is now, and the languages another tab added, removed or made the default reach the toolbar.
+    window.addEventListener('quicksite:translations-changed', function (e) {
+        const detail = (e && e.detail) || {};
+        if (detail.remote && detail.languagesChanged) refreshEditList();
+        if (currentMode === 'text') sendStoredWords();
+    });
+
     if (window.PreviewSimpleAdd) {
         PreviewSimpleAdd.init({
             target: () => ({ struct: selectedStruct, node: selectedNode, frameNode: selectedFrameNode }),
@@ -11503,6 +11294,18 @@
         window.history.replaceState({}, '', cleanUrl);
     }
 
+    // The language remembered for this project in this browser (QSSiteWords): the frame, which opened on the default
+    // language, moves to it below. A language the project no longer has leaves the default.
+    let languageRemembered = false;
+    if (langSelect && multilingual && window.QSSiteWords) {
+        const codes = Array.from(langSelect.options).map((option) => option.value);
+        const remembered = QSSiteWords.editingLanguage(codes, langSelect.value, PreviewConfig.currentProject);
+        if (remembered !== langSelect.value) {
+            langSelect.value = remembered;
+            languageRemembered = true;
+        }
+    }
+
     // Initialize edit target state from dropdown
     // Default to first page option (skip layout options which are just for switching to)
     if (targetSelect && targetSelect.value) {
@@ -11526,9 +11329,10 @@
             currentEditType = 'page';
             currentEditName = value;
         }
-        // A deep link (the Sitemap's edit link) set the list: the frame moves to it, as the list's own
-        // change moves it. Without one, the frame's first address already shows the list's first page.
-        if (deepLinked) {
+        // A deep link (the Sitemap's edit link) set the list, or the remembered language is not the default: the
+        // frame moves to it, as the list's own change moves it. Without either, the frame's first address already
+        // shows the list's first page in the default language.
+        if (deepLinked || languageRemembered) {
             loadFrame(currentEditType, currentEditName);
         }
         

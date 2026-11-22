@@ -42,6 +42,7 @@
  *   - the route, API and storage-key inputType pickers
  *   - the console's pickers of project data (command-form.js)
  *   - the New Project dialog's language (dashboard.js)
+ *   - the language a Translations page adds (translations.js)
  *
  * Search behaviour: case-insensitive substring match against the
  * option's value, textContent, AND data-description attribute. Either

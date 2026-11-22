@@ -98,7 +98,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
-| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
+| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; announces each answered command on the page (`quicksite:command-answered`: its name, whether it succeeded, the project and its sender's mark, nothing it carried or answered); in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `icon(name)` (the panel's named icons: one map of names to drawings, each built with `createElementNS` in the text's colour; a new icon is one entry) + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM — and `followPointer()`, the one drag routine of the panel's handles (the editor's options panel, the device frame's edges), on pointer events. Loaded in `<head>` so page scripts can use it at parse time. |
@@ -109,6 +109,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
 | `js/core/media-pictures.js` | `window.QSMediaPictures.list()`: the pictures a shared link's card can show — Media's images, each named as Media names it (`images/<file>`), SVG left out. The one list the console's picture field and the Social previews page offer (§9.19); loaded by those two pages. |
 | `js/core/media-alt.js` | `window.QSMediaAlt`: a picture's alt text per language, the one rule the Media page reads and saves it by (§9.15) — whether an alt is a translation key (the renderer's test; a text after the raw marker `__RAW__` never is), a new key's name (`freeKey()`), a picture's text in each of the project's languages and the languages it has none in, and the writes a save makes with what takes each back (`plan()`, `run()`). It sends nothing itself. Loaded by the Media page. |
+| `js/core/site-words.js` | `window.QSSiteWords`: the one list of a site's words (§9.20) — the languages, every language's words read under that language, and on request where the site names each key and each key's state per language (by the rule of the `translation-keys-grouped` helper). A surface reads it when it opens: one cache per page and project, a failed read keeping the last list and saying so, a read older than a write never replacing what the write put in. Every write of the site's words answered on the page, made through it or by any other script (`quicksite:command-answered`), marks it stale and announces `quicksite:translations-changed`, to the page and to the project's other tabs in this browser. Holds the panel's one **Create** (the word typed, in the language being edited alone; never over a text any language holds; a word required), the language calls (one language to two: `setMultilingual`, then `addLang`), and the editing language remembered per project (`editorLanguage`, §6). Loaded in `<head>`. |
 | `js/core/social-figures.js` | `window.QSSocialFigures`: a shared link's texts judged by `getSocialPreview`'s platform table — a text's length in characters or bytes, its cut at a platform's length, the platforms that draw a page's card (X by its card type), the platforms a text is longer than. Holds no figure of its own. Loaded by the Social previews page and the visual editor (the Description field's mark, §8.2). |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, the menu's groups after both filters (`applyMenuGroups()`), `canRun(command)` (the one answer to whether a page shows a control: the role holds the command, and a project-scoped command has a project), delegation. |
 
@@ -370,7 +371,7 @@ key — see §9.10.
 
 Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`).
 
-Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
+Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. These forms answer from inside their page, after the layout has written the page's head: the router renders every panel page into an output buffer of its own (`AdminRouter::render()`), so the session cookie and the redirect they send never depend on php.ini's `output_buffering`. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
 
 `QSSESSID` is only ever set by something that deliberately stores state — signing in, or picking a language while signed out (the panel remembers that choice for a visitor who has no account). Loading a page never mints one, and a `QSSESSID` naming a session that no longer exists is treated as no cookie at all: the visitor is anonymous and is not handed a replacement.
 
@@ -394,6 +395,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `addLastTab` | localStorage | `preview.js` — the tab the advanced Add form last opened on |
 | `addPreviewExpanded`, `addPositionExpanded`, `addAdvancedExpanded` | localStorage | `preview.js` — whether each folding section of the Add form is open (`'1'`) or folded (`'0'`); `contextual-add.php` names each on its header (`data-storage-key`) |
 | `tagShowHtmlCode`, `addFavoriteTags` | localStorage | `preview.js` — the Add form's HTML Tag tab: whether a tag's example is shown as its HTML (`'true'`) or drawn, and the tags starred as favourites, newest first, as a JSON list of ten at most; stored as `tagSelector_showHtmlCode` and `qs-add-favorite-tags` |
+| `editorLanguage` | localStorage | `site-words.js` — the language a site's words are edited in, per project (`:<project>` appended): the visual editor's toolbar **Language**, its Translations tool and the Translations page start on it, and a change in any of them is kept; a language the project no longer has reads as its default (§8.9, §9.20) |
 | `socialPreviewDevice` | localStorage | `social-previews.js` — the device the Social previews page draws its cards for: `'phone'`, or anything else (or nothing) for a computer; one per browser, for every project (§9.19) |
 | `workflowsList` | localStorage | `preview-ai-tools.js` — the Workflows panel's workflows last opened, newest first (three kept), and the groups left open once the list folds, as JSON (`{"recent": ["restyle"], "open": ["look"]}`); one per browser, for every project. A missing or malformed part reads as empty, and a failure to read or write is silent (§8.12) |
 | `workflowsBackupNoteHidden` | localStorage | `preview-ai-tools.js` — the Workflows panel's backup message put away for good (`'1'`); stored as `quicksite-ai-tools-backup-note-hidden`, its name from before the registry (§8.12) |
@@ -810,8 +812,11 @@ The Add button (bottom Cancel / Add) posts `addNode` with `nodeKind:"text"` plus
 
 **Text mode — inline editing of both flavours.** The Text-mode tool clicks any
 text node in the preview and makes it `contenteditable`. On commit:
-- For a translation-key node, the new value is saved via `setTranslationKeys`
-  to the current-language translation file.
+- For a translation-key node, the text opens as its word is stored, its
+  placeholders as written (`{{__lang}}`, a parameter's `{{param:…}}`) rather than
+  as the page filled them, and the new value is saved, through the one list of
+  the site's words (§9.20), to the current-language translation file. A word
+  holding a placeholder is drawn again, filled, once saved.
 - For a `__RAW__` literal, the new value is saved via `editStructure`
   by updating the node's `textKey` to `"__RAW__"+value` — *not* a translation
   entry (literals don't have one).
@@ -848,7 +853,9 @@ handle just like translation-key text.
 
 A sixth editor mode that **manages translation keys site-wide for the current project** — a dense table view of every key the site references plus every key the chosen language file has, classified into three buckets. Complements Text mode: Text mode edits values inline on the rendered page; Translations mode is the bird's-eye where you find orphans, set bulk values, and audit coverage.
 
-**Where you land it from:** the **Translations** tool → `setMode('translation')` → `#contextual-translation` shows + `PreviewTranslation.enter()` fetches the panel's data — at every opening, so a key written elsewhere (the wizards' key picker, Text mode, **Add Element → Text**) shows at the next one. The first opening shows the loading state; a later one keeps the rows and the chosen scope on screen until the new data is in.
+**Where you land it from:** the **Translations** tool → `setMode('translation')` → `#contextual-translation` shows + `PreviewTranslation.enter()` reads the one list of the site's words (`QSSiteWords`, §5.1, the reading and the writes the Translations page shares, §9.20) — at every opening, and again whenever a write of the site's words is announced while the panel is open (a picker's Create, Text mode, **Add Element → Text**, the Translations page in another tab), so a key written elsewhere shows without a reload; a word being edited is kept until its editor closes. The first opening shows the loading state; a later one keeps the rows and the chosen scope on screen until the new data is in.
+
+**One editing language** — the panel opens on the toolbar's **Language** (the one remembered for the project in this browser, `editorLanguage`, §6) and keeps its own picker: a change in either moves both. A language changed while the panel is open reloads the preview in that language and leaves the panel open; the other tools return to Select at a language change, as at a move to another page.
 
 **Status taxonomy** — every key is one of:
 
@@ -869,18 +876,18 @@ These three are mutually exclusive — a key never appears in more than one buck
 | Region | What it does |
 |---|---|
 | Toolbar — Language picker | Switches the language file being managed. Hidden when only one language exists (monolingual, or multilingual with a single config'd lang). |
-| Toolbar — Scope picker | "Whole site" / Pages optgroup (page routes) / Layout optgroup (menu, footer) / Components optgroup (`component:<name>`). The site's own sources (`site:consent`, `site:media`, `site:api`, `site:link-previews`, `site:storage`, `site:privacy`) are listed in the Pages optgroup under those names. |
+| Toolbar — Scope picker | "Whole site" / Pages optgroup (page routes) / Layout optgroup (menu, footer) / Components optgroup (`component:<name>`). The site's own sources (`site:consent`, `site:media`, `site:api`, `site:link-previews`, `site:storage`, `site:privacy`) are grouped apart, in a **Site** optgroup, each named by its words (Consent layer, Media pictures, API sentences, Link previews, Storage descriptions, Privacy texts). |
 | Toolbar — Coverage strip | `Coverage: 78% (142/172)` text. Recomputed per-scope. |
 | Filter row — substring | Case-insensitive contains-match on key name. Counts in chips narrow with substring. |
 | Filter row — status chips | 🟢 Used / 🔴 Unset / 🟡 Unused, each with a count + visible label. Toggle to filter rows. Counts are scope-aware (and substring-aware) but NOT status-aware (a chip can't depend on its own checked state). |
 | Row list | One row per filtered key: status dot · `<code>key.name</code>` · value preview (100-char truncate, full value in `title=`) · hover-revealed Edit + Delete icon buttons. Alphabetical by key name. |
 | Bottom action | "Remove all unused (site-wide)" button. Enabled iff site-wide unused count > 0. Opens the bulk-confirm panel (replaces row list temporarily). |
 
-**Inline edit (row expansion, not modal)** — clicking the pencil icon on a row expands an editor panel directly below: textarea pre-filled with current value, Save + Cancel buttons. Saves via `setTranslationKeys` (dot-notation, server normalises to nested). Keyboard: **Esc** = cancel, **Ctrl/Cmd+Enter** = save. The textarea auto-focuses with cursor at the end of existing text.
+**Inline edit (row expansion, not modal)** — clicking the pencil icon on a row expands an editor panel directly below: textarea pre-filled with current value, Save + Cancel buttons. Saves through the one list (`QSSiteWords.write()`: `setTranslationKeys`, its answer checked, a refusal's words shown and nothing changed). Keyboard: **Esc** = cancel, **Ctrl/Cmd+Enter** = save. The textarea auto-focuses with cursor at the end of existing text.
 
 For unset rows the Edit icon becomes a `+` (Set value) icon and the panel pre-fills empty — the textarea is the same; the affordance just signals "this is fresh-set, not a re-edit".
 
-After save success the panel runs `_refetchAndRender()` so the row's status flips naturally (unset → used, etc. — the "stale-sibling sweep"), then calls `PreviewState.reloadPreview()` so the iframe shows the new value live.
+After save success the panel reads the list again so the row's status flips naturally (unset → used, etc. — the "stale-sibling sweep"), then calls `PreviewState.reloadPreview()` so the iframe shows the new value live.
 
 **Per-row delete (list-first confirm, no bare prompt)** — clicking the trash icon expands a red-bordered confirm panel below the row: `Delete {key} from {LANG}.json?` plus a value preview, then Cancel + Delete buttons. Multi-language opt-in checkbox appears beneath when ≥2 languages exist (default OFF — you're usually editing one language). Confirm runs `deleteTranslationKeys` for the target language(s) via `Promise.all`; 404 from a non-current language is treated as success (key already absent in that file).
 
@@ -897,7 +904,7 @@ Unused keys naturally drop out for non-`site` scopes — they belong to no sourc
 **Monolingual mode (`MULTILINGUAL_SUPPORT = false`)** — the runtime ignores per-language files and loads `default.json` exclusively (see [Translator.php:25-27](../secure/src/classes/Translator.php#L25)). The panel detects this from `getLangList`'s `multilingual_enabled` field and:
 - Sets `_availableLangs = ['default']` (NOT the configured `LANGUAGES_SUPPORTED`)
 - Hides the language picker + its label
-- All writes target `default.json`
+- A write is sent in the site's language code, which the shared writer copies into `default.json`; a delete removes the key from both files
 - The multi-language checkbox auto-hides (one language, no choice to surface)
 
 This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists `'en'` or similar — managing `en.json` would be invisible to the rendered site, which loads `default.json`. All translation commands accept `'default'` as a valid language code for monolingual writes.
@@ -918,7 +925,8 @@ This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists 
 | Mode wiring | `public/admin/assets/js/pages/preview/preview.js` (`setMode('translation')`) |
 | i18n keys exposed to JS | `secure/admin/templates/pages/preview-config.php` (`i18nPanels.translation` block) |
 | CSS | `public/admin/assets/admin.css` (`.preview-contextual-translation__*`) |
-| Server: read-side composing helper | `public/admin/api/index.php` case `'translation-keys-grouped'` |
+| Shared list | `public/admin/assets/js/core/site-words.js` (`QSSiteWords`: the reading, the states, the writes, the event) |
+| Server: the states' rule | `public/admin/api/index.php` case `'translation-keys-grouped'` (the console reads it; the list makes the same partition from the commands it reads) |
 | Server: scan commands | `getTranslationKeys.php`, `getUnusedTranslationKeys.php`, `validateTranslations.php`, on `qs_site_translation_keys()` (`translationHelpers.php`) |
 | Server: write commands | `setTranslationKeys.php`, `deleteTranslationKeys.php` |
 | Server: shared key validator | `secure/src/functions/translationHelpers.php` (`isValidTranslationKey`) |
@@ -1244,9 +1252,10 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Settings** (`settings.js`) | System information (QuickSite's version, from the `VERSION` file as the footer's is, and how many commands `help` documents), the caller's permissions, admin preferences (keyboard shortcuts, toast duration), AI configuration status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
-| **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`; for a picture's alt text, `getLangList`, `getTranslations`, `setTranslationKeys`, `deleteTranslationKeys`. |
+| **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`; for a picture's alt text, the one list of the site's words (§9.20), `setTranslationKeys`, `deleteTranslationKeys`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Social previews** (`social-previews.js`) | The card a shared link of the site gets on each platform, drawn for a computer or a phone, and the site's and each page's values it is drawn from — see §9.19. Commands: `getSocialPreview`, `setSocialPreview`. In the Advanced menu's **Site** group. |
+| **Translations** (`translations.js`) | A site's words in every language side by side, and its languages — see §9.20. Reads through the one list of the site's words (`QSSiteWords`); commands `setTranslationKeys`, `deleteTranslationKeys`, `addLang`, `deleteLang`, `setDefaultLang`, `setMultilingual`. In the **Site** group, simple and advanced. |
 | **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
 | **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. An installation can hide the page (setup item 11, `embed-security.php`, `qs_embed_security_shown()`; absent, it is shown): it leaves the menu and says it was turned off, while the policy stays in force and `getIframeSandbox` keeps answering every role that holds it. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
@@ -4180,6 +4189,51 @@ The page says the cards are look-alikes: each platform draws its own card and ca
 #### Who sees what
 
 Every member of the project opens the page: it needs `getSocialPreview`, which every role holds. The form is drawn only for a role that can run `setSocialPreview` (editor and up); a viewer chooses the whole site or a page as anyone does, and sees the same values as text and a line saying that their role can read them, not change them. The page is in the Advanced menu, in the **Site** group after Sitemap (the group's word opens Sitemap); opened in simple mode, it says it lives in the Advanced menu (§5.1).
+
+### 9.20 Translations (/admin/translations)
+
+A site's words in every language, side by side, and the site's languages. In the **Site** group beside Sitemap and Social
+previews, in the simple menu and the advanced one. Every member rank reaches it (the page asks `getTranslations`); every control
+that writes is drawn only for a role that can run its command (`translation.write`), so a viewer reads the words and the
+languages and has nothing to press.
+
+**The one list of a site's words.** The page reads and writes through `QSSiteWords` (`js/core/site-words.js`, §5.1), as the
+editor's Translations tool, the text-key picker (the Add and Edit forms, every Complex wizard, the Interactions tool, a
+component's Variables panel), the enums panel, Text mode, the simple Add, the Sitemap's titles, the table wizard's paste and
+Media's alt texts do. It reads when it opens, again when the list announces a change (a write on the page, in the editor of
+another tab, a workflow, the console) and when its tab comes back into view; a word being edited is not redrawn over. A read
+that fails says so above the table and keeps what was read last.
+
+**Languages.** One card per language: its name and code, **Default** on the default language, **Edited** on the language the
+site's words are edited in (`editorLanguage`, §6), how many words it holds, how many keys the site needs and it lacks
+(**Unset**), and on another language than the default how many of its words are still the default language's. A one-language
+site shows its one language, its words read from `default.json`, the file its pages read.
+
+| Control | What it does |
+|---|---|
+| **Add a language** | A searchable list of the installation's languages the site does not have, and **Add**. Asked first: its words start as a copy of the default language's (`addLang`). On a one-language site the question says the site becomes multilingual, each page then having an address per language: the page sends `setMultilingual` first (which carries `default.json`'s words into the default language's file), then `addLang`. |
+| **Make default** | `setDefaultLang`, asked first: an address with no language in it shows the site in that language, and a language added later starts as a copy of its words. On every language but the default. |
+| **Remove** | `deleteLang`, asked first: the question names the language and how many words go, and says nothing is kept (the file is deleted). On every language but the default, which `deleteLang` refuses. |
+
+**Words.** A row per key, a column per language (on a one-language site the one column of `default.json`), each word as it is
+stored (its markers and placeholders written out), a gap where a language has none: **Unset** where the site needs a word there,
+**—** where it does not. A key nothing on the site names is marked **Unused**. A word that is still the default language's says
+so under it. The table scrolls in its wrapper when it is wider than the page.
+
+| Filter | Shows |
+|---|---|
+| Search | The keys whose name or any word holds the text typed. |
+| **Where** | The whole site, or the keys one source names: a page (by its route), the layout (menu, footer), a component, or the site's own texts (Consent layer, Media pictures, API sentences, Link previews, Storage descriptions, Privacy texts). |
+| **Used** / **Unset** / **Unused** | Each a state a key has in at least one language, with its count; a row shows when one of its states is ticked. The states are those of the editor's Translations tool (§8.9). |
+| **Same as the default language** | On a multilingual site: only the keys whose word in a language is still the default language's, as a language added starts. Such a word is a word, never counted unset. |
+
+**Editing.** The pencil beside a word opens it in place: **Save** (or Ctrl+Enter) writes it in that language
+(`setTranslationKeys`), **Cancel** (or Escape) leaves it. **Add a key** takes a key, a language (on a multilingual site, starting
+on the edited language, and a change there is remembered) and its word, and creates it through the panel's one Create: the word
+in that language alone, the others showing a gap until it is translated; a word is required; a key a language already holds a
+text at is shown instead, never written over; a refusal shows the server's words and changes nothing. The bin on a row deletes
+the key, asked first in a dialog that shows its word in each language: on a multilingual site in one language or in every one
+(`deleteTranslationKeys`); on a one-language site from `default.json` and its language's file.
 
 ## 10. Data attribute reference
 

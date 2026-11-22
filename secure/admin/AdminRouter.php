@@ -72,6 +72,7 @@ class AdminRouter {
                        //   reserved-segment note above.
         'sitemap',     // Visual Sitemap & Route Management
         'social-previews', // Social previews — the card a shared link gets, per platform, and the values it is drawn from
+        'translations', // Translations — a site's words in every language, and its languages
         'builds',      // Builds — build / download / delete the project's single build
         'optimize',    // Optimization Tools
         'logout'       // Logout action — POST only (everywhere=1 ends the account's other sessions too)
@@ -610,6 +611,10 @@ class AdminRouter {
         // so every member rank sees the cards and the values; the controls that write
         // (setSocialPreview, route.write) are hidden in the page from a role without it.
         'social-previews' => ['getSocialPreview'],
+        // Translations: gated on the READ only, as Social previews is. getTranslations is content.read, so every
+        // member rank sees the words; the controls that write (translation.write) are drawn by translations.js
+        // only for a role that can run their command.
+        'translations'   => ['getTranslations'],
         // The `history` category is granted to admin and owner only, so
         // this is a REAL gate rather than chrome-hiding: a lower rank never
         // receives the page. The nav entry is filtered separately client-side,
@@ -886,6 +891,12 @@ class AdminRouter {
             $templatePath = SECURE_FOLDER_PATH . '/admin/templates/pages/404.php';
         }
         
+        // The page is rendered into a buffer of its own: a template that answers its form (sign-in, register and first
+        // run set the session cookie and redirect from inside the template) sends its headers after the layout has
+        // written the page's head, whatever php.ini's output_buffering is (4096 bytes on many hosts, off on others).
+        // PHP sends the buffer when the request ends.
+        ob_start();
+
         // Load the layout with the page content
         require_once SECURE_FOLDER_PATH . '/admin/templates/layout.php';
     }

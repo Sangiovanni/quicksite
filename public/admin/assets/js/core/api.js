@@ -377,7 +377,8 @@ window.QuickSiteAPI = (function() {
      * // Target a SPECIFIC project (the dashboard's bin on a row): opts.project sets the marker
      * const result = await QuickSiteAPI.request('deleteProject', 'POST', { confirm: true }, [], {}, false, { project: 'prj_x' });
      *
-     * @param {Object} [opts] - { project?: string } marker override for this call
+     * @param {Object} [opts] - { project?: string } marker override for this call; { origin?: string } a mark the
+     *        answer's quicksite:command-answered event carries back (announceAnswer())
      */
     async function request(command, method = 'GET', data = null, urlParams = [], queryParams = {}, _isRetry = false, opts = {}) {
         const token = getToken();
@@ -465,6 +466,7 @@ window.QuickSiteAPI = (function() {
                 return { ok: false, status: 401, data: result };
             }
 
+            announceAnswer(command, method, response, opts);
             return {
                 ok: response.ok,
                 status: response.status,
@@ -474,6 +476,25 @@ window.QuickSiteAPI = (function() {
             logRequestError('API request error:', error);
             return clientError('client.network_error', error.message || 'Network error', 0);
         }
+    }
+
+    /**
+     * Tell the page a command was answered: its name, whether it succeeded, the project it ran on and the mark its
+     * sender gave it (opts.origin), and nothing of what it carried or answered. Read by what keeps a copy of
+     * something commands change (js/core/site-words.js keeps the site's words), so a change made by any script of
+     * the page reaches it.
+     */
+    function announceAnswer(command, method, response, opts) {
+        window.dispatchEvent(new CustomEvent('quicksite:command-answered', {
+            detail: {
+                command: command,
+                method: method,
+                ok: response.ok,
+                status: response.status,
+                project: (opts && opts.project) || currentProject,
+                origin: (opts && opts.origin) || null
+            }
+        }));
     }
 
     /**

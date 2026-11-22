@@ -74,6 +74,13 @@ window.QuickSiteStorageKeys = Object.freeze({
     tagShowHtmlCode:     'tagSelector_showHtmlCode',
     addFavoriteTags:     'qs-add-favorite-tags',
 
+    // The language a site's words are edited in, per project (the key gets
+    // ':<project>' appended): the editor's toolbar, its Translation tool and the
+    // Translations page start on it, and a change in any of them is kept here.
+    // A way of looking, kept in this browser; a language the project no longer
+    // has reads as its default (js/core/site-words.js).
+    editorLanguage:      'qs_editor_language',
+
     // Social previews — the device the cards are drawn for: 'phone', or
     // anything else (or nothing) for a computer. One per browser, for every
     // project: a way of looking, not the project's.

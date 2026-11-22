@@ -3209,10 +3209,28 @@ kbd {
     margin-top: var(--space-xs);
 }
 
-/* TextKey picker (searchable + inline-create) used by every wizard's
-   translation-key fields. Mirrors the variables-panel picker visually. */
+/* TextKey picker (searchable + inline-create): every field that asks for a
+   text key, the wizards' and the component Variables panel's. */
 .qs-textkey-picker {
     position: relative;
+}
+
+/* The list could not be read: the keys shown are the last read */
+.qs-textkey-picker__note {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+/* A Create refused: the reason, the server's words included */
+.qs-textkey-picker__error {
+    margin-top: 4px;
+    font-size: var(--font-size-xs);
+    color: var(--admin-error);
+    overflow-wrap: anywhere;
+}
+
+.qs-textkey-picker__error:empty {
+    display: none;
 }
 
 .qs-textkey-picker__input {
@@ -11949,127 +11967,6 @@ kbd {
 
 .preview-variable-card__value input:focus,
 .preview-variable-card__value-select:focus {
-    border-color: var(--admin-primary);
-    outline: none;
-}
-
-/* Translation key combo widget */
-.preview-variable-combo {
-    position: relative;
-    width: 100%;
-}
-
-.preview-variable-combo__input {
-    width: 100%;
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm);
-    background: var(--admin-bg);
-    color: var(--admin-text);
-    box-sizing: border-box;
-}
-
-.preview-variable-combo__input:focus {
-    border-color: var(--admin-primary);
-    outline: none;
-}
-
-.preview-variable-combo__dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    max-height: 200px;
-    overflow-y: auto;
-    background: var(--admin-bg);
-    border: 1px solid var(--admin-border);
-    border-top: none;
-    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-    z-index: 100;
-    box-shadow: 0 4px 12px #00000026;
-}
-
-.preview-variable-combo__item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-xs) var(--space-sm);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-    border-bottom: 1px solid var(--admin-border);
-}
-
-.preview-variable-combo__item:last-child {
-    border-bottom: none;
-}
-
-.preview-variable-combo__item:hover {
-    background: var(--admin-surface-hover);
-}
-
-.preview-variable-combo__item--selected {
-    background: color-mix(in srgb, var(--admin-primary) 10%, transparent);
-}
-
-.preview-variable-combo__item-key {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--admin-text);
-}
-
-.preview-variable-combo__item-value {
-    flex-shrink: 0;
-    max-width: 40%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: var(--font-size-xs);
-    color: var(--admin-text-muted);
-    font-style: italic;
-}
-
-.preview-variable-combo__create {
-    padding: var(--space-sm);
-    background: color-mix(in srgb, var(--admin-primary) 5%, var(--admin-bg));
-    border-top: 1px dashed var(--admin-primary);
-}
-
-.preview-variable-combo__create-label {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--admin-primary);
-    margin-bottom: var(--space-xs);
-}
-
-.preview-variable-combo__create-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    margin-bottom: var(--space-xs);
-}
-
-.preview-variable-combo__create-value-label {
-    font-size: var(--font-size-xs);
-    color: var(--admin-text-muted);
-    flex-shrink: 0;
-}
-
-.preview-variable-combo__create-value {
-    flex: 1;
-    padding: 3px var(--space-xs);
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm);
-    background: var(--admin-bg);
-    color: var(--admin-text);
-    box-sizing: border-box;
-}
-
-.preview-variable-combo__create-value:focus {
     border-color: var(--admin-primary);
     outline: none;
 }

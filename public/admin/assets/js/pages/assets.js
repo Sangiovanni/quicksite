@@ -3,8 +3,8 @@
  *
  * Full-featured asset manager: upload zone, browser grid, edit area, batch delete, and a picture shown large.
  * Uses existing API commands: listAssets, uploadAsset, editAsset, deleteAsset, editFavicon; and for a picture's alt
- * text per language (core/media-alt.js): getLangList and getTranslations to read, setTranslationKeys and
- * deleteTranslationKeys to write. Each control that sends a command is drawn only for a role that can run it.
+ * text per language (core/media-alt.js): the panel's one list of the site's words to read (QSSiteWords,
+ * core/site-words.js), setTranslationKeys and deleteTranslationKeys to write. Each control that sends a command is drawn only for a role that can run it.
  */
 (function() {
     'use strict';
@@ -144,35 +144,24 @@
     }
 
     /**
-     * The project's languages and the word file each one's pages read: one read per page load (and one after a
-     * save), for every card's badge and the edit form, never one per card.
+     * The project's languages and the word file each one's pages read, from the panel's one list of the site's
+     * words (QSSiteWords): one read per page load (and one after a save), for every card's badge and the edit form,
+     * never one per card. A read that fails leaves the alt texts unedited, an older list included.
      */
     async function loadWords() {
-        try {
-            const [langRes, wordRes] = await Promise.all([
-                QuickSiteAdmin.apiRequest('getLangList', 'GET'),
-                QuickSiteAdmin.apiRequest('getTranslations', 'GET')
-            ]);
-            const langData = (langRes && langRes.data && (langRes.data.data || langRes.data)) || {};
-            const wordData = (wordRes && wordRes.data && (wordRes.data.data || wordRes.data)) || {};
-            if (!langRes || !langRes.ok || !Array.isArray(langData.languages) || langData.languages.length === 0) {
-                throw new Error((langRes && langRes.data && langRes.data.message) || 'getLangList');
-            }
-            if (!wordRes || !wordRes.ok) {
-                throw new Error((wordRes && wordRes.data && wordRes.data.message) || 'getTranslations');
-            }
-            projectLangs = langData.languages.map(String);
-            defaultLang = String(langData.default_language || projectLangs[0]);
-            pagesReadDefault = !langData.multilingual_enabled;
-            langNames = langData.language_names || {};
-            const files = wordData.translations || {};
+        const list = await QSSiteWords.read();
+        if (!list || QSSiteWords.readFailed() || list.codes.length === 0) {
             words = {};
-            projectLangs.forEach(l => { words[l] = pagesReadDefault ? (files.default || {}) : (files[l] || {}); });
-            wordsError = null;
-        } catch (e) {
-            words = {};
-            wordsError = e.message || String(e);
+            wordsError = QSSiteWords.readError() || t('media.failed');
+            return;
         }
+        projectLangs = list.codes.slice();
+        defaultLang = list.defaultLanguage;
+        pagesReadDefault = !list.multilingual;
+        langNames = list.names || {};
+        words = {};
+        projectLangs.forEach(l => { words[l] = list.words[QSSiteWords.shownLanguage(list, l)] || {}; });
+        wordsError = null;
     }
 
     /** A language as the selector names it: its name and its code. */
@@ -1523,11 +1512,11 @@
             let p = QSMediaAlt.plan(base);
             if (p.needsKey) {
                 // A new key's name is checked against every word file as they are now, not as the page read them.
-                const res = await QuickSiteAdmin.apiRequest('getTranslations', 'GET');
-                const files = (res && res.ok && res.data && (res.data.data || res.data).translations) || null;
-                const key = files ? QSMediaAlt.freeKey(asset.filename, Object.values(files)) : null;
+                const fresh = await QSSiteWords.read({ fresh: true });
+                const files = fresh && !QSSiteWords.readFailed() ? Object.values(fresh.words) : null;
+                const key = files ? QSMediaAlt.freeKey(asset.filename, files) : null;
                 if (!key) {
-                    _setStatus(status, t('media.altUnreadable', { message: (res && res.data && res.data.message) || t('media.failed') }), 'var(--admin-error)');
+                    _setStatus(status, t('media.altUnreadable', { message: QSSiteWords.readError() || t('media.failed') }), 'var(--admin-error)');
                     return;
                 }
                 p = QSMediaAlt.plan(Object.assign({}, base, { newKey: key }));

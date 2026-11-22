@@ -454,9 +454,10 @@ switch ($action) {
         break;
     
     case 'page-title':
-        // Get current title for a specific route and language
-        $route = $params[0] ?? null;
-        $lang = $params[1] ?? null;
+        // Get current title for a specific route and language: the language is the address's last segment, the
+        // route every segment before it, so a nested route (blog/post) arrives whole.
+        $lang = count($params) >= 2 ? array_pop($params) : null;
+        $route = $params !== [] ? implode('/', $params) : null;
         
         if (!$route || !$lang) {
             echo json_encode(['success' => false, 'error' => 'Route and language parameters required']);

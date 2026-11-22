@@ -62,16 +62,18 @@ if (!function_exists('qs_admin_menu')) {
              'icon' => '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>'],
 
             // Site: what the world sees of the site. The toggle opens the Sitemap. In simple the group holds the Sitemap
-            // alone, so it is drawn as that link; in advanced it adds Social previews, the card a shared link of the site
-            // gets on each platform (a beginner sets the title and the description in the editor, and the cards are
-            // drawn from them). A group rather than a link of its own: one more link wrapped the advanced menu onto a
-            // second row on laptop widths, on every page.
+            // and Translations, a site's words in every language; in advanced it adds Social previews, the card a shared
+            // link of the site gets on each platform (a beginner sets the title and the description in the editor, and
+            // the cards are drawn from them). A group rather than a link of its own: one more link wrapped the advanced
+            // menu onto a second row on laptop widths, on every page.
             ['group' => 'site', 'page' => 'sitemap', 'label' => ['nav.site', 'Site'],
-             'active' => ['sitemap', 'social-previews'],
+             'active' => ['sitemap', 'translations', 'social-previews'],
              'icon' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
              'entries' => [
                 ['page' => 'sitemap', 'label' => ['nav.sitemap', null], 'requires' => 'getSiteMap', 'simple' => true,
                  'icon' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>'],
+                ['page' => 'translations', 'label' => ['nav.translations', 'Translations'], 'requires' => 'getTranslations', 'simple' => true,
+                 'icon' => '<path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>'],
                 ['page' => 'social-previews', 'label' => ['nav.social-previews', 'Social previews'], 'requires' => 'getSocialPreview',
                  'icon' => '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>'],
              ]],

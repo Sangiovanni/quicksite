@@ -1,9 +1,7 @@
 /**
- * Translation-key picker — shared primitive for Complex Element wizards.
- *
- * Reproduces the UX of the component-variables panel's "Translation key"
- * picker (preview.js → buildValueEditor type='translation'), as a clean
- * stand-alone helper that doesn't depend on private preview-state.
+ * Translation-key picker — a key of the site's words, picked or created. One picker for every field that asks for a
+ * text key: the Complex wizards, the Add and Edit forms (the Text tab, and key parameters such as alt and title), the
+ * Interactions tool's sentences and a component's Variables panel (preview.js).
  *
  *   const picker = QSComplexWizard.createTextKeyPicker({
  *     container: HTMLElement,       // required
@@ -14,80 +12,30 @@
  *
  *   picker.getValue() → string
  *   picker.setValue(k)
+ *   picker.input          the text field, for a host that focuses it
  *   picker.destroy()
  *
  * Behaviour:
- *  - On first mount of ANY picker, fetches all translation keys + values
- *    via getTranslationKeys (cached project-wide across instances).
- *  - Searching narrows the dropdown (max 80 visible).
- *  - When the query doesn't exactly match an existing key, an inline
- *    "Create '<query>'" form appears with a value input. Saving creates
- *    the key for every active language (empty value in non-current
- *    languages, the typed value in the current one) via setTranslationKeys
- *    — exactly the variables-panel behaviour.
+ *  - The keys come from the panel's one list of a site's words (QSSiteWords, js/core/site-words.js), read when the
+ *    field takes the focus: every key any language holds, each language's words read under that language, the word
+ *    shown beside a key the language being edited's (else the first language holding one). A key made elsewhere
+ *    (another picker, the Translations page in another tab, a workflow) shows at the next opening; a failed read keeps
+ *    the last list and says so.
+ *  - Searching narrows the list (80 shown at most).
+ *  - Create is the panel's one Create (QSSiteWords.create()), offered when the key typed is not one of the list: the
+ *    word typed is written in the language being edited only, nothing in the others; a word is required; a key a
+ *    language holds a text at is picked as it is, never written over; a refusal shows the server's words and changes
+ *    nothing. It is drawn only for a role that may run setTranslationKeys.
  *
- * Loaded by: secure/admin/templates/pages/preview-config.php BEFORE
- * any complex-*.js file (kinds depend on it).
+ * Loaded by: secure/admin/templates/pages/preview-config.php BEFORE any complex-*.js file (kinds depend on it).
  */
 (function () {
     'use strict';
 
-    // -------- module-scope cache (shared across all picker instances) -----
-    let _keys   = null;            // string[]
-    let _values = null;            // { key: firstLangValue }
-    let _langs  = null;            // string[]
-    let _loadingPromise = null;    // single in-flight fetch
+    const MAX_SHOWN = 80;
 
-    function loadKeysOnce() {
-        if (_keys !== null) return Promise.resolve();
-        if (_loadingPromise) return _loadingPromise;
-        const adminApi = window.QuickSiteAdmin;
-        if (!adminApi || typeof adminApi.apiRequest !== 'function') {
-            console.warn('[TextKeyPicker] QuickSiteAdmin.apiRequest unavailable; running with empty key list');
-            _keys = []; _values = {}; _langs = [];
-            return Promise.resolve();
-        }
-        _loadingPromise = (async function () {
-            try {
-                // List the languages we know about so we can write keys in all of them on create.
-                const langsRes = await adminApi.apiRequest('getLangList', 'GET');
-                const langList = (langsRes && langsRes.data && (langsRes.data.data || langsRes.data)) || {};
-                _langs = Array.isArray(langList.languages) ? langList.languages
-                    : (Array.isArray(langList) ? langList : []);
-                if (!_langs.length) _langs = ['en'];
-
-                // Pick any language to get the key list — keys are the same set across all.
-                const probeLang = _langs[0];
-                const t = await adminApi.apiRequest('getTranslations/' + encodeURIComponent(probeLang), 'GET');
-                const payload = (t && t.data && (t.data.data || t.data)) || {};
-                const translations = payload.translations || payload || {};
-                _keys = []; _values = {};
-                flattenKeys(translations, '', _keys, _values);
-                _keys.sort();
-            } catch (err) {
-                console.warn('[TextKeyPicker] failed to load translation keys:', err);
-                _keys = _keys || []; _values = _values || {}; _langs = _langs || ['en'];
-            } finally {
-                _loadingPromise = null;
-            }
-        })();
-        return _loadingPromise;
-    }
-
-    /** Flatten a nested translation object into dot-notation keys + sample value map. */
-    function flattenKeys(obj, prefix, keysOut, valuesOut) {
-        if (!obj || typeof obj !== 'object') return;
-        for (const k in obj) {
-            if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
-            const v = obj[k];
-            const path = prefix ? prefix + '.' + k : k;
-            if (v && typeof v === 'object' && !Array.isArray(v)) {
-                flattenKeys(v, path, keysOut, valuesOut);
-            } else {
-                keysOut.push(path);
-                valuesOut[path] = (typeof v === 'string') ? v : '';
-            }
-        }
+    function t(key, params) {
+        return window.QSComplexWizard.t('textKeyPicker.' + key, params);
     }
 
     function truncate(s, max) {
@@ -95,30 +43,38 @@
         return s.length > max ? s.substring(0, max) + '…' : s;
     }
 
-    function getCurrentLang() {
-        // Mirrors preview.js — falls back to 'en' if nothing else is available.
+    /** The language being edited: the editor's toolbar language, else the one remembered, else the default. */
+    function editingCode(list) {
         try {
             const sel = document.getElementById('preview-lang');
             if (sel && sel.value) return sel.value;
-        } catch (e) {}
-        try {
-            const cfg = window.PreviewConfig;
-            if (cfg && cfg.defaultLang) return cfg.defaultLang;
-        } catch (e) {}
-        return 'en';
+        } catch (e) { /* no toolbar on this page */ }
+        return list ? window.QSSiteWords.editingLanguage(list.codes, list.defaultLanguage) : null;
     }
 
-    /** Build a nested object from a dot-notation key + value. */
-    function nestedFromKey(key, value) {
-        const out = {};
-        const parts = key.split('.');
-        let ref = out;
-        for (let i = 0; i < parts.length - 1; i++) {
-            ref[parts[i]] = {};
-            ref = ref[parts[i]];
-        }
-        ref[parts[parts.length - 1]] = value;
-        return out;
+    function languageName(list, file) {
+        const code = file === 'default' ? list.defaultLanguage : file;
+        return (list.names && list.names[code]) || code;
+    }
+
+    /** The word shown beside a key: the language being edited's, else the first language holding a text. */
+    function sampleWord(list, key) {
+        const SW = window.QSSiteWords;
+        const own = SW.word(list, SW.shownLanguage(list, editingCode(list)), key);
+        if (own) return own;
+        const holding = SW.languagesWithText(list, key);
+        return holding.length ? SW.word(list, holding[0], key) : '';
+    }
+
+    function mayCreate() {
+        const admin = window.QuickSiteAdmin;
+        return !!(admin && admin.permissions && admin.permissions.loaded && typeof admin.canRun === 'function'
+            && admin.canRun('setTranslationKeys'));
+    }
+
+    function toast(message, type) {
+        const admin = window.QuickSiteAdmin;
+        if (admin && typeof admin.showToast === 'function') admin.showToast(message, type);
     }
 
     // -------- factory -----------------------------------------------------
@@ -127,187 +83,162 @@
         if (!opts || !(opts.container instanceof HTMLElement)) {
             throw new Error('[TextKeyPicker] container (HTMLElement) is required');
         }
-        const cfg = {
-            container:   opts.container,
-            placeholder: opts.placeholder || QSComplexWizard.t('textKeyPicker.searchPlaceholder'),
-            onChange:    typeof opts.onChange === 'function' ? opts.onChange : function () {},
-        };
+        const SW = window.QSSiteWords;
+        const onChange = typeof opts.onChange === 'function' ? opts.onChange : function () {};
         let selectedKey = opts.value || '';
 
         // ---- DOM ---------------------------------------------------------
-        const root = document.createElement('div');
-        root.className = 'qs-textkey-picker';
-
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'admin-input qs-textkey-picker__input';
-        input.placeholder = cfg.placeholder;
+        const input = QSDom.el('input', {
+            type: 'text', class: 'admin-input qs-textkey-picker__input', autocomplete: 'off',
+            placeholder: opts.placeholder || t('searchPlaceholder'),
+        });
         input.value = selectedKey;
-        input.autocomplete = 'off';
-        root.appendChild(input);
-
-        const dropdown = document.createElement('div');
-        dropdown.className = 'qs-textkey-picker__dropdown';
-        dropdown.style.display = 'none';
-        root.appendChild(dropdown);
-
-        // "Create new key" inline form (shown when query doesn't match any existing key)
-        const createForm = document.createElement('div');
-        createForm.className = 'qs-textkey-picker__create';
-        createForm.style.display = 'none';
-
-        const createLabel = document.createElement('div');
-        createLabel.className = 'qs-textkey-picker__create-label';
-        createForm.appendChild(createLabel);
-
-        const createRow = document.createElement('div');
-        createRow.className = 'qs-textkey-picker__create-row';
-
-        const createValInput = document.createElement('input');
-        createValInput.type = 'text';
-        createValInput.className = 'admin-input qs-textkey-picker__create-value';
-        createValInput.placeholder = QSComplexWizard.t('textKeyPicker.valuePlaceholder');
-        createRow.appendChild(createValInput);
-
-        const createBtn = document.createElement('button');
-        createBtn.type = 'button';
-        createBtn.className = 'admin-btn admin-btn--success';
-        createBtn.textContent = QSComplexWizard.t('textKeyPicker.create');
-        createRow.appendChild(createBtn);
-
-        createForm.appendChild(createRow);
-        root.appendChild(createForm);
-
-        cfg.container.appendChild(root);
+        const note = QSDom.el('div', { class: 'qs-textkey-picker__note', hidden: 'hidden' });
+        const dropdown = QSDom.el('div', { class: 'qs-textkey-picker__dropdown', hidden: 'hidden' });
+        const createLabel = QSDom.el('div', { class: 'qs-textkey-picker__create-label' });
+        const createValInput = QSDom.el('input', {
+            type: 'text', class: 'admin-input qs-textkey-picker__create-value', placeholder: t('valuePlaceholder'),
+            'aria-label': t('valuePlaceholder'),
+        });
+        const createBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--success', text: t('create') });
+        const createError = QSDom.el('div', { class: 'qs-textkey-picker__error', role: 'alert' });
+        const createForm = QSDom.el('div', { class: 'qs-textkey-picker__create', hidden: 'hidden' }, [
+            createLabel,
+            QSDom.el('div', { class: 'qs-textkey-picker__create-row' }, [createValInput, createBtn]),
+            createError,
+        ]);
+        const root = QSDom.el('div', { class: 'qs-textkey-picker' }, [input, note, dropdown, createForm]);
+        opts.container.appendChild(root);
 
         // ---- rendering ---------------------------------------------------
 
-        function renderDropdown(query) {
-            dropdown.replaceChildren();
-            const q = (query || '').toLowerCase().trim();
-            let exactMatch = false;
-            let count = 0;
-
-            (_keys || []).forEach(key => {
-                if (q && key.toLowerCase().indexOf(q) === -1) return;
-                if (key.toLowerCase() === q) exactMatch = true;
-                if (count >= 80) return;
-                count++;
-
-                const item = document.createElement('div');
-                item.className = 'qs-textkey-picker__item';
-                if (key === selectedKey) item.classList.add('qs-textkey-picker__item--selected');
-
-                const keySpan = document.createElement('span');
-                keySpan.className = 'qs-textkey-picker__item-key';
-                keySpan.textContent = key;
-                item.appendChild(keySpan);
-
-                const sample = _values && _values[key];
-                if (sample) {
-                    const valSpan = document.createElement('span');
-                    valSpan.className = 'qs-textkey-picker__item-value';
-                    valSpan.textContent = truncate(sample, 30);
-                    valSpan.title = sample;
-                    item.appendChild(valSpan);
-                }
-                // mousedown so the input doesn't blur before we pick.
-                item.addEventListener('mousedown', function (e) {
-                    e.preventDefault();
-                    setValue(key);
-                    dropdown.style.display = 'none';
-                    createForm.style.display = 'none';
-                });
-                dropdown.appendChild(item);
-            });
-
-            // Inline create when query is non-empty and no exact match.
-            if (q && !exactMatch) {
-                createLabel.textContent = QSComplexWizard.t('textKeyPicker.createQuery', { query: q });
-                createForm.style.display = '';
-            } else {
-                createForm.style.display = 'none';
+        function _renderItem(list, key) {
+            const item = QSDom.el('div', {
+                class: 'qs-textkey-picker__item' + (key === selectedKey ? ' qs-textkey-picker__item--selected' : ''),
+            }, [QSDom.el('span', { class: 'qs-textkey-picker__item-key', text: key })]);
+            const sample = list ? sampleWord(list, key) : '';
+            if (sample) {
+                item.appendChild(QSDom.el('span', { class: 'qs-textkey-picker__item-value', text: truncate(sample, 30), title: sample }));
             }
-            dropdown.style.display = (count > 0 || (q && !exactMatch)) ? '' : 'none';
+            // mousedown so the input doesn't blur before we pick.
+            item.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                setValue(key);
+                close();
+            });
+            return item;
         }
 
-        async function ensureLoaded() {
-            await loadKeysOnce();
+        function renderDropdown(query) {
+            const list = SW.current();
+            const keys = SW.keys(list);
+            const q = (query || '').toLowerCase().trim();
+            let exactMatch = false;
+            const shown = [];
+            keys.forEach(function (key) {
+                if (q && key.toLowerCase().indexOf(q) === -1) return;
+                if (key.toLowerCase() === q) exactMatch = true;
+                if (shown.length < MAX_SHOWN) shown.push(_renderItem(list, key));
+            });
+            dropdown.replaceChildren(...shown);
+
+            const failed = SW.readFailed();
+            note.textContent = failed ? t('readFailed') : '';
+            note.hidden = !failed;
+
+            const offerCreate = !!q && !exactMatch && list !== null && mayCreate();
+            if (offerCreate) {
+                createLabel.textContent = t('createQuery', { query: query.trim() });
+            } else {
+                createError.textContent = '';
+            }
+            createForm.hidden = !offerCreate;
+            dropdown.hidden = shown.length === 0;
+        }
+
+        function close() {
+            dropdown.hidden = true;
+            createForm.hidden = true;
+            createError.textContent = '';
+            isOpen = false;
         }
 
         // ---- input wiring -----------------------------------------------
 
         let isOpen = false;
-        async function openIfNotLoading() {
-            if (isOpen) return;
-            await ensureLoaded();
+        function open() {
             renderDropdown(input.value);
             isOpen = true;
+            // Read when the field opens: a key made elsewhere since shows as soon as the list answers.
+            SW.read().then(function () { if (isOpen) renderDropdown(input.value); });
         }
         function closeAfterBlur() {
-            // Delay so option mousedown can fire before we hide.
-            // Skip the close if focus moved INSIDE the picker (e.g. into
-            // the inline create-form's value input or Create button) —
-            // otherwise typing a new key value would be impossible.
+            // Delay so option mousedown can fire before we hide. Skip the close if focus moved INSIDE the picker
+            // (the create form's word or its button): otherwise typing a new key's word would be impossible.
             setTimeout(function () {
                 if (root.contains(document.activeElement)) return;
-                dropdown.style.display = 'none';
-                createForm.style.display = 'none';
-                isOpen = false;
+                close();
             }, 120);
         }
 
-        input.addEventListener('focus', openIfNotLoading);
+        input.addEventListener('focus', function () { if (!isOpen) open(); });
         input.addEventListener('input', function () {
-            // Treat typing as a new (unconfirmed) selection; surface it on
-            // change so the wizard sees the same string the user typed.
+            // Typing is a new (unconfirmed) selection: the host sees the same string the user typed.
             selectedKey = input.value;
-            cfg.onChange(selectedKey);
-            ensureLoaded().then(() => { renderDropdown(input.value); isOpen = true; });
+            onChange(selectedKey);
+            renderDropdown(input.value);
+            isOpen = true;
         });
         input.addEventListener('blur', closeAfterBlur);
+        createValInput.addEventListener('blur', closeAfterBlur);
+        createValInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                create();
+            }
+        });
+        createBtn.addEventListener('click', create);
 
-        createBtn.addEventListener('click', async function () {
-            const newKey = input.value.trim();
-            if (!newKey) return;
-            const newValue = createValInput.value.trim() || newKey;
-
+        async function create() {
+            const key = input.value.trim();
+            if (!key) return;
+            createError.textContent = '';
             createBtn.disabled = true;
+            let done;
             try {
-                const currentLang = getCurrentLang();
-                const targetLangs = (_langs && _langs.length) ? _langs : [currentLang];
-                const adminApi = window.QuickSiteAdmin;
-                if (!adminApi) throw new Error('QuickSiteAdmin unavailable');
-
-                const promises = targetLangs.map(function (lang) {
-                    const valForLang = (lang === currentLang) ? newValue : '';
-                    return adminApi.apiRequest('setTranslationKeys', 'POST', {
-                        language: lang,
-                        translations: nestedFromKey(newKey, valForLang),
-                    });
-                });
-                await Promise.all(promises);
-
-                // Update shared cache.
-                if (_keys) {
-                    _keys.push(newKey); _keys.sort();
-                    if (_values) _values[newKey] = newValue;
-                }
-                setValue(newKey);
-                dropdown.style.display = 'none';
-                createForm.style.display = 'none';
-                if (typeof window.showToast === 'function') {
-                    window.showToast(QSComplexWizard.t('textKeyPicker.created'), 'success');
-                }
-            } catch (err) {
-                console.error('[TextKeyPicker] create failed:', err);
-                if (typeof window.showToast === 'function') {
-                    window.showToast(QSComplexWizard.t('textKeyPicker.createFailed'), 'error');
-                }
+                done = await SW.create(key, createValInput.value, editingCode(SW.current()));
             } finally {
                 createBtn.disabled = false;
             }
-        });
+            const list = SW.current();
+            if (done.ok) {
+                setValue(done.key);
+                createValInput.value = '';
+                close();
+                toast(t('created', { key: done.key, language: list ? languageName(list, SW.shownLanguage(list, done.language)) : done.language }), 'success');
+                return;
+            }
+            if (done.reason === 'exists') {
+                // A key with a text in a language is the key it is: picked, never written over.
+                setValue(key);
+                createValInput.value = '';
+                close();
+                toast(t('exists', { key: key, languages: done.languages.map(function (l) { return languageName(list, l); }).join(', ') }), 'info');
+                return;
+            }
+            createError.textContent = createWords(done, key, list);
+        }
+
+        function createWords(done, key, list) {
+            const names = function () { return (done.languages || []).map(function (l) { return languageName(list, l); }).join(', '); };
+            switch (done.reason) {
+                case 'keyInvalid': return t('keyInvalid');
+                case 'wordRequired': return t('wordRequired');
+                case 'clash': return t('clash', { key: key, languages: names() });
+                case 'unread': return t('unread');
+                default: return t('createFailed', { reason: done.message || '' });
+            }
+        }
 
         // ---- controller -------------------------------------------------
 
@@ -315,13 +246,14 @@
         function setValue(v) {
             selectedKey = v || '';
             input.value = selectedKey;
-            cfg.onChange(selectedKey);
+            onChange(selectedKey);
         }
         function destroy() {
             if (root.parentNode) root.parentNode.removeChild(root);
         }
 
-        return { getValue, setValue, destroy, _refresh: function () { renderDropdown(input.value); } };
+        return { getValue: getValue, setValue: setValue, destroy: destroy, input: input,
+            _refresh: function () { renderDropdown(input.value); } };
     }
 
     window.QSComplexWizard = window.QSComplexWizard || {};

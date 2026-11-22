@@ -16468,3 +16468,32 @@ project, copies a write in the default language alone; `getTranslations` answers
 `secure/src/functions/translationHelpers.php` (`qs_site_translation_keys()`, `qs_translation_keys_in_use()`,
 `writeTranslationsToFile()`), the four commands, `deleteNode`. Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §5,
 [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.9.
+
+### The panel reads a site's words through one list, and every write of them updates it with one event (locked 2026-11-19)
+
+**Decision**: every panel surface that offers a site's keys or shows its words reads them through one list in the panel's
+core, `QSSiteWords` (`public/admin/assets/js/core/site-words.js`): the languages and every language's words, each read under
+its language, and, where a surface shows them, each key's state per language by the rule of the `translation-keys-grouped`
+helper. A surface reads when it opens; one cache serves the page; a failed read keeps the last good list and says so; a read
+that started before a write never drops what the write put in. Every write of a site's words answered on the page, through the
+list or by a command of a surface's own (the panel's API client announces each answer), marks the list stale and announces
+`quicksite:translations-changed`, to the page and to the project's other tabs in the same browser, so an open tool redraws
+without a reload. The list holds the panel's one Create (the word typed, in the language being edited alone, never over a text
+any language holds, a word required) and the editing language, remembered per project in the browser.
+
+**Reasoning**: about twenty surfaces each read a site's words their own way, with their own cache and their own Create: a picker
+listed keys prefixed by their language, a failed read stayed cached for the page, a refusal counted as success, a Create wrote an
+empty word over another language's text, and a key made in one tool was missing from the next until a reload. One reading, one
+cache and one event make them agree by construction; one Create makes a key's birth the same wherever it starts. The event
+comes from the answers themselves, so a surface that writes with a command of its own (a page's title, Media's alt texts, the
+console) is heard without being changed.
+
+**Alternatives considered**: each surface keeping its own reading, with the defects fixed one by one (rejected — that is how they
+drifted apart, and a new surface would start a twenty-first copy); a push from the server when a word file changes (rejected —
+a channel the file-based engine does not have, for changes the browser already sees answered); announcing from each surface after
+its own writes (rejected — every writer would have to remember it; the answer event reaches them all).
+
+**Source**: Sangio's design round for the Translations page, 2026-11-19 (the page, its languages, propagation and Create), and his
+ruling on the editing language, 2026-11-20; built in beta.12. Code: `public/admin/assets/js/core/site-words.js`, `api.js`
+(`announceAnswer()`), `public/admin/assets/js/pages/translations.js`. Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §5.1, §8.9,
+§9.20; [ARCHITECTURE.md](ARCHITECTURE.md) §5.

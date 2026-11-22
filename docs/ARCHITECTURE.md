@@ -572,7 +572,7 @@ What each one needs follows what a visitor sees. A key a page shows is needed in
 
 `deleteNode` removes a key the deleted element named only when, once the element is gone, nothing else on the site uses it; a key still used elsewhere, such as a picture's description another page or Media holds, is kept in every language and named in its answer.
 
-The admin panel reads the **composed** view via `public/admin/api/index.php` case `'translation-keys-grouped'`, which calls `getTranslation` + `getUnusedTranslationKeys` + `validateTranslations` and partitions the result into `{used, unset, unused}`. See [ADMIN_PANEL.md §8.9](ADMIN_PANEL.md) for the Translation Manager UI.
+The admin panel reads a site's words through one list, `QSSiteWords` (`public/admin/assets/js/core/site-words.js`): `getLangList` and `getTranslations` (every language's words, each under its language), and, where a surface shows the states, `getTranslationKeys` + `validateTranslations` + `getUnusedTranslationKeys`, partitioned into `{used, unset, unused}` per language by the rule of the `translation-keys-grouped` helper arm (`public/admin/api/index.php`), which composes the same three for the console. Every panel write of a site's words is announced to the page and its other tabs (`quicksite:translations-changed`). See [ADMIN_PANEL.md §8.9](ADMIN_PANEL.md) for the Translation Manager UI.
 
 Key-format validation lives in `secure/src/functions/translationHelpers.php`'s `isValidTranslationKey()` — single source of truth, permissive (is_string + non-empty + no null byte). Translation values are user-controlled UTF-8 strings; the panel uses `textContent` everywhere (no `innerHTML`) to keep XSS off the table.
 
