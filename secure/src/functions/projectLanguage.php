@@ -8,8 +8,8 @@
  *
  *   - the AUTHOR'S SITE          Translator + TrimParameters, files under
  *                                PROJECT_PATH/translate/, configured by
- *                                CONFIG['LANGUAGES_SUPPORTED'] and
- *                                MULTILINGUAL_SUPPORT, chosen by a URL path
+ *                                CONFIG['LANGUAGES_SUPPORTED'] (two or more:
+ *                                multilingual), chosen by a URL path
  *                                segment.  ← this file
  *   - the ADMIN PANEL            AdminTranslation + __admin(), files under
  *                                secure/admin/translations/, chosen by ?lang=,
@@ -48,15 +48,23 @@
 require_once __DIR__ . '/String.php';   // removePrefix()
 
 /**
- * Whether the project serves more than one language.
+ * Whether the project serves more than one language: the switch is the language
+ * count. Two or more languages, multilingual (an address per language, each
+ * language's own word file); one, one-language (no language in the address, the
+ * words of default.json). Nothing else is stored: a config.php that still holds
+ * a MULTILINGUAL_SUPPORT key is not read.
  *
- * Read from the constant rather than from `count(LANGUAGES_SUPPORTED)`: a
- * project can declare languages while multilingual mode is off, and in that
- * state the URL carries no language segment at all.
+ * MULTILINGUAL_SUPPORT is this answer for the request's project, made a constant
+ * where the project is bound (projectContext.php, a build's runtime), so the
+ * router, the translator, the renderer and the compiler read one value.
+ *
+ * Takes the settings to read, as the two functions below do: a config.php array
+ * a caller already holds (an export, a project listing, the panel's edited
+ * project), or nothing for the current project's CONFIG.
  */
-function qs_project_is_multilingual(): bool
+function qs_project_is_multilingual(?array $config = null): bool
 {
-    return defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT;
+    return count(array_unique(qs_project_language_codes($config))) >= 2;
 }
 
 /**

@@ -928,9 +928,10 @@ function qs_format_size(int $bytes): string {
  * Four commands need the same eight steps — lock, invalidate, re-read FRESH (the
  * `CONFIG` constant is the request's stale snapshot), patch, `var_export`, write,
  * unlock, invalidate again — and each hand-rolled them. `setThemeMode`,
- * `setMultilingual` and `addLang` still do; they hold the lock across other work
- * (translation-file merges) and cannot be folded in without restructuring what
- * runs inside the critical section. New writers use this.
+ * `addLang`, `deleteLang` and `setDefaultLang` still do; they hold the lock
+ * across other work (the words carried as the language count crosses two, a
+ * word file's removal or rename) and cannot be folded in without restructuring
+ * what runs inside the critical section. New writers use this.
  *
  * `var_export` is what makes the write safe: a config value ends up as PHP
  * source in an array literal, so anything a caller stores must be re-parsable

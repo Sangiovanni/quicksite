@@ -1201,7 +1201,6 @@ class WorkflowManager {
         if ($category === 'translation.write') {
             if ($command === 'deleteLang') return ['languages', $text($params['code'] ?? '')];
             if ($command === 'setDefaultLang') return ['defaultLanguage', $text($params['lang'] ?? '')];
-            if ($command === 'setMultilingual') return ['multilingual', ''];
             if ($command === 'cleanOrphanTranslations') return ['translationFiles', ''];
             return ['texts', $text($params['language'] ?? '')];
         }

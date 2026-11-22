@@ -192,7 +192,7 @@ window.PreviewConfig = {
     // the session cookie is the credential (see AuthManagement).
     authToken: <?= json_encode($router->getToken()) ?>,
     structureUrl: <?= json_encode($router->url('structure')) ?>,
-    multilingual: <?= json_encode($editConfig['MULTILINGUAL_SUPPORT'] ?? false) ?>,
+    multilingual: <?= json_encode(qs_project_is_multilingual($editConfig)) ?>,
     defaultLang: <?= json_encode(qs_project_default_language($editConfig)) ?>,
     
     // Theme mode
@@ -865,7 +865,6 @@ window.PreviewConfig = {
             whatLanguages: <?= qs_inline_script_json(__admin('preview.aiToolsWhatLanguages', 'Languages')) ?>,
             whatMedia: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMedia', 'Media files')) ?>,
             whatMenu: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMenu', 'The menu')) ?>,
-            whatMultilingual: <?= qs_inline_script_json(__admin('preview.aiToolsWhatMultilingual', 'Multilingual mode')) ?>,
             whatOther: <?= qs_inline_script_json(__admin('preview.aiToolsWhatOther', 'Other commands')) ?>,
             whatPages: <?= qs_inline_script_json(__admin('preview.aiToolsWhatPages', 'Pages')) ?>,
             whatPrivacy: <?= qs_inline_script_json(__admin('preview.aiToolsWhatPrivacy', 'Privacy pages and settings')) ?>,

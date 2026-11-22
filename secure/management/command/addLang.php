@@ -5,9 +5,28 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php'; // qs_translation_carry_words
 
-// NOTE: addLang works regardless of MULTILINGUAL_SUPPORT setting
-// This allows adding languages BEFORE enabling multilingual mode
+/**
+ * addLang - Add a language to the project, from the installation's language list
+ *
+ * A project with two or more languages is multilingual (the switch is the language count). Adding the
+ * second language makes a one-language site multilingual: each page then has an address per language
+ * (/en/x, /fr/x; /x still shows the default language). Its words cross with it: the words of default.json,
+ * which every page read until now, are carried into the default language's file first
+ * (qs_translation_carry_words(): the words shown win, a key that is a word in one file and a group in the
+ * other refuses with nothing changed), and the new language's file is a copy of that file, as it is when
+ * a third language is added.
+ *
+ * Everything this command writes (the carried words, config.php, the new file) is put back when a later
+ * step fails or is refused: nothing is half-added.
+ *
+ * @method POST
+ * @url /management/addLang
+ * @auth required
+ * @permission translation.write
+ */
 
 $params = $trimParametersManagement->params();
 
@@ -112,6 +131,9 @@ if (in_array($langCode, qs_project_language_codes($current_config), true)) {
         ->send();
 }
 
+// Whether this addition is the second language: the one-language site becomes multilingual.
+$crossing = !qs_project_is_multilingual($current_config);
+
 // Add new language
 $current_config['LANGUAGES_SUPPORTED'] = array_merge(qs_project_language_codes($current_config), [$langCode]);
 
@@ -126,31 +148,46 @@ if ($refusal !== null) {
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
 
-// The size check on both files this command writes, before either is
-// (qs_small_write_refusal): config.php, and the new language's translation file
-// — a copy of the default language's.
-$default_lang = qs_project_default_language();
+$default_lang = qs_project_default_language($current_config);
 $source_file = PROJECT_PATH . '/translate/' . $default_lang . '.json';
 $target_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
+
+/** Release the config lock, put back everything this command wrote, and answer $response. */
+$fail = static function (ApiResponse $response) use ($lockHandle, $lockFile): void {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
+    qs_small_write_rollback(qs_small_write_journal());
+    $response->send();
+};
+
+// --- THE SECOND LANGUAGE: default.json's words cross into the default language's file ---
+// Through the shared writer, whose size check guards and journals what it writes.
+$sync = null;
+if ($crossing) {
+    $sync = qs_translation_carry_words('default', $default_lang);
+    if (!$sync['ok']) {
+        $fail(qs_translation_write_refusal_response($sync));
+    }
+    clearstatcache(true, $source_file);
+}
+
+// The size check on the two other files this command writes, before either is
+// (qs_small_write_refusal): config.php, and the new language's translation file
+// — a copy of the default language's, as the crossing left it.
 $refusal = qs_small_write_refusal([
     $config_path => strlen($new_config_content),
     $target_file => file_exists($source_file) ? (int) filesize($source_file) : qs_json_size([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
 ]);
 if ($refusal !== null) {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
-    $refusal->send();
+    $fail($refusal);
 }
 
-// Write updated config
+// Write updated config (its bytes kept first, so a failure below puts it back)
+qs_small_write_keep($config_path);
 if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to write configuration file")
-        ->send();
+    $fail(ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to write configuration file"));
 }
 
 // Clear opcode cache if available
@@ -158,16 +195,17 @@ qs_opcache_invalidate($config_path);
 
 // --- CREATE TRANSLATION FILE ---
 // Copy from default language ($source_file / $target_file, set for the size check)
+qs_small_write_keep($target_file);
 if (!file_exists($source_file)) {
     // Fallback: create empty translation file
-    qs_json_write($target_file, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
-} else {
-    // Copy default translations as starting point
-    if (!copy($source_file, $target_file)) {
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to create translation file")
-            ->send();
+    if (!qs_json_write($target_file, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX)) {
+        $fail(ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to create translation file"));
     }
+} elseif (!copy($source_file, $target_file)) {
+    // Copy default translations as starting point
+    $fail(ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage("Failed to create translation file"));
 }
 
 // Release config lock
@@ -184,6 +222,11 @@ ApiResponse::create(201, 'operation.success')
         'name' => qs_language_label($langCode),
         'config_updated' => true,
         'translation_file' => 'translate/' . $langCode . '.json',
-        'copied_from' => file_exists($source_file) ? $default_lang : 'empty'
-    ])
+        'copied_from' => file_exists($source_file) ? $default_lang : 'empty',
+        'multilingual_enabled' => true,
+    ] + ($sync !== null ? ['sync' => [
+        'direction' => $sync['direction'],
+        'keys_added' => $sync['added'],
+        'keys_replaced' => $sync['replaced'],
+    ]] : []))
     ->send();

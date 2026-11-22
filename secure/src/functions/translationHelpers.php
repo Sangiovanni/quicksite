@@ -427,6 +427,95 @@ function qs_translation_write_refusal_response(array $result, array $data = []):
 }
 
 /**
+ * Carry a project's words from the file its pages read into the file they read next, as its language count crosses
+ * two: addLang taking one language to two carries default.json into the default language's file (which it then
+ * copies for the language added), deleteLang taking two to one carries the default language's file into default.json.
+ * One function, so the two crossings follow one rule.
+ *
+ * The words the site showed win: where both files hold a word at a key, the receiving file takes the sending one's (the
+ * receiving file's was not shown until the crossing, and stays unshown no longer). A key only the receiving file holds
+ * stays. A key that is a word in one file and a group of words in the other refuses the crossing with nothing written
+ * (the shared writer's clash check), the clash's words naming both files. A file that is there but cannot be read as a
+ * JSON object refuses it too: its words are never written over.
+ *
+ * Written through the shared writer, in merge mode (its size check; on a one-language project its copy into
+ * default.json, which adds nothing: the words come from there).
+ *
+ * @param string $from 'default' or a language code: the file the pages read until the crossing
+ * @param string $to   'default' or a language code: the file they read after it
+ * @return array ok true: ['direction' => "<from>.json → <to>.json", 'added' => int, 'replaced' => int] (the words
+ *               written where the receiving file had none, and where it had another); ok false: the writer's refusal, or
+ *               ['reason' => 'unreadable', 'message' => …], for qs_translation_write_refusal_response()
+ */
+function qs_translation_carry_words(string $from, string $to): array {
+    $read = static function (string $name): ?array {
+        $file = PROJECT_PATH . '/translate/' . $name . '.json';
+        if (!is_file($file)) {
+            return [];
+        }
+        $tree = json_decode((string) @file_get_contents($file), true);
+        return is_array($tree) ? $tree : null;
+    };
+    $direction = "$from.json → $to.json";
+    $source = $read($from);
+    $target = $read($to);
+    foreach ([$from => $source, $to => $target] as $name => $tree) {
+        if ($tree === null) {
+            return ['ok' => false, 'reason' => 'unreadable',
+                'message' => "translate/$name.json cannot be read as a JSON object, so its words cannot be carried ($direction): nothing was changed."];
+        }
+    }
+    $added = 0;
+    $replaced = 0;
+    $words = qs_translation_carry_delta($source, $target, $added, $replaced);
+    if ($words !== []) {
+        $written = writeTranslationsToFile($to, $words, false);
+        if (!$written['ok']) {
+            foreach ($written['collisions'] ?? [] as $i => $collision) {
+                $written['collisions'][$i]['suggestion'] = "Carrying the words of $from.json into $to.json, which holds another shape at this key: "
+                    . $collision['suggestion'];
+            }
+            return $written;
+        }
+    }
+    return ['ok' => true, 'direction' => $direction, 'added' => $added, 'replaced' => $replaced];
+}
+
+/**
+ * What qs_translation_carry_words() writes: every word of $from that $to lacks or holds differently, as a tree. A key
+ * whose shape differs (a word in one, a group in the other) is kept in it, for the writer's clash check to refuse.
+ * $added and $replaced count the words written where $to had none and where it had another.
+ */
+function qs_translation_carry_delta(array $from, array $to, int &$added, int &$replaced): array {
+    $delta = [];
+    foreach ($from as $key => $value) {
+        $there = array_key_exists($key, $to);
+        if (is_array($value)) {
+            if ($there && is_array($to[$key])) {
+                $sub = qs_translation_carry_delta($value, $to[$key], $added, $replaced);
+                if ($sub !== []) {
+                    $delta[$key] = $sub;
+                }
+            } else {
+                $delta[$key] = $value;
+                if (!$there) {
+                    $added += countNestedTranslationKeys($value);
+                }
+            }
+        } elseif (!$there) {
+            $delta[$key] = $value;
+            $added++;
+        } elseif (is_array($to[$key]) || $to[$key] !== $value) {
+            $delta[$key] = $value;
+            if (!is_array($to[$key])) {
+                $replaced++;
+            }
+        }
+    }
+    return $delta;
+}
+
+/**
  * The project's languages a write of a site's words reaches, the default language first, each with the word file its pages
  * read (where a word to copy is read from). On a multilingual project: the default language, and every other listed language
  * that has a file of its own, each reading its own (a listed language with none reads default.json, which the default

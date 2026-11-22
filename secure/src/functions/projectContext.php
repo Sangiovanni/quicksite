@@ -66,8 +66,11 @@ function qs_load_project_context(string $projectName, bool $strict = true): void
         define('CONFIG', require CONFIG_PATH);
     }
 
+    // The switch is the language count (qs_project_is_multilingual()): two or more
+    // languages, multilingual; one, one-language. A config.php that still holds a
+    // MULTILINGUAL_SUPPORT key is not read.
     if (!defined('MULTILINGUAL_SUPPORT')) {
-        define('MULTILINGUAL_SUPPORT', CONFIG['MULTILINGUAL_SUPPORT'] ?? false);
+        define('MULTILINGUAL_SUPPORT', qs_project_is_multilingual(CONFIG));
     }
 
     // --- theme flags (safe fallbacks) ----------------------------------------
@@ -157,6 +160,7 @@ function qs_project_context_die(string $fileName, string $absPath, string $proje
  * and this file (which resolves secure/projects/<id>/) cannot travel.
  */
 require_once __DIR__ . '/requestRuntime.php';
+require_once __DIR__ . '/projectLanguage.php';   // qs_project_is_multilingual(): MULTILINGUAL_SUPPORT
 /**
  * Define safe, empty project-scoped constants for the tolerant (non-strict)
  * path — a GLOBAL command whose UX-default project could not be resolved
@@ -165,7 +169,7 @@ require_once __DIR__ . '/requestRuntime.php';
  */
 function qs_define_empty_project_context(): void
 {
-    if (!defined('CONFIG'))                   define('CONFIG', ['MULTILINGUAL_SUPPORT' => false]);
+    if (!defined('CONFIG'))                   define('CONFIG', []);
     if (!defined('MULTILINGUAL_SUPPORT'))     define('MULTILINGUAL_SUPPORT', false);
     if (!defined('THEME_MODE_ENABLED'))       define('THEME_MODE_ENABLED', false);
     if (!defined('THEME_DEFAULT'))            define('THEME_DEFAULT', 'light');

@@ -16497,3 +16497,61 @@ its own writes (rejected — every writer would have to remember it; the answer 
 ruling on the editing language, 2026-11-20; built in beta.12. Code: `public/admin/assets/js/core/site-words.js`, `api.js`
 (`announceAnswer()`), `public/admin/assets/js/pages/translations.js`. Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §5.1, §8.9,
 §9.20; [ARCHITECTURE.md](ARCHITECTURE.md) §5.
+
+### A site's multilingual switch is its language count, and its words cross with the second language and the last (locked 2026-11-22)
+
+**Amends**: *Every validator in the engine ends at the true end of the string, and an import takes only the settings a
+command could write* (locked 2026-09-26), which rejected requiring two languages for multilingual mode because deleting a
+language and turning multilingual mode off left exactly those states, and the import had to take what the commands
+produce. Its decisions stand; with no switch of its own to turn off, those states no longer arise.
+
+**Decision**: a project with two or more languages is multilingual, a project with one is not, and nothing else says so.
+
+- **The switch is derived.** `qs_project_is_multilingual()` counts the project's languages; `MULTILINGUAL_SUPPORT` stays a
+  constant, its answer, defined where the project is bound (the project context and a build's front controller), so its
+  readers did not change. No command writes a `MULTILINGUAL_SUPPORT` key, an export does not carry it, an import does not
+  take it, and a `config.php` that still holds one is not read: no project is migrated.
+- **Adding the second language** (`addLang`) carries the words of `default.json`, which every page read until then, into
+  the default language's file, then copies that file for the language added, as for any language added. **Removing down
+  to one** (`deleteLang`) carries the default language's words into `default.json`, which the pages then read. One
+  function does both (`qs_translation_carry_words()`), through the shared translation writer: **the words the site showed
+  win** — where both files hold a word, the receiving file takes the shown one — a key only the receiving file holds stays,
+  and a key that is a word in one file and a group of words in the other refuses the command with nothing changed. A
+  failure after the first write puts back everything the command wrote; `deleteLang` writes `config.php` last.
+- **`deleteLang` stays a removal**, never refused by the size cap or the storage quota, though going down to one language
+  it writes the carried words into `default.json`: they are words the project already holds, moved as a whole language
+  file goes.
+- **`setDefaultLang` works on a one-language site**: there it takes a language of the installation's list, which becomes
+  the site's one language; its words (`default.json`) and its addresses stay as they are, and the old language's word
+  file is renamed to the new code (a file already under that code refuses it, nothing changed).
+- **`setMultilingual` is removed** (148 commands). The panel's *Add a language* sends `addLang` alone; the workflows add,
+  remove and set the default with the three language commands; their **Several languages** box stays as the form's choice
+  between one language and several, with nothing stored behind it.
+- **The Translations page asks before a removal down to one language**: the addresses lose their language (`/en/x` becomes
+  `/x`, and an old `/en/…` link stops working), and it lists the site's own links that name a language
+  (`checkStructureMulti`), or says there are none. On a one-language site its *Make default* sits beside *Add*.
+
+**Reasoning**: stored apart, the switch and the language list fell out of step. A one-language site with two languages
+listed answered 404 for every `/fr/…` address, and a word written in French was copied into `default.json`, replacing the
+live site's word: a site's language mode is its languages, and a second value for the same fact is a value to keep in step
+by hand. The direction of the words was measured before it was chosen: on the development install's projects, a
+two-language project's `default.json` held the French word for 78 keys where its English file held English, written there
+by an earlier writer, and a one-language project's language file held 2 words its pages had never shown. Carrying only the
+words the receiving file lacks would have put the French words on the English site after a removal, and the unshown words
+on the site after an addition; carrying the shown words keeps every page's words as they were, and replaces only words no
+page showed.
+
+**Alternatives considered**: a switch kept apart and held in step by the commands (rejected — every writer of the list would
+have to remember it, which is how the two drifted); a one-language site served at `/en/…` (not offered — nothing wants it,
+and one language needs no address segment); carrying only the words the receiving file lacks, as the removed command did
+(rejected — measured above); refusing to remove down to one language while the site's own links name one (not taken — the
+question names them and the author decides); a migration of every `config.php` (not taken — a key that is not read needs
+none).
+
+**Source**: Sangio's review of the multilingual switch, 2026-11-22, after the Translations page shipped (his question: a
+switch needed at all, one language monolingual and two or more multilingual), his seven rulings that day, and his three
+answers while it was built, the same day (the words shown win, *Make default* on a one-language site, a removal stays one);
+beta.12. Code: `secure/src/functions/projectLanguage.php` (`qs_project_is_multilingual()`), `projectContext.php`,
+`secure/src/runtime/site/index.php`, `translationHelpers.php` (`qs_translation_carry_words()`), `addLang`, `deleteLang`,
+`setDefaultLang`, `public/admin/assets/js/pages/translations.js`. Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §5,
+[COMMAND_API.md](COMMAND_API.md) (*Languages*), [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.20.

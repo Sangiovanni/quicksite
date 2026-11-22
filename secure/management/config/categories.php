@@ -70,7 +70,7 @@ return [
         'scope' => 'project',
         'commands' => [
             'setTranslationKeys', 'deleteTranslationKeys', 'addLang', 'deleteLang',
-            'setDefaultLang', 'setMultilingual', 'cleanOrphanTranslations', 'importStructureTranslations',
+            'setDefaultLang', 'cleanOrphanTranslations', 'importStructureTranslations',
         ],
     ],
 

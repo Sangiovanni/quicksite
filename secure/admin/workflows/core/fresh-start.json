@@ -103,7 +103,7 @@
             }
         },
         {
-            "comment": "=== 4. DELETE NON-DEFAULT LANGUAGES ===",
+            "comment": "=== 4. DELETE NON-DEFAULT LANGUAGES (the last removal leaves one language: deleteLang carries the default language's words into default.json, and the site is one-language) ===",
             "condition": "param.keepLanguages !== true",
             "forEach": "langData.languages",
             "filter": "{{$value}} !== {{langData.default_language}}",
@@ -259,14 +259,6 @@
                         "backHome": "Back to Home"
                     }
                 }
-            }
-        },
-        {
-            "comment": "=== 7. DISABLE MULTILINGUAL (only if currently multilingual) ===",
-            "condition": "param.keepLanguages !== true && langData.multilingual_enabled === true",
-            "command": "setMultilingual",
-            "params": {
-                "enabled": false
             }
         },
         {

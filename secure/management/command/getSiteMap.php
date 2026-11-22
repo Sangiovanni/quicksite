@@ -64,7 +64,7 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
             $baseUrl = rtrim($customBase, '/');
         }
     }
-    $multilingual = CONFIG['MULTILINGUAL_SUPPORT'] ?? false;
+    $multilingual = qs_project_is_multilingual();
     $languages = qs_project_language_codes();
     $defaultLang = qs_project_default_language();
     // Names come from the installation's language list; a project stores codes only.

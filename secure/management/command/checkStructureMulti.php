@@ -8,9 +8,12 @@
  * @permission content.read
  * 
  * Scans all JSON structures (pages, menu, footer, components) for patterns
- * that would break in mono-language mode, such as lang= in href attributes.
- * 
- * Use this before switching to mono-language mode with setMultilingual.
+ * that would break on a one-language site, such as lang= in href attributes.
+ *
+ * Use this before removing a site's languages down to one with deleteLang: the
+ * site then has one language, and its addresses lose their language segment.
+ * The admin panel's Translations page reads it as it stands, to name the site's
+ * own links that will break in the question it asks before such a removal.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -148,8 +151,8 @@ function __command_checkStructureMulti(array $params = [], array $urlParams = []
     $totalFindings = count($allFindings);
     $status = $totalFindings === 0 ? 'clean' : 'has_multilingual_content';
     $message = $totalFindings === 0 
-        ? 'No multilingual-specific content found. Safe to switch to mono-language mode.'
-        : "Found {$totalFindings} multilingual-specific pattern(s). Review before switching to mono-language mode.";
+        ? 'No multilingual-specific content found. Safe to remove the languages down to one.'
+        : "Found {$totalFindings} multilingual-specific pattern(s). Review before removing the languages down to one.";
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage($message)
@@ -160,8 +163,8 @@ function __command_checkStructureMulti(array $params = [], array $urlParams = []
             'affected_sources' => array_keys($groupedFindings),
             'scanned' => $scannedFiles,
             'recommendation' => $totalFindings > 0 
-                ? 'Remove or update lang-specific content before switching to mono-language mode, or these links may break.'
-                : 'You can safely use setMultilingual to switch to mono-language mode.'
+                ? 'Remove or update lang-specific content before removing the languages down to one with deleteLang, or these links may break.'
+                : 'You can safely remove the languages down to one with deleteLang.'
         ]);
 }
 

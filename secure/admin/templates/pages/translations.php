@@ -5,7 +5,7 @@
  * A site's words in every language, side by side: a row per key, a column per language, each word as it is stored
  * (markers and placeholders as written), a gap where a language has none, and each key's state per language (used,
  * unset, unused). Above them, the site's languages: each one's words and gaps, the default marked, and a language
- * added, made the default or removed.
+ * added, made the default or removed; on a one-language site, a language made the site's one language.
  *
  * Reachable by every member rank: the page is gated on getTranslations (content.read). Every control that writes
  * carries its command's role mark: the static ones here (data-requires-command, which admin.js filters once the
@@ -26,9 +26,11 @@ $__trWords = [];
 foreach (['loadFailed', 'loadFailedNone', 'retry', 'noProject',
           'languageDefault', 'languageWords', 'languageUnset', 'languageSame', 'languageFile', 'languageEditing',
           'makeDefault', 'removeLanguage', 'addLanguageButton', 'addLanguageNone',
-          'addLanguageTitle', 'addLanguageCopy', 'addLanguageEmpty', 'addLanguageSwitch', 'addLanguageDone',
-          'addLanguageSwitchedOnly', 'removeLanguageTitle', 'removeLanguageText', 'removeLanguageDone',
-          'makeDefaultTitle', 'makeDefaultText', 'makeDefaultDone', 'languageFailed',
+          'addLanguageTitle', 'addLanguageCopy', 'addLanguageEmpty', 'addLanguageSwitch', 'addLanguageAddresses',
+          'addLanguageDone', 'removeLanguageTitle', 'removeLanguageText', 'removeLanguageDone',
+          'removeLanguageToOne', 'removeLanguageLinks', 'removeLanguageLinksNone', 'removeLanguageLinksUnread',
+          'makeDefaultTitle', 'makeDefaultText', 'makeDefaultDone',
+          'makeDefaultOneTitle', 'makeDefaultOneText', 'makeDefaultOneDone', 'languageFailed',
           'scopeAll', 'groupPages', 'groupLayout', 'groupComponents', 'groupSite',
           'count',
           'columnKey', 'columnActions', 'gapUnset', 'gapAbsent', 'unusedMark', 'unusedMarkHint', 'sameMark',
@@ -78,6 +80,7 @@ window.QS_TRANSLATIONS_I18N = <?= json_encode($__trWords, JSON_HEX_TAG | JSON_HE
         <div class="translations-languages__add-row">
             <select class="admin-input translations-languages__pick" id="translations-language-pick"></select>
             <button type="button" class="admin-btn admin-btn--primary" id="translations-language-add-btn"><?= __admin('translations.addLanguageButton') ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" id="translations-language-default-btn" data-requires-command="setDefaultLang" hidden><?= __admin('translations.makeDefault') ?></button>
         </div>
     </div>
     </div>

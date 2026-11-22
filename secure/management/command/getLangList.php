@@ -3,7 +3,8 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
- * getLangList - Retrieves supported languages and multilingual configuration
+ * getLangList - Retrieves the project's languages, its default, and whether it is multilingual
+ * (two or more languages: qs_project_is_multilingual())
  * 
  * @method GET
  * @url /management/getLangList
@@ -33,7 +34,7 @@ function __command_getLangList(array $params = [], array $urlParams = []): ApiRe
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Language list retrieved successfully')
         ->withData([
-            'multilingual_enabled' => CONFIG['MULTILINGUAL_SUPPORT'],
+            'multilingual_enabled' => qs_project_is_multilingual(),
             'languages' => qs_project_language_codes(),
             'default_language' => qs_project_default_language(),
             'language_names' => $names

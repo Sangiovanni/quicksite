@@ -46,7 +46,7 @@ window.QSSiteWords = (function () {
 
     /**
      * Every command that writes a site's words or changes its languages: the engine's writers of the word files
-     * (MAINTAINING.md, the shared translation writer's census) and the four language commands. An answered one
+     * (MAINTAINING.md, the shared translation writer's census) and the three language commands. An answered one
      * announces the event, whichever script of the page sent it.
      */
     const WORD_COMMANDS = Object.freeze([
@@ -54,10 +54,10 @@ window.QSSiteWords = (function () {
         'deleteCollectedDatum', 'deleteLang', 'deleteNode', 'deleteStorageItem', 'deleteTranslationKeys',
         'duplicateNode', 'editNode', 'editStorageItem', 'editTitle', 'generateConsentLayer', 'generateCookiePolicy',
         'generatePrivacyPolicy', 'importStructureTranslations', 'insertSnippet', 'setCollectedDatum',
-        'setDefaultLang', 'setMultilingual', 'setPrivacyDescLang', 'setSocialPreview', 'setStorageDescLang',
+        'setDefaultLang', 'setPrivacyDescLang', 'setSocialPreview', 'setStorageDescLang',
         'setTranslationKeys',
     ]);
-    const LANGUAGE_COMMANDS = Object.freeze(['addLang', 'deleteLang', 'setDefaultLang', 'setMultilingual']);
+    const LANGUAGE_COMMANDS = Object.freeze(['addLang', 'deleteLang', 'setDefaultLang']);
 
     // -------- the cache --------------------------------------------------------------------------------------
     let _project = null;      // the project the cache holds
@@ -585,28 +585,27 @@ window.QSSiteWords = (function () {
     }
 
     /**
-     * Add a language, its words copied from the default language's (addLang). A one-language site becomes
-     * multilingual first (setMultilingual, which carries default.json's words into the default language's file,
-     * so the copy holds them): addLang alone would copy a file the pages never read. Answers {ok, message?,
-     * switched}: `switched` when the site is multilingual now, even if the language was then refused.
+     * Add a language, its words copied from the default language's (addLang). A site with two or more languages is
+     * multilingual: adding the second makes a one-language site multilingual, and addLang carries default.json's
+     * words into the default language's file first, so the copy holds them. Answers {ok, message?}.
      */
-    async function addLanguage(code) {
-        const list = current() || await read();
-        let switched = false;
-        if (list && !list.multilingual) {
-            const turned = await _languageCommand('setMultilingual', { enabled: true });
-            if (!turned.ok) return { ok: false, message: turned.message, switched: false };
-            switched = true;
-        }
-        const added = await _languageCommand('addLang', { code: code });
-        return Object.assign(added, { switched: switched });
+    function addLanguage(code) {
+        return _languageCommand('addLang', { code: code });
     }
 
-    /** Remove a language: deleteLang deletes its file and keeps no copy, and refuses the default language. */
+    /**
+     * Remove a language: deleteLang deletes its file and keeps no copy, and refuses the default language. Removing
+     * down to one language makes the site one-language: deleteLang carries the default language's words into
+     * default.json, the file its pages then read.
+     */
     function removeLanguage(code) {
         return _languageCommand('deleteLang', { code: code });
     }
 
+    /**
+     * Make a language the default (setDefaultLang): on a multilingual site one of its languages; on a one-language site
+     * a language of the installation's list, which becomes the site's one language (its words stay as they are).
+     */
     function setDefaultLanguage(code) {
         return _languageCommand('setDefaultLang', { lang: code });
     }

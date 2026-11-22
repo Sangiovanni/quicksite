@@ -395,7 +395,7 @@
         },
         "condition": {
           "type": "string",
-          "description": "Condition expression. Supports: param.X === value, config.MULTILINGUAL_SUPPORT === true, data.X for dataRequirements. Also supports && and || operators."
+          "description": "Condition expression. Supports: param.X === value, data.X for dataRequirements (data.langData.multilingual_enabled === true, with getLangList read as langData: true when the project has two or more languages). Also supports && and || operators."
         },
         "forEach": {
           "type": "string",

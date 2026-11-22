@@ -607,7 +607,7 @@ function createExportMetadata(string $projectName, string $projectPath, array $s
             'name' => qs_project_name_in($projectPath) ?? $projectName,
             'routes_count' => $routesCount,
             'languages' => $languages,
-            'multilingual' => $config['MULTILINGUAL_SUPPORT'] ?? false
+            'multilingual' => qs_project_is_multilingual($config)
         ],
         'statistics' => [
             'files' => $stats['files'],

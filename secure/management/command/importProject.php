@@ -1123,9 +1123,6 @@ function rebuildPhpFromJson(string $projectPath): array {
     if (!isset($validConfig['LANGUAGE_DEFAULT'])) {
         $validConfig['LANGUAGE_DEFAULT'] = $validConfig['LANGUAGES_SUPPORTED'][0];
     }
-    if (!isset($validConfig['MULTILINGUAL_SUPPORT'])) {
-        $validConfig['MULTILINGUAL_SUPPORT'] = false;
-    }
 
     $configPhp = "<?php\n/**\n * Site Configuration\n * Rebuilt from JSON on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($validConfig, true) . ";\n";
 

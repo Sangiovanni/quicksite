@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `public/p/` + `secure/projects/<projectId>/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. The public half is a single entry point, `index.php`, through which every project is served. |
-| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 149 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 148 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. It also owns the things that are **not** about developing a project — the installation's update check, the panel's own per-user state, and everything to do with the signed-in account and its access to projects — which are served from its own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) rather than being commands. |
 
 ```
@@ -66,7 +66,7 @@ A project is a self-contained website on disk. One QuickSite installation can ho
 
 ```
 secure/projects/<projectId>/
-├── config.php           # languages, default lang, multilingual flag, etc.
+├── config.php           # languages, default lang, theme, etc.
 ├── config/              # members.json — owner, join policy, roster;
 │                        # project.json — the project's name
 ├── routes.php           # ['home' => …, 'about' => …, 'docs/install' => …]
@@ -202,7 +202,7 @@ ApiResponse::create(201, 'route.created')
 
 **One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. A translation key the element names that has no text yet gets the builder's starting text, written where the key has none, its words read by key from `secure/src/translations/<lang>.json`. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
 
-The full list of 149 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 148 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -510,12 +510,12 @@ different things.
 project/translate/
 ├── en.json
 ├── fr.json
-└── default.json   # fallback when multilingual is off
+└── default.json   # the words of a one-language site
 ```
 
 Files are nested JSON objects. `{ "textKey": "home.hero.title" }` resolves at render time via `Translator::translate('home.hero.title')`. Interpolation supports `{{name}}` placeholders.
 
-**Multilingual vs monolingual.** When `MULTILINGUAL_SUPPORT = true`, `Translator` loads `{active-lang}.json`, or `default.json` when that language has no file of its own; a key missing from the file it loads shows as missing. When `MULTILINGUAL_SUPPORT = false`, `Translator` loads `default.json` exclusively — `LANGUAGES_SUPPORTED` entries are NOT consulted at render time. The admin's Translation Manager mode is `default.json`-aware in monolingual mode (the language picker hides and writes target `default.json`).
+**Multilingual vs monolingual.** A project with two or more languages in `LANGUAGES_SUPPORTED` is multilingual, a project with one is not: the switch is the language count (`qs_project_is_multilingual()`), made the constant `MULTILINGUAL_SUPPORT` where the project is bound (the project context, a build's front controller), and nothing else is stored — a `config.php` that still holds a `MULTILINGUAL_SUPPORT` key is not read. On a multilingual project `Translator` loads `{active-lang}.json`, or `default.json` when that language has no file of its own; a key missing from the file it loads shows as missing. On a one-language project `Translator` loads `default.json` exclusively — the language's own file is NOT consulted at render time. The admin's Translation Manager mode is `default.json`-aware in monolingual mode (the language picker hides and writes target `default.json`).
 
 ### 5.1 Which language a request is
 
@@ -523,7 +523,7 @@ One function answers it, in `secure/src/functions/projectLanguage.php`:
 
 | function | answers |
 |---|---|
-| `qs_project_is_multilingual()` | is this project multilingual at all? |
+| `qs_project_is_multilingual()` | is this project multilingual at all: two or more languages? |
 | `qs_project_languages()` | the supported codes — empty when it is not |
 | `qs_project_default_language()` | the configured fallback (never empty) |
 | `qs_is_project_language($segment)` | is this URL segment one of them? |
@@ -710,7 +710,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 149 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 148 commands.
 
 ### 6.3 Routing — exact and parameterised routes
 

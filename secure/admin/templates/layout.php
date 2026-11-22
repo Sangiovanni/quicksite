@@ -521,7 +521,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
             // The edited project's own value is project DATA, so it is written
             // the way every data value in an inline script is.
             defaultLang: <?= qs_inline_script_json(qs_project_default_language()) ?>,
-            multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
+            multilingual: <?= qs_project_is_multilingual() ? 'true' : 'false' ?>,
             translations: {
                 common: {
                     success: '<?= __adminJs('common.status.success') ?>',

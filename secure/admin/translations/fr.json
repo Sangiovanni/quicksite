@@ -984,7 +984,6 @@
         "addLanguageEmpty": "Ses textes commencent vides : la langue par défaut n'en a pas encore.",
         "addLanguageSwitch": "Ce site a une seule langue. En ajouter une deuxième le rend multilingue : chaque page a alors une adresse par langue.",
         "addLanguageDone": "{language} ajoutée.",
-        "addLanguageSwitchedOnly": "Le site est multilingue maintenant, mais {language} n'a pas été ajoutée : {reason}",
         "removeLanguageTitle": "Supprimer {language} ?",
         "removeLanguageText": "Ses {n} textes partent avec elle et rien n'est conservé : le fichier de la langue est supprimé. C'est irréversible.",
         "removeLanguageDone": "{language} supprimée.",

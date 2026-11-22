@@ -38,7 +38,7 @@ For a deeper view of how QuickSite is organized:
 - **Visual Admin Panel** — iframe-based page editor with drag-and-drop node management, live preview, and component library
 - **A complete API** — one RESTful command per operation, covering pages, routes, translations, styles, assets, builds, projects, backups, membership, and more. `GET /management/help` documents the whole surface and reports how many commands this installation routes
 - **JSON-Driven Templates** — page structures defined in JSON, compiled to optimized PHP for production
-- **Multilingual** — built-in translation system with validation, health checks, and mono/multi-language modes
+- **Multilingual** — built-in translation system with validation and health checks; a site in one language or several, each page with an address per language once it has two
 - **Multi-Project** — host multiple independent sites from one installation
 - **Production Builds** — one-command compilation, optimization, and ZIP packaging
 - **File-Based** — no database, no migrations. JSON + PHP files, deployable anywhere

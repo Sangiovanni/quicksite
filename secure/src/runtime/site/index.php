@@ -267,7 +267,11 @@ if (!is_file(ROUTES_PATH)) {
 define('CONFIG', require CONFIG_PATH);
 define('ROUTES', require ROUTES_PATH);
 
-define('MULTILINGUAL_SUPPORT',      CONFIG['MULTILINGUAL_SUPPORT'] ?? false);
+// The switch is the language count, by the engine's one rule (projectLanguage.php,
+// which a build carries): two or more languages, multilingual. A config.php that
+// still holds a MULTILINGUAL_SUPPORT key is not read.
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
+define('MULTILINGUAL_SUPPORT',      qs_project_is_multilingual(CONFIG));
 define('THEME_MODE_ENABLED',        CONFIG['THEME_MODE_ENABLED'] ?? false);
 define('THEME_DEFAULT',             CONFIG['THEME_DEFAULT'] ?? 'light');
 define('THEME_USER_TOGGLE_ENABLED', CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false);

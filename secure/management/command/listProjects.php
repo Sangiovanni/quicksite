@@ -128,7 +128,7 @@ function getProjectInfo(string $projectPath, string $projectName): array {
         if (is_array($config)) {
             $info['default_language'] = qs_project_default_language($config);
             $info['languages'] = qs_project_language_codes($config);
-            $info['multilingual'] = $config['MULTILINGUAL_SUPPORT'] ?? false;
+            $info['multilingual'] = qs_project_is_multilingual($config);
         }
     }
     

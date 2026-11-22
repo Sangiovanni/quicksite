@@ -67,17 +67,10 @@
             }
         },
         {
-            "comment": "Add French",
+            "comment": "Add French (two or more languages: the site is multilingual)",
             "command": "addLang",
             "params": {
                 "code": "fr"
-            }
-        },
-        {
-            "comment": "Enable multilingual support",
-            "command": "setMultilingual",
-            "params": {
-                "enabled": true
             }
         },
         {

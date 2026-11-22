@@ -13,15 +13,18 @@
  * a key missing from it is lost on a round trip.
  *
  *   LANGUAGES_SUPPORTED          createProject, addLang,       a non-empty list of distinct language codes
- *                                deleteLang
+ *                                deleteLang, setDefaultLang
  *   LANGUAGE_DEFAULT             createProject, setDefaultLang a code listed in LANGUAGES_SUPPORTED
- *   MULTILINGUAL_SUPPORT         createProject, setMultilingual true or false
  *   THEME_MODE_ENABLED,          setThemeMode                  true or false
  *   THEME_USER_TOGGLE_ENABLED
  *   THEME_DEFAULT                setThemeMode                  light, dark or system
  *   FAVICON_PATH                 editFavicon,                  /assets/images/ and a file name with a favicon extension
  *                                qs_favicon_repoint()
  *   MAX_BUILD_SIZE_MB            no command; build reads it    a positive whole number
+ *
+ * Whether a project is multilingual is not a setting: it is its language count (two or more,
+ * qs_project_is_multilingual() in projectLanguage.php). A config.php or an archive's config.json
+ * that still holds a MULTILINGUAL_SUPPORT key is not read, and an export does not carry it.
  *
  * A language code's SHAPE is checked here. Whether a NEW code may be used is the installation's
  * language list (languageRegistry.php), which the writers that add a language and the import ask
@@ -38,7 +41,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php'; // qs_favicon
 const QS_PROJECT_SETTING_KEYS = [
     'LANGUAGES_SUPPORTED',
     'LANGUAGE_DEFAULT',
-    'MULTILINGUAL_SUPPORT',
     'THEME_MODE_ENABLED',
     'THEME_DEFAULT',
     'THEME_USER_TOGGLE_ENABLED',
@@ -71,7 +73,6 @@ function qs_project_setting_error(string $key, $value, array $settings = []): ?s
                 ? null
                 : "LANGUAGE_DEFAULT must be a language code ({$codeRule}) listed in LANGUAGES_SUPPORTED.";
 
-        case 'MULTILINGUAL_SUPPORT':
         case 'THEME_MODE_ENABLED':
         case 'THEME_USER_TOGGLE_ENABLED':
             return is_bool($value) ? null : "{$key} must be true or false.";

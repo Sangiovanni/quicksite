@@ -3374,7 +3374,6 @@ window.PreviewAiTools = (function () {
         snippets: ['whatSnippets', 'Snippets'],
         languages: ['whatLanguages', 'Languages'],
         defaultLanguage: ['whatDefaultLanguage', 'The default language'],
-        multilingual: ['whatMultilingual', 'Multilingual mode'],
         texts: ['whatTexts', 'Texts'],
         translationFiles: ['whatTranslationFiles', 'Translation files of languages the project no longer has'],
         media: ['whatMedia', 'Media files'],

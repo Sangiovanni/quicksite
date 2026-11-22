@@ -1423,14 +1423,21 @@
         "addLanguageCopy": "Its words start as a copy of the {n} words of {default}, the default language, to translate here.",
         "addLanguageEmpty": "Its words start empty: the default language holds none yet.",
         "addLanguageSwitch": "This site has one language. Adding a second makes it multilingual: each page then has an address per language.",
+        "addLanguageAddresses": "/about becomes /{default}/about and /{code}/about; /about itself still shows the site in {defaultName}. The site's words are kept as its pages show them now.",
         "addLanguageDone": "{language} added.",
-        "addLanguageSwitchedOnly": "The site is multilingual now, but {language} was not added: {reason}",
         "removeLanguageTitle": "Remove {language}?",
         "removeLanguageText": "Its {n} words go with it and nothing is kept: the language's file is deleted. This cannot be undone.",
+        "removeLanguageToOne": "The site then has one language, {remaining}, and its addresses lose their language: /{remainingCode}/about becomes /about, and an old /{remainingCode}/… or /{code}/… link stops working, on this site and wherever it was shared. The words of {remaining} are kept as its pages show them now.",
+        "removeLanguageLinks": "The site's own links that name a language, and will break ({n}):",
+        "removeLanguageLinksNone": "None of the site's own links names a language.",
+        "removeLanguageLinksUnread": "The site's own links could not be checked: {reason}",
         "removeLanguageDone": "{language} removed.",
         "makeDefaultTitle": "Make {language} the default language?",
         "makeDefaultText": "An address with no language in it shows the site in {language}, and a language added later starts as a copy of its words. The words stay as they are.",
         "makeDefaultDone": "{language} is the default language now.",
+        "makeDefaultOneTitle": "Make {language} the site's language?",
+        "makeDefaultOneText": "The site keeps one language: {language} takes the place of {current}. Its words and its addresses stay as they are; its pages say they are in {language}.",
+        "makeDefaultOneDone": "{language} is the site's language now.",
         "languageFailed": "Not done: {reason}",
         "wordsTitle": "Words",
         "search": "Search a key or a word",
@@ -2323,11 +2330,11 @@
             },
             "setupLanguages": {
                 "title": "Setup Languages",
-                "description": "Configure project languages and multilingual support. Add languages, set the default, and enable/disable multilingual mode.",
+                "description": "Configure the project's languages: add and remove them and set the default. A site with two or more languages is multilingual, each page with an address per language.",
                 "params": {
                     "multilingual": {
-                        "label": "🌐 Enable multilingual support",
-                        "help": "Enable to support multiple languages with a language switcher"
+                        "label": "🌐 Several languages",
+                        "help": "Ticked: the site in the languages chosen below, two or more. Unticked: the site in one language. Nothing is stored behind this box: the languages decide, and a site with two or more is multilingual."
                     },
                     "languages": {
                         "label": "Languages",
@@ -2622,7 +2629,6 @@
         "aiToolsWhatLanguages": "Languages",
         "aiToolsWhatMedia": "Media files",
         "aiToolsWhatMenu": "The menu",
-        "aiToolsWhatMultilingual": "Multilingual mode",
         "aiToolsWhatOther": "Other commands",
         "aiToolsWhatPages": "Pages",
         "aiToolsWhatPrivacy": "Privacy pages and settings",

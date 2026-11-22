@@ -64,10 +64,10 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
         return qs_language_not_listed_response($defaultLang, 'language');
     }
 
+    // One language: a one-language site (the switch is the language count).
     $config = [
         'LANGUAGE_DEFAULT' => $defaultLang,
         'LANGUAGES_SUPPORTED' => [$defaultLang],
-        'MULTILINGUAL_SUPPORT' => false,
     ];
     $refusal = qs_project_settings_guard($config, array_keys($config));
     if ($refusal !== null) {

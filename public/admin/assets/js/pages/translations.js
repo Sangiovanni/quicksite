@@ -36,7 +36,7 @@
         filter: { used: true, unset: true, unused: true, same: false, search: '', scope: 'site' },
         editing: null,               // {key, language, text, error, busy} while a word is edited
         pendingReload: false,        // a change announced while a word was edited: read once it is done
-        can: { write: false, remove: false, addLang: false, multilingual: false, deleteLang: false, setDefault: false },
+        can: { write: false, remove: false, addLang: false, deleteLang: false, setDefault: false },
     };
 
     const $ = function (id) { return document.getElementById(id); };
@@ -216,7 +216,7 @@
         if (list.multilingual && !lang.isDefault && state.can.deleteLang) {
             actions.push(el('button', {
                 type: 'button', class: 'admin-btn admin-btn--ghost translations-language__remove', text: t('removeLanguage'),
-                onclick: function () { askRemoveLanguage(lang, words); },
+                onclick: function (e) { askRemoveLanguage(lang, words, e.currentTarget); },
             }));
         }
         return el('div', { class: 'translations-language' + (lang.isDefault ? ' translations-language--default' : '') }, [
@@ -226,11 +226,18 @@
         ]);
     }
 
+    /**
+     * The installation's languages the site does not have: Add makes one the site's next language (addLang), and on a
+     * one-language site Make default makes it the site's one language instead (setDefaultLang).
+     */
     function drawLanguageAdd() {
         const list = state.list;
-        const canAdd = state.can.addLang && (list.multilingual || state.can.multilingual);
-        dom.languageAdd.hidden = !canAdd;
-        if (!canAdd) return;
+        const canAdd = state.can.addLang;
+        const canReplace = !list.multilingual && state.can.setDefault;
+        dom.languageAdd.hidden = !canAdd && !canReplace;
+        if (dom.languageAdd.hidden) return;
+        dom.languageAddBtn.hidden = !canAdd;
+        dom.languageDefaultBtn.hidden = !canReplace;
         const taken = new Set(list.codes);
         const offered = (state.allLanguages || []).filter(function (l) { return l && l.code && !taken.has(l.code); });
         dom.languagePick.replaceChildren(...(offered.length
@@ -238,6 +245,7 @@
             : [el('option', { value: '', text: t('addLanguageNone') })]));
         dom.languagePick.disabled = offered.length === 0;
         dom.languageAddBtn.disabled = offered.length === 0;
+        dom.languageDefaultBtn.disabled = offered.length === 0;
         if (!dom.languageList && window.QSSearchableSelect) {
             dom.languageList = new window.QSSearchableSelect(dom.languagePick, {});
         }
@@ -659,7 +667,12 @@
         const dflt = list.multilingual ? list.defaultLanguage : 'default';
         const words = SW.leafKeys(list.words[dflt] || {}).length;
         const body = [];
-        if (!list.multilingual) body.push(_renderParagraph(t('addLanguageSwitch')));
+        if (!list.multilingual) {
+            body.push(_renderParagraph(t('addLanguageSwitch')));
+            body.push(_renderParagraph(t('addLanguageAddresses', {
+                default: list.defaultLanguage, code: code, defaultName: languageName(list.defaultLanguage),
+            })));
+        }
         body.push(_renderParagraph(words > 0
             ? t('addLanguageCopy', { n: words, default: languageName(dflt) })
             : t('addLanguageEmpty')));
@@ -670,23 +683,106 @@
             run: async function () {
                 const done = await SW.addLanguage(code);
                 if (done.ok) return { ok: true, toast: t('addLanguageDone', { language: name }) };
-                if (done.switched) {
-                    return { ok: true, toast: t('addLanguageSwitchedOnly', { language: name, reason: done.message }), toastType: 'warning' };
-                }
                 return { ok: false, message: t('languageFailed', { reason: done.message }) };
             },
         });
     }
 
-    function askRemoveLanguage(lang, words) {
+    /**
+     * Remove a language, asked first. Removing the second language of two leaves the site one language: the question
+     * says its addresses lose their language, and names the site's own links that name one (checkStructureMulti),
+     * read before it opens.
+     */
+    async function askRemoveLanguage(lang, words, button) {
+        const list = state.list;
+        const body = [_renderParagraph(t('removeLanguageText', { n: words, language: lang.name }))];
+        if (list.multilingual && list.codes.length === 2) {
+            const remaining = list.defaultLanguage;
+            body.push(_renderParagraph(t('removeLanguageToOne', {
+                language: lang.name, code: lang.code, remaining: languageName(remaining), remainingCode: remaining,
+            })));
+            if (button) button.disabled = true;
+            let links;
+            try {
+                links = await readLanguageLinks();
+            } finally {
+                if (button) button.disabled = false;
+            }
+            body.push(_renderLanguageLinks(links));
+        }
         ask({
             title: t('removeLanguageTitle', { language: lang.name }),
-            body: [_renderParagraph(t('removeLanguageText', { n: words, language: lang.name }))],
+            body: body,
             action: t('removeLanguage'),
             danger: true,
             run: async function () {
                 const done = await SW.removeLanguage(lang.code);
                 if (done.ok) return { ok: true, toast: t('removeLanguageDone', { language: lang.name }) };
+                return { ok: false, message: t('languageFailed', { reason: done.message }) };
+            },
+        });
+    }
+
+    /**
+     * The site's own links that name a language, by source (checkStructureMulti): {ok: true, bySource} or
+     * {ok: false, message} in the server's words.
+     */
+    async function readLanguageLinks() {
+        try {
+            const res = await window.QuickSiteAdmin.apiRequest('checkStructureMulti', 'GET');
+            const data = res && res.ok && res.data && res.data.data;
+            if (!data || typeof data.findings_by_source !== 'object' || data.findings_by_source === null) {
+                return { ok: false, message: SW.serverWords(res) };
+            }
+            return { ok: true, bySource: data.findings_by_source };
+        } catch (e) {
+            return { ok: false, message: String((e && e.message) || e) };
+        }
+    }
+
+    /**
+     * The links a removal down to one language breaks: each source and what it holds, or that there are none. A link is
+     * listed once, by its place in the structure: checkStructureMulti reports one finding per pattern a value matches.
+     */
+    function _renderLanguageLinks(links) {
+        if (!links.ok) return _renderParagraph(t('removeLanguageLinksUnread', { reason: links.message }));
+        const sources = Array.isArray(links.bySource) ? [] : Object.keys(links.bySource);
+        if (!sources.length) return _renderParagraph(t('removeLanguageLinksNone'));
+        const found = el('dl', { class: 'translations-dialog__words' });
+        let n = 0;
+        sources.forEach(function (source) {
+            const seen = new Set();
+            const values = [];
+            (Array.isArray(links.bySource[source]) ? links.bySource[source] : []).forEach(function (f) {
+                const place = String(f && f.path !== undefined ? f.path : values.length);
+                if (seen.has(place)) return;
+                seen.add(place);
+                values.push(String(f && f.value !== undefined ? f.value : ''));
+            });
+            n += values.length;
+            found.appendChild(el('dt', { text: source }));
+            found.appendChild(el('dd', { text: values.join('\n') }));
+        });
+        return el('div', {}, [_renderParagraph(t('removeLanguageLinks', { n: n })), found]);
+    }
+
+    /**
+     * On a one-language site: make the language picked in the Add row the site's one language (setDefaultLang). Its
+     * words and its addresses stay as they are.
+     */
+    function askReplaceLanguage() {
+        const code = dom.languagePick.value;
+        if (!code) return;
+        const list = state.list;
+        const offered = (state.allLanguages || []).find(function (l) { return l.code === code; });
+        const name = (offered && offered.name) || code;
+        ask({
+            title: t('makeDefaultOneTitle', { language: name }),
+            body: [_renderParagraph(t('makeDefaultOneText', { language: name, current: languageName(list.defaultLanguage) }))],
+            action: t('makeDefault'),
+            run: async function () {
+                const done = await SW.setDefaultLanguage(code);
+                if (done.ok) return { ok: true, toast: t('makeDefaultOneDone', { language: name }) };
                 return { ok: false, message: t('languageFailed', { reason: done.message }) };
             },
         });
@@ -716,6 +812,7 @@
             languageAdd: $('translations-language-add'),
             languagePick: $('translations-language-pick'),
             languageAddBtn: $('translations-language-add-btn'),
+            languageDefaultBtn: $('translations-language-default-btn'),
             search: $('translations-search'),
             scope: $('translations-scope'),
             sameChip: $('translations-same-chip'),
@@ -757,6 +854,7 @@
             drawTable();
         });
         dom.languageAddBtn.addEventListener('click', askAddLanguage);
+        dom.languageDefaultBtn.addEventListener('click', askReplaceLanguage);
 
         window.addEventListener(SW.EVENT, reloadSoon);
         document.addEventListener('visibilitychange', function () {
@@ -773,7 +871,6 @@
             write: can('setTranslationKeys'),
             remove: can('deleteTranslationKeys'),
             addLang: can('addLang'),
-            multilingual: can('setMultilingual'),
             deleteLang: can('deleteLang'),
             setDefault: can('setDefaultLang'),
         };
@@ -786,7 +883,7 @@
             try { await admin.permissionsReady; } catch (e) { /* drawn with no writing control */ }
         }
         readPermissions();
-        if (state.can.addLang) await loadAllLanguages();
+        if (state.can.addLang || state.can.setDefault) await loadAllLanguages();
         await load();
     }
 

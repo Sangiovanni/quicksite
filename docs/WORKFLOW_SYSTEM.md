@@ -386,7 +386,12 @@ a run names a template by its id.
 | Name, Phone number, E-mail address, Address, Booking or ordering link | `param.businessName`, `param.phone`, `param.email`, `param.address`, `param.bookingUrl` | Nothing: the template's own steps read them. Each is shown only for a template whose `asks` lists it, and is empty when left empty |
 
 A run goes through *Fresh Start*, *Setup Languages*, *Update Language Switch* when the site has several
-languages, *Theme Switch Button* when it has a dark mode, then the template's steps. The languages are set
+languages, *Theme Switch Button* when it has a dark mode, then the template's steps. **Several languages** — the
+`multilingual` box of this run and of *Setup Languages* and the two Create Websites — is the form's choice between one
+language and several, with nothing stored behind it: a site with two or more languages is multilingual. *Setup
+Languages* adds the languages chosen with `addLang` (adding the second carries the site's words into the default
+language's file), sets the default with `setDefaultLang`, and removes the others with `deleteLang` (removing down to
+one carries them back into `default.json`). The languages are set
 before the template's steps, since a language's texts can only be sent once the language exists.
 
 **The kinds are the picker's own list.** The row's `template` parameter lists them as its `options`, in the order the picker
@@ -573,7 +578,7 @@ User input form fields. Each parameter:
 - `min` / `max` — numeric range limits (for `number`)
 - `minItems` / `maxItems` — array-length limits (for `tag-select`)
 
-Hidden parameters (those failing their own `condition`) skip validation entirely — useful for "Languages must contain ≥2 entries, but only when Multilingual is checked" style rules.
+Hidden parameters (those failing their own `condition`) skip validation entirely — useful for "Languages must contain ≥2 entries, but only when Several languages is ticked" style rules.
 
 **Parameter types:**
 - `text` — single-line input
@@ -631,7 +636,7 @@ Data that is a map rather than a list gives one option per entry, its key the va
 
 `filterFrom` cascades the resolved options from another parameter's value: the option list is restricted to entries whose `value` appears in the referenced parameter's current selection. The cascade only applies when the referenced parameter is currently visible (its own `condition` is truthy) AND has a non-empty value — otherwise the full list is used. The auto-correct rule: when the cascade narrows the option set and the dependent's current value is no longer valid, the dependent flips to the first available option.
 
-Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. With Multilingual unchecked, Languages is hidden, so the cascade is skipped and Default language shows all 230 languages. Check Multilingual and pick `[en, fr]` in Languages, and Default language re-renders with just English + Français.
+Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. With **Several languages** unticked, Languages is hidden, so the cascade is skipped and Default language shows all 230 languages. Tick it and pick `[en, fr]` in Languages, and Default language re-renders with just English + Français.
 
 `excludeFrom` names another parameter whose current value — or values, for a list — is left out of the options, read as `filterFrom` reads its parameter (only while that one is visible and has a value), drawn again on the same changes and with the same auto-correct. Translate Site's *Language to write* has `"excludeFrom": "from"`, so it never offers the *Translate from* language.
 

@@ -1320,7 +1320,7 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'No translation files found',
             '500.server.internal_error' => 'Failed to load any translation files.'
         ],
-        'notes' => 'In multilingual mode: returns all language files (en.json, fr.json, etc.), and default_language is the project\'s default language (getLangList\'s). In mono-language mode: returns only default.json, under the key default, with languages ["default"] and default_language "default". Response includes multilingual_enabled flag.'
+        'notes' => 'A project with two or more languages is multilingual (getLangList\'s multilingual_enabled): this returns its language files (en.json, fr.json, etc.), and default_language is the project\'s default language (getLangList\'s). A project with one language: only default.json, the file its pages read, under the key default, with languages ["default"] and default_language "default". Response includes multilingual_enabled and mode (multilingual or mono-language).'
     ],
     
     'setTranslationKeys' => [
@@ -1434,7 +1434,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'getLangList' => [
-        'description' => 'Returns list of configured languages and multilingual settings',
+        'description' => 'Returns the project\'s languages, its default language, and whether it is multilingual',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/p/<projectId>/getLangList',
@@ -1455,7 +1455,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '500.server.internal_error' => 'Configuration not loaded.'
         ],
-        'notes' => 'Returns configuration from config.php. Useful for UI language selectors and checking current mode. language_names gives each of the project\'s codes its name from the installation\'s language list (the code itself when the list does not hold it): a project stores codes only.'
+        'notes' => 'Returns configuration from config.php. Useful for UI language selectors and checking current mode. multilingual_enabled is true when the project has two or more languages: the switch is the language count, and nothing else is stored (addLang adding the second language and deleteLang removing down to one change it). language_names gives each of the project\'s codes its name from the installation\'s language list (the code itself when the list does not hold it): a project stores codes only.'
     ],
 
     'getLanguageList' => [
@@ -1479,58 +1479,18 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'The list belongs to the installation: <secure>/management/config/languages.json when the installation has made its own copy of the shipped languages.json.example beside it, and the shipped list otherwise — so two installations can answer differently, and nothing a project does changes it. The shipped list holds every ISO 639-1 language and the most widely used languages that have only a three-letter code. Each entry has a "code" — an ISO 639 code as BCP 47 writes it: two letters, or three when the language has no two-letter code — and a "name", the language\'s own name (e.g. "Français", "日本語"), which is what QuickSite shows for that language everywhere. A NEW language must be in the list: createProject, addLang and importProject refuse a code it does not hold. Pair it with getLangList to show which of them a project already has. "default_language" is the installation\'s default language: the language a new project starts in when none is chosen — createProject\'s default and the one the admin panel preselects for a new project. An imported archive names its own languages. The operator sets it in <secure>/management/config/default-language.php (the shipped default-language.php.example documents it, and setup.sh / setup.bat offer it). It is en when that file is absent, and also when the file cannot be used — unreadable, broken, or naming a code the list does not hold — which is written to the PHP error log. A project that already exists never reads it.'
-    ],
-    
-    'setMultilingual' => [
-        'description' => 'Enable or disable multilingual support. Syncs translations between default.json and default language file.',
-        'method' => 'PATCH',
-        'parameters' => [
-            'enabled' => [
-                'required' => true,
-                'type' => 'boolean',
-                'description' => 'true for multilingual mode, false for mono-language mode',
-                'example' => true,
-                'validation' => 'Must be boolean true/false'
-            ]
-        ],
-        'example_patch' => 'PATCH /management/p/<projectId>/setMultilingual with body: {"enabled": true}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Successfully switched to multilingual mode',
-            'data' => [
-                'multilingual_enabled' => true,
-                'changed' => true,
-                'mode' => 'multilingual',
-                'default_language' => 'en',
-                'sync' => [
-                    'direction' => 'default.json → en.json',
-                    'keys_added' => 42
-                ]
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'Missing enabled parameter',
-            '400.validation.invalid_type' => 'enabled must be boolean',
-            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
-            '400.validation.invalid_format' => 'The sync meets a key that is a word in one file and a group of words in the other: nothing is changed. The message is the clash\'s words; errors[] and data.collisions name each clash.',
-            '500.server.file_write_failed' => 'Failed to update config.php or translation files (the words a sync wrote are put back when config.php could not be written)',
-            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to read configuration file.',
-            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
-        ],
-        'notes' => 'Works with one language or with several; use addLang to add more. When switching modes, translations are synced through the shared translation writer: mono→multi adds the default.json keys the default language\'s file lacks, multi→mono adds the default language\'s keys default.json lacks; a word already there is never replaced. A key that is a word in one file and a group of words in the other refuses the switch: 400 validation.invalid_format, the clash\'s words as setTranslationKeys gives them (prefixed with the two files), errors[] and data.collisions naming each clash; nothing is changed, the configuration included. A project already in the mode asked for answers 200 with multilingual_enabled and changed false, and writes nothing.'
+        'notes' => 'The list belongs to the installation: <secure>/management/config/languages.json when the installation has made its own copy of the shipped languages.json.example beside it, and the shipped list otherwise — so two installations can answer differently, and nothing a project does changes it. The shipped list holds every ISO 639-1 language and the most widely used languages that have only a three-letter code. Each entry has a "code" — an ISO 639 code as BCP 47 writes it: two letters, or three when the language has no two-letter code — and a "name", the language\'s own name (e.g. "Français", "日本語"), which is what QuickSite shows for that language everywhere. A NEW language must be in the list: createProject, addLang, importProject and setDefaultLang on a one-language project refuse a code it does not hold. Pair it with getLangList to show which of them a project already has. "default_language" is the installation\'s default language: the language a new project starts in when none is chosen — createProject\'s default and the one the admin panel preselects for a new project. An imported archive names its own languages. The operator sets it in <secure>/management/config/default-language.php (the shipped default-language.php.example documents it, and setup.sh / setup.bat offer it). It is en when that file is absent, and also when the file cannot be used — unreadable, broken, or naming a code the list does not hold — which is written to the PHP error log. A project that already exists never reads it.'
     ],
     
     'checkStructureMulti' => [
-        'description' => 'Scans all structures (pages, menu, footer, components) for lang-specific content. Use before switching to mono-language mode.',
+        'description' => 'Scans all structures (pages, menu, footer, components) for lang-specific content. Use before removing a site\'s languages down to one with deleteLang.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/p/<projectId>/checkStructureMulti',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Found 4 multilingual-specific pattern(s). Review before switching to mono-language mode.',
+            'message' => 'Found 4 multilingual-specific pattern(s). Review before removing the languages down to one.',
             'data' => [
                 'status' => 'has_multilingual_content',
                 'total_findings' => 4,
@@ -1551,16 +1511,16 @@ $GLOBALS['__help_commands'] = [
                     'footer' => true,
                     'components' => ['menu-link', '...']
                 ],
-                'recommendation' => 'Remove or update lang-specific content before switching to mono-language mode, or these links may break.'
+                'recommendation' => 'Remove or update lang-specific content before removing the languages down to one with deleteLang, or these links may break.'
             ]
         ],
         'error_responses' => [
         ],
-        'notes' => 'Detects patterns like lang=XX, {{__current_page;lang=XX}}, ?lang= query params, and /XX/ path segments. A source is named page:<route>, component:<name>, menu or footer; a page reads by its route, nested and parameter routes included. Returns "clean" status if no multilingual content found, with findings_by_source empty. Useful to audit before setMultilingual(enabled=false).'
+        'notes' => 'Detects patterns like lang=XX, {{__current_page;lang=XX}}, ?lang= query params, and /XX/ path segments. A source is named page:<route>, component:<name>, menu or footer; a page reads by its route, nested and parameter routes included. Returns "clean" status if no multilingual content found, with findings_by_source empty. Useful to audit before deleteLang removes the second language of two: the site then has one language, and its addresses lose their language segment (/en/x becomes /x).'
     ],
     
     'addLang' => [
-        'description' => 'Adds a language to the project, from the installation\'s language list. Can be used before or after enabling multilingual mode.',
+        'description' => 'Adds a language to the project, from the installation\'s language list. Adding the second language makes the site multilingual: each page then has an address per language.',
         'method' => 'POST',
         'parameters' => [
             'code' => [
@@ -1582,25 +1542,31 @@ $GLOBALS['__help_commands'] = [
                 'name' => 'Español',
                 'config_updated' => true,
                 'translation_file' => 'translate/es.json',
-                'copied_from' => 'en'
+                'copied_from' => 'en',
+                'multilingual_enabled' => true,
+                'sync' => [
+                    'direction' => 'default.json → en.json',
+                    'keys_added' => 42,
+                    'keys_replaced' => 0
+                ]
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing code/lang parameter',
-            '400.validation.invalid_format' => 'The code is not a string',
+            '400.validation.invalid_format' => 'The code is not a string. Or, adding the second language, a key is a word in default.json and a group of words in the default language\'s file (or the reverse): nothing is changed; the message is the clash\'s words, errors[] and data.collisions name each clash.',
             '400.validation.unsupported_language' => 'The code is not in the installation\'s language list (getLanguageList returns it)',
             '409.conflict.duplicate' => 'Language already exists',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
-            '500.server.file_write_failed' => 'Failed to update config or create translation file',
+            '500.server.file_write_failed' => 'Failed to update config or create translation file, or, adding the second language, a word file that cannot be read as a JSON object (the message names it); what the command wrote is put back',
             '500.file.not_found' => 'Configuration file not found.',
             '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to parse configuration file.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Can be used before enabling multilingual mode (to add languages first). Use setMultilingual to enable multilingual mode. Updates config.php and creates translation file by copying from default language. The language\'s name is not stored: it comes from the installation\'s language list wherever it is shown, and data.name carries it. translation_file is relative to the project.'
+        'notes' => 'A project with two or more languages is multilingual: the switch is the language count, and nothing else is stored. Adding the second language makes a one-language site multilingual: each page then has an address per language (/en/x, /fr/x), and /x still shows the default language. Its words cross first, through the shared translation writer: the words of default.json, which every page read until then, go into the default language\'s file, replacing a different word there (the words the site showed win) and keeping the keys only that file holds; sync reports it (keys_added where the file had no word, keys_replaced where it had another). A key that is a word in one file and a group of words in the other refuses the addition with nothing changed. Then, as for every language added, the new language\'s file is a copy of the default language\'s. Updates config.php. A failure after the first write puts back everything the command wrote. The language\'s name is not stored: it comes from the installation\'s language list wherever it is shown, and data.name carries it. translation_file is relative to the project.'
     ],
     
     'deleteLang' => [
-        'description' => 'Deletes one of the project\'s languages and its translation file. Works in either mode.',
+        'description' => 'Deletes one of the project\'s languages and its translation file. Removing down to one language makes the site one-language: its addresses lose their language.',
         'method' => 'DELETE',
         'parameters' => [
             'code' => [
@@ -1620,17 +1586,18 @@ $GLOBALS['__help_commands'] = [
                 'code' => 'es',
                 'config_updated' => true,
                 'translation_file_deleted' => true,
-                'remaining_languages' => ['en', 'fr']
+                'remaining_languages' => ['en', 'fr'],
+                'multilingual_enabled' => true
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing code parameter',
-            '400.validation.invalid_format' => 'code is not a string, or it is the default or the last language',
+            '400.validation.invalid_format' => 'code is not a string, or it is the default or the last language. Or, removing down to one language, a key is a word in the default language\'s file and a group of words in default.json (or the reverse): nothing is changed; the message is the clash\'s words, errors[] and data.collisions name each clash.',
             '404.route.not_found' => 'The language is not one of the project\'s',
-            '500.server.file_write_failed' => 'Failed to update config',
-            '500.server.internal_error' => 'Failed to parse configuration file.'
+            '500.server.file_write_failed' => 'Failed to update config or delete the translation file, or, removing down to one language, a word file that cannot be read as a JSON object (the message names it); what the command wrote is put back',
+            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to parse configuration file.'
         ],
-        'notes' => 'Works in either mode, so a fresh start can remove languages before multilingual mode is on. Cannot delete the default language or the last remaining one. A language the installation\'s list no longer holds can still be deleted.'
+        'notes' => 'A project with two or more languages is multilingual: the switch is the language count, and nothing else is stored. Removing down to one language makes the site one-language: its addresses lose their language segment (/en/x becomes /x, and an old /en/… link stops working; checkStructureMulti lists the site\'s own links that name a language), and its pages read default.json. Its words cross first, through the shared translation writer: the default language\'s words, which its pages showed until then, go into default.json, replacing a different word there (the words the site showed win) and keeping the keys only default.json holds; data.sync reports it (keys_added, keys_replaced). A key that is a word in one file and a group of words in the other refuses the removal with nothing changed. The language\'s file is then deleted and config.php written last; a failure puts back everything the command wrote. Cannot delete the default language (setDefaultLang moves it first) or the last remaining one. A language the installation\'s list no longer holds can still be deleted. Only removes content: never refused by the size cap or the storage quota, the words it carries included.'
     ],
 
     'cleanOrphanTranslations' => [
@@ -1668,16 +1635,15 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'setDefaultLang' => [
-        'description' => 'Sets the default language for the site. The language must already exist in LANGUAGES_SUPPORTED.',
+        'description' => 'Sets the site\'s default language. On a multilingual site it must be one of the project\'s languages; on a one-language site it changes the site\'s one language.',
         'method' => 'PATCH',
-        'requires_mode' => 'multilingual',
         'parameters' => [
             'lang' => [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'The language to make the default',
                 'example' => 'fr',
-                'validation' => 'One of the project\'s languages (getLangList returns them); upper case is lowered first'
+                'validation' => 'On a multilingual site, one of the project\'s languages (getLangList returns them); on a one-language site, a code in the installation\'s language list (getLanguageList returns it). Upper case is lowered first'
             ]
         ],
         'example_patch' => 'PATCH /management/p/<projectId>/setDefaultLang with body: {"lang": "fr"}',
@@ -1688,22 +1654,25 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'new_default' => ['code' => 'fr', 'name' => 'Français'],
                 'previous_default' => ['code' => 'en', 'name' => 'English'],
-                'config_updated' => true
+                'config_updated' => true,
+                'multilingual_enabled' => true,
+                'languages' => ['en', 'fr']
             ]
         ],
         'error_responses' => [
             '200.operation.no_change' => 'Language is already the default',
             '400.validation.required' => 'Missing lang parameter',
             '400.validation.invalid_format' => 'lang is not a string',
-            '403.mode.requires_multilingual' => 'This command requires multilingual mode',
-            '404.not_found.language' => 'The language is not one of the project\'s',
+            '400.validation.unsupported_language' => 'On a one-language site: the code is not in the installation\'s language list (getLanguageList returns it)',
+            '404.not_found.language' => 'On a multilingual site: the language is not one of the project\'s',
+            '409.conflict.duplicate' => 'On a one-language site: a word file for the new code is already on disk, one no language of the project reads (cleanOrphanTranslations removes it). Nothing was changed.',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
-            '500.server.file_write_failed' => 'Failed to update config file',
+            '500.server.file_write_failed' => 'Failed to update config file, or to rename the language\'s translation file; what the command wrote is put back',
             '500.file.not_found' => 'Configuration file not found.',
-            '500.server.internal_error' => 'Failed to parse configuration file.',
+            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to parse configuration file.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. The language must first be added using addLang. This affects the LANGUAGE_DEFAULT config value.'
+        'notes' => 'On a multilingual site (two or more languages) the language must first be added using addLang; this changes LANGUAGE_DEFAULT alone: an address with no language in it shows the site in that language, and a language added later starts as a copy of its words. On a one-language site it changes the site\'s one language: LANGUAGES_SUPPORTED becomes the new code alone and LANGUAGE_DEFAULT the same; the site\'s words (default.json, the file its pages read) and its addresses stay as they are, the old language\'s word file is renamed to the new code (data.translation_file_renamed, null when there was none), and data.languages lists the languages after.'
     ],
     
     'getTranslationKeys' => [
@@ -4842,7 +4811,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder',
             '507.quota.storage_exceeded' => 'save=true and a storage quota is configured: keeping the archive would put the project owner over it, counting the archive less the oldest one the five-export limit drops for it. The archive was not kept. A streamed export (save=false) is never charged: it lives in the system\'s temporary folder for the download only.'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json (its name file, config/project.json, among them), its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. Its data never includes the project\'s OAuth key file as it is: without include_oauth_secrets no key travels, and with it data/oauth-secrets.json holds the build keys alone (an import writes them into the new project as they are). A link is never followed: a folder the export reads that is a link, or is reached through one, is left out, and so is a link inside one - an archive carries the project\'s own files, nothing a link reaches elsewhere. It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Every archive is built in the system\'s temporary folder, in a file of its own that only the server\'s account can read, and removed however the request ends: once streamed or saved, when the client cuts the stream, and when the request stops on an error. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), readable by the server\'s account only, are named <id>_export_<date>_<time>.zip - a second archive saved in the same second takes _2, then _3 and so on, so one never replaces another (the name is claimed before the archive is moved into the folder) -, are auto-cleaned (keeps the last 5: the oldest by modification time, then by name within one second), and are reachable only through their own project\'s marker via downloadExport.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (languages, theme mode, favicon and build size limit; whether the site is multilingual follows from its languages) and the routes as config.json and routes.json, config/*.json except members.json (its name file, config/project.json, among them), its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. Its data never includes the project\'s OAuth key file as it is: without include_oauth_secrets no key travels, and with it data/oauth-secrets.json holds the build keys alone (an import writes them into the new project as they are). A link is never followed: a folder the export reads that is a link, or is reached through one, is left out, and so is a link inside one - an archive carries the project\'s own files, nothing a link reaches elsewhere. It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Every archive is built in the system\'s temporary folder, in a file of its own that only the server\'s account can read, and removed however the request ends: once streamed or saved, when the client cuts the stream, and when the request stops on an error. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), readable by the server\'s account only, are named <id>_export_<date>_<time>.zip - a second archive saved in the same second takes _2, then _3 and so on, so one never replaces another (the name is claimed before the archive is moved into the folder) -, are auto-cleaned (keeps the last 5: the oldest by modification time, then by name within one second), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [

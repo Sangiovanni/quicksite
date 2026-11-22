@@ -24,8 +24,8 @@ $editConfigFile  = $editProjectPath . '/config.php';
 $editConfig      = is_file($editConfigFile) ? (require $editConfigFile) : (defined('CONFIG') ? CONFIG : []);
 $editConfig      = is_array($editConfig) ? $editConfig : [];
 
-// Get multilingual config (of the EDITED project)
-$isMultilingual = $editConfig['MULTILINGUAL_SUPPORT'] ?? false;
+// Whether the EDITED project is multilingual: two or more languages
+$isMultilingual = qs_project_is_multilingual($editConfig);
 $defaultLang = qs_project_default_language($editConfig);
 $languages = $isMultilingual ? qs_project_language_codes($editConfig) : [$defaultLang];
 
