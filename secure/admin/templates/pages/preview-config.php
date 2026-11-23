@@ -212,6 +212,19 @@ window.PreviewConfig = {
         noResults: <?= json_encode(__admin('common.noResults', 'No results')) ?>,
         remove: <?= json_encode(__admin('common.remove', 'Remove')) ?>,
         save: <?= json_encode(__admin('common.save', 'Save')) ?>,
+        // The questions before a delete or a discard: each names its thing, its red button says the verb.
+        deleteComponentNamed: <?= json_encode(__admin('preview.deleteComponentNamed')) ?>,
+        deleteComponentTitle: <?= json_encode(__admin('preview.deleteComponentTitle')) ?>,
+        deleteSnippetTitle: <?= json_encode(__admin('preview.deleteSnippetTitle')) ?>,
+        deleteCannotBeUndone: <?= json_encode(__admin('structure.componentList.confirm.deleteWarning')) ?>,
+        discard: <?= json_encode(__admin('preview.discard')) ?>,
+        discardUnsavedParams: <?= json_encode(__admin('preview.discardUnsavedParams')) ?>,
+        snippetCssConfirmAction: <?= json_encode(__admin('preview.snippetCssConfirmAction')) ?>,
+        editNamed: <?= json_encode(__admin('preview.editNamed')) ?>,
+        deleteNamed: <?= json_encode(__admin('preview.deleteNamed')) ?>,
+        removeNamed: <?= json_encode(__admin('preview.removeNamed')) ?>,
+        transitionRemovePropertyTitle: <?= json_encode(__admin('preview.transitionRemovePropertyTitle')) ?>,
+        transitionRemoveAnimationTitle: <?= json_encode(__admin('preview.transitionRemoveAnimationTitle')) ?>,
         saveFailed: <?= json_encode(__admin('common.saveFailed', 'Save failed')) ?>,
         saving: <?= json_encode(__admin('common.saving', 'Saving')) ?>,
         search: <?= json_encode(__admin('common.search', 'Search')) ?>,
@@ -254,7 +267,6 @@ window.PreviewConfig = {
         componentSaved: <?= json_encode(__admin('preview.componentSaved', 'Component saved successfully!')) ?>,
         componentWarning: <?= json_encode(__admin('preview.componentWarning', 'Editing component template - changes affect all :count usage(s)')) ?>,
         deleteComponent: <?= json_encode(__admin('preview.deleteComponent', 'Delete')) ?>,
-        confirmDeleteComponent: <?= json_encode(__admin('preview.confirmDeleteComponent', 'Delete component "%s"? This cannot be undone.')) ?>,
         componentDeleted: <?= json_encode(__admin('preview.componentDeleted', 'Component deleted')) ?>,
         componentDeleteFailed: <?= json_encode(__admin('preview.componentDeleteFailed', 'Failed to delete component')) ?>,
         searchComponents: <?= json_encode(__admin('preview.searchComponents', 'Search components...')) ?>,
@@ -269,7 +281,6 @@ window.PreviewConfig = {
         allSnippets: <?= json_encode(__admin('preview.allSnippets', 'All')) ?>,
         noSnippetsInCategory: <?= json_encode(__admin('preview.noSnippetsInCategory', 'No snippets in this category')) ?>,
         noSnippetSelected: <?= json_encode(__admin('preview.noSnippetSelected', 'No snippet selected')) ?>,
-        confirmDeleteSnippet: <?= json_encode(__admin('preview.confirmDeleteSnippet', 'Delete snippet "%s"? This action cannot be undone.')) ?>,
         switchToMenuConfirm: <?= qs_inline_script_json(__admin('preview.switchToMenuConfirm')) ?>,
         switchToFooterConfirm: <?= qs_inline_script_json(__admin('preview.switchToFooterConfirm')) ?>,
         switchToPageConfirm: <?= qs_inline_script_json(__admin('preview.switchToPageConfirm')) ?>,
@@ -622,12 +633,14 @@ window.PreviewConfig = {
 
         // ── Animations tab (preview-style-motion.js) ──
         animations: {
+            keyframeDeleteTitle: <?= json_encode(__admin('preview.keyframeDeleteTitle')) ?>,
+            keyframeReplaceTitle: <?= json_encode(__admin('preview.keyframeReplaceTitle')) ?>,
+            keyframeReplace: <?= json_encode(__admin('preview.keyframeReplace')) ?>,
             addFrame: <?= json_encode(__admin('preview.addFrame', 'Add Frame')) ?>,
             addKeyframeProperty: <?= json_encode(__admin('preview.addKeyframeProperty', 'Add Property')) ?>,
             atLeastOneFrame: <?= json_encode(__admin('preview.atLeastOneFrame', 'At least one frame required')) ?>,
             cannotDeleteLastFrame: <?= json_encode(__admin('preview.cannotDeleteLastFrame', 'Cannot delete last frame')) ?>,
             cannotDeleteLastProperty: <?= json_encode(__admin('preview.cannotDeleteLastProperty', 'Cannot delete last property')) ?>,
-            confirmDeleteKeyframe: <?= json_encode(__admin('preview.confirmDeleteKeyframe', 'Delete this keyframe?')) ?>,
             createKeyframe: <?= json_encode(__admin('preview.createKeyframe', 'Create Keyframe')) ?>,
             customProperty: <?= json_encode(__admin('preview.customProperty', 'Custom Property')) ?>,
             deleteFrame: <?= json_encode(__admin('preview.deleteFrame', 'Delete Frame')) ?>,
@@ -704,6 +717,10 @@ window.PreviewConfig = {
 
         // ── Source tab (preview-style-source.js) ──
         source: {
+            styleSourceLeaveTitle: <?= json_encode(__admin('preview.styleSourceLeaveTitle')) ?>,
+            styleSourceLeave: <?= json_encode(__admin('preview.styleSourceLeave')) ?>,
+            styleSourceSwitchTitle: <?= json_encode(__admin('preview.styleSourceSwitchTitle')) ?>,
+            styleSourceSwitch: <?= json_encode(__admin('preview.styleSourceSwitch')) ?>,
             styleSource: <?= json_encode(__admin('preview.styleSource', 'Source')) ?>,
             styleSourceHint: <?= json_encode(__admin('preview.styleSourceHint', 'Edit the full style.css source')) ?>,
             styleSourceComingSoon: <?= json_encode(__admin('preview.styleSourceComingSoon', 'Source editor coming soon')) ?>,
@@ -969,6 +986,8 @@ window.PreviewConfig = {
 
         // ── Translation manager panel (preview-translation.js) ──
         translation: {
+            translationBulkDeleteTitle: <?= json_encode(__admin('preview.translationBulkDeleteTitle')) ?>,
+            translationDeleteKey: <?= json_encode(__admin('translations.deleteKey')) ?>,
             translationScopeSite: <?= json_encode(__admin('preview.translationScopeSite', 'Whole site')) ?>,
             translationScopePages: <?= json_encode(__admin('preview.translationScopePages', 'Pages')) ?>,
             translationScopeComponents: <?= json_encode(__admin('preview.translationScopeComponents', 'Components')) ?>,
@@ -987,7 +1006,6 @@ window.PreviewConfig = {
             translationCoverage: <?= json_encode(__admin('preview.translationCoverage', 'Coverage: {pct}% ({used}/{total})')) ?>,
             translationLoading: <?= json_encode(__admin('preview.translationLoading', 'Loading…')) ?>,
             translationActionEdit: <?= json_encode(__admin('preview.translationActionEdit', 'Edit')) ?>,
-            translationActionDelete: <?= json_encode(__admin('preview.translationActionDelete', 'Delete')) ?>,
             translationActionSetValue: <?= json_encode(__admin('preview.translationActionSetValue', 'Set value')) ?>,
             translationUnsetPlaceholder: <?= json_encode(__admin('preview.translationUnsetPlaceholder', '(not set)')) ?>,
             translationNoMatches: <?= json_encode(__admin('preview.translationNoMatches', 'No keys match the current filters.')) ?>,
@@ -998,7 +1016,6 @@ window.PreviewConfig = {
             translationEditSaveError: <?= json_encode(__admin('preview.translationEditSaveError', 'Failed to save: {error}')) ?>,
             translationDeletePrompt: <?= json_encode(__admin('preview.translationDeletePrompt', 'Delete {key} from {lang}.json?')) ?>,
             translationConfirmDelete: <?= json_encode(__admin('preview.translationConfirmDelete', 'Delete')) ?>,
-            translationDeleting: <?= json_encode(__admin('preview.translationDeleting', 'Deleting…')) ?>,
             translationDeleteError: <?= json_encode(__admin('preview.translationDeleteError', 'Failed to delete: {error}')) ?>,
             translationBulkDeleteHeader: <?= json_encode(__admin('preview.translationBulkDeleteHeader', 'These {n} unused keys will be deleted from {lang}.json:')) ?>,
             translationBulkDeleteConfirm: <?= json_encode(__admin('preview.translationBulkDeleteConfirm', 'Delete {n} keys')) ?>,

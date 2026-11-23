@@ -284,11 +284,7 @@
                            class="preview-selectors-search__input" 
                            placeholder="<?= __admin('preview.searchSelectors') ?? 'Search selectors...' ?>"
                            autocomplete="off">
-                    <button type="button" class="preview-selectors-search__clear" id="selector-search-clear" title="<?= __admin('common.clear') ?? 'Clear' ?>" style="display: none;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                    </button>
+                    <button type="button" class="preview-selectors-search__clear" id="selector-search-clear" data-qs-icon="row" aria-label="<?= adminAttr(__admin('common.clear')) ?>" title="<?= adminAttr(__admin('common.clear')) ?>" style="display: none;"></button>
                 </div>
             </div>
             
@@ -370,11 +366,7 @@
                     <span class="preview-selector-selected__label"><?= __admin('preview.selectedSelector') ?? 'Selected' ?>:</span>
                     <code class="preview-selector-selected__value" id="selector-selected-value"></code>
                     <span class="preview-rule-media" id="selector-selected-media" hidden></span>
-                    <button type="button" class="preview-selector-selected__clear" id="selector-selected-clear" title="<?= __admin('common.clear') ?? 'Clear' ?>">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                    </button>
+                    <button type="button" class="preview-selector-selected__clear" id="selector-selected-clear" data-qs-icon="row" aria-label="<?= adminAttr(__admin('common.clear')) ?>" title="<?= adminAttr(__admin('common.clear')) ?>"></button>
                 </div>
                 <div class="preview-selector-selected__info">
                     <span class="preview-selector-selected__matches" id="selector-matches">
@@ -382,13 +374,8 @@
                     </span>
                 </div>
                 <div class="preview-selector-selected__actions">
-                    <button type="button" class="admin-btn admin-btn--primary" id="selector-edit-btn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                        </svg>
-                        <?= __admin('preview.editStyles') ?? 'Edit Styles' ?>
-                    </button>
+                    <button type="button" class="admin-btn admin-btn--ghost admin-action admin-action--edit" id="selector-edit-btn" data-qs-icon="edit"
+                            aria-label="<?= adminAttr(__admin('preview.editStyles')) ?>" title="<?= adminAttr(__admin('preview.editStyles')) ?>"></button>
                     <button type="button" class="admin-btn admin-btn--outline" id="selector-copy-from-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -406,11 +393,7 @@
                 <div class="preview-selector-copy-picker" id="selector-copy-picker" style="display: none;">
                     <div class="preview-selector-copy-picker__header">
                         <span><?= __admin('preview.copyStyleFromLabel') ?? 'Copy styles from:' ?></span>
-                        <button type="button" class="preview-selector-copy-picker__close" id="selector-copy-picker-close" title="<?= __admin('common.cancel') ?? 'Cancel' ?>">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
-                        </button>
+                        <button type="button" class="admin-modal__close" id="selector-copy-picker-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
                     </div>
                     <input type="text" class="admin-input admin-input--sm preview-selector-copy-picker__search" id="selector-copy-search" placeholder="<?= __admin('preview.searchSelectors') ?? 'Search selectors…' ?>">
                     <div class="preview-selector-copy-picker__list" id="selector-copy-list"></div>

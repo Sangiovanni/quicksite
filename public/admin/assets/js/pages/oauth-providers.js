@@ -158,8 +158,8 @@
         });
         const actions = QSDom.el('div', { class: 'oauth-keyset__actions' }, [saveBtn]);
         if (current.client_id) {
-            const clearBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost oauth-keyset__clear', text: t('clear') });
-            clearBtn.addEventListener('click', function () { clearSet(p, setName, title, clearBtn, status); });
+            // The set's bin: its keys removed, asked first (clearSet).
+            const clearBtn = QSControls.bin(t('clear'), function () { clearSet(p, setName, title, clearBtn, status); });
             actions.appendChild(clearBtn);
         }
         actions.appendChild(status);
@@ -242,9 +242,12 @@
 
     async function clearSet(p, setName, title, btn, status) {
         const utils = window.QuickSiteUtils;
-        const message = t('clearConfirm', { set: title, provider: p.name });
         const ok = utils && typeof utils.confirm === 'function'
-            ? await utils.confirm(message, { type: 'danger', confirmText: t('clear'), confirmClass: 'danger' })
+            ? await utils.confirm(t('clearText', { provider: p.name }), {
+                title: t('clearTitle', { set: title, provider: p.name }),
+                type: 'danger',
+                confirmText: t('clear'),
+            })
             : false;
         if (!ok) return;
         btn.disabled = true;

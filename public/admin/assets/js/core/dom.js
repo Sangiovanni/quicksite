@@ -206,6 +206,60 @@ window.QSDom = (function () {
     }
 
     /**
+     * The control of the page carrying this focus key (`data-focus-key`, compared as text: an item's name may hold
+     * any character), or null.
+     * @param {?string} key
+     * @returns {?HTMLElement}
+     */
+    function byFocusKey(key) {
+        if (!key) return null;
+        var all = document.querySelectorAll('[data-focus-key]');
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].getAttribute('data-focus-key') === key) return all[i];
+        }
+        return null;
+    }
+
+    /**
+     * Remember where the focus is, to give it back after the page redraws: a dialog closing (openModal), a list
+     * drawn again under the focus. restore() focuses the element if it is still in the page, else the element that
+     * took its place: the same `id`, else the same `data-focus-key` (the controls of QSControls carry one, `<kind>:<item>`),
+     * else, the item being gone (a delete), the control of the same kind after it, then the one before it, as they
+     * stood when the focus was remembered.
+     *
+     * @param {Element} [target=document.activeElement]
+     * @returns {{restore: function(): boolean}} restore() answers whether it gave the focus to something
+     */
+    function rememberFocus(target) {
+        var doc = document;
+        var el = target || doc.activeElement;
+        var id = el && el.id ? el.id : '';
+        var key = el && el.getAttribute ? el.getAttribute('data-focus-key') : null;
+        var after = null;
+        var before = null;
+        if (key) {
+            var kind = key.split(':')[0] + ':';
+            var keyed = Array.prototype.slice.call(doc.querySelectorAll('[data-focus-key]')).filter(function (k) {
+                return k.getAttribute('data-focus-key').indexOf(kind) === 0;
+            });
+            var at = keyed.indexOf(el);
+            if (at !== -1) {
+                after = at + 1 < keyed.length ? keyed[at + 1].getAttribute('data-focus-key') : null;
+                before = at > 0 ? keyed[at - 1].getAttribute('data-focus-key') : null;
+            }
+        }
+        function restore() {
+            var back = el && el !== doc.body && el.isConnected ? el : null;
+            if (!back && id) back = doc.getElementById(id);
+            if (!back) back = byFocusKey(key) || byFocusKey(after) || byFocusKey(before);
+            if (!back || typeof back.focus !== 'function') return false;
+            back.focus();
+            return doc.activeElement === back;
+        }
+        return { restore: restore };
+    }
+
+    /**
      * Put a button into its working state: the panel's spinner, then a label.
      *
      * The panel repeats `btn.innerHTML = spinner + ' ' + label` in three files.
@@ -323,6 +377,8 @@ window.QSDom = (function () {
         clear: clear,
         setSelectPlaceholder: setSelectPlaceholder,
         setButtonBusy: setButtonBusy,
+        rememberFocus: rememberFocus,
+        byFocusKey: byFocusKey,
         followPointer: followPointer
     };
 })();

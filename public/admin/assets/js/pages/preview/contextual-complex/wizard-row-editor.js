@@ -97,13 +97,16 @@
             try { cfg.onChange(getRows()); } catch (e) { console.warn('[WizardRowEditor] onChange threw:', e); }
         }
 
-        /** A row's side toolbar: move up, move down, remove (the clicks are delegated below). */
+        /**
+         * A row's side toolbar: move up, move down, and the row's × (QSControls.removeRow: nothing is written
+         * until the wizard's own action). The clicks are delegated below.
+         */
         function buildToolbar() {
             const tool = (cls, label, symbol) => QSDom.el('button', { type: 'button', class: cls, title: label, 'aria-label': label, text: symbol });
             return QSDom.el('div', { class: ROW_TOOLS_CLASS }, [
                 tool(BTN_UP_CLASS, t('rowEditor.moveUp'), '↑'),
                 tool(BTN_DOWN_CLASS, t('rowEditor.moveDown'), '↓'),
-                tool(BTN_DELETE_CLASS, t('rowEditor.remove'), '×')
+                window.QSControls.removeRow(t('rowEditor.remove'), null, { className: BTN_DELETE_CLASS })
             ]);
         }
 

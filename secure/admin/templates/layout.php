@@ -190,6 +190,8 @@ $langNames = [
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
     <!-- Shared DOM factory — must load before any page script that references QSDom -->
     <script src="<?= $versionedAsset('/js/core/dom.js') ?>"></script>
+    <!-- The panel's edit, delete and close controls (QSControls): one look each, icons from QuickSiteUtils.ICON_PATHS -->
+    <script src="<?= $versionedAsset('/js/core/controls.js') ?>"></script>
     <!-- The one list of a site's words: every surface that offers a site's keys reads it, every write updates it -->
     <script src="<?= $versionedAsset('/js/core/site-words.js') ?>"></script>
     <!-- Reusable searchable combobox. Wraps a native <select> — page scripts construct QSSearchableSelect after locating their select element. -->
@@ -538,7 +540,6 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                     // labels ship on every page like admin.js's do.
                     cancel: '<?= __adminJs('common.cancel') ?>',
                     confirm: '<?= __adminJs('common.confirm') ?>',
-                    confirmAction: '<?= __adminJs('common.confirmAction') ?>',
                     copyFailed: '<?= __adminJs('common.copyFailed') ?>',
                     // The searchable select's words (core/searchable-select.js),
                     // for every list in the panel that is one.
@@ -594,7 +595,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                         switch: <?= json_encode(__admin('dashboard.projects.switch', 'Switch Project')) ?>,
                         switchBtn: <?= json_encode(__admin('dashboard.projects.switchBtn', 'Switch')) ?>,
                         switchConfirmNamed: <?= json_encode(__admin('dashboard.projects.switchConfirmNamed', 'Switch to ":name"? Every page of the panel then works on this project.')) ?>,
-                        restoring: '<?= __adminJs('dashboard.projects.restoring') ?>',
+                        restoreQuestion: '<?= __adminJs('dashboard.projects.restoreQuestion') ?>',
                         restoreBtn: '<?= __adminJs('dashboard.projects.restoreBtn') ?>',
                         restore_success: '<?= __adminJs('dashboard.projects.restore_success') ?>',
                         restore_failed: '<?= __adminJs('dashboard.projects.restore_failed') ?>',
@@ -619,7 +620,15 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                         exports: '<?= __adminJs('dashboard.storage.exports') ?>',
                         showAll: '<?= __adminJs('dashboard.storage.showAll') ?>',
                         showTop: '<?= __adminJs('dashboard.storage.showTop') ?>',
-                        noMatch: '<?= __adminJs('dashboard.storage.noMatch') ?>'
+                        noMatch: '<?= __adminJs('dashboard.storage.noMatch') ?>',
+                        // A build's or a backup's bin, and the question it asks.
+                        deleteBuild: '<?= __adminJs('dashboard.storage.deleteBuild') ?>',
+                        deleteBuildTitle: '<?= __adminJs('dashboard.storage.deleteBuildTitle') ?>',
+                        deleteBackup: '<?= __adminJs('dashboard.storage.deleteBackup') ?>',
+                        deleteBackupTitle: '<?= __adminJs('dashboard.storage.deleteBackupTitle') ?>',
+                        delete: '<?= __adminJs('dashboard.storage.delete') ?>',
+                        clearAll: '<?= __adminJs('dashboard.storage.clearAll') ?>',
+                        confirmClearExports: '<?= __adminJs('dashboard.storage.confirmClearExports') ?>'
                     }
                 },
                 history: {
@@ -655,8 +664,8 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                     responseCopied: '<?= __adminJs('commands.responseCopied') ?>',
                     selectPlaceholder: '<?= __adminJs('commands.selectPlaceholder') ?>',
                     confirmDestructive: {
-                        title: '<?= __adminJs('commands.confirmDestructive.title') ?>',
-                        message: '<?= __adminJs('commands.confirmDestructive.message') ?>'
+                        question: '<?= __adminJs('commands.confirmDestructive.question') ?>',
+                        text: '<?= __adminJs('commands.confirmDestructive.text') ?>'
                     },
                     jsonEditor: {
                         format: '<?= __adminJs('commands.jsonEditor.format') ?>',

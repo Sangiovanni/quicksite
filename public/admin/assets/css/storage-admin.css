@@ -70,7 +70,6 @@
 /* The language shown has no description for the item: said, not left blank */
 .storage-card__summary--none { font-style: italic; }
 .storage-card__actions { display: flex; gap: 4px; flex-shrink: 0; }
-.storage-card__action { padding: 6px; }
 
 /* Pills — semantic admin colors */
 .storage-pill {
@@ -101,26 +100,15 @@
     color: var(--admin-text);
 }
 
-/* Modal */
-.storage-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: #00000099;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 48px 16px;
-    overflow-y: auto;
-    z-index: 1000;
-}
+/* A dialog of the page, in the panel's one modal (QuickSiteUtils.openModal): the screen's width less a margin, at most 560px. */
 .storage-modal-dialog {
     background: var(--admin-bg-secondary);
     color: var(--admin-text);
     border: 0.5px solid var(--admin-border);
     border-radius: 10px;
-    width: 100%;
+    width: calc(100% - 32px);
     max-width: 560px;
-    /* The backdrop's padding, top and bottom: the dialog scrolls inside the screen. */
+    /* A margin above and below: the dialog scrolls inside the screen. */
     max-height: calc(100vh - 96px);
     overflow-y: auto;
     overflow-wrap: break-word;
@@ -141,7 +129,6 @@
     background: var(--admin-bg-secondary);
 }
 .storage-modal-header__title { margin: 0; font-size: 17px; color: var(--admin-text); }
-.storage-modal-header__close { padding: 6px; }
 
 /* Retention: select on top, custom input full-width below (stacked, robust) */
 .storage-retention { display: block; }
@@ -195,12 +182,6 @@
 }
 .storage-desc-row__lang { width: auto; max-width: 100%; }
 .storage-desc-row__input { flex: 1 1 14rem; min-width: 0; }
-.storage-modal-actions__btn--danger {
-    background: var(--admin-error);
-    border-color: var(--admin-error);
-    color: #ffffff;
-}
-
 /* The warning on a site that declares no non-essential key: its block's padding is its top margin. */
 .storage-consent-offer > p:first-child { margin-top: 0; }
 
@@ -232,7 +213,6 @@
     margin-bottom: 4px;
 }
 .storage-scan__title { margin: 0; font-size: 16px; color: var(--admin-text); }
-.storage-scan__dismiss { padding: 6px; }
 .storage-scan__loading,
 .storage-scan__error {
     padding: 16px 4px;

@@ -24,8 +24,6 @@
     var clearNode = window.QSDom.clear;
 
     var ICON_CHECK = 'M20 6L9 17l-5-5';
-    var ICON_X = 'M18 6L6 18M6 6l12 12';
-    var ICON_EDIT = 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z';
     var ICON_OUT = 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9';
     var ICON_BUILD = 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z';
 
@@ -97,9 +95,10 @@
         return wrap;
     }
 
+    /** A row's action with its word: kind 'primary', 'ghost', or 'danger' (a ghost red on hover, as the bin is: Leave, Decline). */
     function _renderActionBtn(label, iconD, kind, onClick) {
         var b = el('button', {
-            class: 'admin-btn ' + (kind === 'danger' ? 'admin-btn--danger' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
+            class: 'admin-btn ' + (kind === 'danger' ? 'admin-btn--ghost admin-action--delete' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
             type: 'button',
             onclick: onClick,
         });
@@ -144,38 +143,24 @@
         return el('div', { class: 'members-row' }, [main, actions]);
     }
 
-    // One shared confirm modal (admin-modal classes come from admin.css).
-    function _renderConfirmModal(title, bodyNodes, confirmLabel, danger, onConfirm) {
-        var root = document.getElementById('memberships-modal-root');
-        clearNode(root);
+    /**
+     * A question in the panel's one confirm (QuickSiteUtils.confirm): its title, what it shows (body), Cancel and the
+     * verb. `act` runs on the verb with the question open: true closes it, {ok: false, message} keeps it open showing
+     * those words. Answers whether it was done.
+     */
+    function ask(title, body, verb, danger, act) {
+        return QuickSiteUtils.confirm('', {
+            title: title,
+            body: body,
+            confirmText: verb,
+            type: danger ? 'danger' : 'info',
+            action: act,
+        });
+    }
 
-        function close() { clearNode(root); }
-
-        var confirmBtn = el('button', {
-            class: 'admin-btn ' + (danger ? 'admin-btn--danger' : 'admin-btn--primary'),
-            type: 'button',
-            onclick: function () {
-                confirmBtn.disabled = true;
-                onConfirm(close, confirmBtn);
-            },
-        }, [confirmLabel]);
-
-        var modal = el('div', { class: 'admin-modal' }, [
-            el('div', { class: 'admin-modal__backdrop', onclick: close }),
-            el('div', { class: 'admin-modal__content' }, [
-                el('div', { class: 'admin-modal__header' }, [
-                    el('h3', { class: 'admin-modal__title', text: title }),
-                    el('button', { class: 'admin-modal__close', type: 'button', 'aria-label': T.cancel || 'Cancel', onclick: close }, ['×']),
-                ]),
-                el('div', { class: 'admin-modal__body' }, bodyNodes),
-                el('div', { class: 'admin-modal__footer' }, [
-                    el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', onclick: close }, [T.cancel || 'Cancel']),
-                    confirmBtn,
-                ]),
-            ]),
-        ]);
-        root.appendChild(modal);
-        return { close: close };
+    /** A command's answer as a question's action wants it: true, or the server's words kept in the question. */
+    function answered(res) {
+        return res && res.ok ? true : { ok: false, message: serverMessage(res) };
     }
 
     function setCount(chipId, n) {
@@ -222,9 +207,9 @@
 
         var actions = [];
         if (!isEditing) {
-            actions.push(_renderActionBtn(T.editBtn || 'Edit this project', ICON_EDIT, 'ghost', function () {
-                onEditProject(p.project, this);
-            }));
+            actions.push(QSControls.edit(T.editBtn || 'Edit this project', function (e) {
+                onEditProject(p.project, e.currentTarget);
+            }, { focusKey: 'project-edit:' + p.project }));
         }
         // Per-project route to the builds page. Gated on THIS project's role
         // against the server-derived set of roles that hold getBuild — the
@@ -303,25 +288,21 @@
     }
 
     function onLeaveProject(project, name) {
-        _renderConfirmModal(
+        ask(
             T.leaveTitle || 'Leave project',
             [el('p', { text: (T.leaveConfirm || 'Leave {project}?').replace('{project}', projectLabel(project, name)) })],
             T.leaveBtn || 'Leave', true,
-            function (close, btn) {
-                account('leave-project', 'POST', { project: project }).then(function (res) {
-                    close();
-                    if (res && res.ok) {
-                        toast(T.leftMsg || 'You left the project', 'success');
-                        // Leaving changes the caller's SERVER-computed permission set
-                        // (nav links, PAGE_PERMISSIONS, the project picker) — a soft
-                        // refreshAll() leaves stale tabs that only correct themselves on
-                        // the next click. Reload instead; no notifyMembershipChange first
-                        // (its fetches would be cancelled by the reload).
-                        window.location.href = window.location.pathname + '?t=' + Date.now();
-                    } else {
-                        toast(serverMessage(res), 'error');
-                    }
-                });
+            async function () {
+                var res = await account('leave-project', 'POST', { project: project });
+                if (!res || !res.ok) return answered(res);
+                toast(T.leftMsg || 'You left the project', 'success');
+                // Leaving changes the caller's SERVER-computed permission set
+                // (nav links, PAGE_PERMISSIONS, the project picker) — a soft
+                // refreshAll() leaves stale tabs that only correct themselves on
+                // the next click. Reload instead; no notifyMembershipChange first
+                // (its fetches would be cancelled by the reload).
+                window.location.href = window.location.pathname + '?t=' + Date.now();
+                return true;
             }
         );
     }
@@ -348,7 +329,7 @@
         if (inv.note) main.push(_renderNote(inv.note));
         return _renderRow(main, [
             _renderActionBtn(T.accept || 'Accept', ICON_CHECK, 'primary', function () { onAccept(inv); }),
-            _renderActionBtn(T.decline || 'Decline', ICON_X, 'ghost', function () { onDecline(inv); }),
+            _renderActionBtn(T.decline || 'Decline', null, 'danger', function () { onDecline(inv); }),
         ]);
     }
 
@@ -402,21 +383,17 @@
     }
 
     function onDecline(inv) {
-        _renderConfirmModal(
-            T.decline || 'Decline',
+        ask(
+            T.declineTitle,
             [el('p', { text: projectLabel(inv.project, inv.project_name) + ' — ' + String(inv.role || '') })],
-            T.decline || 'Decline', false,
-            function (close) {
-                account('decline-invitation', 'POST', { project: inv.project }).then(function (res) {
-                    close();
-                    if (res && res.ok) {
-                        toast(T.declinedMsg || 'Invitation declined', 'success');
-                    } else {
-                        toast(serverMessage(res), 'error');
-                    }
-                    refreshAll();
-                    notifyMembershipChange();
-                });
+            T.decline || 'Decline', true,
+            async function () {
+                var res = await account('decline-invitation', 'POST', { project: inv.project });
+                await refreshAll();
+                notifyMembershipChange();
+                if (!res || !res.ok) return answered(res);
+                toast(T.declinedMsg || 'Invitation declined', 'success');
+                return true;
             }
         );
     }
@@ -431,8 +408,12 @@
             _renderMeta([req.at || null]),
         ];
         if (req.note) main.push(_renderNote(req.note));
+        var label = String(T.withdrawRequestOf).split('{project}').join(projectLabel(req.project, req.project_name));
         return _renderRow(main, [
-            _renderActionBtn(T.withdraw || 'Withdraw', ICON_X, 'ghost', function () { onWithdraw(req.project, null, T.withdrawnMsg); }),
+            QSControls.bin(label, function () {
+                onWithdraw(req.project, null, T.withdrawnMsg,
+                    String(T.withdrawRequestTitle).split('{project}').join(projectLabel(req.project, req.project_name)));
+            }, { focusKey: 'request-withdraw:' + req.project }),
         ]);
     }
 
@@ -447,17 +428,17 @@
         requests.forEach(function (r) { root.appendChild(_renderRequestRow(r)); });
     }
 
-    function onWithdraw(project, userId, doneMsg) {
+    /** Withdraw a request or a proposal, asked first (`question` names it): a refusal stays in the question. */
+    function onWithdraw(project, userId, doneMsg, question) {
         var body = { project: project };
         if (userId) body.user_id = userId;
-        account('withdraw-request', 'POST', body).then(function (res) {
-            if (res && res.ok) {
-                toast(doneMsg || T.withdrawnMsg || 'Withdrawn', 'success');
-            } else {
-                toast(serverMessage(res), 'error');
-            }
-            refreshAll();
+        return ask(question, [el('p', { text: T.withdrawText })], T.withdraw || 'Withdraw', true, async function () {
+            var res = await account('withdraw-request', 'POST', body);
+            await refreshAll();
             notifyMembershipChange();
+            if (!res || !res.ok) return answered(res);
+            toast(doneMsg || T.withdrawnMsg || 'Withdrawn', 'success');
+            return true;
         });
     }
 
@@ -483,9 +464,13 @@
         if (pr.note) main.push(_renderNote(pr.note));
         var actions = [];
         if (pr.status === 'pending_validation') {
-            actions.push(_renderActionBtn(T.withdraw || 'Withdraw', ICON_X, 'ghost', function () {
-                onWithdraw(pr.project, pr.user ? pr.user.user_id : null, T.proposalWithdrawnMsg);
-            }));
+            var who = (pr.user && (pr.user.name || pr.user.user_id)) || '?';
+            var label = String(T.withdrawProposalOf).split('{name}').join(who)
+                .split('{project}').join(projectLabel(pr.project, pr.project_name));
+            actions.push(QSControls.bin(label, function () {
+                onWithdraw(pr.project, pr.user ? pr.user.user_id : null, T.proposalWithdrawnMsg,
+                    String(T.withdrawProposalTitle).split('{name}').join(who).split('{project}').join(projectLabel(pr.project, pr.project_name)));
+            }, { focusKey: 'proposal-withdraw:' + pr.project + '/' + (pr.user ? pr.user.user_id : '') }));
         }
         return _renderRow(main, actions);
     }
@@ -616,18 +601,25 @@
     // Load + init
     // ============================================================
 
+    /** Read every list again and draw it: a promise of all drawn. The focus, when it was in the page, goes to the control that took its place. */
     function refreshAll() {
-        api('listProjects', 'GET').then(function (res) {
-            renderProjects((res && res.ok && res.data && res.data.data && res.data.data.projects) || []);
-        });
-        account('invitations', 'GET').then(function (res) {
-            var d = (res && res.ok && res.data && res.data.data) || {};
-            renderInbox(d.invitations || []);
-            renderRequests(d.requests || []);
-            renderNotices(d.notices || []);
-        });
-        account('proposals', 'GET').then(function (res) {
-            renderProposals((res && res.ok && res.data && res.data.data && res.data.data.proposals) || []);
+        var main = document.querySelector('.admin-main');
+        var focusBack = main && main.contains(document.activeElement) ? window.QSDom.rememberFocus() : null;
+        return Promise.all([
+            api('listProjects', 'GET').then(function (res) {
+                renderProjects((res && res.ok && res.data && res.data.data && res.data.data.projects) || []);
+            }),
+            account('invitations', 'GET').then(function (res) {
+                var d = (res && res.ok && res.data && res.data.data) || {};
+                renderInbox(d.invitations || []);
+                renderRequests(d.requests || []);
+                renderNotices(d.notices || []);
+            }),
+            account('proposals', 'GET').then(function (res) {
+                renderProposals((res && res.ok && res.data && res.data.data && res.data.data.proposals) || []);
+            }),
+        ]).catch(function () { /* a failed read leaves its list as it was */ }).then(function () {
+            if (focusBack) focusBack.restore();
         });
     }
 

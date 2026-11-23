@@ -14,17 +14,16 @@
             <span class="preview-contextual-info__label"><?= __admin('preview.textKey') ?? 'Text key' ?>:</span>
             <code id="ctx-text-key">-</code>
         </div>
-        <div class="preview-contextual-info__actions">
+        <div class="preview-contextual-info__actions" id="ctx-text-actions">
             <label class="admin-checkbox" id="ctx-text-keep-keys-label" title="<?= __admin('preview.keepTranslationKeysHint') ?? 'Keep the translation key in language files after deleting the node' ?>">
                 <input type="checkbox" id="ctx-text-keep-keys">
                 <span><?= __admin('preview.keepTranslationKeys') ?? 'Keep translation keys' ?></span>
             </label>
-            <button type="button" class="admin-btn admin-btn--danger" id="ctx-text-delete" title="<?= __admin('preview.deleteTextNode') ?? 'Delete this text node' ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-                <span><?= __admin('preview.deleteText') ?? 'Delete Text' ?></span>
+            <!-- Delete: red, its bin and its name as Select's actions are, or its bin alone with the tools' names off
+                 (Show names, preview.js), its title the tooltip and its aria-label the name; it asks first -->
+            <button type="button" class="admin-btn admin-btn--danger" id="ctx-text-delete" data-qs-icon="trash"
+                    title="<?= adminAttr(__admin('preview.deleteTextNode')) ?>" aria-label="<?= adminAttr(__admin('preview.deleteTextNode')) ?>">
+                <span><?= __admin('preview.deleteTextNode') ?></span>
             </button>
         </div>
     </div>

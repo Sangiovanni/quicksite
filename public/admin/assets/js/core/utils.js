@@ -283,11 +283,14 @@ window.QuickSiteUtils = (function() {
         if (iconSvg) icon.appendChild(iconSvg);
         toast.appendChild(icon);
         toast.appendChild(QSDom.el('span', { class: 'admin-toast__message', text: message }));
+        // The panel's one × (ICON_PATHS.close), named for a screen reader.
         toast.appendChild(QSDom.el('button', {
+            type: 'button',
             class: 'admin-toast__close',
-            text: '×',
+            'aria-label': tCommon('close'),
+            title: tCommon('close'),
             onclick: function () { toast.remove(); }
-        }));
+        }, [QSDom.iconEl(ICON_PATHS.close, 14)]));
 
         container.appendChild(toast);
 
@@ -327,16 +330,22 @@ window.QuickSiteUtils = (function() {
      * cancel. A caller that passes none (the chooser, which closes only by a pick) makes
      * both do nothing.
      *
+     * The focus goes back to what held it, or, when the page drew that again while the
+     * dialog was open (a save that redraws a list), to what took its place: the same id or
+     * `data-focus-key`, else the next control of its kind (QSDom.rememberFocus), else what
+     * `returnFocus` gives.
+     *
      * @param {HTMLElement} modal  the box: role="dialog", aria-modal and its labels are the caller's
      * @param {Object} opts
      * @param {function(): HTMLElement[]} opts.focusable  what Tab cycles through, in order
      * @param {HTMLElement} opts.first  what takes the focus when it opens
      * @param {?function()} [opts.dismiss]  what Escape and the backdrop do; none: nothing
      * @param {function(KeyboardEvent): boolean} [opts.onKey]  a key the caller answers (true: answered)
+     * @param {function(): ?HTMLElement} [opts.returnFocus]  where the focus goes when nothing took its place
      * @returns {{close: function(), overlay: HTMLElement}} close() removes it
      */
     function openModal(modal, opts) {
-        const previous = document.activeElement;
+        const focusBack = QSDom.rememberFocus(document.activeElement);
         const overlay = QSDom.el('div', { class: 'admin-modal-overlay admin-modal-overlay--dialog' }, [modal]);
         document.body.appendChild(overlay);
 
@@ -350,8 +359,9 @@ window.QuickSiteUtils = (function() {
             openDialogs.splice(openDialogs.indexOf(entry), 1);
             overlay.classList.remove('admin-modal-overlay--visible');
             setTimeout(() => overlay.remove(), 300);
-            if (previous && previous !== document.body && previous.isConnected && typeof previous.focus === 'function') {
-                previous.focus();
+            if (!focusBack.restore() && opts.returnFocus) {
+                const target = opts.returnFocus();
+                if (target && typeof target.focus === 'function') target.focus();
             }
         };
 
@@ -396,28 +406,46 @@ window.QuickSiteUtils = (function() {
         return { close: close, overlay: overlay };
     }
 
+    /** What Tab reaches inside a dialog: its enabled controls, those inside something hidden left out. */
+    const DIALOG_FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
     /**
-     * The content behind confirm() and prompt(), in the one modal (openModal): a
-     * message (its line breaks kept) or a text field, and Cancel / OK. The focus goes
-     * to OK, to Cancel for a 'danger' one, or to the text field; Escape and the
-     * backdrop cancel.
+     * The controls Tab reaches inside a dialog, in order: what openModal()'s `focusable` gives
+     * for a dialog whose content changes while it is open.
+     *
+     * @param {Element} root
+     * @returns {HTMLElement[]}
+     */
+    function focusables(root) {
+        return Array.from(root.querySelectorAll(DIALOG_FOCUSABLE)).filter((el) => !el.closest('[hidden]'));
+    }
+
+    /**
+     * The content behind confirm() and prompt(), in the one modal (openModal): the × at
+     * its top right, a title when one is given, the message (its line breaks kept) or a
+     * text field, what the body holds, and Cancel / the verb. The focus goes to the verb,
+     * to Cancel for a 'danger' one, to the text field, or to what `focus` names; the ×,
+     * Escape and the backdrop cancel.
+     *
+     * With an `action`, the verb runs it with the dialog still open, its button busy: the
+     * dialog closes when it succeeds, and stays open showing its words when it is refused
+     * ({ok: false, message} or false), so nothing chosen in the body is lost.
      *
      * @param {string} message
      * @param {Object} options   see confirm() and prompt()
      * @param {boolean} withInput true: a text field (prompt)
-     * @returns {Promise<string|null>} the field's text ('' for a confirm) on OK, null on cancel
+     * @returns {Promise<string|null>} the field's text ('' for a confirm) once done, null on cancel
      */
     function openDialog(message, options, withInput) {
         return new Promise((resolve) => {
             const id = 'qs-dialog-' + (++dialogSeq);
             const type = options.type || 'warning';
+            const title = options.title || '';
 
             const modal = QSDom.el('div', {
                 class: 'admin-modal-dialog' + (withInput ? ' admin-modal-dialog--prompt' : ''),
                 role: 'dialog',
-                'aria-modal': 'true',
-                'aria-labelledby': id + '-title',
-                'aria-describedby': id + '-message'
+                'aria-modal': 'true'
             });
             const content = QSDom.el('div', { class: 'admin-modal-dialog__content' });
             if (!withInput) {
@@ -427,13 +455,12 @@ window.QuickSiteUtils = (function() {
                 if (warnIcon) iconBox.appendChild(warnIcon);
                 content.appendChild(iconBox);
             }
-            // A prompt has no title of its own unless asked: its question is the field's label.
-            const title = withInput ? (options.title || '') : (options.title || tCommon('confirmAction'));
+            // The question names the thing it is about: a title when the caller gives one, else the message itself.
             if (title) content.appendChild(QSDom.el('h3', { class: 'admin-modal-dialog__title', id: id + '-title', text: title }));
             let input = null;
             if (withInput) {
                 content.appendChild(QSDom.el('label', {
-                    class: 'admin-modal-dialog__message', id: title ? id + '-message' : id + '-title', for: id + '-input', text: message
+                    class: 'admin-modal-dialog__message', id: id + '-message', for: id + '-input', text: message
                 }));
                 input = QSDom.el('input', {
                     class: 'admin-input admin-modal-dialog__input', id: id + '-input', type: 'text', autocomplete: 'off'
@@ -441,10 +468,17 @@ window.QuickSiteUtils = (function() {
                 input.value = options.defaultValue == null ? '' : String(options.defaultValue);
                 if (options.placeholder) input.placeholder = options.placeholder;
                 content.appendChild(input);
-                if (!title) modal.removeAttribute('aria-describedby');
-            } else {
+            } else if (message) {
                 content.appendChild(QSDom.el('p', { class: 'admin-modal-dialog__message', id: id + '-message', text: message }));
             }
+            if (title || message) modal.setAttribute('aria-labelledby', id + (title ? '-title' : '-message'));
+            if (title && message) modal.setAttribute('aria-describedby', id + '-message');
+            const body = options.body ? [].concat(options.body).filter(Boolean) : [];
+            if (body.length) content.appendChild(QSDom.el('div', { class: 'admin-modal-dialog__body' }, body));
+            // Where a refused action says why (only a dialog that runs one has it).
+            const error = QSDom.el('p', { class: 'admin-modal-dialog__error', role: 'alert' });
+            error.hidden = true;
+            if (options.action) content.appendChild(error);
             const cancelBtn = QSDom.el('button', {
                 type: 'button',
                 class: 'admin-btn admin-modal-dialog__cancel',
@@ -456,9 +490,16 @@ window.QuickSiteUtils = (function() {
                 text: options.confirmText || tCommon('confirm')
             });
             content.appendChild(QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [cancelBtn, confirmBtn]));
-            modal.appendChild(content);
 
             let shown = null;
+            let busy = false;
+            // A question that needs something first (a date picked and what it would delete read) keeps its verb
+            // disabled until the body says it is ready (onOpen's setReady).
+            let ready = true;
+            const setReady = (on) => {
+                ready = !!on;
+                if (!busy) confirmBtn.disabled = !ready;
+            };
             const close = (result) => {
                 if (!shown) return;
                 const s = shown;
@@ -466,15 +507,58 @@ window.QuickSiteUtils = (function() {
                 s.close();
                 resolve(result);
             };
-            const ok = () => close(input ? input.value : '');
-            const cancel = () => close(null);
+            const cancel = () => {
+                if (!busy) close(null);
+            };
+            const closeBtn = window.QSControls.close(tCommon('close'), cancel);
+            modal.appendChild(closeBtn);
+            modal.appendChild(content);
+            const first = options.focus || input || (type === 'danger' ? cancelBtn : confirmBtn);
+
+            const ok = async () => {
+                if (busy || !ready) return;
+                const value = input ? input.value : '';
+                if (!options.action) {
+                    close(value);
+                    return;
+                }
+                busy = true;
+                error.hidden = true;
+                error.textContent = '';
+                const label = confirmBtn.textContent;
+                cancelBtn.disabled = true;
+                QSDom.setButtonBusy(confirmBtn, label);
+                let result;
+                let failure = null;
+                try {
+                    result = await options.action(input ? value : undefined);
+                } catch (e) {
+                    failure = String((e && e.message) || e);
+                }
+                busy = false;
+                if (failure === null && result !== false && !(result && result.ok === false)) {
+                    close(value);
+                    return;
+                }
+                confirmBtn.textContent = label;
+                confirmBtn.disabled = !ready;
+                cancelBtn.disabled = false;
+                const words = failure !== null ? failure : ((result && result.message) || '');
+                if (words) {
+                    error.textContent = words;
+                    error.hidden = false;
+                }
+                // The action may have given the focus to the field it wants filled; else the verb takes it back.
+                if (!modal.contains(document.activeElement)) confirmBtn.focus();
+            };
 
             cancelBtn.addEventListener('click', cancel);
             confirmBtn.addEventListener('click', ok);
             shown = openModal(modal, {
-                focusable: () => (input ? [input, cancelBtn, confirmBtn] : [cancelBtn, confirmBtn]),
-                first: input || (type === 'danger' ? cancelBtn : confirmBtn),
+                focusable: () => focusables(modal),
+                first: first,
                 dismiss: cancel,
+                returnFocus: options.returnFocus,
                 onKey: (e) => {
                     if (e.key === 'Enter' && e.target === input) {
                         e.preventDefault();
@@ -484,7 +568,8 @@ window.QuickSiteUtils = (function() {
                     return false;
                 }
             });
-            if (input) input.select();
+            if (input && first === input) input.select();
+            if (options.onOpen) options.onOpen({ setReady: setReady });
         });
     }
 
@@ -492,22 +577,37 @@ window.QuickSiteUtils = (function() {
      * Ask the user to confirm: the panel's dialog in place of the browser's
      * window.confirm(), as a promise of the answer.
      *
-     * @param {string} message - Message to display (its line breaks are kept)
+     * The words are the question's own: a delete names what it deletes (its title,
+     * "Delete the key cartItems?") and its red button says the verb ("Delete",
+     * "Remove"), never "Confirm".
+     *
+     * @param {string} message - What the question needs to say (its line breaks are kept); '' when the title says it all
      * @param {Object} [options={}] - Dialog options
-     * @param {string} [options.title='Confirm Action'] - Dialog title
+     * @param {string} [options.title] - The question, naming the thing; none: the message is the question
      * @param {string} [options.type='warning'] - Icon type: warning, danger, info. 'danger' is
      *        for an action that destroys or overwrites: Cancel takes the focus, the button is red.
-     * @param {string} [options.confirmText='Confirm'] - Confirm button text
+     * @param {string} [options.confirmText='Confirm'] - The verb on the button: required for a 'danger' one
      * @param {string} [options.cancelText='Cancel'] - Cancel button text
      * @param {string} [options.confirmClass] - Confirm button class ('danger' for a 'danger'
      *        dialog, else 'primary')
-     * @returns {Promise<boolean>} True if confirmed, false if cancelled
+     * @param {Node|Node[]} [options.body] - What the question shows or asks to choose, under the message
+     * @param {HTMLElement} [options.focus] - What takes the focus when it opens (a field of the body)
+     * @param {function(): (Promise<*>|*)} [options.action] - Run on the verb, the dialog open and its
+     *        button busy: closes on success, stays open showing its words on a refusal
+     *        ({ok: false, message}, false, or an error thrown)
+     * @param {function(): ?HTMLElement} [options.returnFocus] - Where the focus goes when what held
+     *        it is gone and nothing took its place
+     * @param {function({setReady: function(boolean)})} [options.onOpen] - Called once the dialog is
+     *        open, for a question that needs something first: setReady(false) disables the verb
+     *        until the body calls setReady(true)
+     * @returns {Promise<boolean>} True once confirmed (and its action done), false if cancelled
      *
      * @example
-     * const confirmed = await QuickSiteUtils.confirm('Delete this item?', {
-     *     title: 'Confirm Delete',
+     * const deleted = await QuickSiteUtils.confirm('', {
+     *     title: 'Delete the key "cartItems"?',
      *     type: 'danger',
-     *     confirmText: 'Delete'
+     *     confirmText: 'Delete',
+     *     action: () => deleteTheKey()   // {ok: false, message} keeps the dialog open
      * });
      */
     async function confirm(message, options = {}) {
@@ -526,7 +626,7 @@ window.QuickSiteUtils = (function() {
      * @param {string} [options.confirmText='Confirm'] - OK button text
      * @param {string} [options.cancelText='Cancel'] - Cancel button text
      * @returns {Promise<string|null>} The text on OK (Enter in the field is OK; '' when left
-     *          empty), null on Cancel, Escape or the backdrop
+     *          empty), null on Cancel, the ×, Escape or the backdrop
      *
      * @example
      * const name = await QuickSiteUtils.prompt('Component name:', { defaultValue: 'card' });
@@ -639,15 +739,12 @@ window.QuickSiteUtils = (function() {
         home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'
     };
 
-    function iconTrash(size) { return svgIcon(ICON_PATHS.trash, size); }
-    function iconEdit(size) { return svgIcon(ICON_PATHS.edit, size); }
     function iconCheck(size) { return svgIcon(ICON_PATHS.check, size); }
     function iconRefresh(size) { return svgIcon(ICON_PATHS.refresh, size); }
     function iconChevronRight(size) { return svgIcon(ICON_PATHS.chevronRight, size); }
     function iconChevronLeft(size) { return svgIcon(ICON_PATHS.chevronLeft, size); }
     function iconChevronDown(size) { return svgIcon(ICON_PATHS.chevronDown, size); }
     function iconChevronUp(size) { return svgIcon(ICON_PATHS.chevronUp, size); }
-    function iconClose(size) { return svgIcon(ICON_PATHS.close, size); }
     function iconPlus(size) { return svgIcon(ICON_PATHS.plus, size); }
     function iconPlay(size) { return svgIcon(ICON_PATHS.play, size); }
     function iconInfo(size) { return svgIcon(ICON_PATHS.info, size); }
@@ -726,6 +823,7 @@ window.QuickSiteUtils = (function() {
         confirm,
         prompt,
         openModal,
+        focusables,
 
         // Clipboard
         copyToClipboard,
@@ -733,15 +831,12 @@ window.QuickSiteUtils = (function() {
         // SVG Icons
         svgIcon,
         ICON_PATHS,
-        iconTrash,
-        iconEdit,
         iconCheck,
         iconRefresh,
         iconChevronRight,
         iconChevronLeft,
         iconChevronDown,
         iconChevronUp,
-        iconClose,
         iconPlus,
         iconPlay,
         iconInfo,

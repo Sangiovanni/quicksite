@@ -212,19 +212,17 @@ window.PreviewSimpleAdd = (function () {
         if (choose) choose.addEventListener('click', openPicker);
     }
 
-    /** One line of the List: its field and its remove button. Returns ONE Element (renumberList() names it). */
+    /**
+     * One line of the List: its field and its small × (the form writes nothing until Add; its class is the List's
+     * delegated click). Returns ONE Element (renumberList() names it).
+     */
     function _renderListRow() {
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'admin-input';
         input.autocomplete = 'off';
         input.setAttribute('data-simple-add-list-item', '');
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'admin-btn admin-btn--ghost preview-simple-add__list-remove';
-        remove.setAttribute('aria-label', word('listRemove', 'Remove this item'));
-        remove.title = word('listRemove', 'Remove this item');
-        remove.textContent = '×';
+        const remove = QSControls.removeRow(word('listRemove', 'Remove this item'), null, { className: 'preview-simple-add__list-remove' });
         const row = document.createElement('div');
         row.className = 'preview-simple-add__list-row';
         row.append(input, remove);

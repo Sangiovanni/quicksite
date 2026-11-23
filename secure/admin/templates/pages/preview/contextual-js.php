@@ -254,12 +254,7 @@
         <div class="preview-contextual-js-form" id="js-add-form" style="display: none;">
             <div class="preview-contextual-js-form-header">
                 <strong><?= __admin('preview.newInteraction') ?? 'New Interaction' ?></strong>
-                <button type="button" class="preview-contextual-js-form-close" id="js-form-close" title="<?= __admin('common.cancel') ?>">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
-                        <line x1="18" y1="6" x2="6" y2="18"/>
-                        <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                </button>
+                <button type="button" class="admin-modal__close" id="js-form-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
             </div>
             
             <div class="preview-contextual-js-form-row">

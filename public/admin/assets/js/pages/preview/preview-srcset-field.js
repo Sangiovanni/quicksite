@@ -74,13 +74,6 @@ window.PreviewSrcsetField = (function () {
         return '';
     }
 
-    /** A small × button with its tooltip. Returns ONE Element. */
-    function _renderCloseButton(cls, title) {
-        const btn = QSDom.el('button', { type: 'button', class: cls, title: title, 'aria-label': title });
-        btn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
-        return btn;
-    }
-
     /** One choice of the kind: a radio and its words. Returns ONE Element. */
     function _renderKindChoice(name, value, words, checked) {
         const radio = QSDom.el('input', { type: 'radio', name: name, value: value });
@@ -121,9 +114,9 @@ window.PreviewSrcsetField = (function () {
         // ── the screen ────────────────────────────────────────────────────────
         const root = QSDom.el('div', { class: 'preview-srcset-field' + (o.closable ? ' preview-srcset-field--closable' : ''), 'data-param-field': param });
         if (o.closable) {
-            const close = _renderCloseButton('preview-srcset-field__close', PreviewConfig.i18n.srcsetOfferClose);
-            close.addEventListener('click', () => { if (typeof o.onClose === 'function') o.onClose(); });
-            root.appendChild(close);
+            // The field's × at its top right: the panel's close, placed by the field's own class
+            root.appendChild(QSControls.close(PreviewConfig.i18n.srcsetOfferClose,
+                () => { if (typeof o.onClose === 'function') o.onClose(); }, { className: 'preview-srcset-field__close' }));
         }
 
         const kinds = QSDom.el('div', { class: 'preview-srcset-field__kinds', role: 'radiogroup' }, [
@@ -191,7 +184,8 @@ window.PreviewSrcsetField = (function () {
             address.value = row.address;
             const browse = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--outline preview-asset-browse-btn',
                 title: PreviewConfig.i18n.browseAssets }, ['📁']);
-            const remove = _renderCloseButton('preview-contextual-form__remove-param', PreviewConfig.i18n.srcsetRemovePicture);
+            // The row's small ×: the field writes nothing until the form is saved
+            const remove = QSControls.removeRow(PreviewConfig.i18n.srcsetRemovePicture, null);
             const descriptor = QSDom.el('div', { class: 'preview-srcset-field__descriptor' });
             const problem = QSDom.el('small', { class: 'preview-srcset-field__problem', hidden: '' });
             const el = QSDom.el('div', { class: 'preview-srcset-field__row' }, [

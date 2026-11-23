@@ -29,7 +29,6 @@
     var clearNode = window.QSDom.clear;
 
     var ICON_DOWNLOAD = 'M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2';
-    var ICON_TRASH = 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6';
     var ICON_BUILD = 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z';
     var ICON_REFRESH = 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15';
     var ICON_WARNING = 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01';
@@ -145,25 +144,6 @@
         if (iconD) btn.appendChild(svgIcon(iconD, 16));
         btn.appendChild(document.createTextNode(' ' + label));
         return btn;
-    }
-
-    function _renderModal(title, bodyNodes, footerNodes) {
-        var root = document.getElementById('builds-modal-root');
-        clearNode(root);
-        function close() { clearNode(root); }
-
-        root.appendChild(el('div', { class: 'admin-modal admin-modal--builds' }, [
-            el('div', { class: 'admin-modal__backdrop', onclick: close }),
-            el('div', { class: 'admin-modal__content' }, [
-                el('div', { class: 'admin-modal__header' }, [
-                    el('h3', { class: 'admin-modal__title', text: title }),
-                    el('button', { class: 'admin-modal__close', type: 'button', 'aria-label': T.close || 'Close', onclick: close }, ['×']),
-                ]),
-                el('div', { class: 'admin-modal__body' }, bodyNodes),
-                el('div', { class: 'admin-modal__footer' }, footerNodes(close)),
-            ]),
-        ]));
-        return { close: close };
     }
 
     // ============================================================
@@ -390,7 +370,7 @@
             }));
         }
         if (_mayDelete(b)) {
-            actions.push(_renderButton(T.deleteBtn || 'Delete', ICON_TRASH, 'danger', function () {
+            actions.push(_renderButton(T.deleteBtn || 'Delete', null, 'danger', function () {
                 onDeleteConfirm(b);
             }));
         }
@@ -523,48 +503,37 @@
      *
      * At N = 1, deleting is not tidying — it is the only way to make room for the
      * next build, and the build being deleted is the only copy anywhere. So the
-     * modal that asks says both of those things and puts the download one click
-     * away, instead of leaving the user to cancel, download, and come back.
+     * question says both of those things and puts the download one click away in
+     * its body, instead of leaving the user to cancel, download, and come back.
+     * It is the panel's one confirm; a refusal stays in it in the server's words.
      */
-    function onDeleteConfirm(b) {
+    async function onDeleteConfirm(b) {
         var body = [
             el('p', { text: T.deleteBody || '' }),
             el('p', { class: 'admin-hint', text: T.deleteWhy || '' }),
             el('p', { class: 'builds-modal__name', text: b.name }),
         ];
-
-        _renderModal(T.deleteTitle || 'Delete this build?', body, function (close) {
-            var footer = [];
-            if (_mayDownload(b)) {
-                footer.push(_renderButton(T.deleteDownloadFirst || 'Download it first', ICON_DOWNLOAD, 'outline', async function () {
-                    var ok = await onDownload(this);
-                    if (ok) toast(T.deleteDownloaded || 'Downloaded', 'success');
-                }));
-            }
-            footer.push(el('button', {
-                class: 'admin-btn admin-btn--ghost', type: 'button', onclick: close,
-            }, [T.cancel || 'Cancel']));
-            footer.push(_renderButton(T.deleteBtn || 'Delete', ICON_TRASH, 'danger', async function () {
-                this.disabled = true;
-                var res;
-                try {
-                    res = await api('deleteBuild', 'POST', {});
-                } catch (e) {
-                    this.disabled = false;
-                    toast(T.deleteFailed || 'Delete failed', 'error');
-                    return;
-                }
-                close();
-                if (res && res.ok) {
-                    toast(T.deletedMsg || 'Build deleted', 'success');
-                    await loadBuild();
-                    await loadSpace(true);
-                } else {
-                    toast(serverMessage(res, T.deleteFailed), 'error');
-                }
-            }));
-            return footer;
+        if (_mayDownload(b)) {
+            body.push(el('div', {}, [_renderButton(T.deleteDownloadFirst || 'Download it first', ICON_DOWNLOAD, 'outline', async function () {
+                var ok = await onDownload(this);
+                if (ok) toast(T.deleteDownloaded || 'Downloaded', 'success');
+            })]));
+        }
+        var deleted = await QuickSiteUtils.confirm('', {
+            title: T.deleteTitle || 'Delete this build?',
+            body: body,
+            type: 'danger',
+            confirmText: T.deleteBtn || 'Delete',
+            action: async function () {
+                var res = await api('deleteBuild', 'POST', {});
+                if (!res || !res.ok) return { ok: false, message: serverMessage(res, T.deleteFailed) };
+                return true;
+            },
         });
+        if (!deleted) return;
+        toast(T.deletedMsg || 'Build deleted', 'success');
+        await loadBuild();
+        await loadSpace(true);
     }
 
     // ============================================================

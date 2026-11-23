@@ -10,10 +10,10 @@
  * UX flow:
  *   1. Context menu → list view opens with the route's resolvers (or
  *      empty state if none).
- *   2. Per-row Edit button → list view closes, per-config modal opens
+ *   2. A row's pencil → list view closes, per-config modal opens
  *      scoped to that slot's index. Save closes the modal and re-opens
  *      the list view with refreshed data.
- *   3. Per-row × Remove → confirms, deletes that slot, refreshes the
+ *   3. A row's bin → confirms, deletes that slot, refreshes the
  *      list. Last-resolver removal collapses the route to "no resolver".
  *   4. Drag handle reorder → immediate apply via setRouteResolver
  *      array-replace (no separate Save order button).
@@ -41,17 +41,12 @@
                 <code id="sitemap-resolver-list-route" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
                 <span class="sitemap-resolver-list__count" id="sitemap-resolver-list-count"></span>
             </h3>
-            <button type="button" class="sitemap-resolver-list-modal__close" id="sitemap-resolver-list-close" title="<?= __admin('common.close', 'Close') ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
+            <button type="button" class="admin-modal__close" id="sitemap-resolver-list-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
 
         <div class="sitemap-resolver-list-modal__body">
             <p style="margin: 0 0 var(--space-md); color: var(--admin-text);">
-                <?= __admin('sitemapPage.resolverListHint', 'Each resolver fires in parallel server-side before the page renders. Drag rows to reorder (affects render-time order + namespaced-by-index addressing like <code>$r0</code> / <code>$r1</code>). Per-resolver Edit opens the detailed config; × removes that slot.') ?>
+                <?= __admin('sitemapPage.resolverListHint', 'Each resolver fires in parallel server-side before the page renders. Drag rows to reorder (affects render-time order + namespaced-by-index addressing like <code>$r0</code> / <code>$r1</code>). A resolver\'s pencil opens its detailed config; its bin removes it.') ?>
             </p>
 
             <!-- Row container — populated dynamically by the list-view JS.
@@ -76,12 +71,6 @@
             </button>
 
             <p class="admin-hint" id="sitemap-resolver-list-status" style="margin: var(--space-sm) 0 0; min-height: 1.2em;"></p>
-        </div>
-
-        <div class="sitemap-resolver-list-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" id="sitemap-resolver-list-done">
-                <?= __admin('common.done', 'Done') ?>
-            </button>
         </div>
     </div>
 </div>

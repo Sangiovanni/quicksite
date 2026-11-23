@@ -161,25 +161,6 @@
         return g;
     }
 
-    function _renderSvgIcon(pathD, size) {
-        var ns = 'http://www.w3.org/2000/svg';
-        var svg = document.createElementNS(ns, 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24');
-        svg.setAttribute('fill', 'none');
-        svg.setAttribute('stroke', 'currentColor');
-        svg.setAttribute('stroke-width', '2');
-        svg.setAttribute('width', String(size || 14));
-        svg.setAttribute('height', String(size || 14));
-        svg.setAttribute('aria-hidden', 'true');
-        var p = document.createElementNS(ns, 'path');
-        p.setAttribute('d', pathD);
-        svg.appendChild(p);
-        return svg;
-    }
-    var ICON_EDIT = 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z';
-    var ICON_TRASH = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2';
-    var ICON_X = 'M18 6L6 18M6 6l12 12';
-
     function _renderPill(text, kind) {
         return QSDom.el('span', { class: 'storage-pill storage-pill--' + kind, text: text });
     }
@@ -242,15 +223,6 @@
         });
     }
 
-    function _renderActionBtn(iconD, label, onClick, command) {
-        var b = QSDom.el('button', {
-            class: 'admin-btn admin-btn--ghost storage-card__action',
-            'aria-label': label, title: label, type: 'button', onclick: onClick,
-        });
-        b.appendChild(_renderSvgIcon(iconD, 14));
-        return _mark(b, command);
-    }
-
     function _renderCard(item) {
         var card = QSDom.el('div', { class: 'storage-card' });
         var row = QSDom.el('div', { class: 'storage-card__row' });
@@ -277,8 +249,10 @@
         row.appendChild(main);
 
         var actions = QSDom.el('div', { class: 'storage-card__actions' });
-        actions.appendChild(_renderActionBtn(ICON_EDIT, 'Edit', function () { openEditModal(item); }, 'editStorageItem'));
-        actions.appendChild(_renderActionBtn(ICON_TRASH, 'Delete', function () { openDeleteConfirm(item); }, 'deleteStorageItem'));
+        actions.appendChild(QSControls.edit(t('storage.actions.edit', { id: item.id }),
+            function () { openEditModal(item); }, { command: 'editStorageItem', focusKey: 'edit:' + item.id }));
+        actions.appendChild(QSControls.bin(t('storage.actions.delete', { id: item.id }),
+            function () { openDeleteConfirm(item); }, { command: 'deleteStorageItem', focusKey: 'delete:' + item.id }));
         row.appendChild(actions);
 
         card.appendChild(row);
@@ -320,6 +294,8 @@
     function renderList() {
         var root = document.getElementById('storage-list');
         if (!root) return;
+        // A redraw under the focus (a save, a delete, a language) gives it to the control that took its place.
+        var focusBack = root.contains(document.activeElement) ? QSDom.rememberFocus() : null;
         root.textContent = '';
         root.className = 'storage-list';
 
@@ -330,6 +306,7 @@
             filtered.forEach(function (it) { root.appendChild(_renderCard(it)); });
         }
         _filterControls(root);
+        if (focusBack) focusBack.restore();
 
         var filterBar = document.getElementById('storage-filter-bar');
         if (filterBar) {
@@ -423,35 +400,43 @@
     // Modal — add / edit
     // ====================================================================
 
-    function _renderModalShell(titleText, onClose) {
-        var root = document.getElementById('storage-modal-root');
-        if (!root) return null;
-        root.textContent = '';
+    /** The page's open dialog ({close} from QuickSiteUtils.openModal), or null. */
+    var shownModal = null;
+    var modalSeq = 0;
 
-        var backdrop = QSDom.el('div', {
-            class: 'storage-modal-backdrop',
-            onclick: function (e) { if (e.target === backdrop) onClose(); },
+    /**
+     * A dialog of the page, in the panel's one modal: its title and its × at the top right. The caller fills it, then
+     * shows it with _showModal(); the ×, Escape and the backdrop close it.
+     */
+    function _renderModalShell(titleText) {
+        closeModal();
+        var titleId = 'storage-modal-title-' + (++modalSeq);
+        var dialog = QSDom.el('div', {
+            class: 'storage-modal-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId,
         });
-        var dialog = QSDom.el('div', { class: 'storage-modal-dialog' });
-
-        var header = QSDom.el('div', { class: 'storage-modal-header' });
-        header.appendChild(QSDom.el('h2', { class: 'storage-modal-header__title', text: titleText }));
-        var closeBtn = QSDom.el('button', {
-            class: 'admin-btn admin-btn--ghost storage-modal-header__close',
-            type: 'button', 'aria-label': 'Close', onclick: onClose,
-        });
-        closeBtn.appendChild(_renderSvgIcon(ICON_X, 16));
-        header.appendChild(closeBtn);
-        dialog.appendChild(header);
-
-        backdrop.appendChild(dialog);
-        root.appendChild(backdrop);
+        dialog.appendChild(QSDom.el('div', { class: 'storage-modal-header' }, [
+            QSDom.el('h2', { class: 'storage-modal-header__title', id: titleId, text: titleText }),
+            QSControls.close(null, closeModal),
+        ]));
         return dialog;
     }
 
+    /** Show a filled dialog: the focus on its first control past the header, kept inside, given back on close. */
+    function _showModal(dialog) {
+        var inside = QuickSiteUtils.focusables(dialog);
+        var first = inside.filter(function (el) { return !el.closest('.storage-modal-header'); })[0] || inside[0];
+        shownModal = QuickSiteUtils.openModal(dialog, {
+            focusable: function () { return QuickSiteUtils.focusables(dialog); },
+            first: first,
+            dismiss: closeModal,
+        });
+    }
+
     function closeModal() {
-        var root = document.getElementById('storage-modal-root');
-        if (root) root.textContent = '';
+        if (!shownModal) return;
+        var shown = shownModal;
+        shownModal = null;
+        shown.close();
     }
 
     function _renderSelect(options, selected) {
@@ -470,8 +455,7 @@
         // scope couldn't be inferred (one-click declare needs a scope).
         var isDeclare = (!isEdit && prefill && prefill.id);
         var titleText = isEdit ? 'Edit "' + item.id + '"' : (isDeclare ? 'Declare "' + prefill.id + '"' : 'Add storage key');
-        var dialog = _renderModalShell(titleText, closeModal);
-        if (!dialog) return;
+        var dialog = _renderModalShell(titleText);
 
         // id — shown behind the non-editable prefix chip, so the author reads
         // the WHOLE physical key as they type rather than discovering it in
@@ -602,6 +586,9 @@
                 }
                 closeModal();
                 await refresh();
+                // A renamed key's pencil is the one that took the edited one's place.
+                var renamed = body.newId ? QSDom.byFocusKey('edit:' + body.newId) : null;
+                if (renamed) renamed.focus();
                 if (scan.data) await runScan();
             } catch (e) {
                 errBox.show((e && e.message) || 'Network error');
@@ -609,6 +596,7 @@
             }
         });
         _filterControls(dialog);
+        _showModal(dialog);
     }
 
     /** A dialog's error line, in its flow: show() brings it into view above the sticky buttons. */
@@ -695,44 +683,24 @@
     // Delete confirmation
     // ====================================================================
 
-    function openDeleteConfirm(item) {
-        var dialog = _renderModalShell('Delete "' + item.id + '"?', closeModal);
-        if (!dialog) return;
-
-        var body = QSDom.el('div');
-        body.appendChild(_renderHint('Removes this key from the registry. It does not touch any code that reads or writes the key — the storage scan will flag a now-undeclared key if it is still referenced.'));
-        var errPanel = QSDom.el('div', { class: 'storage-modal-actions__error' });
-        errPanel.hidden = true;
-        body.appendChild(errPanel);
-        dialog.appendChild(body);
-
-        var actions = QSDom.el('div', { class: 'storage-modal-actions' });
-        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var confirmBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary storage-modal-actions__btn--danger', type: 'button', text: 'Delete key' }), 'deleteStorageItem');
-        actions.appendChild(confirmBtn);
-        dialog.appendChild(actions);
-
-        confirmBtn.addEventListener('click', async function () {
-            errPanel.hidden = true;
-            errPanel.textContent = '';
-            confirmBtn.disabled = true;
-            try {
+    /**
+     * A key's delete, asked first in the panel's one confirm: the question names the key, the red button says the
+     * verb, and a refusal stays in the dialog in the server's words. The list is drawn again before the dialog closes,
+     * so the focus goes to the next key's bin.
+     */
+    async function openDeleteConfirm(item) {
+        var deleted = await QuickSiteUtils.confirm(t('storage.dialogs.deleteKeyText'), {
+            title: t('storage.dialogs.deleteKey', { id: item.id }),
+            type: 'danger',
+            confirmText: t('storage.dialogs.delete'),
+            action: async function () {
                 var r = await api('deleteStorageItem', 'POST', { id: item.id });
-                if (!r || !r.ok) {
-                    errPanel.hidden = false;
-                    errPanel.textContent = (r && r.data && r.data.message) || 'Delete failed';
-                    confirmBtn.disabled = false;
-                    return;
-                }
-                closeModal();
+                if (!r || !r.ok) return { ok: false, message: _serverWords(r, t('storage.dialogs.deleteFailed')) };
                 await refresh();
-                if (scan.data) await runScan();
-            } catch (e) {
-                errPanel.hidden = false;
-                errPanel.textContent = (e && e.message) || 'Network error';
-                confirmBtn.disabled = false;
-            }
+                return true;
+            },
         });
+        if (deleted && scan.data) await runScan();
     }
 
     // ====================================================================
@@ -778,7 +746,7 @@
             var act = QSDom.el('div', { class: 'storage-scan-row__action' });
             var btn = _mark(QSDom.el('button', {
                 class: 'admin-btn admin-btn--primary',
-                type: 'button', text: 'Declare',
+                type: 'button', text: 'Declare', 'data-focus-key': 'declare:' + row.id,
             }), 'addStorageItem');
             btn.addEventListener('click', function () { declareIncomplete(row, btn); });
             act.appendChild(btn);
@@ -843,13 +811,7 @@
     function _renderScanHeader() {
         var h = QSDom.el('div', { class: 'storage-scan__header' });
         h.appendChild(QSDom.el('h2', { class: 'storage-scan__title', text: 'Scan results' }));
-        var dismiss = QSDom.el('button', {
-            class: 'admin-btn admin-btn--ghost storage-scan__dismiss',
-            type: 'button', 'aria-label': 'Dismiss scan results',
-            onclick: dismissScan,
-        });
-        dismiss.appendChild(_renderSvgIcon(ICON_X, 16));
-        h.appendChild(dismiss);
+        h.appendChild(QSControls.close(t('storage.scan.dismiss'), dismissScan));
         return h;
     }
 
@@ -863,6 +825,12 @@
     function renderScanPanel() {
         var root = document.getElementById('storage-scan-panel');
         if (!root) return;
+        var focusBack = root.contains(document.activeElement) ? QSDom.rememberFocus() : null;
+        _drawScanPanel(root);
+        if (focusBack) focusBack.restore();
+    }
+
+    function _drawScanPanel(root) {
         root.textContent = '';
 
         if (!scan.loading && !scan.error && !scan.data) {
@@ -959,14 +927,14 @@
     }
 
     async function openGenerateConsentModal() {
-        var dialog = _renderModalShell('Consent layer', closeModal);
-        if (!dialog) return;
+        var dialog = _renderModalShell('Consent layer');
         // All body content lives in one container we can clear + rebuild as the
         // state changes (after Generate / Update / Delete), so the modal always
         // reflects the real status (e.g. locks the route once a page exists).
         var content = QSDom.el('div', {});
         dialog.appendChild(content);
         content.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Loading…' }));
+        _showModal(dialog);
         await _refreshConsentContent(content, '');
     }
 
@@ -979,7 +947,13 @@
             status = (s && s.data && (s.data.data || s.data)) || {};
         } catch (e) { /* treat as fresh */ }
         if (!content.isConnected) return; // modal closed during the fetch
+        var dialog = content.closest('.storage-modal-dialog');
         _renderConsentContent(content, status, message);
+        // The content drawn again under the focus: it goes to its first control.
+        if (dialog && !dialog.contains(document.activeElement)) {
+            var first = QuickSiteUtils.focusables(content)[0];
+            if (first) first.focus();
+        }
     }
 
     /**
@@ -1061,12 +1035,13 @@
         content.appendChild(errBox);
 
         var actions = QSDom.el('div', { class: 'storage-modal-actions' });
-        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Close', onclick: closeModal }));
 
         if (hasPage) {
-            var delBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--ghost storage-modal-actions__btn--danger', type: 'button', text: 'Delete page' }), 'deleteCookiePolicy');
+            var delBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--danger', type: 'button', text: 'Delete page' }), 'deleteCookiePolicy');
             delBtn.addEventListener('click', async function () {
-                if (!(await QuickSiteUtils.confirm(t('storage.dialogs.deletePage', { route: status.policyRoute }), { type: 'danger' }))) return;
+                if (!(await QuickSiteUtils.confirm(t('storage.dialogs.deletePage', { route: status.policyRoute }), {
+                    type: 'danger', confirmText: t('storage.dialogs.delete'),
+                }))) return;
                 delBtn.disabled = true; errBox.hidden = true;
                 try {
                     var dr = await api('deleteCookiePolicy', 'POST', {});
@@ -1120,7 +1095,9 @@
                 var pr = await api('generateCookiePolicy', 'POST', opts.isUpdate ? { route: policyRoute, overwrite: true } : { route: policyRoute });
                 var pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
                 if (pr && !pr.ok && pd.needsConfirm) {
-                    if (await QuickSiteUtils.confirm(t('storage.dialogs.overwritePage', { route: policyRoute }), { type: 'danger' })) {
+                    if (await QuickSiteUtils.confirm(t('storage.dialogs.overwritePage', { route: policyRoute }), {
+                        type: 'danger', confirmText: t('storage.dialogs.overwrite'),
+                    })) {
                         pr = await api('generateCookiePolicy', 'POST', { route: policyRoute, overwrite: true });
                         pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
                     } else {

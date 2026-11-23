@@ -32,11 +32,11 @@
              Edit-Params flow can hide the whole tab strip in one go. -->
         <div class="preview-contextual-form__field" id="add-type-field">
             <div class="preview-contextual-form__tabs" id="add-type-tabs">
-                <button type="button" class="preview-contextual-form__tab active" data-type="snippet">
+                <button type="button" class="preview-contextual-form__tab active" data-type="tag">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+                        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
                     </svg>
-                    <span><?= __admin('preview.snippet') ?? 'Snippet' ?></span>
+                    <span><?= __admin('preview.htmlTag') ?? 'HTML Tag' ?></span>
                 </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="component">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -44,6 +44,12 @@
                         <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
                     </svg>
                     <span><?= __admin('preview.component') ?? 'Component' ?></span>
+                </button>
+                <button type="button" class="preview-contextual-form__tab" data-type="snippet">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
+                    </svg>
+                    <span><?= __admin('preview.snippet') ?? 'Snippet' ?></span>
                 </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="complex">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -54,12 +60,6 @@
                     </svg>
                     <span><?= __admin('preview.complex', 'Complex') ?></span>
                 </button>
-                <button type="button" class="preview-contextual-form__tab" data-type="tag">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
-                    </svg>
-                    <span><?= __admin('preview.htmlTag') ?? 'HTML Tag' ?></span>
-                </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="text">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="4 7 4 4 20 4 20 7"/>
@@ -69,7 +69,7 @@
                     <span><?= __admin('preview.textTab') ?? 'Text' ?></span>
                 </button>
             </div>
-            <input type="hidden" id="add-type-input" value="snippet">
+            <input type="hidden" id="add-type-input" value="tag">
         </div>
 
         <!-- The simple Add: in simple mode, a beginner's list in place of the tabs above -->

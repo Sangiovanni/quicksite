@@ -65,7 +65,6 @@
     // Animation Preview Modal elements
     let animationPreviewModal = null;
     let animationPreviewCloseBtn = null;
-    let animationPreviewDoneBtn = null;
     let animationPreviewPlayBtn = null;
     let animationPreviewName = null;
     let animationPreviewStage = null;
@@ -140,7 +139,6 @@
         // Animation Preview Modal
         animationPreviewModal = document.getElementById('animation-preview-modal');
         animationPreviewCloseBtn = document.getElementById('animation-preview-close');
-        animationPreviewDoneBtn = document.getElementById('animation-preview-done');
         animationPreviewPlayBtn = document.getElementById('animation-preview-play');
         animationPreviewName = document.getElementById('animation-preview-name');
         animationPreviewStage = document.getElementById('animation-preview-stage');
@@ -258,20 +256,31 @@
         keyframesList.replaceChildren(...keyframesData.map(kf => _renderKeyframeItem(kf, usersMap[kf.name] || [])));
     }
 
-    /** One keyframe row: its name, frame count and "used by" badge, its four actions, the selectors using it. */
+    /**
+     * One keyframe row: its name, frame count and "used by" badge, its actions (preview, apply, its pencil and
+     * its bin), the selectors using it.
+     */
     function _renderKeyframeItem(kf, users) {
         const i18n = PreviewConfig.i18n;
+        const name = kf.name || '';
+        const named = (word, fallback) => (i18n[word] || fallback).replace('{name}', () => name);
         const info = QSDom.el('div', { class: 'preview-keyframe-item__info' }, [
-            QSDom.el('span', { class: 'preview-keyframe-item__name', text: '@keyframes ' + (kf.name || '') }),
+            QSDom.el('span', { class: 'preview-keyframe-item__name', text: '@keyframes ' + name }),
             QSDom.el('span', { class: 'preview-keyframe-item__frames', text: kf.frameCount + ' ' + (kf.frameCount === 1 ? i18n.frame : i18n.frames) })
         ]);
-        const item = QSDom.el('div', { class: 'preview-keyframe-item', dataset: { keyframe: kf.name || '' } }, [
+        const item = QSDom.el('div', { class: 'preview-keyframe-item', dataset: { keyframe: name } }, [
             info,
             QSDom.el('div', { class: 'preview-keyframe-item__actions' }, [
                 _renderKeyframeAction(kf.name, 'preview', i18n.previewAnimation, _icon(QuickSiteUtils.ICON_PATHS.play, 14)),
                 _renderKeyframeAction(kf.name, 'apply', i18n.applyKeyframeToSelector || 'Apply to selector…', _icon(ICON_APPLY, 14, 'round-join')),
-                _renderKeyframeAction(kf.name, 'edit', i18n.edit, _icon(QuickSiteUtils.ICON_PATHS.edit)),
-                _renderKeyframeAction(kf.name, 'delete', i18n.delete, _icon(QuickSiteUtils.ICON_PATHS.trash))
+                QSControls.edit(named('editNamed', 'Edit “{name}”'), (e) => {
+                    e.stopPropagation();
+                    if (name) editKeyframe(name);
+                }, { className: 'preview-keyframe-item__btn--edit', focusKey: 'keyframe-edit:' + name, attrs: { 'data-action': 'edit' } }),
+                QSControls.bin(named('deleteNamed', 'Delete “{name}”'), (e) => {
+                    e.stopPropagation();
+                    if (name) deleteKeyframe(name);
+                }, { focusKey: 'keyframe-delete:' + name, attrs: { 'data-action': 'delete' } })
             ])
         ]);
         if (users.length > 0) {
@@ -297,7 +306,7 @@
         return item;
     }
 
-    /** One of a keyframe row's action buttons: preview, apply, edit, delete. */
+    /** A keyframe row's preview or apply button (its pencil and its bin are QSControls'). */
     function _renderKeyframeAction(keyframeName, action, title, icon) {
         return QSDom.el('button', {
             type: 'button',
@@ -307,40 +316,24 @@
             onclick: (e) => {
                 e.stopPropagation();
                 if (!keyframeName) return;
-                switch (action) {
-                    case 'preview':
-                        previewKeyframe(keyframeName);
-                        break;
-                    case 'apply':
-                        applyKeyframeToSelector(keyframeName);
-                        break;
-                    case 'edit':
-                        editKeyframe(keyframeName);
-                        break;
-                    case 'delete':
-                        deleteKeyframe(keyframeName);
-                        break;
-                }
+                if (action === 'preview') previewKeyframe(keyframeName);
+                else if (action === 'apply') applyKeyframeToSelector(keyframeName);
             }
         }, [icon]);
     }
 
-    /** A selector using a keyframe; its ✕ removes the animation from that selector (setStyleRule + removeProperties). */
+    /**
+     * A selector using a keyframe; its bin removes the animation from that selector, after asking
+     * (removeKeyframeFromSelector: setStyleRule + removeProperties).
+     */
     function _renderKeyframeUser(keyframeName, selector) {
         return QSDom.el('div', { class: 'preview-keyframe-item__user' }, [
             QSDom.el('code', { text: selector }),
-            QSDom.el('button', {
-                type: 'button',
-                class: 'preview-keyframe-item__user-remove',
-                'data-action': 'remove-user',
-                'data-target': selector,
-                title: PreviewConfig.i18n.keyframeRemoveFromSelector || 'Remove animation from this selector',
-                onclick: (e) => {
-                    e.stopPropagation();
-                    if (!keyframeName || !selector) return;
-                    removeKeyframeFromSelector(keyframeName, selector);
-                }
-            }, [_icon(QuickSiteUtils.ICON_PATHS.close, 12, 'round')])
+            QSControls.bin(PreviewConfig.i18n.keyframeRemoveFromSelector || 'Remove animation from this selector', (e) => {
+                e.stopPropagation();
+                if (!keyframeName || !selector) return;
+                removeKeyframeFromSelector(keyframeName, selector);
+            }, { focusKey: 'keyframe-user:' + keyframeName + '|' + selector, attrs: { 'data-action': 'remove-user', 'data-target': selector } })
         ]);
     }
 
@@ -696,10 +689,7 @@
         if (animationPreviewCloseBtn) {
             animationPreviewCloseBtn.addEventListener('click', closeAnimationPreview);
         }
-        if (animationPreviewDoneBtn) {
-            animationPreviewDoneBtn.addEventListener('click', closeAnimationPreview);
-        }
-        
+
         const backdrop = animationPreviewModal?.querySelector('.preview-keyframe-modal__backdrop');
         if (backdrop) {
             backdrop.addEventListener('click', closeAnimationPreview);
@@ -1092,7 +1082,7 @@
 
     /**
      * A frame's header: its position in percent (any decimal CSS accepts: `12.5%`) and, when
-     * there is more than one frame, its delete button. A click elsewhere on it selects the frame.
+     * there is more than one frame, its ×. A click elsewhere on it selects the frame.
      *
      * The field's `min` of 0 is set on a whole-number position only: a browser that moves a
      * `step="any"` field by 1 with its arrows aligns the result to the step base, which is `min`
@@ -1135,15 +1125,11 @@
         }
         const actions = QSDom.el('div', { class: 'preview-keyframe-modal__frame-actions' });
         if (keyframeFrames.length > 1) {
-            actions.appendChild(QSDom.el('button', {
-                type: 'button',
-                class: 'preview-keyframe-modal__delete-frame',
-                title: PreviewConfig.i18n.deleteFrame,
-                onclick: (e) => {
-                    e.stopPropagation();
-                    deleteKeyframeFrame(frame.percent);
-                }
-            }, [_icon(QuickSiteUtils.ICON_PATHS.trash)]));
+            // The frame leaves the form: nothing is written until Save
+            actions.appendChild(QSControls.removeRow(PreviewConfig.i18n.deleteFrame, (e) => {
+                e.stopPropagation();
+                deleteKeyframeFrame(frame.percent);
+            }));
         }
         return QSDom.el('div', {
             class: 'preview-keyframe-modal__frame-header',
@@ -1161,7 +1147,7 @@
         ]);
     }
 
-    /** One property of a frame: a common property or a custom name, its value, its delete button. */
+    /** One property of a frame: a common property or a custom name, its value, its ×. */
     function _renderFrameProperty(commonProperties, prop, frameIndex, propIndex) {
         const isCommonProp = commonProperties.includes(prop.property);
         const index = { 'data-frame': String(frameIndex), 'data-prop': String(propIndex) };
@@ -1207,12 +1193,8 @@
             QSDom.el('div', { class: 'preview-keyframe-modal__property-name-group' }, [propSelect, nameInput]),
             QSDom.el('span', { class: 'preview-keyframe-modal__property-colon', text: ':' }),
             valueInput,
-            QSDom.el('button', {
-                type: 'button',
-                class: 'preview-keyframe-modal__delete-property',
-                title: PreviewConfig.i18n.deleteKeyframeProperty,
-                onclick: () => deleteKeyframeProperty(frameIndex, propIndex)
-            }, [_icon(QuickSiteUtils.ICON_PATHS.close, 12)])
+            QSControls.removeRow(PreviewConfig.i18n.deleteKeyframeProperty, () => deleteKeyframeProperty(frameIndex, propIndex),
+                { className: 'preview-keyframe-modal__delete-property' })
         ]);
     }
 
@@ -1390,6 +1372,19 @@
         }
     }
     
+    /**
+     * The question before a save replaces the keyframe of the same name: its title names the keyframe,
+     * its red button says Replace.
+     */
+    function _askReplaceKeyframe(name) {
+        const i18n = PreviewConfig.i18n;
+        return QuickSiteUtils.confirm(i18n.keyframeExistsConfirm, {
+            title: (i18n.keyframeReplaceTitle || 'Replace the keyframe “{name}”?').replace('{name}', () => name),
+            type: 'danger',
+            confirmText: i18n.keyframeReplace || 'Replace'
+        });
+    }
+
     async function saveKeyframe() {
         const name = keyframeNameInput.value.trim();
         
@@ -1410,10 +1405,7 @@
         if (keyframeEditorMode === 'create') {
             const existingKeyframe = keyframesData.find(kf => kf.name === name);
             if (existingKeyframe) {
-                const confirmOverwrite = await QuickSiteUtils.confirm(
-                    PreviewConfig.i18n.keyframeExistsConfirm +
-                    `\n\n@keyframes ${name}`, { type: 'danger' }
-                );
+                const confirmOverwrite = await _askReplaceKeyframe(name);
                 if (!confirmOverwrite) {
                     keyframeNameInput.focus();
                     keyframeNameInput.select();
@@ -1454,10 +1446,7 @@
             const data = response.data || {};
             
             if (data.status === 409) {
-                const confirmOverwrite = await QuickSiteUtils.confirm(
-                    PreviewConfig.i18n.keyframeExistsConfirm +
-                    `\n\n@keyframes ${name}`, { type: 'danger' }
-                );
+                const confirmOverwrite = await _askReplaceKeyframe(name);
                 if (confirmOverwrite) {
                     const retryResponse = await QuickSiteAdmin.apiRequest('setKeyframes', 'POST', {
                         name: name,
@@ -1503,7 +1492,11 @@
     }
     
     async function deleteKeyframe(keyframeName) {
-        if (!(await QuickSiteUtils.confirm(PreviewConfig.i18n.confirmDeleteKeyframe + `\n\n@keyframes ${keyframeName}`, { type: 'danger' }))) {
+        if (!(await QuickSiteUtils.confirm('', {
+            title: (PreviewConfig.i18n.keyframeDeleteTitle || 'Delete the keyframe “{name}”?').replace('{name}', () => keyframeName),
+            type: 'danger',
+            confirmText: PreviewConfig.i18n.delete || 'Delete'
+        }))) {
             return;
         }
         
@@ -1767,7 +1760,11 @@
     async function removeKeyframeFromSelector(keyframeName, selector) {
         const i18n = PreviewConfig.i18n || {};
         const confirmTpl = i18n.keyframeRemoveConfirm || 'Remove animation from {selector}?';
-        if (!(await QuickSiteUtils.confirm(confirmTpl.replace('{selector}', selector), { type: 'danger' }))) return;
+        if (!(await QuickSiteUtils.confirm('', {
+            title: confirmTpl.replace('{selector}', () => selector),
+            type: 'danger',
+            confirmText: i18n.remove || 'Remove'
+        }))) return;
 
         try {
             // Empty styles + removeProperties:['animation'] tells setStyleRule

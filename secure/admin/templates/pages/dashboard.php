@@ -83,12 +83,8 @@ if (isset($_GET['denied'])): ?>
         </button>
 
         <!-- Rename Project: renameProject is owner-only. -->
-        <button type="button" id="btn-rename-project" data-requires-command="renameProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.renameTooltip') ?>" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <?= __admin('dashboard.projects.rename') ?>
-        </button>
+        <button type="button" id="btn-rename-project" data-requires-command="renameProject" class="admin-btn admin-btn--ghost admin-action admin-action--edit" data-qs-icon="edit"
+                title="<?= adminAttr(__admin('dashboard.projects.renameTooltip')) ?>" aria-label="<?= adminAttr(__admin('dashboard.projects.renameTooltip')) ?>" disabled></button>
 
         <!-- Backup/Restore Group -->
         <div class="dashboard-current__divider" data-requires-command="backupProject"></div>
@@ -334,7 +330,7 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('dashboard.projects.restoreTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+            <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div id="backup-list-container">
@@ -344,57 +340,35 @@ if (isset($_GET['denied'])): ?>
                 </div>
             </div>
         </div>
-        <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.close') ?></button>
-        </div>
     </div>
 </div>
 
-<!-- Restore Confirmation Modal -->
-<div id="modal-restore-confirm" class="admin-modal" style="display: none;">
-    <div class="admin-modal__backdrop"></div>
-    <div class="admin-modal__content">
-        <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.confirmRestore') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
-        </div>
-        <div class="admin-modal__body">
-            <p style="margin-bottom: var(--space-md);">
-                <?= __admin('dashboard.projects.restoreFrom') ?>: <strong id="restore-backup-name"></strong>
-            </p>
-            
-            <div class="admin-alert admin-alert--warning" style="margin-bottom: var(--space-md);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-                <div>
-                    <strong><?= __admin('dashboard.projects.restoreWarningTitle') ?></strong>
-                    <p id="restore-warning-text" style="margin: 0.25rem 0 0 0; font-size: 0.875rem;"></p>
-                </div>
+<!--
+  What Restore asks, shown in the panel's one confirm (dashboard.js clones it into its body).
+-->
+<template id="dashboard-restore-body">
+    <div class="dashboard-restore">
+        <p><?= __admin('dashboard.projects.restoreFrom') ?>: <strong id="restore-backup-name"></strong></p>
+        <div class="admin-alert admin-alert--warning">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div>
+                <strong><?= __admin('dashboard.projects.restoreWarningTitle') ?></strong>
+                <p id="restore-warning-text" class="dashboard-restore__warning"></p>
             </div>
-            
-            <label class="admin-checkbox-group" style="cursor: pointer;">
-                <input type="checkbox" id="restore-create-backup" class="admin-checkbox">
-                <span class="admin-checkbox-label"><?= __admin('dashboard.projects.createBackupBeforeRestore') ?></span>
-            </label>
-            <label class="admin-checkbox-group" style="cursor: pointer;">
-                <input type="checkbox" id="restore-delete-backup" class="admin-checkbox">
-                <span class="admin-checkbox-label"><?= __admin('dashboard.projects.deleteBackupAfterRestore') ?></span>
-            </label>
         </div>
-        <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
-            <button type="button" id="btn-confirm-restore" class="admin-btn admin-btn--primary">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                    <path d="M3 3v5h5"/>
-                </svg>
-                <?= __admin('dashboard.projects.restoreBtn') ?>
-            </button>
-        </div>
+        <label class="admin-checkbox-group dashboard-restore__choice">
+            <input type="checkbox" id="restore-create-backup" class="admin-checkbox">
+            <span class="admin-checkbox-label"><?= __admin('dashboard.projects.createBackupBeforeRestore') ?></span>
+        </label>
+        <label class="admin-checkbox-group dashboard-restore__choice">
+            <input type="checkbox" id="restore-delete-backup" class="admin-checkbox">
+            <span class="admin-checkbox-label"><?= __admin('dashboard.projects.deleteBackupAfterRestore') ?></span>
+        </label>
     </div>
-</div>
+</template>
 
 <!-- Create Project Modal -->
 <div id="modal-create-project" class="admin-modal" style="display: none;">
@@ -402,7 +376,7 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('dashboard.projects.createTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+            <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div class="admin-form-group">
@@ -439,7 +413,7 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('dashboard.projects.cloneTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+            <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);">
@@ -477,7 +451,7 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('dashboard.projects.exportTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+            <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div class="admin-form-group">
@@ -517,7 +491,7 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('dashboard.projects.importTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+            <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);">
@@ -549,7 +523,7 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('dashboard.projects.renameTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+            <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);"><strong id="rename-project-current"></strong></p>

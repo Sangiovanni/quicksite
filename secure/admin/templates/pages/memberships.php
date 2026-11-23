@@ -79,9 +79,15 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'acceptedMsg'        => __admin('memberships.inbox.acceptedMsg', 'Invitation accepted — welcome aboard'),
     'acceptedOpenedMsg'  => __admin('memberships.inbox.acceptedOpenedMsg'),
     'declinedMsg'        => __admin('memberships.inbox.declinedMsg', 'Invitation declined'),
+    'declineTitle'       => __admin('memberships.inbox.declineTitle'),
     'requestsEmpty'      => __admin('memberships.requests.empty', 'No pending join requests.'),
     'withdraw'           => __admin('memberships.requests.withdraw', 'Withdraw'),
     'withdrawnMsg'       => __admin('memberships.requests.withdrawnMsg', 'Request withdrawn'),
+    'withdrawRequestOf'  => __admin('memberships.requests.withdrawOf'),
+    'withdrawRequestTitle' => __admin('memberships.requests.withdrawTitle'),
+    'withdrawText'       => __admin('memberships.requests.withdrawText'),
+    'withdrawProposalOf' => __admin('memberships.proposals.withdrawOf'),
+    'withdrawProposalTitle' => __admin('memberships.proposals.withdrawTitle'),
     'proposalsEmpty'     => __admin('memberships.proposals.empty', 'No outgoing proposals.'),
     'proposalFor'        => __admin('memberships.proposals.for', 'for'),
     'pendingValidation'  => __admin('memberships.proposals.pendingValidation', 'awaiting validation'),
@@ -190,5 +196,3 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
         </div>
     </div>
 </section>
-
-<div id="memberships-modal-root"></div>

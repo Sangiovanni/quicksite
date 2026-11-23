@@ -474,17 +474,11 @@
         
         row.appendChild(valueContainer);
         
-        // Delete button
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'preview-style-property__delete';
-        deleteBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
-        deleteBtn.title = PreviewConfig.i18n.delete;
-        deleteBtn.addEventListener('click', () => {
+        // The row's ×: the property leaves the form, removed from the rule on Save (deletedProperties)
+        row.appendChild(QSControls.removeRow(PreviewConfig.i18n.remove, () => {
             deleteProperty(row.dataset.property, isNew);
-        });
-        row.appendChild(deleteBtn);
-        
+        }, { className: 'preview-style-property__delete' }));
+
         styleEditorProperties.appendChild(row);
     }
     

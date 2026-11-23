@@ -115,13 +115,8 @@ $selectorId = $selectorId ?? 'add';
         </div><!-- End snippet-selector__css-status -->
         <!-- Actions for non-core snippets -->
         <div class="snippet-selector__preview-actions" id="<?= $selectorId ?>-snippet-preview-actions" style="display: none;">
-            <button type="button" class="admin-btn admin-btn--danger" id="delete-snippet-btn">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
-                </svg>
-                <?= __admin('preview.deleteSnippet', 'Delete Snippet') ?>
-            </button>
+            <button type="button" class="admin-btn admin-btn--ghost admin-action admin-action--delete" id="delete-snippet-btn" data-qs-icon="trash"
+                    title="<?= adminAttr(__admin('preview.deleteSnippet', 'Delete Snippet')) ?>" aria-label="<?= adminAttr(__admin('preview.deleteSnippet', 'Delete Snippet')) ?>"></button>
         </div>
     </div>
 </div>

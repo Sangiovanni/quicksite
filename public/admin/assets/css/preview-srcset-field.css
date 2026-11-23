@@ -63,7 +63,7 @@
 .preview-srcset-field [hidden] {
     display: none;
 }
-/* An <img>'s field closes with an × at its top right: room kept for it */
+/* An <img>'s field closes with an × at its top right (the panel's, admin-modal__close): room kept for it */
 .preview-srcset-field--closable {
     padding-right: calc(var(--space-sm) + 1.75rem);
 }
@@ -71,17 +71,6 @@
     position: absolute;
     top: var(--space-xs);
     right: var(--space-xs);
-    display: inline-flex;
-    padding: 4px;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--admin-text-muted);
-    cursor: pointer;
-}
-.preview-srcset-field__close:hover {
-    background: var(--admin-surface-hover);
-    color: var(--admin-text);
 }
 
 /* The kind, and a group's choice above the field: plain choices, side by side where they fit */

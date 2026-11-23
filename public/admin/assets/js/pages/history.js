@@ -40,7 +40,9 @@
     let filterDate, filterCommand, filterStatus;
     let historyContent, pagination, pageInfo, prevBtn, nextBtn;
     let detailModal, detailContent;
-    let clearModal, clearBefore, clearPreview, clearConfirmBtn;
+    // The Clear question's date and preview, while it is open; setClearReady allows its Delete (onOpen).
+    let clearBefore, clearPreview;
+    let setClearReady = () => {};
 
     /**
      * Dotted-path lookup over the page's own i18n bundle, then the layout's
@@ -441,21 +443,39 @@
     // =======================================================================
     // Clear — destructive, so preview first
     // =======================================================================
-    function openClear() {
+    /**
+     * Clear asks in the panel's one confirm: the date and what it would delete in its body (the template's), its
+     * Delete disabled until the preview has come back, and a refusal kept in the question in the server's words.
+     */
+    async function openClear() {
+        const template = document.getElementById('history-clear-body');
+        if (!template) return;
+        const body = template.content.firstElementChild.cloneNode(true);
+        clearBefore = body.querySelector('#clear-before');
+        clearPreview = body.querySelector('#clear-preview');
         // Default to today: the command deletes strictly BEFORE this date, so
         // today's own entries are kept and the common case ("clear the backlog,
         // keep what I am working on") is one click.
         clearBefore.value = new Date().toISOString().split('T')[0];
-        clearConfirmBtn.disabled = true;
-        clearModal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
-        previewClear();
-    }
-
-    function closeClear() {
-        if (!clearModal) return;
-        clearModal.style.display = 'none';
-        document.body.style.overflow = '';
+        clearBefore.addEventListener('change', previewClear);
+        const cleared = await QuickSiteUtils.confirm('', {
+            title: t('history.clear.title', 'Delete this project\'s command history?'),
+            type: 'danger',
+            confirmText: t('history.clear.confirmButton', 'Delete permanently'),
+            body: body,
+            focus: clearBefore,
+            onOpen: (dialog) => {
+                setClearReady = dialog.setReady;
+                setClearReady(false);
+                previewClear();
+            },
+            action: doClear
+        });
+        setClearReady = () => {};
+        if (!cleared) return;
+        QuickSiteAdmin.showToast(t('history.clear.done', 'Command history cleared'), 'success');
+        currentPage = 1;
+        loadHistory();
     }
 
     function setPreviewText(text, variant) {
@@ -472,7 +492,7 @@
      */
     async function previewClear() {
         const before = clearBefore.value;
-        clearConfirmBtn.disabled = true;
+        setClearReady(false);
         if (!before) {
             setPreviewText(t('history.clear.pickDate', 'Choose a date to see what would be deleted.'), 'info');
             return;
@@ -485,7 +505,7 @@
             const data = result.data?.data;
             const d = data?.would_delete;
             if (!result.ok || !d) {
-                setPreviewText(result.data?.message || 'Could not read what would be deleted.', 'warning');
+                setPreviewText(result.data?.message || t('history.clear.previewFailed', 'Could not read what would be deleted.'), 'warning');
                 return;
             }
             if (!d.files) {
@@ -499,11 +519,10 @@
                 renderNothingToDelete(data?.stored_days || []);
                 return;
             }
-            setPreviewText(
-                d.entries + ' entries in ' + d.files + ' day(s), ' + d.size_kb + ' KB '
-                + 'will be permanently deleted.', 'warning'
-            );
-            clearConfirmBtn.disabled = false;
+            setPreviewText(t('history.clear.preview', ':entries entries in :days day(s), :size KB will be permanently deleted.')
+                .split(':entries').join(String(d.entries)).split(':days').join(String(d.files))
+                .split(':size').join(String(d.size_kb)), 'warning');
+            setClearReady(true);
         } catch (e) {
             setPreviewText(String(e.message || e), 'error');
         }
@@ -540,29 +559,15 @@
         }));
     }
 
+    /** The Clear question's action: the delete itself, or the server's words kept in the question. */
     async function doClear() {
         const before = clearBefore.value;
-        if (!before) return;
-        clearConfirmBtn.disabled = true;
-        try {
-            const result = await QuickSiteAdmin.apiRequest(
-                'clearCommandHistory', 'POST', { before: before, confirm: true }
-            );
-            if (result.ok) {
-                QuickSiteAdmin.showToast(
-                    t('history.clear.done', 'Command history cleared'), 'success'
-                );
-                closeClear();
-                currentPage = 1;
-                loadHistory();
-            } else {
-                setPreviewText(result.data?.message || 'Clear failed.', 'error');
-                clearConfirmBtn.disabled = false;
-            }
-        } catch (e) {
-            setPreviewText(String(e.message || e), 'error');
-            clearConfirmBtn.disabled = false;
-        }
+        if (!before) return { ok: false, message: t('history.clear.pickDate', 'Choose a date to see what would be deleted.') };
+        const result = await QuickSiteAdmin.apiRequest(
+            'clearCommandHistory', 'POST', { before: before, confirm: true }
+        );
+        if (result.ok) return true;
+        return { ok: false, message: result.data?.message || t('history.clear.failed', 'The history could not be deleted.') };
     }
 
     // =======================================================================
@@ -579,10 +584,6 @@
         nextBtn = document.getElementById('next-page');
         detailModal = document.getElementById('detail-modal');
         detailContent = document.getElementById('detail-content');
-        clearModal = document.getElementById('clear-modal');
-        clearBefore = document.getElementById('clear-before');
-        clearPreview = document.getElementById('clear-preview');
-        clearConfirmBtn = document.getElementById('clear-confirm');
 
         if (!historyContent) return;   // not this page
 
@@ -607,15 +608,13 @@
         prevBtn?.addEventListener('click', () => changePage(-1));
         nextBtn?.addEventListener('click', () => changePage(1));
 
-        clearBefore?.addEventListener('change', previewClear);
-        clearConfirmBtn?.addEventListener('click', doClear);
 
         filterCommand?.addEventListener('keypress', e => {
             if (e.key === 'Enter') { currentPage = 1; loadHistory(); }
         });
 
         document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') { closeDetail(); closeClear(); }
+            if (e.key === 'Escape') closeDetail();
         });
 
         historyContent.addEventListener('click', e => {
@@ -625,8 +624,6 @@
 
         document.querySelectorAll('[data-action="close-detail"]')
             .forEach(n => n.addEventListener('click', closeDetail));
-        document.querySelectorAll('[data-action="close-clear"]')
-            .forEach(n => n.addEventListener('click', closeClear));
 
         loadHistory();
     }

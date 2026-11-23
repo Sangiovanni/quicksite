@@ -5,7 +5,7 @@
  * Translation Manager panel: per-language view, scope filter (whole site /
  * page / layout / component / the site's own texts), status chips (used /
  * unset / unused), substring filter, inline value editor, delete +
- * bulk-remove-unused.
+ * bulk-remove-unused (each delete asked in the panel's one confirm).
  *
  * Activation surface: sidebar "Translations" tool → setMode('translation')
  * in preview.js shows #contextual-translation and calls
@@ -38,21 +38,9 @@ window.PreviewTranslation = (function () {
     var _currentScope = 'site';   // 'site' | 'page:<name>' | 'component:<name>'
     var _statusFilter = { used: true, unset: true, unused: true };
     var _substringFilter = '';
-    var _expandedKey = null;   // which row currently has an expanded panel
-    var _expandedMode = null;  // 'edit' | 'delete' — what kind of panel
-    var _busyKey = null;       // key whose row action (save/delete) is in flight
-    var _actionError = null;   // { key, message } for the active row action
-
-    // Bulk remove-unused confirm state.
-    var _bulkConfirm = false;  // true → confirm view replaces row list
-    var _bulkBusy = false;     // delete in flight
-    var _bulkError = null;     // string | null
-
-    // Multi-language delete checkbox state. Reset on each panel open.
-    // Per-row default OFF (you're usually editing one language's value).
-    // Bulk default ON (orphaned keys are orphaned everywhere).
-    var _deleteAllLangs = false;
-    var _bulkDeleteAllLangs = true;
+    var _expandedKey = null;   // the row whose inline editor is open (one at a time)
+    var _busyKey = null;       // key whose save is in flight
+    var _actionError = null;   // { key, message } for the open editor's refused save
     var _entered = false;      // set by the first enter(): only that one shows the loading state
     var _loadSeq = 0;          // the latest load; an older load's answer is dropped
     var _active = false;       // between enter() and leave(): a change announced redraws the panel
@@ -132,7 +120,7 @@ window.PreviewTranslation = (function () {
         if (window.QSSiteWords) {
             window.addEventListener(QSSiteWords.EVENT, function () {
                 if (!_active) return;
-                if (_busyKey || _bulkBusy || (_expandedKey && _expandedMode === 'edit')) {
+                if (_busyKey || _expandedKey) {
                     _pendingReload = true;
                     return;
                 }
@@ -182,7 +170,6 @@ window.PreviewTranslation = (function () {
         _currentLang = code;
         if (_langSelect) _langSelect.value = code;
         _expandedKey = null;
-        _expandedMode = null;
         _actionError = null;
         _applyLanguage();
     }
@@ -389,10 +376,7 @@ window.PreviewTranslation = (function () {
         }
         _showLoading(false);
         _showEmpty(false);
-        // Also disable while bulk confirm is open or bulk delete is in flight.
-        if (_removeUnusedBtn) {
-            _removeUnusedBtn.disabled = siteUnusedCount === 0 || _bulkConfirm || _bulkBusy;
-        }
+        if (_removeUnusedBtn) _removeUnusedBtn.disabled = siteUnusedCount === 0;
 
         _renderRows();
     }
@@ -432,12 +416,6 @@ window.PreviewTranslation = (function () {
         if (!_rowsContainer) return;
         _rowsContainer.textContent = '';
 
-        // Bulk-confirm view replaces the row list entirely.
-        if (_bulkConfirm) {
-            _rowsContainer.appendChild(_renderBulkConfirm());
-            return;
-        }
-
         var entries = _buildEntries();
         var filtered = _applyFilters(entries);
 
@@ -454,19 +432,13 @@ window.PreviewTranslation = (function () {
         var frag = document.createDocumentFragment();
         filtered.forEach(function (entry) {
             frag.appendChild(_renderRow(entry));
-            // Expanded panel for the currently-active row.
-            if (entry.key === _expandedKey) {
-                if (_expandedMode === 'delete') {
-                    frag.appendChild(_renderDeleteConfirm(entry));
-                } else {
-                    frag.appendChild(_renderEditor(entry));
-                }
-            }
+            // The open editor, under its row.
+            if (entry.key === _expandedKey) frag.appendChild(_renderEditor(entry));
         });
         _rowsContainer.appendChild(frag);
 
-        // Auto-focus the textarea when an editor was just rendered (edit mode only).
-        if (_expandedKey && _expandedMode === 'edit') {
+        // Auto-focus the textarea when an editor was just rendered.
+        if (_expandedKey) {
             var ta = _rowsContainer.querySelector('.preview-contextual-translation__row-editor-textarea');
             if (ta) {
                 ta.focus();
@@ -543,17 +515,15 @@ window.PreviewTranslation = (function () {
 
     var _STATUS_DOTS = { used: '🟢', unset: '🔴', unused: '🟡' };
 
-    // The row actions' own icons, inner SVG markup for QSDom.iconEl ("set value" is the
-    // catalogue's plus). Their size, stroke and fill come from the panel's CSS, one rule
-    // for all three.
+    // The row edit's own icon, inner SVG markup for QSDom.iconEl ("set value" is the
+    // catalogue's plus). Its size, stroke and fill come from the panel's CSS.
     var _ICON_EDIT = '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>';
-    var _ICON_DELETE = '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>';
 
-    function _renderActionButton(label, iconMarkup, modifier, onClick) {
+    /** The row's own edit button (edit, or set a value). Returns ONE Element. */
+    function _renderActionButton(label, iconMarkup, onClick) {
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'preview-contextual-translation__row-action'
-            + (modifier ? ' preview-contextual-translation__row-action--' + modifier : '');
+        btn.className = 'preview-contextual-translation__row-action';
         btn.setAttribute('aria-label', label);
         btn.title = label;
         btn.appendChild(QSDom.iconEl(iconMarkup, 0));
@@ -605,21 +575,16 @@ window.PreviewTranslation = (function () {
                 && PreviewConfig.i18n.translationActionSetValue) || 'Set value')
             : ((window.PreviewConfig && PreviewConfig.i18n
                 && PreviewConfig.i18n.translationActionEdit) || 'Edit');
-        var deleteLabel = (window.PreviewConfig && PreviewConfig.i18n
-            && PreviewConfig.i18n.translationActionDelete) || 'Delete';
+        var deleteLabel = ((window.PreviewConfig && PreviewConfig.i18n
+            && PreviewConfig.i18n.translationDeleteKey) || 'Delete {key}').split('{key}').join(entry.key);
 
         actions.appendChild(_renderActionButton(
             editLabel,
             entry.status === 'unset' ? QuickSiteUtils.ICON_PATHS.plus : _ICON_EDIT,
-            null,
             function () { _handleEditKey(entry.key); }
         ));
-        actions.appendChild(_renderActionButton(
-            deleteLabel,
-            _ICON_DELETE,
-            'danger',
-            function () { _handleDeleteKey(entry.key); }
-        ));
+        actions.appendChild(window.QSControls.bin(deleteLabel, function () { _handleDeleteKey(entry); },
+            { focusKey: 'translation-delete:' + entry.key }));
 
         row.appendChild(actions);
         return row;
@@ -631,29 +596,8 @@ window.PreviewTranslation = (function () {
     }
 
     function _handleEditKey(key) {
-        // Toggle: clicking Edit on the already-open edit row closes it.
-        // Clicking it on a row that's open for delete switches to edit.
-        if (_expandedKey === key && _expandedMode === 'edit') {
-            _expandedKey = null;
-            _expandedMode = null;
-        } else {
-            _expandedKey = key;
-            _expandedMode = 'edit';
-        }
-        _actionError = null;
-        _renderRows();
-    }
-
-    function _handleDeleteKey(key) {
-        // Toggle: clicking Delete on the already-open delete row closes it.
-        if (_expandedKey === key && _expandedMode === 'delete') {
-            _expandedKey = null;
-            _expandedMode = null;
-        } else {
-            _expandedKey = key;
-            _expandedMode = 'delete';
-            _deleteAllLangs = false;  // Reset per-open: per-row defaults OFF.
-        }
+        // Toggle: clicking Edit on the row whose editor is open closes it; on another row, opens that one's.
+        _expandedKey = _expandedKey === key ? null : key;
         _actionError = null;
         _renderRows();
     }
@@ -727,7 +671,6 @@ window.PreviewTranslation = (function () {
 
     function _handleCancelEdit() {
         _expandedKey = null;
-        _expandedMode = null;
         _actionError = null;
         if (_pendingReload) {
             _pendingReload = false;
@@ -761,7 +704,6 @@ window.PreviewTranslation = (function () {
 
         _busyKey = null;
         _expandedKey = null;
-        _expandedMode = null;
         _pendingReload = false;
         await _load(true);
         _reloadPreviewIframe();
@@ -777,82 +719,79 @@ window.PreviewTranslation = (function () {
     // ──────────────────────────── Delete flows ──────────────────────────
 
     /**
-     * Inline delete-confirm panel for a single row. Mirrors the editor
-     * mechanism (sibling element after the row) but with a short prompt
-     * + [Cancel] [Delete] instead of a textarea.
+     * A row's delete, asked in the panel's one confirm: the key and the language in the title, the word it holds as
+     * the message (a key the person may never have seen on a page), and with several languages the choice of deleting
+     * it from all of them (off by default: a word is usually edited in one language). The delete runs with the
+     * question open (_deleteAndReload()).
      */
-    function _renderDeleteConfirm(entry) {
+    function _handleDeleteKey(entry) {
         var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var panel = document.createElement('div');
-        panel.className = 'preview-contextual-translation__row-confirm';
-        panel.dataset.key = entry.key;
-
-        var prompt = document.createElement('div');
-        prompt.className = 'preview-contextual-translation__row-confirm-prompt';
-        // i18n template: "Delete {key} from {lang}.json?"
-        var tpl = i18n.translationDeletePrompt || 'Delete {key} from {lang}.json?';
-        prompt.textContent = tpl
-            .replace('{key}', entry.key)
-            .replace('{lang}', (_currentLang || '').toUpperCase());
-        panel.appendChild(prompt);
-
-        // Show the value being deleted (helpful for unused keys the user
-        // might not have seen rendered before).
-        if (entry.value) {
-            var valuePreview = document.createElement('div');
-            valuePreview.className = 'preview-contextual-translation__row-confirm-value';
-            valuePreview.textContent = _truncate(entry.value, 200);
-            if (entry.value.length > 200) valuePreview.title = entry.value;
-            panel.appendChild(valuePreview);
-        }
-
-        if (_actionError && _actionError.key === entry.key) {
-            var errEl = document.createElement('div');
-            errEl.className = 'preview-contextual-translation__row-editor-error';
-            errEl.textContent = _actionError.message;
-            panel.appendChild(errEl);
-        }
-
-        // Multi-language opt-in (hidden if only one language exists).
-        var multiLang = _renderMultiLangCheckbox(_deleteAllLangs, function (checked) {
-            _deleteAllLangs = checked;
-        }, _busyKey === entry.key);
-        if (multiLang) panel.appendChild(multiLang);
-
-        var actions = document.createElement('div');
-        actions.className = 'preview-contextual-translation__row-editor-actions';
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.type = 'button';
-        cancelBtn.className = 'admin-btn';
-        cancelBtn.textContent = i18n.translationEditCancel || 'Cancel';
-        if (_busyKey === entry.key) cancelBtn.disabled = true;
-        cancelBtn.addEventListener('click', _handleCancelEdit);
-        actions.appendChild(cancelBtn);
-
-        var deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'admin-btn admin-btn--danger';
-        if (_busyKey === entry.key) {
-            deleteBtn.textContent = i18n.translationDeleting || 'Deleting…';
-            deleteBtn.disabled = true;
-        } else {
-            deleteBtn.textContent = i18n.translationConfirmDelete || 'Delete';
-        }
-        deleteBtn.addEventListener('click', function () {
-            _handleConfirmDeleteKey(entry.key);
+        var allLangs = false;
+        var multiLang = _renderMultiLangCheckbox(allLangs, function (checked) { allLangs = checked; });
+        QuickSiteUtils.confirm(_truncate(entry.value, 200), {
+            title: (i18n.translationDeletePrompt || 'Delete {key} from {lang}.json?')
+                .split('{key}').join(entry.key)
+                .split('{lang}').join((_currentLang || '').toUpperCase()),
+            type: 'danger',
+            confirmText: i18n.translationConfirmDelete || 'Delete',
+            body: multiLang,
+            action: function () {
+                return _deleteAndReload(_targetLangs(allLangs), [entry.key]);
+            }
         });
-        actions.appendChild(deleteBtn);
-
-        panel.appendChild(actions);
-        return panel;
     }
 
     /**
-     * Build the "Delete from all N languages" opt-in checkbox. Returns
-     * null when only one language exists (no choice to surface).
+     * "Remove all unused", asked list first in the panel's one confirm: every unused key with its word in a list that
+     * scrolls, and with several languages the choice of deleting them from all of them (on by default: a key nothing
+     * names is unused in every language). The delete runs with the question open (_deleteAndReload()).
      */
-    function _renderMultiLangCheckbox(checked, onChange, disabled) {
+    function _handleRemoveUnused() {
+        var keys = _bulkUnusedKeys();
+        if (!keys.length) return;
+        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
+        var n = String(keys.length);
+        var allLangs = true;
+        var multiLang = _renderMultiLangCheckbox(allLangs, function (checked) { allLangs = checked; });
+        QuickSiteUtils.confirm((i18n.translationBulkDeleteHeader || 'These {n} unused keys will be deleted from {lang}.json:')
+            .split('{n}').join(n)
+            .split('{lang}').join((_currentLang || '').toUpperCase()), {
+            title: (i18n.translationBulkDeleteTitle || 'Delete the {n} unused keys?').split('{n}').join(n),
+            type: 'danger',
+            confirmText: (i18n.translationBulkDeleteConfirm || 'Delete {n} keys').split('{n}').join(n),
+            body: [_renderUnusedList(keys), multiLang],
+            action: function () {
+                return _deleteAndReload(_targetLangs(allLangs), keys);
+            }
+        });
+    }
+
+    /** The languages a delete writes: every one when the question's choice says so, else the one shown. */
+    function _targetLangs(allLangs) {
+        return (_availableLangs.length >= 2 && allLangs) ? _availableLangs.slice() : [_currentLang];
+    }
+
+    /**
+     * A delete question's action: the keys deleted in each language given. A refusal answers its words, which keep
+     * the question open; done, an open editor closes and the list is read again before the question closes, so the
+     * focus finds the control that took the deleted row's place.
+     */
+    async function _deleteAndReload(langs, keys) {
+        var done = await _deleteKeys(langs, keys);
+        if (!done.ok) return { ok: false, message: _formatMultiLangDeleteError(done.failures, done.total) };
+        _expandedKey = null;
+        _actionError = null;
+        _pendingReload = false;
+        await _load(true);
+        _reloadPreviewIframe();
+        return true;
+    }
+
+    /**
+     * A delete question's "Delete from all N languages" choice. Returns ONE Element, or null when only one language
+     * exists (no choice to surface).
+     */
+    function _renderMultiLangCheckbox(checked, onChange) {
         if (!_availableLangs || _availableLangs.length < 2) return null;
         var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
         var wrap = document.createElement('label');
@@ -860,7 +799,6 @@ window.PreviewTranslation = (function () {
         var input = document.createElement('input');
         input.type = 'checkbox';
         input.checked = !!checked;
-        if (disabled) input.disabled = true;
         input.addEventListener('change', function () { onChange(input.checked); });
         wrap.appendChild(input);
         var text = document.createElement('span');
@@ -872,34 +810,28 @@ window.PreviewTranslation = (function () {
         return wrap;
     }
 
-    /**
-     * Execute the per-row delete after the user confirms. Loops over
-     * languages if the multi-lang opt-in is checked.
-     */
-    async function _handleConfirmDeleteKey(key) {
-        if (_busyKey) return;
-        _busyKey = key;
-        _actionError = null;
-        _renderRows();
-
-        var targetLangs = (_availableLangs.length >= 2 && _deleteAllLangs)
-            ? _availableLangs.slice()
-            : [_currentLang];
-
-        var done = await _deleteKeys(targetLangs, [key]);
-        if (!done.ok) {
-            _actionError = { key: key, message: _formatMultiLangDeleteError(done.failures, done.total) };
-            _busyKey = null;
-            _renderRows();
-            return;
-        }
-
-        _busyKey = null;
-        _expandedKey = null;
-        _expandedMode = null;
-        _deleteAllLangs = false;
-        await _load(true);
-        _reloadPreviewIframe();
+    /** The unused keys a bulk delete lists, each with its word. Returns ONE Element, which scrolls in the question. */
+    function _renderUnusedList(keys) {
+        var listEl = document.createElement('ul');
+        listEl.className = 'preview-contextual-translation__unused-list';
+        keys.forEach(function (key) {
+            var li = document.createElement('li');
+            li.className = 'preview-contextual-translation__unused-item';
+            var keyEl = document.createElement('code');
+            keyEl.className = 'preview-contextual-translation__unused-key';
+            keyEl.textContent = key;
+            li.appendChild(keyEl);
+            var value = _resolveTranslation(key);
+            if (value) {
+                var valueEl = document.createElement('span');
+                valueEl.className = 'preview-contextual-translation__unused-value';
+                valueEl.textContent = _truncate(value, 120);
+                if (value.length > 120) valueEl.title = value;
+                li.appendChild(valueEl);
+            }
+            listEl.appendChild(li);
+        });
+        return listEl;
     }
 
     /**
@@ -937,60 +869,6 @@ window.PreviewTranslation = (function () {
             }).join(' | '));
     }
 
-    // ── Bulk remove-unused ──────────────────────────────────────────────
-
-    /**
-     * "Remove all unused" button handler — enters the list-first confirm
-     * view (by design — no bare confirm).
-     */
-    function _handleRemoveUnused() {
-        if (!_grouped || !(_grouped.unused || []).length) return;
-        _bulkConfirm = true;
-        _bulkError = null;
-        _bulkDeleteAllLangs = true;  // Reset per-open: bulk defaults ON.
-        // Close any open row panel so the view is unambiguous.
-        _expandedKey = null;
-        _expandedMode = null;
-        _actionError = null;
-        _renderRows();
-    }
-
-    function _handleCancelBulkDelete() {
-        _bulkConfirm = false;
-        _bulkError = null;
-        _renderRows();
-    }
-
-    async function _handleConfirmBulkDelete() {
-        if (_bulkBusy) return;
-        var keys = _bulkUnusedKeys();
-        if (!keys.length) {
-            _bulkConfirm = false;
-            _renderRows();
-            return;
-        }
-        _bulkBusy = true;
-        _bulkError = null;
-        _renderRows();
-
-        var targetLangs = (_availableLangs.length >= 2 && _bulkDeleteAllLangs)
-            ? _availableLangs.slice()
-            : [_currentLang];
-
-        var done = await _deleteKeys(targetLangs, keys);
-        if (!done.ok) {
-            _bulkError = _formatMultiLangDeleteError(done.failures, done.total);
-            _bulkBusy = false;
-            _renderRows();
-            return;
-        }
-
-        _bulkBusy = false;
-        _bulkConfirm = false;
-        await _load(true);
-        _reloadPreviewIframe();
-    }
-
     /**
      * Ask the host editor to reload the preview iframe so users see the
      * translation change live. Uses the shared PreviewState helper — same
@@ -1003,90 +881,9 @@ window.PreviewTranslation = (function () {
         }
     }
 
-    /** The unused keys, for the bulk confirm. */
+    /** The unused keys, for the bulk delete. */
     function _bulkUnusedKeys() {
         return ((_grouped && _grouped.unused) || []).filter(function (k) { return typeof k === 'string'; });
-    }
-
-    /**
-     * Render the bulk-delete confirm view that REPLACES the row list
-     * (by design: list-first, dry-run style). Shows every unused key
-     * (with value preview) so the user reviews before pulling the trigger.
-     */
-    function _renderBulkConfirm() {
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var keys = _bulkUnusedKeys();
-        var wrap = document.createElement('div');
-        wrap.className = 'preview-contextual-translation__bulk-confirm';
-
-        var header = document.createElement('div');
-        header.className = 'preview-contextual-translation__bulk-confirm-header';
-        var tpl = i18n.translationBulkDeleteHeader
-            || 'These {n} unused keys will be deleted from {lang}.json:';
-        header.textContent = tpl
-            .replace('{n}', String(keys.length))
-            .replace('{lang}', (_currentLang || '').toUpperCase());
-        wrap.appendChild(header);
-
-        var listEl = document.createElement('ul');
-        listEl.className = 'preview-contextual-translation__bulk-confirm-list';
-        keys.forEach(function (key) {
-            var li = document.createElement('li');
-            li.className = 'preview-contextual-translation__bulk-confirm-item';
-            var keyEl = document.createElement('code');
-            keyEl.className = 'preview-contextual-translation__bulk-confirm-key';
-            keyEl.textContent = key;
-            li.appendChild(keyEl);
-            var value = _resolveTranslation(key);
-            if (value) {
-                var valueEl = document.createElement('span');
-                valueEl.className = 'preview-contextual-translation__bulk-confirm-value';
-                valueEl.textContent = _truncate(value, 120);
-                if (value.length > 120) valueEl.title = value;
-                li.appendChild(valueEl);
-            }
-            listEl.appendChild(li);
-        });
-        wrap.appendChild(listEl);
-
-        if (_bulkError) {
-            var errEl = document.createElement('div');
-            errEl.className = 'preview-contextual-translation__row-editor-error';
-            errEl.textContent = _bulkError;
-            wrap.appendChild(errEl);
-        }
-
-        var multiLang = _renderMultiLangCheckbox(_bulkDeleteAllLangs, function (checked) {
-            _bulkDeleteAllLangs = checked;
-        }, _bulkBusy);
-        if (multiLang) wrap.appendChild(multiLang);
-
-        var actions = document.createElement('div');
-        actions.className = 'preview-contextual-translation__bulk-confirm-actions';
-
-        var cancelBtn = document.createElement('button');
-        cancelBtn.type = 'button';
-        cancelBtn.className = 'admin-btn';
-        cancelBtn.textContent = i18n.translationEditCancel || 'Cancel';
-        if (_bulkBusy) cancelBtn.disabled = true;
-        cancelBtn.addEventListener('click', _handleCancelBulkDelete);
-        actions.appendChild(cancelBtn);
-
-        var deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'admin-btn admin-btn--danger';
-        if (_bulkBusy) {
-            deleteBtn.textContent = i18n.translationDeleting || 'Deleting…';
-            deleteBtn.disabled = true;
-        } else {
-            var btnTpl = i18n.translationBulkDeleteConfirm || 'Delete {n} keys';
-            deleteBtn.textContent = btnTpl.replace('{n}', String(keys.length));
-        }
-        deleteBtn.addEventListener('click', _handleConfirmBulkDelete);
-        actions.appendChild(deleteBtn);
-
-        wrap.appendChild(actions);
-        return wrap;
     }
 
     function _showLoading(show) {

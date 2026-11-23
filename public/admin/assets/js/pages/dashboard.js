@@ -14,7 +14,6 @@
     
     let currentProject = null;
     let allProjects = [];
-    let pendingRestoreBackup = null;
     let restoreTargetProject = null; // the project whose backups the restore modal is showing
     let manageSpaceLoaded = false;
 
@@ -611,12 +610,7 @@
         const proj = t('dashboard.projects', {});
         const label = QuickSiteAdmin.projectLabel(project.project, project.name);
         const title = t('dashboard.projects.deleteTitle', 'Delete Project');
-        const button = QSDom.el('button', {
-            type: 'button',
-            class: 'manage-space__delete-btn',
-            title: title,
-            'aria-label': title + ': ' + label,
-        }, [QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14)]);
+        const button = QSControls.bin(title + ': ' + label, null, { focusKey: 'project-delete:' + project.project });
 
         button.addEventListener('click', async function () {
             // A function, so a project's name is taken as it is: a string would read `$&` in it as a pattern.
@@ -994,15 +988,14 @@
         // the button would only ever produce an error toast.
         const dlBtn = (build.complete === false || outOfReach) ? null : QSDom.el('button', {
             type: 'button',
-            class: 'manage-space__download-btn',
-            title: t('dashboard.storage.download', 'Download')
+            class: 'admin-btn admin-btn--ghost admin-action manage-space__download-btn',
+            title: t('dashboard.storage.download', 'Download'),
+            'aria-label': t('dashboard.storage.download', 'Download')
         }, [QSDom.svgIcon('M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 14)]);
 
-        const delBtn = outOfReach ? null : QSDom.el('button', {
-            type: 'button',
-            class: 'manage-space__delete-btn',
-            title: t('common.delete', 'Delete')
-        }, [QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14)]);
+        const delBtn = outOfReach ? null : QSControls.bin(
+            t('dashboard.storage.deleteBuild', 'dashboard.storage.deleteBuild').replace(':name', () => build.name), null,
+            { focusKey: 'build-delete:' + build.name });
 
         const item = QSDom.el('div', { class: 'manage-space__item', dataset: { build: build.name } }, [
             QSDom.el('div', { class: 'manage-space__item-info' }, [
@@ -1033,14 +1026,20 @@
 
         if (delBtn) {
             delBtn.addEventListener('click', async function () {
-                if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + build.name, { type: 'danger' }))) return;
+                if (!(await QuickSiteUtils.confirm('', {
+                    title: t('dashboard.storage.deleteBuildTitle', 'dashboard.storage.deleteBuildTitle').replace(':name', () => build.name),
+                    type: 'danger',
+                    confirmText: t('dashboard.storage.delete', 'dashboard.storage.delete')
+                }))) return;
                 this.disabled = true;
                 try {
                     const res = await QuickSiteAdmin.apiRequest('deleteBuild', 'POST', {});
                     if (res.ok) {
+                        const focusBack = QSDom.rememberFocus(this);
                         item.remove();
                         count.textContent = '0';
                         list.appendChild(emptyRow());
+                        _focusAfterRemoval(focusBack);
                         refreshSpaceFigures();
                         QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + build.name, 'success');
                     } else {
@@ -1087,7 +1086,7 @@
     function _renderManageSpaceExports(fileCount, totalBytes, section) {
         const clearBtn = QSDom.el('button', {
             type: 'button',
-            class: 'manage-space__clear-btn',
+            class: 'admin-btn admin-btn--danger admin-btn--xs',
             id: 'clear-exports-btn',
             text: t('dashboard.storage.clearAll', 'Clear All')
         });
@@ -1104,13 +1103,19 @@
         ]);
 
         clearBtn.addEventListener('click', async function () {
-            if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmClearExports', 'Clear all export files?'), { type: 'danger' }))) return;
+            if (!(await QuickSiteUtils.confirm('', {
+                title: t('dashboard.storage.confirmClearExports', 'Clear all export files?'),
+                type: 'danger',
+                confirmText: t('dashboard.storage.clearAll', 'Clear All')
+            }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('clearExports', 'POST', { confirm: true });
                 if (res.ok) {
+                    const focusBack = QSDom.rememberFocus(this);
                     section.style.display = 'none';
                     item.remove();
+                    _focusAfterRemoval(focusBack);
                     refreshSpaceFigures();
                     QuickSiteAdmin.showToast(t('dashboard.storage.exportsCleared', 'Exports cleared'), 'success');
                 } else {
@@ -1168,8 +1173,8 @@
         const nameChildren = [b.name];
         if (b.type !== 'manual') nameChildren.push(QSDom.el('span', { class: 'manage-space__item-badge', text: b.type }));
 
-        const delBtn = QSDom.el('button', { type: 'button', class: 'manage-space__delete-btn', title: t('common.delete', 'Delete') },
-            [QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14)]);
+        const delBtn = QSControls.bin(t('dashboard.storage.deleteBackup', 'dashboard.storage.deleteBackup').replace(':name', () => b.name), null,
+            { focusKey: 'backup-delete:' + b.name });
         const item = QSDom.el('div', { class: 'manage-space__item', dataset: { backup: b.name } }, [
             QSDom.el('div', { class: 'manage-space__item-info' }, [
                 QSDom.el('span', { class: 'manage-space__item-name' }, nameChildren),
@@ -1178,15 +1183,21 @@
             delBtn,
         ]);
         delBtn.addEventListener('click', async function () {
-            if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + b.name, { type: 'danger' }))) return;
+            if (!(await QuickSiteUtils.confirm('', {
+                title: t('dashboard.storage.deleteBackupTitle', 'dashboard.storage.deleteBackupTitle').replace(':name', () => b.name),
+                type: 'danger',
+                confirmText: t('dashboard.storage.delete', 'dashboard.storage.delete')
+            }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: b.name }, [], {}, { project: managed });
                 if (res.ok) {
+                    const focusBack = QSDom.rememberFocus(this);
                     item.remove();
                     const remaining = list.querySelectorAll('.manage-space__item').length;
                     count.textContent = remaining;
                     if (remaining === 0) list.appendChild(emptyRow());
+                    _focusAfterRemoval(focusBack);
                     refreshSpaceFigures();
                     QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + b.name, 'success');
                 } else {
@@ -1674,29 +1685,74 @@
         });
     }
 
+    /**
+     * After an item of Manage Space is taken out under the focus: the focus goes to the control of its kind after it (or
+     * before it), else to the Manage Space toggle, never to nothing.
+     */
+    function _focusAfterRemoval(focusBack) {
+        if (!focusBack.restore()) document.getElementById('manage-space-toggle')?.focus();
+    }
+
     // ========================================================================
     // Restore Confirmation Modal
     // ========================================================================
 
+    /**
+     * Restore asks in the panel's one confirm: the backup, the warning and the two choices in its body (the template's);
+     * the restore runs with the question open, and a refusal (a quota, say) stays in it in the server's words.
+     */
     function openRestoreConfirmModal(backupName) {
-        const proj = t('dashboard.projects', {});
-        
-        pendingRestoreBackup = backupName;
-        
-        document.getElementById('restore-backup-name').textContent = backupName;
-        document.getElementById('restore-create-backup').checked = false;
-        document.getElementById('restore-delete-backup').checked = false;
+        const template = document.getElementById('dashboard-restore-body');
+        if (!template) return;
+        const body = template.content.firstElementChild.cloneNode(true);
+        body.querySelector('#restore-backup-name').textContent = backupName;
+        const createBackup = body.querySelector('#restore-create-backup');
+        const deleteBackup = body.querySelector('#restore-delete-backup');
+        createBackup.addEventListener('change', () => updateRestoreWarning(body));
+        updateRestoreWarning(body);
+        const restoreFailed = t('dashboard.projects.restore_failed', 'dashboard.projects.restore_failed');
 
-        updateRestoreWarning();
-        
-        document.getElementById('modal-restore-confirm').style.display = 'flex';
+        return QuickSiteUtils.confirm('', {
+            title: t('dashboard.projects.restoreQuestion', 'dashboard.projects.restoreQuestion').replace(':name', () => backupName),
+            body: body,
+            type: 'danger',
+            confirmText: t('dashboard.projects.restoreBtn', 'dashboard.projects.restoreBtn'),
+            action: async function () {
+                const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', {
+                    backup: backupName,
+                    create_backup: createBackup.checked,
+                    delete_backup: deleteBackup.checked
+                }, [], {}, { project: restoreTargetProject || currentProject });
+                if (result.ok) {
+                    closeAllModals();
+                    reloadWithMessage(t('dashboard.projects.restore_success', 'dashboard.projects.restore_success'));
+                    return true;
+                }
+                if (result.data?.code === 'restore.incomplete') {
+                    // Part of the backup came back, so the project has changed: the page
+                    // reloads to show it as it now is, with a message that stays until
+                    // it is closed and names what the restore could not bring back.
+                    const items = (result.data.data?.failed_items || []).join(', ');
+                    closeAllModals();
+                    reloadWithMessage(
+                        t('dashboard.projects.restore_incomplete', 'dashboard.projects.restore_incomplete').replace(':items', items),
+                        'error',
+                        0
+                    );
+                    return true;
+                }
+                // A quota refusal names the way out (free space, or delete this backup
+                // once it is restored): it stays in the question.
+                return { ok: false, message: result.data?.message || restoreFailed };
+            }
+        });
     }
 
-    function updateRestoreWarning() {
+    function updateRestoreWarning(body) {
         const proj = t('dashboard.projects', {});
-        const checkbox = document.getElementById('restore-create-backup');
-        const warningText = document.getElementById('restore-warning-text');
-        
+        const checkbox = body.querySelector('#restore-create-backup');
+        const warningText = body.querySelector('#restore-warning-text');
+                
         if (checkbox.checked) {
             warningText.textContent = proj.restoreWarningWithBackup || 'A backup of your current project will be created before restoring.';
         } else {
@@ -1763,19 +1819,25 @@
             QSDom.svgIcon('M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15', 14),
             ' ' + (proj.restore_btn || 'Restore'),
         ]);
-        const delBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost admin-btn--danger' }, [
-            QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14),
-        ]);
+        const delBtn = QSControls.bin(t('dashboard.storage.deleteBackup', 'dashboard.storage.deleteBackup').replace(':name', () => backup.name), null,
+            { focusKey: 'backup-restore-delete:' + backup.name });
 
         restoreBtn.addEventListener('click', () => openRestoreConfirmModal(backup.name));
         delBtn.addEventListener('click', async function () {
-            if (!(await QuickSiteUtils.confirm((proj.confirm_delete_backup || 'Delete backup') + ': ' + backup.name + '?', { type: 'danger' }))) return;
+            if (!(await QuickSiteUtils.confirm('', {
+                title: t('dashboard.storage.deleteBackupTitle', 'dashboard.storage.deleteBackupTitle').replace(':name', () => backup.name),
+                type: 'danger',
+                confirmText: t('dashboard.storage.delete', 'dashboard.storage.delete')
+            }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: backup.name }, [], {}, { project: target });
                 if (res.ok) {
                     QuickSiteAdmin.showToast(proj.backup_deleted || 'Backup deleted', 'success');
+                    // The list is drawn again: the focus goes to the next backup's bin, else to the list's ×.
+                    const focusBack = QSDom.rememberFocus(this);
                     await loadBackupList();
+                    if (!focusBack.restore()) document.querySelector('#modal-restore-backup .admin-modal__close')?.focus();
                     afterBackupsChanged();
                 } else {
                     QuickSiteAdmin.showToast(res.data?.message || 'Failed to delete backup', 'error');
@@ -1807,78 +1869,10 @@
     }
 
     // ========================================================================
-    // Restore Confirm Modal
-    // ========================================================================
-
-    function setupRestoreConfirmModal() {
-        const restoreCheckbox = document.getElementById('restore-create-backup');
-        if (restoreCheckbox) {
-            restoreCheckbox.addEventListener('change', updateRestoreWarning);
-        }
-        
-        const confirmRestoreBtn = document.getElementById('btn-confirm-restore');
-        if (!confirmRestoreBtn) return;
-
-        // The button's resting label, rebuilt after a failed restore.
-        const restoreLabel = () => [
-            QSDom.iconEl(QuickSiteUtils.ICON_PATHS.refresh, 16),
-            ' ' + t('dashboard.projects.restoreBtn', 'dashboard.projects.restoreBtn')
-        ];
-        const restoreFailed = t('dashboard.projects.restore_failed', 'dashboard.projects.restore_failed');
-
-        confirmRestoreBtn.addEventListener('click', async function() {
-            if (!pendingRestoreBackup) return;
-
-            const createBackup = document.getElementById('restore-create-backup').checked;
-            const deleteBackup = document.getElementById('restore-delete-backup').checked;
-
-            QSDom.setButtonBusy(this, t('dashboard.projects.restoring', 'dashboard.projects.restoring'), { size: 16 });
-
-            try {
-                const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', {
-                    backup: pendingRestoreBackup,
-                    create_backup: createBackup,
-                    delete_backup: deleteBackup
-                }, [], {}, { project: restoreTargetProject || currentProject });
-
-                if (result.ok) {
-                    closeAllModals();
-                    reloadWithMessage(t('dashboard.projects.restore_success', 'dashboard.projects.restore_success'));
-                } else if (result.data?.code === 'restore.incomplete') {
-                    // Part of the backup came back, so the project has changed: the page
-                    // reloads to show it as it now is, with a message that stays until
-                    // it is closed and names what the restore could not bring back.
-                    const items = (result.data.data?.failed_items || []).join(', ');
-                    closeAllModals();
-                    reloadWithMessage(
-                        t('dashboard.projects.restore_incomplete', 'dashboard.projects.restore_incomplete').replace(':items', items),
-                        'error',
-                        0
-                    );
-                } else {
-                    // A quota refusal names the way out (free space, or delete this backup
-                    // once it is restored), so it stays until it is closed.
-                    QuickSiteAdmin.showToast(result.data?.message || restoreFailed, 'error',
-                        result.data?.code === 'quota.storage_exceeded' ? 0 : undefined);
-                    this.disabled = false;
-                    QSDom.clear(this);
-                    restoreLabel().forEach(n => this.append(n));
-                }
-            } catch (error) {
-                QuickSiteAdmin.showToast(restoreFailed, 'error');
-                this.disabled = false;
-                QSDom.clear(this);
-                restoreLabel().forEach(n => this.append(n));
-            }
-        });
-    }
-
-    // ========================================================================
     // Initialization
     // ========================================================================
 
     document.addEventListener('DOMContentLoaded', async function() {
-        setupRestoreConfirmModal();
         setupOwnerSpaceList();
 
         // Wait for admin.js to finish loading permissions before checking them

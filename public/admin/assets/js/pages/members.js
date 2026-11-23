@@ -24,9 +24,6 @@
     var clearNode = window.QSDom.clear;
 
     var ICON_CHECK = 'M20 6L9 17l-5-5';
-    var ICON_X = 'M18 6L6 18M6 6l12 12';
-    var ICON_EDIT = 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z';
-    var ICON_TRASH = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2';
 
     var state = {
         roster: [],
@@ -131,9 +128,10 @@
         return wrap;
     }
 
+    /** A row's action with its word: kind 'primary', 'ghost', or 'danger' (a ghost red on hover, as the bin is: Deny). */
     function _renderActionBtn(label, iconD, kind, onClick) {
         var b = el('button', {
-            class: 'admin-btn ' + (kind === 'danger' ? 'admin-btn--danger' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
+            class: 'admin-btn ' + (kind === 'danger' ? 'admin-btn--ghost admin-action--delete' : (kind === 'primary' ? 'admin-btn--primary' : 'admin-btn--ghost')),
             type: 'button',
             onclick: onClick,
         });
@@ -152,37 +150,30 @@
         return el('div', { class: 'members-row' }, [main, actions]);
     }
 
-    function _renderModal(title, bodyNodes, confirmLabel, danger, onConfirm) {
-        var root = document.getElementById('members-modal-root');
-        clearNode(root);
+    /**
+     * A question in the panel's one confirm (QuickSiteUtils.confirm): its title, what it shows or asks (body), Cancel
+     * and the verb. `act` runs on the verb with the question open: true closes it, {ok: false, message} keeps it open
+     * showing those words, so a field it asks keeps what was typed. Answers whether it was done.
+     */
+    function ask(title, body, verb, danger, act, focus) {
+        return QuickSiteUtils.confirm('', {
+            title: title,
+            body: body,
+            confirmText: verb,
+            type: danger ? 'danger' : 'info',
+            focus: focus,
+            action: act,
+        });
+    }
 
-        function close() { clearNode(root); }
+    /** A command's answer as a question's action wants it: true, or the server's words kept in the question. */
+    function answered(res) {
+        return res && res.ok ? true : { ok: false, message: serverMessage(res) };
+    }
 
-        var confirmBtn = el('button', {
-            class: 'admin-btn ' + (danger ? 'admin-btn--danger' : 'admin-btn--primary'),
-            type: 'button',
-            onclick: function () {
-                confirmBtn.disabled = true;
-                onConfirm(close, confirmBtn);
-            },
-        }, [confirmLabel]);
-
-        var modal = el('div', { class: 'admin-modal' }, [
-            el('div', { class: 'admin-modal__backdrop', onclick: close }),
-            el('div', { class: 'admin-modal__content' }, [
-                el('div', { class: 'admin-modal__header' }, [
-                    el('h3', { class: 'admin-modal__title', text: title }),
-                    el('button', { class: 'admin-modal__close', type: 'button', 'aria-label': T.cancel || 'Cancel', onclick: close }, ['×']),
-                ]),
-                el('div', { class: 'admin-modal__body' }, bodyNodes),
-                el('div', { class: 'admin-modal__footer' }, [
-                    el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', onclick: close }, [T.cancel || 'Cancel']),
-                    confirmBtn,
-                ]),
-            ]),
-        ]);
-        root.appendChild(modal);
-        return { close: close };
+    /** A name in a word ({name}). */
+    function named(word, name) {
+        return String(word).split('{name}').join(name);
     }
 
     function _renderRoleSelect(id, roles) {
@@ -224,8 +215,11 @@
         ];
         var actions = [];
         if (!isSelf && !m.is_owner && iOutrank(m.role)) {
-            actions.push(_renderActionBtn(T.changeRole || 'Change role', ICON_EDIT, 'ghost', function () { openChangeRoleModal(m); }));
-            actions.push(_renderActionBtn(T.remove || 'Remove', ICON_TRASH, 'danger', function () { openRemoveModal(m); }));
+            var who = m.name || m.user_id;
+            actions.push(QSControls.edit(named(T.changeRoleOf, who), function () { openChangeRoleModal(m); },
+                { focusKey: 'member-role:' + m.user_id }));
+            actions.push(QSControls.bin(named(T.removeOf, who), function () { openRemoveModal(m); },
+                { focusKey: 'member-remove:' + m.user_id }));
         }
         return _renderRow(main, actions);
     }
@@ -233,6 +227,12 @@
     function renderRoster() {
         var root = document.getElementById('members-roster');
         if (!root) return;
+        var focusBack = root.contains(document.activeElement) ? window.QSDom.rememberFocus() : null;
+        drawRoster(root);
+        if (focusBack) focusBack.restore();
+    }
+
+    function drawRoster(root) {
         clearNode(root);
         setCount('members-roster-count', state.roster.length);
         if (!state.roster.length) {
@@ -245,7 +245,7 @@
     function openChangeRoleModal(m) {
         var sel = _renderRoleSelect('change-role-select', assignableRoles());
         sel.value = iOutrank(m.role) && rankOf(m.role) > 0 ? m.role : sel.value;
-        _renderModal(
+        ask(
             (T.changeRoleTitle || 'Change role') + ' — ' + (m.name || m.user_id),
             [
                 el('div', { class: 'admin-form-group' }, [
@@ -254,23 +254,20 @@
                 ]),
             ],
             T.apply || 'Apply', false,
-            function (close) {
-                api('changeMemberRole', 'POST', { user_id: m.user_id, role: sel.value }).then(function (res) {
-                    close();
-                    if (res && res.ok) {
-                        toast(T.roleChangedMsg || 'Role updated', 'success');
-                    } else {
-                        toast(serverMessage(res), 'error');
-                    }
-                    refreshLists();
-                });
-            }
+            async function () {
+                var res = await api('changeMemberRole', 'POST', { user_id: m.user_id, role: sel.value });
+                await refreshLists();
+                if (!res || !res.ok) return answered(res);
+                toast(T.roleChangedMsg || 'Role updated', 'success');
+                return true;
+            },
+            sel
         );
     }
 
     function openRemoveModal(m) {
         var noteInput = el('input', { type: 'text', class: 'admin-input', id: 'remove-note-input', maxlength: '500' });
-        _renderModal(
+        ask(
             (T.removeTitle || 'Remove member') + ' — ' + (m.name || m.user_id),
             [
                 el('div', { class: 'admin-form-group' }, [
@@ -279,20 +276,16 @@
                 ]),
             ],
             T.remove || 'Remove', true,
-            function (close) {
+            async function () {
                 var body = { user_id: m.user_id };
                 var note = noteInput.value.trim();
                 if (note) body.note = note;
-                api('removeMember', 'POST', body).then(function (res) {
-                    close();
-                    if (res && res.ok) {
-                        toast(T.removedMsg || 'Member removed', 'success');
-                    } else {
-                        toast(serverMessage(res), 'error');
-                    }
-                    refreshLists();
-                    notifyMembershipChange();
-                });
+                var res = await api('removeMember', 'POST', body);
+                await refreshLists();
+                notifyMembershipChange();
+                if (!res || !res.ok) return answered(res);
+                toast(T.removedMsg || 'Member removed', 'success');
+                return true;
             }
         );
     }
@@ -331,10 +324,11 @@
         var actions = [];
         if (iOutrank(q.role)) {
             if (isInvite) {
-                actions.push(_renderActionBtn(T.cancelInvite || 'Cancel', ICON_X, 'ghost', function () { openCancelInviteModal(q); }));
+                actions.push(QSControls.bin(named(T.cancelInviteOf, q.name || q.user_id), function () { openCancelInviteModal(q); },
+                    { focusKey: 'invite-delete:' + q.user_id }));
             } else {
                 actions.push(_renderActionBtn(T.approve || 'Approve', ICON_CHECK, 'primary', function () { openApproveModal(q); }));
-                actions.push(_renderActionBtn(T.deny || 'Deny', ICON_X, 'danger', function () { openDenyModal(q); }));
+                actions.push(_renderActionBtn(T.deny || 'Deny', null, 'danger', function () { openDenyModal(q); }));
             }
         }
         return _renderRow(main, actions);
@@ -343,6 +337,12 @@
     function renderQueue() {
         var root = document.getElementById('members-queue');
         if (!root) return;
+        var focusBack = root.contains(document.activeElement) ? window.QSDom.rememberFocus() : null;
+        drawQueue(root);
+        if (focusBack) focusBack.restore();
+    }
+
+    function drawQueue(root) {
         clearNode(root);
         setCount('members-queue-count', state.queue.length);
         if (!state.queue.length) {
@@ -370,28 +370,25 @@
             ]),
         ];
         if (q.note) body.push(_renderNote(q.note));
-        _renderModal(
+        ask(
             T.approveTitle || 'Approve this request?', body,
             T.approve || 'Approve', false,
-            function (close) {
-                api('approveJoinRequest', 'POST', { user_id: q.user_id, role: roleSelect.value }).then(function (res) {
-                    close();
-                    if (res && res.ok) {
-                        var converted = res.data && res.data.data && res.data.data.converted_to_invitation;
-                        toast(converted ? (T.convertedMsg || 'Invitation sent') : (T.approvedMsg || 'Approved'), 'success');
-                    } else {
-                        toast(serverMessage(res), res && res.status === 409 ? 'warning' : 'error');
-                    }
-                    refreshLists();
-                    notifyMembershipChange();
-                });
-            }
+            async function () {
+                var res = await api('approveJoinRequest', 'POST', { user_id: q.user_id, role: roleSelect.value });
+                await refreshLists();
+                notifyMembershipChange();
+                if (!res || !res.ok) return answered(res);
+                var converted = res.data && res.data.data && res.data.data.converted_to_invitation;
+                toast(converted ? (T.convertedMsg || 'Invitation sent') : (T.approvedMsg || 'Approved'), 'success');
+                return true;
+            },
+            roleSelect
         );
     }
 
     function openDenyModal(q) {
         var noteInput = el('textarea', { class: 'admin-input', id: 'deny-note-input', rows: '3', maxlength: '500' });
-        _renderModal(
+        ask(
             (T.denyTitle || 'Deny this request') + ' — ' + (q.name || q.user_id),
             [
                 el('div', { class: 'admin-form-group' }, [
@@ -400,44 +397,35 @@
                 ]),
             ],
             T.deny || 'Deny', true,
-            function (close, btn) {
+            async function () {
                 var note = noteInput.value.trim();
                 if (!note) {
-                    btn.disabled = false;
-                    toast(T.denyNoteRequired || 'The refusal reason is required.', 'warning');
                     noteInput.focus();
-                    return;
+                    return { ok: false, message: T.denyNoteRequired || 'The refusal reason is required.' };
                 }
-                api('denyJoinRequest', 'POST', { user_id: q.user_id, note: note }).then(function (res) {
-                    close();
-                    if (res && res.ok) {
-                        toast(T.deniedMsg || 'Request denied', 'success');
-                    } else {
-                        toast(serverMessage(res), 'error');
-                    }
-                    refreshLists();
-                    notifyMembershipChange();
-                });
-            }
+                var res = await api('denyJoinRequest', 'POST', { user_id: q.user_id, note: note });
+                await refreshLists();
+                notifyMembershipChange();
+                if (!res || !res.ok) return answered(res);
+                toast(T.deniedMsg || 'Request denied', 'success');
+                return true;
+            },
+            noteInput
         );
     }
 
     function openCancelInviteModal(q) {
-        _renderModal(
-            T.cancelTitle || 'Cancel this invitation?',
+        ask(
+            named(T.withdrawInviteTitle, q.name || q.user_id),
             [el('p', {}, [el('strong', { text: q.name || q.user_id }), ' — ', _renderRoleChip(q.role)])],
-            T.cancelInvite || 'Cancel', true,
-            function (close) {
-                api('cancelInvitation', 'POST', { user_id: q.user_id }).then(function (res) {
-                    close();
-                    if (res && res.ok) {
-                        toast(T.cancelledMsg || 'Invitation cancelled', 'success');
-                    } else {
-                        toast(serverMessage(res), 'error');
-                    }
-                    refreshLists();
-                    notifyMembershipChange();
-                });
+            T.withdrawInvite, true,
+            async function () {
+                var res = await api('cancelInvitation', 'POST', { user_id: q.user_id });
+                await refreshLists();
+                notifyMembershipChange();
+                if (!res || !res.ok) return answered(res);
+                toast(T.cancelledMsg || 'Invitation cancelled', 'success');
+                return true;
             }
         );
     }
@@ -504,15 +492,17 @@
             });
     }
 
+    /** Forget a contact, asked first: a refusal stays in the question. Answers whether it was forgotten. */
     function forgetContact(contact) {
-        selfRequest('remove-contact', 'POST', { user_id: contact.user_id }).then(function (res) {
-            if (res && res.ok) {
+        return ask(named(T.contactForgetTitle, contact.name || contact.user_id), [el('p', { text: T.contactForgetText })],
+            T.contactForget, true,
+            async function () {
+                var res = await selfRequest('remove-contact', 'POST', { user_id: contact.user_id });
+                if (!res || !res.ok) return { ok: false, message: serverMessage(res, T.contactForgetFailed || 'members.contacts.forgetFailed') };
                 toast(T.contactForgotten || 'members.contacts.forgotten', 'success');
                 loadContacts();
-            } else {
-                toast(T.contactForgetFailed || 'members.contacts.forgetFailed', 'error');
-            }
-        });
+                return true;
+            });
     }
 
     /** The contact this user id names on the caller's list, or null. */
@@ -611,15 +601,15 @@
             });
         }
         if (forgetBtn && contactsSelect) {
-            forgetBtn.addEventListener('click', function () {
+            forgetBtn.addEventListener('click', async function () {
                 var contact = contactOf(contactsSelect.value);
                 if (!contact) return;
+                if (!(await forgetContact(contact))) return;
                 if (picked && picked.user_id === contact.user_id) {
                     picked = null;
                     clearNode(results);
                     if (sendBtn) sendBtn.disabled = true;
                 }
-                forgetContact(contact);
             });
         }
         contactRenderers.push(renderContacts);
@@ -794,15 +784,12 @@
         toggleBtn.addEventListener('click', function () {
             var target = (state.joinPolicy || 'closed') === 'open' ? 'closed' : 'open';
             if (target === 'open') {
-                _renderModal(
+                ask(
                     T.policyTitle || (T.policyOpen || 'open'),
                     [el('p', { text: T.policyConfirmOpenPrivate || 'Open the join policy?' })],
                     T.policyOpen || 'open', true,
-                    function (close) {
-                        close();
-                        applyPolicy(target);
-                    }
-                );
+                    function () { return true; }
+                ).then(function (yes) { if (yes) applyPolicy(target); });
                 return;
             }
             applyPolicy(target);
@@ -845,27 +832,23 @@
                 .replace('{name}', (picked && picked.name) || userId)
                 .replace('{role}', roleSel.value);
 
-            _renderModal(
+            ask(
                 T.transferTitle || 'Transfer ownership — final confirmation',
                 [el('p', { text: bodyText })],
                 T.transferBtn || 'Transfer ownership', true,
-                function (close) {
-                    api('transferOwnership', 'POST', { user_id: userId, confirm: true, old_owner_role: roleSel.value }).then(function (res) {
-                        close();
-                        if (res && res.ok) {
-                            toast(T.transferredMsg || 'Ownership transferred', 'success');
-                            // Roles changed radically (owner → old_owner_role):
-                            // reload so the server re-renders the page for the
-                            // new reality (sections, banner, pickers). The reload
-                            // recomputes the nav badge on its own — do NOT fire
-                            // notifyMembershipChange() here, or its in-flight
-                            // count fetches get cancelled by the navigation and
-                            // log a spurious NetworkError.
-                            window.location.href = window.location.pathname + '?t=' + Date.now();
-                        } else {
-                            toast(serverMessage(res), 'error');
-                        }
-                    });
+                async function () {
+                    var res = await api('transferOwnership', 'POST', { user_id: userId, confirm: true, old_owner_role: roleSel.value });
+                    if (!res || !res.ok) return answered(res);
+                    toast(T.transferredMsg || 'Ownership transferred', 'success');
+                    // Roles changed radically (owner → old_owner_role):
+                    // reload so the server re-renders the page for the
+                    // new reality (sections, banner, pickers). The reload
+                    // recomputes the nav badge on its own — do NOT fire
+                    // notifyMembershipChange() here, or its in-flight
+                    // count fetches get cancelled by the navigation and
+                    // log a spurious NetworkError.
+                    window.location.href = window.location.pathname + '?t=' + Date.now();
+                    return true;
                 }
             );
         });
@@ -930,20 +913,22 @@
         others.forEach(function (p) { box.appendChild(_renderElsewhereRow(p)); });
     }
 
+    /** Read the roster and the queue again and draw them: a promise of both drawn. */
     function refreshLists() {
-        api('getProjectRoster', 'GET').then(function (res) {
+        var reads = [api('getProjectRoster', 'GET').then(function (res) {
             state.roster = (res && res.ok && res.data && res.data.data && res.data.data.members) || [];
             renderRoster();
             fillTransferSelectors();
-        });
+        })];
         if (document.getElementById('members-queue')) {
-            api('listMembers', 'GET').then(function (res) {
+            reads.push(api('listMembers', 'GET').then(function (res) {
                 var d = (res && res.ok && res.data && res.data.data) || {};
                 state.queue = d.invitations || [];
                 renderQueue();
                 renderPolicy();
-            });
+            }));
         }
+        return Promise.all(reads).catch(function () { /* a failed read leaves the lists as they were */ });
     }
 
     document.addEventListener('DOMContentLoaded', function () {

@@ -174,22 +174,17 @@
                 QSDom.el('span', { text: ' · ' + streamingTag })
             ]),
             QSDom.el('div', { class: 'qsac-card__actions' }, [
-                _renderCardAction('edit', t('aiConnections.edit')),
-                _renderCardAction('default', t('aiConnections.setDefault')),
-                _renderCardAction('delete', t('aiConnections.delete'), 'admin-btn--danger')
+                QSDom.el('button', {
+                    type: 'button', class: 'admin-btn', 'data-qsac-action': 'default', text: t('aiConnections.setDefault')
+                }),
+                QSControls.edit(t('aiConnections.editNamed', { name: c.name }), null, {
+                    focusKey: 'edit:' + c.id, attrs: { 'data-qsac-action': 'edit' }
+                }),
+                QSControls.bin(t('aiConnections.deleteNamed', { name: c.name }), null, {
+                    focusKey: 'delete:' + c.id, attrs: { 'data-qsac-action': 'delete' }
+                })
             ])
         ]);
-    }
-
-    /** One card action button. @returns {HTMLElement} */
-    function _renderCardAction(action, label, extraClass) {
-        return QSDom.el('button', {
-            type: 'button',
-            class: 'admin-btn'
-                + (extraClass ? ' ' + extraClass : ''),
-            'data-qsac-action': action,
-            text: label
-        });
     }
 
     /** The connection's status dot. @returns {HTMLElement} */
@@ -243,9 +238,17 @@
             window.QSConnectionsStore.setDefault(id);
             renderList();
         } else if (action === 'delete') {
-            if (!(await QuickSiteUtils.confirm(t('aiConnections.confirmDelete', { name: conn.name }), { type: 'danger' }))) return;
-            window.QSConnectionsStore.removeConnection(id);
-            renderList();
+            // The list is drawn again before the question closes, so the focus goes to the next card's bin.
+            await QuickSiteUtils.confirm('', {
+                title: t('aiConnections.confirmDelete', { name: conn.name }),
+                type: 'danger',
+                confirmText: t('aiConnections.delete'),
+                action: () => {
+                    window.QSConnectionsStore.removeConnection(id);
+                    renderList();
+                    return true;
+                }
+            });
         } else if (action === 'edit') {
             openWizard(conn);
         } else if (action === 'test') {

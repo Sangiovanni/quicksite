@@ -11,12 +11,7 @@
             <h3><?= __admin('preview.stateAnimationEditor') ?? 'State & Animation Editor' ?></h3>
             <span class="transition-editor__selector" id="transition-editor-selector">.selector</span>
             <span class="preview-rule-media" id="transition-editor-media" hidden></span>
-            <button type="button" class="preview-keyframe-modal__close" id="transition-editor-close">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
+            <button type="button" class="admin-modal__close" id="transition-editor-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         
         <div class="preview-keyframe-modal__body transition-editor__body">
@@ -226,11 +221,7 @@
                             <option value="ease-in-out">ease-in-out</option>
                             <option value="cubic-bezier"><?= __admin('preview.customCubicBezier') ?></option>
                         </select>
-                        <button type="button" class="transition-editor__property-btn transition-editor__property-btn--delete transition-editor__row-remove" title="<?= adminEscape(__admin('common.remove')) ?>">
-                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
-                        </button>
+                        <button type="button" class="admin-row-remove transition-editor__row-remove" data-qs-icon="row" aria-label="<?= adminAttr(__admin('common.remove')) ?>" title="<?= adminAttr(__admin('common.remove')) ?>"></button>
                         <div class="transition-editor__cubic-bezier transition-editor__row-bezier" style="display: none;">
                             <span>cubic-bezier(</span>
                             <input type="number" class="admin-input admin-input--mini" data-bezier="x1" value="0.4" min="0" max="1" step="0.1">
@@ -285,11 +276,8 @@
                                         <polygon points="5 3 19 12 5 21 5 3"/>
                                     </svg>
                                 </button>
-                                <button type="button" class="transition-editor__animation-remove" id="transition-base-animation-remove" title="<?= __admin('common.remove') ?? 'Remove' ?>">
-                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                    </svg>
-                                </button>
+                                <button type="button" class="admin-btn admin-btn--ghost admin-action admin-action--delete" id="transition-base-animation-remove" data-qs-icon="trash"
+                                        aria-label="<?= adminAttr(__admin('common.remove')) ?>" title="<?= adminAttr(__admin('common.remove')) ?>"></button>
                             </div>
                             <div class="transition-editor__animation-settings">
                                 <div class="transition-editor__anim-setting">
@@ -341,11 +329,8 @@
                                         <polygon points="5 3 19 12 5 21 5 3"/>
                                     </svg>
                                 </button>
-                                <button type="button" class="transition-editor__animation-remove" id="transition-trigger-animation-remove" title="<?= __admin('common.remove') ?? 'Remove' ?>">
-                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                    </svg>
-                                </button>
+                                <button type="button" class="admin-btn admin-btn--ghost admin-action admin-action--delete" id="transition-trigger-animation-remove" data-qs-icon="trash"
+                                        aria-label="<?= adminAttr(__admin('common.remove')) ?>" title="<?= adminAttr(__admin('common.remove')) ?>"></button>
                             </div>
                             <div class="transition-editor__animation-settings">
                                 <div class="transition-editor__anim-setting">

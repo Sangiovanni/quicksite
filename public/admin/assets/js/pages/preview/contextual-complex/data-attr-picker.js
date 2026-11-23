@@ -466,35 +466,21 @@
         box.className = DESC_CLASS;
         box.style.position = 'relative';   // anchors the dismiss × in the top-right
         box.style.margin = '4px 0 8px';
-        box.style.padding = '8px 28px 8px 12px';  // right padding leaves room for ×
+        box.style.padding = '8px 36px 8px 12px';  // right padding leaves room for ×
         box.style.background = 'var(--admin-bg-tertiary, #2a2a2a)';
         box.style.border = '1px solid var(--admin-border, #444)';
         box.style.borderLeft = '3px solid var(--admin-accent, #5a9fd4)';
         box.style.borderRadius = '3px';
         box.style.fontSize = '0.8rem';
 
-        // Dismiss × — lets the user hide the hint without removing the
-        // row (e.g. once they've read the description and want screen
-        // space back). The row's own × (preview.js handler) still does
-        // double-duty via the capture-phase hook in attachPicker.
-        var dismiss = document.createElement('button');
-        dismiss.type = 'button';
-        dismiss.setAttribute('aria-label', 'Dismiss hint');
-        dismiss.setAttribute('title', 'Hide this hint');
+        // Dismiss × (the panel's close, its word "Close") — lets the user hide
+        // the hint without removing the row (e.g. once they've read the
+        // description and want screen space back). The row's own × (preview.js
+        // handler) still does double-duty via the capture-phase hook in attachPicker.
+        var dismiss = QSControls.close(null, function () { box.remove(); });
         dismiss.style.position = 'absolute';
         dismiss.style.top = '4px';
         dismiss.style.right = '4px';
-        dismiss.style.background = 'transparent';
-        dismiss.style.border = 'none';
-        dismiss.style.color = 'var(--admin-text-muted, #888)';
-        dismiss.style.cursor = 'pointer';
-        dismiss.style.fontSize = '1rem';
-        dismiss.style.lineHeight = '1';
-        dismiss.style.padding = '2px 6px';
-        dismiss.textContent = '×';
-        dismiss.addEventListener('mouseenter', function () { dismiss.style.color = 'var(--admin-text, #ddd)'; });
-        dismiss.addEventListener('mouseleave', function () { dismiss.style.color = 'var(--admin-text-muted, #888)'; });
-        dismiss.addEventListener('click', function () { box.remove(); });
         box.appendChild(dismiss);
 
         // Description text

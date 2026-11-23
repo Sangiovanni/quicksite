@@ -125,7 +125,9 @@
                 window.QSDom.clear(host);
             }
         });
-        dismiss.textContent = '×';
+        // The panel's one × (QuickSiteUtils.ICON_PATHS.close), as every close of the panel draws it.
+        var cross = D.iconEl(window.QuickSiteUtils.ICON_PATHS.close, 16);
+        if (cross) dismiss.appendChild(cross);
 
         return D.el('div', { 'class': 'admin-security-warning__content' }, [
             D.svgIcon('M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16', 18),

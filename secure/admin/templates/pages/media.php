@@ -91,7 +91,7 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
         <div class="admin-card">
             <div class="admin-card__header asset-edit-area__header">
                 <h2 class="admin-card__title" id="asset-edit-title"><?= __admin('media.editAsset') ?></h2>
-                <button type="button" class="admin-modal__close asset-edit-area__close" id="asset-edit-close" aria-label="<?= __admin('common.close') ?>" title="<?= __admin('common.close') ?>">&times;</button>
+                <button type="button" class="admin-modal__close" id="asset-edit-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
             </div>
             <div class="admin-card__body asset-edit-area__content">
                 <div class="asset-edit-area__preview" id="asset-edit-preview"></div>

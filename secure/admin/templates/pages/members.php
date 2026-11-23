@@ -70,7 +70,8 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'proposedBy'       => __admin('members.queue.proposedBy', 'proposed by'),
     'approve'          => __admin('members.queue.approve', 'Approve'),
     'deny'             => __admin('members.queue.deny', 'Deny'),
-    'cancelInvite'     => __admin('members.queue.cancelInvite', 'Cancel'),
+    'cancelInviteOf'   => __admin('members.queue.cancelInviteOf'),
+    'withdrawInvite'   => __admin('members.queue.withdrawInvite'),
     'approveTitle'     => __admin('members.queue.approveTitle', 'Approve this request?'),
     'approveRoleLabel' => __admin('members.queue.approveRoleLabel', 'Role to grant'),
     'approvedMsg'      => __admin('members.queue.approvedMsg', 'Approved — they are now a member'),
@@ -82,9 +83,9 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'elsewhereTitle'   => __admin('members.queue.elsewhereTitle', 'Join requests are waiting in your other projects'),
     'elsewhereSwitch'  => __admin('members.queue.elsewhereSwitch', 'Switch to this project'),
     'elsewhereSwitchFailed' => __admin('members.queue.elsewhereSwitchFailed', 'Could not switch project'),
-    'cancelTitle'      => __admin('members.queue.cancelTitle', 'Cancel this invitation?'),
+    'withdrawInviteTitle' => __admin('members.queue.withdrawInviteTitle'),
     'cancelledMsg'     => __admin('members.queue.cancelledMsg', 'Invitation cancelled'),
-    'changeRole'       => __admin('members.roster.changeRole', 'Change role'),
+    'changeRoleOf'     => __admin('members.roster.changeRoleOf'),
     'changeRoleTitle'  => __admin('members.roster.changeRoleTitle', 'Change role'),
     'newRoleLabel'     => __admin('members.roster.newRoleLabel', 'New role'),
     'apply'            => __admin('members.roster.apply', 'Apply'),
@@ -93,6 +94,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'removeTitle'      => __admin('members.roster.removeTitle', 'Remove member'),
     'removeNoteLabel'  => __admin('members.roster.removeNoteLabel', 'Reason (optional — shown to them)'),
     'removedMsg'       => __admin('members.roster.removedMsg', 'Member removed'),
+    'removeOf'         => __admin('members.roster.removeOf'),
     'searchNoMatch'    => __admin('members.invite.noMatches', 'No account with this exact public name.'),
     'select'           => __admin('members.invite.select', 'Select'),
     'selected'         => __admin('members.invite.selected', 'Selected'),
@@ -102,6 +104,9 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'contactGone'       => __admin('members.contacts.gone'),
     'contactForgotten'  => __admin('members.contacts.forgotten'),
     'contactForgetFailed' => __admin('members.contacts.forgetFailed'),
+    'contactForget'     => __admin('members.contacts.forget'),
+    'contactForgetTitle' => __admin('members.contacts.forgetTitle'),
+    'contactForgetText' => __admin('members.contacts.forgetText'),
     'contactSaveFailed' => __admin('members.contacts.saveFailed'),
     'contactsFull'      => __admin('members.contacts.full'),
     'nameRequired'     => __admin('members.invite.nameRequired', 'Type the exact public name first.'),
@@ -190,7 +195,8 @@ window.QS_MEMBERS_I18N = <?= json_encode([
                     <div class="admin-form-group members-find-row__name">
                         <select id="invite-contacts-select" class="admin-input" aria-labelledby="invite-contacts-title"></select>
                     </div>
-                    <button type="button" id="btn-invite-contact-forget" class="admin-btn admin-btn--ghost" disabled><?= __admin('members.contacts.forget') ?></button>
+                    <button type="button" id="btn-invite-contact-forget" class="admin-btn admin-btn--ghost admin-action admin-action--delete" data-qs-icon="trash"
+                            aria-label="<?= adminAttr(__admin('members.contacts.forgetOne')) ?>" title="<?= adminAttr(__admin('members.contacts.forgetOne')) ?>" disabled></button>
                 </div>
             </div>
             <div class="members-find-row">
@@ -241,7 +247,8 @@ window.QS_MEMBERS_I18N = <?= json_encode([
                     <div class="admin-form-group members-find-row__name">
                         <select id="propose-contacts-select" class="admin-input" aria-labelledby="propose-contacts-title"></select>
                     </div>
-                    <button type="button" id="btn-propose-contact-forget" class="admin-btn admin-btn--ghost" disabled><?= __admin('members.contacts.forget') ?></button>
+                    <button type="button" id="btn-propose-contact-forget" class="admin-btn admin-btn--ghost admin-action admin-action--delete" data-qs-icon="trash"
+                            aria-label="<?= adminAttr(__admin('members.contacts.forgetOne')) ?>" title="<?= adminAttr(__admin('members.contacts.forgetOne')) ?>" disabled></button>
                 </div>
             </div>
             <div class="members-find-row">
@@ -319,5 +326,3 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     </div>
 </section>
 <?php endif; ?>
-
-<div id="members-modal-root"></div>

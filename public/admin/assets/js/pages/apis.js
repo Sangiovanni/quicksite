@@ -44,7 +44,6 @@
     // State
     let apisData = {};
     let currentTestEndpoint = null;
-    let pendingDelete = null;
     let tokenSource = null;         // the API form's two token sources (_tokenSourceField)
     let refreshTokenSource = null;
     // The prefixes that name a storage key. `header` names something else, and stays typed.
@@ -134,9 +133,6 @@
         document.getElementById('btn-import-back')?.addEventListener('click', handleImportBack);
         document.getElementById('btn-import-confirm')?.addEventListener('click', handleImportConfirm);
         document.getElementById('btn-load-example-ours')?.addEventListener('click', () => loadExampleJson('ours'));
-
-        // Delete confirmation
-        document.getElementById('btn-confirm-delete')?.addEventListener('click', confirmDelete);
 
         // Modal close handlers
         document.querySelectorAll('[data-dismiss="modal"]').forEach(btn => {
@@ -350,12 +346,14 @@
         if (canRun('editApi')) {
             headerActions.push(_renderApiAction('add-endpoint', apiId, t('apis.addEndpoint'),
                 QuickSiteUtils.ICON_PATHS.plus));
-            headerActions.push(_renderApiAction('edit-api', apiId, t('apis.editApi'),
-                QuickSiteUtils.ICON_PATHS.edit));
+            headerActions.push(QSControls.edit(t('apis.editApi'), null, {
+                attrs: { 'data-action': 'edit-api', 'data-api': apiId }, focusKey: 'api-edit:' + apiId
+            }));
         }
         if (canRun('deleteApi')) {
-            headerActions.push(_renderApiAction('delete-api', apiId, t('apis.deleteApi'),
-                QuickSiteUtils.ICON_PATHS.trash, 'admin-btn--danger-hover'));
+            headerActions.push(QSControls.bin(t('apis.deleteApi'), null, {
+                attrs: { 'data-action': 'delete-api', 'data-api': apiId }, focusKey: 'api-delete:' + apiId
+            }));
         }
 
         return QSDom.el('div', {
@@ -403,16 +401,16 @@
         return canRun('testApiEndpoint') || canRun('editApi');
     }
 
-    /** One card-header action button. @returns {HTMLElement} */
-    function _renderApiAction(action, apiId, title, iconPath, extraClass) {
+    /** A card-header action other than the pencil and the bin, drawn in their frame. @returns {HTMLElement} */
+    function _renderApiAction(action, apiId, title, iconPath) {
         return QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--ghost'
-                + (extraClass ? ' ' + extraClass : ''),
+            class: 'admin-btn admin-btn--ghost admin-action',
             'data-action': action,
             'data-api': apiId,
-            title: title
-        }, [QSDom.iconEl(iconPath, 16)]);
+            title: title,
+            'aria-label': title
+        }, [QSDom.iconEl(iconPath, 14)]);
     }
 
     /**
@@ -498,14 +496,16 @@
         const actions = [];
         if (canRun('testApiEndpoint')) {
             actions.push(_renderEndpointAction('test-endpoint', apiId, endpoint.id,
-                t('apis.actions.test'), QuickSiteUtils.ICON_PATHS.play, 14));
+                t('apis.actions.test'), QuickSiteUtils.ICON_PATHS.play));
         }
         if (canRun('editApi')) {
-            actions.push(_renderEndpointAction('edit-endpoint', apiId, endpoint.id,
-                t('common.edit'), QuickSiteUtils.ICON_PATHS.edit, 14));
-            actions.push(_renderEndpointAction('delete-endpoint', apiId, endpoint.id,
-                t('common.delete'), QuickSiteUtils.ICON_PATHS.trash, 14,
-                'admin-btn--danger-hover'));
+            const attrs = { 'data-action': 'edit-endpoint', 'data-api': apiId, 'data-endpoint': endpoint.id };
+            actions.push(QSControls.edit(t('common.edit'), null, {
+                attrs: attrs, focusKey: 'endpoint-edit:' + apiId + '/' + endpoint.id
+            }));
+            actions.push(QSControls.bin(t('common.delete'), null, {
+                attrs: Object.assign({}, attrs, { 'data-action': 'delete-endpoint' }), focusKey: 'endpoint-delete:' + apiId + '/' + endpoint.id
+            }));
         }
         return QSDom.el('td', null, [
             QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, actions)
@@ -531,17 +531,17 @@
         return endpoint?.auth === 'required' ? 'required' : null;
     }
 
-    /** One endpoint-row action button. @returns {HTMLElement} */
-    function _renderEndpointAction(action, apiId, endpointId, title, iconPath, size, extraClass) {
+    /** An endpoint-row action other than the pencil and the bin (Test), drawn in their frame. @returns {HTMLElement} */
+    function _renderEndpointAction(action, apiId, endpointId, title, iconPath) {
         return QSDom.el('button', {
             type: 'button',
-            class: 'admin-btn admin-btn--xs admin-btn--ghost'
-                + (extraClass ? ' ' + extraClass : ''),
+            class: 'admin-btn admin-btn--ghost admin-action',
             'data-action': action,
             'data-api': apiId,
             'data-endpoint': endpointId,
-            title: title
-        }, [QSDom.iconEl(iconPath, size)]);
+            title: title,
+            'aria-label': title
+        }, [QSDom.iconEl(iconPath, 14)]);
     }
 
     // =========================================================================
@@ -1088,13 +1088,7 @@
             requiredInput,
             QSDom.el('span', { text: requiredLabel })
         ]));
-        row.appendChild(QSDom.el('button', {
-            type: 'button',
-            class: 'admin-btn admin-btn--ghost admin-btn--xs apis-param-row__delete',
-            title: removeLabel,
-            'aria-label': removeLabel,
-            text: '×'
-        }));
+        row.appendChild(QSControls.removeRow(removeLabel, null, { className: 'apis-param-row__delete' }));
 
         rows.appendChild(row);
     }
@@ -1256,58 +1250,44 @@
     // Delete Operations
     // =========================================================================
 
+    /** An API's delete, asked first: the question names the API and its endpoints, the red button says the verb. */
     function promptDeleteApi(apiId) {
         const api = apisData[apiId];
         const endpointCount = (api?.endpoints || []).length;
-        let message = t('apis.confirm.deleteApi', { name: api?.name || apiId });
-        if (endpointCount > 0) {
-            message += ' ' + t(endpointCount !== 1
-                ? 'apis.confirm.deleteApiEndpointsMany'
-                : 'apis.confirm.deleteApiEndpointsOne', { count: endpointCount });
-        }
-        
-        pendingDelete = { type: 'api', apiId: apiId };
-        document.getElementById('confirm-delete-message').textContent = message;
-        openModal(document.getElementById('modal-confirm-delete'));
+        const message = endpointCount > 0
+            ? t(endpointCount !== 1 ? 'apis.confirm.deleteApiEndpointsMany' : 'apis.confirm.deleteApiEndpointsOne', { count: endpointCount })
+            : '';
+        return _askDelete(t('apis.confirm.deleteApi', { name: api?.name || apiId }), message,
+            () => QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId: apiId }));
     }
 
+    /** An endpoint's delete, asked first. */
     function promptDeleteEndpoint(apiId, endpointId) {
         const api = apisData[apiId];
         const endpoint = (api?.endpoints || []).find(ep => ep.id === endpointId);
-        const message = t('apis.confirm.deleteEndpoint', { name: endpoint?.name || endpointId });
-        
-        pendingDelete = { type: 'endpoint', apiId: apiId, endpointId: endpointId };
-        document.getElementById('confirm-delete-message').textContent = message;
-        openModal(document.getElementById('modal-confirm-delete'));
+        return _askDelete(t('apis.confirm.deleteEndpoint', { name: endpoint?.name || endpointId }), '',
+            () => QuickSiteAdmin.apiRequest('editApi', 'POST', { apiId: apiId, deleteEndpoint: endpointId }));
     }
 
-    async function confirmDelete() {
-        if (!pendingDelete) return;
-        
-        try {
-            let response;
-            if (pendingDelete.type === 'api') {
-                response = await QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId: pendingDelete.apiId });
-            } else {
-                response = await QuickSiteAdmin.apiRequest('editApi', 'POST', { 
-                    apiId: pendingDelete.apiId, 
-                    deleteEndpoint: pendingDelete.endpointId 
-                });
-            }
-
-            if (response.ok) {
-                showToast(response.data?.message || t('apis.toast.deleted'), 'success');
-                closeModal(document.getElementById('modal-confirm-delete'));
+    /**
+     * A delete in the panel's one confirm: `send` runs on the verb, the dialog open; a refusal stays in it in the server's
+     * words, and the list is drawn again before it closes, so the focus goes to the next one of its kind.
+     */
+    async function _askDelete(title, message, send) {
+        let said = '';
+        const done = await QuickSiteUtils.confirm(message, {
+            title: title,
+            type: 'danger',
+            confirmText: t('apis.confirm.delete'),
+            action: async () => {
+                const response = await send();
+                if (!response.ok) return { ok: false, message: response.data?.message || t('apis.toast.deleteFailed') };
+                said = response.data?.message || t('apis.toast.deleted');
                 await loadApis();
-            } else {
-                showToast(response.data?.message || t('apis.toast.deleteFailed'), 'error');
+                return true;
             }
-        } catch (error) {
-            console.error('Failed to delete:', error);
-            showToast(t('apis.toast.deleteFailedDetail', { message: error.message }), 'error');
-        }
-        
-        pendingDelete = null;
+        });
+        if (done) showToast(said, 'success');
     }
 
     // =========================================================================
@@ -2760,21 +2740,29 @@
     async function _applyImportPrivacy(apiId, apiData) {
         const p = (apiData && apiData.privacy) || {};
         const labelToId = {};
+        // What the server refused, in its own words: shown once the import is done.
+        const refused = [];
+        const send = async (command, body) => {
+            try {
+                const r = await QuickSiteAdmin.apiRequest(command, 'POST', body);
+                if (!r || !r.ok) refused.push((r && r.data && r.data.message) || command);
+                return !!(r && r.ok);
+            } catch (e) {
+                refused.push(String((e && e.message) || e));
+                return false;
+            }
+        };
         if (Array.isArray(p.collects)) {
             for (const c of p.collects) {
                 if (!c || !c.label) continue;
                 const id = _privSlug(c.label);
                 if (!id) continue;
                 labelToId[c.label] = id;
-                try {
-                    await QuickSiteAdmin.apiRequest('setCollectedDatum', 'POST', { id, label: c.label, purpose: c.purpose || '' });
-                } catch (e) { console.warn('[apis] setCollectedDatum failed', id, e); }
+                await send('setCollectedDatum', { id, label: c.label, purpose: c.purpose || '' });
             }
         }
         if (p.host === 'self' || p.host === 'third-party') {
-            try {
-                await QuickSiteAdmin.apiRequest('setPrivacyHost', 'POST', { baseUrl: apiData.baseUrl, kind: p.host, name: p.name || '', privacyUrl: p.url || '' });
-            } catch (e) { console.warn('[apis] setPrivacyHost failed', apiData.baseUrl, e); }
+            await send('setPrivacyHost', { baseUrl: apiData.baseUrl, kind: p.host, name: p.name || '', privacyUrl: p.url || '' });
         }
         for (const endpoint of (apiData.endpoints || [])) {
             const fields = endpoint.privacy && endpoint.privacy.fields;
@@ -2784,11 +2772,10 @@
             for (const field of Object.keys(fields)) {
                 const id = labelToId[fields[field]];
                 if (!id) continue; // unknown label — flagged in preview, skip
-                try {
-                    await QuickSiteAdmin.apiRequest('setPrivacyMapping', 'POST', { endpoint: apiId + '/' + epId, field: field, datum: id });
-                } catch (e) { console.warn('[apis] setPrivacyMapping failed', apiId, epId, field, e); }
+                await send('setPrivacyMapping', { endpoint: apiId + '/' + epId, field: field, datum: id });
             }
         }
+        if (refused.length) showToast(t('apis.toast.privacyRefused', { reasons: refused.join(' · ') }), 'warning');
     }
 
     async function handleImportConfirm() {

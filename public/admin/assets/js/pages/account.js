@@ -81,42 +81,18 @@
     // ============================================================
 
     /**
-     * Confirm modal. Same shape as the members page's, kept local rather than
-     * shared: the two differ in root node and in nothing else today, and a
-     * premature shared modal module would have to guess at both pages' futures.
+     * A question in the panel's one confirm (QuickSiteUtils.confirm): its title, what it shows (body), Cancel and the
+     * verb. `act` runs on the verb with the question open: true closes it, {ok: false, message} keeps it open showing
+     * those words. Answers whether it was done.
      */
-    function _renderModal(title, bodyNodes, confirmLabel, danger, onConfirm) {
-        var root = document.getElementById('account-modal-root');
-        if (!root) return null;
-        clearNode(root);
-
-        function close() { clearNode(root); }
-
-        var confirmBtn = el('button', {
-            class: 'admin-btn ' + (danger ? 'admin-btn--danger' : 'admin-btn--primary'),
-            type: 'button',
-            onclick: function () {
-                confirmBtn.disabled = true;
-                onConfirm(close, confirmBtn);
-            },
-        }, [confirmLabel]);
-
-        var modal = el('div', { class: 'admin-modal' }, [
-            el('div', { class: 'admin-modal__backdrop', onclick: close }),
-            el('div', { class: 'admin-modal__content' }, [
-                el('div', { class: 'admin-modal__header' }, [
-                    el('h3', { class: 'admin-modal__title', text: title }),
-                    el('button', { class: 'admin-modal__close', type: 'button', 'aria-label': T.cancel || 'Cancel', onclick: close }, ['×']),
-                ]),
-                el('div', { class: 'admin-modal__body' }, bodyNodes),
-                el('div', { class: 'admin-modal__footer' }, [
-                    el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', onclick: close }, [T.cancel || 'Cancel']),
-                    confirmBtn,
-                ]),
-            ]),
-        ]);
-        root.appendChild(modal);
-        return { close: close };
+    function ask(title, body, verb, danger, act) {
+        return QuickSiteUtils.confirm('', {
+            title: title,
+            body: body,
+            confirmText: verb,
+            type: danger ? 'danger' : 'info',
+            action: act,
+        });
     }
 
     /** One project standing between the caller and deleting their account. */
@@ -214,24 +190,24 @@
         if (!btn) return;
 
         btn.addEventListener('click', function () {
-            _renderModal(
+            ask(
                 T.everywhereTitle || 'Sign out everywhere?',
                 [el('p', { text: T.everywhereBody || '' })],
                 T.everywhereBtn || 'Sign out everywhere', false,
-                function (close) {
-                    api('logoutSession', { everywhere: true }).then(function (res) {
-                        close();
-                        if (res && res.ok) {
-                            toast(T.everywhereDone || 'Signed out everywhere.', 'success');
-                            toLogin();
-                            return;
-                        }
-                        toast(serverMessage(res), 'error');
-                    }).catch(function () {
+                async function () {
+                    var res;
+                    try {
+                        res = await api('logoutSession', { everywhere: true });
+                    } catch (e) {
                         // The session may already be gone — the login page is the
                         // right destination either way.
                         toLogin();
-                    });
+                        return true;
+                    }
+                    if (!res || !res.ok) return { ok: false, message: serverMessage(res) };
+                    toast(T.everywhereDone || 'Signed out everywhere.', 'success');
+                    toLogin();
+                    return true;
                 }
             );
         });
@@ -265,29 +241,24 @@
                 return;
             }
 
-            _renderModal(
+            ask(
                 T.deleteTitle || 'Delete your account — final confirmation',
                 [el('p', { text: T.deleteBody || '' })],
                 T.deleteBtn || 'Delete my account', true,
-                function (close) {
-                    account('delete', { current_password: password, username: typed, confirm: true }).then(function (res) {
-                        close();
-                        if (res && res.ok) {
-                            toast(T.deleteDone || 'Your account has been deleted.', 'success');
-                            toLogin();
-                            return;
-                        }
-                        // 409 account.sole_owner names the projects that block the
-                        // deletion — list them instead of leaving the user to guess.
-                        var data = (res && res.data && res.data.data) || {};
-                        if (res && res.status === 409 && Array.isArray(data.owned_projects)) {
-                            showBlockers(data.owned_projects);
-                        }
-                        toast(credentialRefusal(res, T.wrongCredentials || 'Your current password or your username is not correct.'),
-                            (res && (res.status === 409 || res.status === 429)) ? 'warning' : 'error');
-                    }).catch(function (err) {
-                        toast((err && err.message) || String(err), 'error');
-                    });
+                async function () {
+                    var res = await account('delete', { current_password: password, username: typed, confirm: true });
+                    if (res && res.ok) {
+                        toast(T.deleteDone || 'Your account has been deleted.', 'success');
+                        toLogin();
+                        return true;
+                    }
+                    // 409 account.sole_owner names the projects that block the
+                    // deletion — list them instead of leaving the user to guess.
+                    var data = (res && res.data && res.data.data) || {};
+                    if (res && res.status === 409 && Array.isArray(data.owned_projects)) {
+                        showBlockers(data.owned_projects);
+                    }
+                    return { ok: false, message: credentialRefusal(res, T.wrongCredentials || 'Your current password or your username is not correct.') };
                 }
             );
         });

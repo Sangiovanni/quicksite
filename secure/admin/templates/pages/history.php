@@ -91,6 +91,11 @@ window.QS_HISTORY_I18N = <?= json_encode([
             'storedDays'      => __admin('history.clear.storedDays'),
             'dayGranularHint' => __admin('history.clear.dayGranularHint'),
             'done'            => __admin('history.clear.done'),
+            'title'           => __admin('history.clear.title'),
+            'confirmButton'   => __admin('history.clear.confirmButton'),
+            'preview'         => __admin('history.clear.preview'),
+            'previewFailed'   => __admin('history.clear.previewFailed'),
+            'failed'          => __admin('history.clear.failed'),
         ],
     ],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
@@ -164,12 +169,8 @@ window.QS_HISTORY_I18N = <?= json_encode([
                 </svg>
                 <?= __admin('history.exportCsv', 'Export CSV') ?>
             </button>
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--danger"
+            <button type="button" class="admin-btn admin-btn--danger"
                     id="history-clear" data-requires-command="clearCommandHistory">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
                 <?= __admin('history.clearHistory') ?>
             </button>
         </div>
@@ -205,60 +206,36 @@ window.QS_HISTORY_I18N = <?= json_encode([
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title"><?= __admin('history.columns.details') ?></h3>
-            <button class="admin-modal__close" data-action="close-detail">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
+            <button type="button" class="admin-modal__close" data-action="close-detail" data-qs-icon="close"
+                    aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body" id="detail-content"></div>
     </div>
 </div>
 
 <!--
-  Clear Modal.
+  What Clear History asks, shown in the panel's one confirm (history.js clones it into its body).
 
-  ⚠ DESTRUCTIVE AND IRREVERSIBLE, so the dialog does not ask "are you sure" over
+  ⚠ DESTRUCTIVE AND IRREVERSIBLE, so the question does not ask "are you sure" over
   an unknown quantity. `clearCommandHistory` answers a PREVIEW when called
   without `confirm` — files, entries and kilobytes that would go — and the
-  confirm button stays disabled until that preview has come back. What is being
+  Delete button stays disabled until that preview has come back. What is being
   destroyed is stated in numbers before anything is destroyed.
 
   ⚠ The command deletes entries recorded strictly BEFORE the chosen date and
-  refuses a future one, so today's entries cannot be cleared. The dialog says so
+  refuses a future one, so today's entries cannot be cleared. The question says so
   rather than letting the operator discover it.
 -->
-<div class="admin-modal" id="clear-modal" style="display: none;">
-    <div class="admin-modal__backdrop" data-action="close-clear"></div>
-    <div class="admin-modal__content">
-        <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('history.clearHistory') ?></h3>
-            <button class="admin-modal__close" data-action="close-clear">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
-        </div>
-        <div class="admin-modal__body">
-            <p><?= __admin('history.clear.intro', 'Deletes stored command history for this project. This cannot be undone.') ?></p>
+<template id="history-clear-body">
+    <div class="history-clear">
+        <p><?= __admin('history.clear.intro', 'Deletes stored command history for this project. This cannot be undone.') ?></p>
 
-            <div class="admin-filter-group" style="margin: var(--space-md) 0;">
-                <label class="admin-label" for="clear-before"><?= __admin('history.clear.beforeLabel', 'Delete whole days before') ?></label>
-                <input type="date" id="clear-before" class="admin-input">
-                <small><?= __admin('history.clear.beforeHint', 'History is stored one file per day and is deleted a whole day at a time. Days from this date onwards are kept, so today is never deleted.') ?></small>
-            </div>
+        <div class="admin-filter-group">
+            <label class="admin-label" for="clear-before"><?= __admin('history.clear.beforeLabel', 'Delete whole days before') ?></label>
+            <input type="date" id="clear-before" class="admin-input">
+            <small><?= __admin('history.clear.beforeHint', 'History is stored one file per day and is deleted a whole day at a time. Days from this date onwards are kept, so today is never deleted.') ?></small>
+        </div>
 
-            <div id="clear-preview" class="admin-alert admin-alert--info"></div>
-        </div>
-        <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--outline" data-action="close-clear">
-                <?= __admin('common.cancel') ?>
-            </button>
-            <button type="button" class="admin-btn admin-btn--danger" id="clear-confirm" disabled>
-                <?= __admin('history.clear.confirmButton', 'Delete permanently') ?>
-            </button>
-        </div>
+        <div id="clear-preview" class="admin-alert admin-alert--info"></div>
     </div>
-</div>
+</template>

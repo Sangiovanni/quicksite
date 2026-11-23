@@ -122,12 +122,6 @@
     text-decoration: underline;
 }
 
-/* The base .admin-modal__content is 90% wide with no ceiling, which is right for
-   the editor's big panels and far too wide for a confirmation. */
-.admin-modal--builds .admin-modal__content {
-    max-width: 520px;
-}
-
 .builds-modal__name {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: var(--font-size-sm);

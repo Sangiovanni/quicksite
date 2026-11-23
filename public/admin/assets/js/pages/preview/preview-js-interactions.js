@@ -8,9 +8,6 @@
 (function() {
     'use strict';
 
-    // A response-binding row's delete cross (inner SVG markup for QSDom.iconEl).
-    const ICON_ROW_DELETE = '<path d="M18 6L6 18M6 6l12 12"/>';
-
     // ==================== Module State ====================
     
     let currentJsContext = null;
@@ -660,36 +657,43 @@
         ].concat(interactions.map((interaction, indexInEvent) => _renderInteractionRow(event, interaction, indexInEvent))));
     }
 
-    /** One interaction: its call (the function and its params, as text) and its Edit and Delete buttons. */
+    /** An interaction's call as its row shows it, and as its delete question names it: the function and its params. */
+    function _callText(interaction) {
+        return interaction.function + '(' + (interaction.params?.join(', ') || '') + ')';
+    }
+
+    /** One interaction: its call (as text), its pencil and its bin. */
     function _renderInteractionRow(event, interaction, indexInEvent) {
-        const button = (cls, label) => QSDom.el('button', {
-            type: 'button', class: 'admin-btn admin-btn--xs ' + cls, 'data-event': event, 'data-index': String(indexInEvent)
-        }, [label]);
-        return QSDom.el('div', { class: 'preview-js-interaction', 'data-event': event, 'data-index': String(indexInEvent) }, [
+        const where = { 'data-event': event, 'data-index': String(indexInEvent) };
+        const key = event + '|' + indexInEvent;
+        return QSDom.el('div', Object.assign({ class: 'preview-js-interaction' }, where), [
             QSDom.el('div', { class: 'preview-js-interaction__body' }, [
-                QSDom.el('div', { class: 'preview-js-interaction__function', text: interaction.function + '(' + (interaction.params?.join(', ') || '') + ')' })
+                QSDom.el('div', { class: 'preview-js-interaction__function', text: _callText(interaction) })
             ]),
             QSDom.el('div', { class: 'preview-js-interaction__actions' }, [
-                button('js-edit-btn', PreviewConfig.i18n?.edit || 'Edit'),
-                ' ',
-                button('admin-btn--danger js-delete-btn', PreviewConfig.i18n?.delete || 'Delete')
+                QSControls.edit(PreviewConfig.i18n?.edit || 'Edit', () => editInteraction(event, indexInEvent),
+                    { focusKey: 'interaction-edit:' + key, attrs: where }),
+                QSControls.bin(PreviewConfig.i18n?.delete || 'Delete', () => deleteInteraction(event, indexInEvent, _callText(interaction)),
+                    { className: 'js-delete-btn', focusKey: 'interaction-delete:' + key, attrs: where })
             ])
         ]);
     }
 
-    /**
-     * One page event: its event, its call (as text) and its edit and delete buttons. Both buttons
-     * carry the `__delete` class (their size and place); the `--edit` modifier tells them apart.
-     */
+    /** One page event: its event, its call (as text), its pencil and its bin. */
     function _renderPageEventItem(interaction) {
-        const button = (cls, title, iconPaths) => QSDom.el('button', {
-            type: 'button', class: cls, 'data-event': interaction.event, 'data-index': String(interaction.index), title: title
-        }, [QSDom.iconEl(iconPaths, 14)]);
+        const where = { 'data-event': interaction.event, 'data-index': String(interaction.index) };
+        const key = interaction.event + '|' + interaction.index;
         return QSDom.el('div', { class: 'preview-contextual-js-page-events__item' }, [
             QSDom.el('span', { class: 'preview-contextual-js-page-events__event-badge', text: interaction.event }),
-            QSDom.el('code', { class: 'preview-contextual-js-page-events__code', text: interaction.function + '(' + (interaction.params?.join(', ') || '') + ')' }),
-            button('preview-contextual-js-page-events__delete preview-contextual-js-page-events__edit', PreviewConfig.i18n?.edit || 'Edit', QuickSiteUtils.ICON_PATHS.edit),
-            button('preview-contextual-js-page-events__delete', PreviewConfig.i18n?.delete || 'Delete', QuickSiteUtils.ICON_PATHS.close)
+            QSDom.el('code', { class: 'preview-contextual-js-page-events__code', text: _callText(interaction) }),
+            QSControls.edit(PreviewConfig.i18n?.edit || 'Edit', (e) => {
+                e.stopPropagation();
+                editPageEventEntry(interaction.event, interaction.index);
+            }, { className: 'preview-contextual-js-page-events__edit', focusKey: 'page-event-edit:' + key, attrs: where }),
+            QSControls.bin(PreviewConfig.i18n?.delete || 'Delete', (e) => {
+                e.stopPropagation();
+                deletePageEvent(interaction.event, interaction.index, _callText(interaction));
+            }, { focusKey: 'page-event-delete:' + key, attrs: where })
         ]);
     }
 
@@ -721,34 +725,17 @@
         
         listEl.replaceChildren(QSDom.el('div', {},
             Object.entries(byEvent).map(([event, interactions]) => _renderEventGroup(event, interactions))));
-        
-        // Attach event listeners to edit/delete buttons
-        listEl.querySelectorAll('.js-edit-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                editInteraction(btn.dataset.event, parseInt(btn.dataset.index));
-            });
-        });
-        
-        listEl.querySelectorAll('.js-delete-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                deleteInteraction(btn.dataset.event, parseInt(btn.dataset.index));
-            });
-        });
     }
 
     // ==================== Delete Interaction ====================
     
     /**
-     * Delete an interaction
+     * Delete an interaction: the question shows its call, and the delete runs on its verb, the list
+     * drawn again before the question closes (a refusal keeps it open with the server's words).
      */
-    async function deleteInteraction(eventName, index) {
+    async function deleteInteraction(eventName, index, call) {
         if (!currentJsContext) return;
-        
-        const confirmMsg = PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?';
-        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) {
-            return;
-        }
-        
+
         const { struct, nodeId } = currentJsContext;
         
         let structType = struct;
@@ -768,34 +755,32 @@
         if (pageName) {
             body.pageName = pageName;
         }
-        
-        try {
-            const response = await QuickSiteAdmin.apiRequest('deleteInteraction', 'DELETE', body);
 
-            const result = response.data || {};
-            
-            if (!response.ok) {
-                throw new Error(result.message || 'Failed to delete interaction');
+        await QuickSiteUtils.confirm(call || '', {
+            title: PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?',
+            type: 'danger',
+            confirmText: PreviewConfig.i18n?.delete || 'Delete',
+            action: async () => {
+                try {
+                    const response = await QuickSiteAdmin.apiRequest('deleteInteraction', 'DELETE', body);
+                    const result = response.data || {};
+                    if (!response.ok) {
+                        return { ok: false, message: result.message || 'Failed to delete interaction' };
+                    }
+                } catch (error) {
+                    console.error('[PreviewJsInteractions] Delete error:', error);
+                    return { ok: false, message: error.message };
+                }
+                if (showToastFn) {
+                    showToastFn(PreviewConfig.i18n?.interactionDeleted || 'Interaction deleted', 'success');
+                }
+                await loadInteractions();
+                if (reloadPreviewFn) {
+                    reloadPreviewFn();
+                }
+                return true;
             }
-            
-            if (showToastFn) {
-                showToastFn(PreviewConfig.i18n?.interactionDeleted || 'Interaction deleted', 'success');
-            }
-            
-            // Refresh list
-            await loadInteractions();
-            
-            // Reload preview
-            if (reloadPreviewFn) {
-                reloadPreviewFn();
-            }
-            
-        } catch (error) {
-            console.error('[PreviewJsInteractions] Delete error:', error);
-            if (showToastFn) {
-                showToastFn('Error: ' + error.message, 'error');
-            }
-        }
+        });
     }
 
     // ==================== Edit Interaction ====================
@@ -1632,13 +1617,8 @@
             updatePreview();
         });
 
-        // Delete button
-        var del = document.createElement('button');
-        del.type = 'button';
-        del.className = 'preview-contextual-js-form-action-delete';
-        del.title = 'Remove action';
-        del.textContent = '×';
-        del.addEventListener('click', function() {
+        // The row's ×: the action leaves the list (nothing is written until Save)
+        var del = QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove', function() {
             postFetchActionsState.splice(idx, 1);
             renderActionsList();
             updatePreview();
@@ -3543,12 +3523,8 @@
                 const label = document.createElement('span');
                 label.className = 'preview-js-picker-chip-label';
                 label.textContent = part;
-                const close = document.createElement('button');
-                close.type = 'button';
-                close.className = 'preview-js-picker-chip-remove';
-                close.setAttribute('aria-label', 'Remove ' + part);
-                close.textContent = '✕';
-                close.addEventListener('click', (e) => {
+                const removeLabel = (PreviewConfig.i18n?.removeNamed || 'Remove “{name}”').replace('{name}', () => part);
+                const close = QSControls.removeRow(removeLabel, (e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     chips.splice(i, 1);
@@ -3794,14 +3770,10 @@
                 return;
             }
             
+            // The arguments as Save writes them: an empty one keeps its place, the empty ones at the end go
             const paramInputs = jsFormParams?.querySelectorAll('.preview-contextual-js-form-input') || [];
-            const params = [];
-            paramInputs.forEach(input => {
-                if (input.value.trim()) {
-                    params.push(input.value.trim());
-                }
-            });
-            
+            const params = _collectPositionalParams(paramInputs);
+
             let preview = '{{call:' + fnName;
             if (params.length > 0) {
                 preview += ':' + params.join(',');
@@ -4169,47 +4141,33 @@
         }
         
         peList.replaceChildren(...interactions.map(_renderPageEventItem));
-
-        // Attach edit handlers (must run BEFORE the delete-handler selector so
-        // the more-specific `--edit` selector wins).
-        peList.querySelectorAll('.preview-contextual-js-page-events__edit').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                editPageEventEntry(btn.dataset.event, parseInt(btn.dataset.index));
-            });
-        });
-
-        // Attach delete handlers — skip the edit button by checking the modifier.
-        peList.querySelectorAll('.preview-contextual-js-page-events__delete').forEach(function(btn) {
-            if (btn.classList.contains('preview-contextual-js-page-events__edit')) return;
-            btn.addEventListener('click', function(e) {
-                e.stopPropagation();
-                deletePageEvent(btn.dataset.event, parseInt(btn.dataset.index));
-            });
-        });
     }
-    
+
     /**
-     * Delete a page event
+     * Delete a page event: the question shows its call, and the delete runs on its verb, the list
+     * drawn again before the question closes (a refusal keeps it open with the server's words).
      */
-    async function deletePageEvent(eventName, index) {
+    async function deletePageEvent(eventName, index, call) {
         if (!currentPageName) return;
-        if (!(await QuickSiteUtils.confirm(PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?', { type: 'danger' }))) return;
-        
-        try {
-            var response = await QuickSiteAdmin.apiRequest('deletePageEvent', 'DELETE', { pageName: currentPageName, event: eventName, index: index });
-            
-            var result = response.data || {};
-            if (!response.ok) throw new Error(result.message || 'Failed to delete');
-            
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.interactionDeleted || 'Deleted', 'success');
-            await loadPageEvents();
-            if (reloadPreviewFn) reloadPreviewFn();
-            
-        } catch (error) {
-            console.error('[PreviewJsInteractions] Delete page event error:', error);
-            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
-        }
+        await QuickSiteUtils.confirm(call || '', {
+            title: PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?',
+            type: 'danger',
+            confirmText: PreviewConfig.i18n?.delete || 'Delete',
+            action: async function() {
+                try {
+                    var response = await QuickSiteAdmin.apiRequest('deletePageEvent', 'DELETE', { pageName: currentPageName, event: eventName, index: index });
+                    var result = response.data || {};
+                    if (!response.ok) return { ok: false, message: result.message || 'Failed to delete' };
+                } catch (error) {
+                    console.error('[PreviewJsInteractions] Delete page event error:', error);
+                    return { ok: false, message: error.message };
+                }
+                if (showToastFn) showToastFn(PreviewConfig.i18n?.interactionDeleted || 'Deleted', 'success');
+                await loadPageEvents();
+                if (reloadPreviewFn) reloadPreviewFn();
+                return true;
+            }
+        });
     }
 
     /**
@@ -4512,12 +4470,8 @@
             }
             
             var paramInputs = peFormParams?.querySelectorAll('.preview-contextual-js-form-input') || [];
-            var params = [];
-            paramInputs.forEach(function(input) {
-                if (input.value.trim()) params.push(input.value.trim());
-            });
-            params = params.concat(_pageEventUnshownParams('function', paramInputs.length, fnName));
-            
+            var params = _pageEventFunctionParams(paramInputs, fnName);
+
             var preview = '{{call:' + fnName;
             if (params.length > 0) preview += ':' + params.join(',');
             preview += '}}';
@@ -4542,6 +4496,18 @@
         if (kind === 'api') return savedIsApi ? saved.params.slice(shownCount) : [];
         if (savedIsApi || saved.function !== fnName) return [];
         return saved.params.slice(shownCount);
+    }
+
+    /**
+     * A page event's function arguments as Save writes them, and as the preview line shows them: each input in its
+     * place, an empty one in the middle kept and the empty ones at the end dropped (_collectPositionalParams); when the
+     * edited event holds arguments the form does not show, every input keeps its place, the empty ones at the end
+     * included, so what follows them stays where it was.
+     */
+    function _pageEventFunctionParams(paramInputs, fnName) {
+        var unshown = _pageEventUnshownParams('function', paramInputs.length, fnName);
+        if (unshown.length === 0) return _collectPositionalParams(paramInputs);
+        return Array.from(paramInputs).map(function(input) { return (input.value || '').trim(); }).concat(unshown);
     }
     
     /**
@@ -4591,12 +4557,7 @@
                 return;
             }
             _clearArgErrors(peFormParams);
-            params = _collectPositionalParams(peParamInputs);
-            var peUnshown = _pageEventUnshownParams('function', peParamInputs.length, fnName);
-            if (peUnshown.length > 0) {
-                // The inputs keep their places, an empty one included, so what follows them stays where it was
-                params = Array.from(peParamInputs).map(function(input) { return (input.value || '').trim(); }).concat(peUnshown);
-            }
+            params = _pageEventFunctionParams(peParamInputs, fnName);
         }
         
         var isEdit = !!editingPageEvent;
@@ -4778,7 +4739,7 @@
     }
 
     /**
-     * One store summary card: id badge + endpoint/field summary + edit/delete.
+     * One store summary card: id badge + endpoint/field summary + its pencil and its bin.
      */
     function _renderStoreCard(id, def) {
         var card = document.createElement('div');
@@ -4797,52 +4758,55 @@
         code.textContent = summary;
         card.appendChild(code);
 
-        var editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.className = 'preview-contextual-js-page-events__delete';
-        editBtn.title = PreviewConfig.i18n?.edit || 'Edit';
-        editBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.edit, 12));
-        editBtn.addEventListener('click', function(e) { e.stopPropagation(); handleStateStoreEdit(id); });
-        card.appendChild(editBtn);
-
-        var delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.className = 'preview-contextual-js-page-events__delete';
-        delBtn.title = PreviewConfig.i18n?.delete || 'Delete';
-        delBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 12));
-        delBtn.addEventListener('click', function(e) { e.stopPropagation(); deleteStore(id); });
-        card.appendChild(delBtn);
+        var named = function(word, fallback) { return (PreviewConfig.i18n?.[word] || fallback).replace('{name}', function() { return id; }); };
+        card.appendChild(QSControls.edit(named('editNamed', 'Edit “{name}”'), function(e) {
+            e.stopPropagation();
+            handleStateStoreEdit(id);
+        }, { focusKey: 'store-edit:' + id }));
+        card.appendChild(QSControls.bin(named('deleteNamed', 'Delete “{name}”'), function(e) {
+            e.stopPropagation();
+            deleteStore(id);
+        }, { focusKey: 'store-delete:' + id }));
 
         return card;
     }
 
     /**
-     * Delete one store (read-modify-write: send the route's full set minus it).
+     * Delete one store (read-modify-write: send the route's full set minus it). The question names the store,
+     * and the write runs on its verb, the list drawn again before the question closes (a refusal keeps it open
+     * with the server's words).
      */
     async function deleteStore(id) {
         if (!currentPageName) return;
-        if (!(await QuickSiteUtils.confirm((PreviewConfig.i18n?.confirmDeleteStateStore || 'Delete state store "%s"?').replace('%s', id), { type: 'danger' }))) return;
         var stores = Object.assign({}, ssCurrentStores);
         delete stores[id];
-        try {
-            var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
-            var result = response.data || {};
-            if (!response.ok) throw new Error(result.message || 'Failed to delete');
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreDeleted || 'State store deleted', 'success');
-            await loadStateStores();
-            // Tell the data-attribute picker its cached store list is
-            // stale — next pick of a store-field attribute (data-state-*)
-            // will refetch and see the just-written change. Otherwise
-            // the user has to hard-refresh the editor to see a new /
-            // imported / deleted store in the picker dropdown.
-            if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
-                window.QSComplexWizard.invalidateDataAttrStoresCache();
+        await QuickSiteUtils.confirm('', {
+            title: (PreviewConfig.i18n?.confirmDeleteStateStore || 'Delete state store "%s"?').replace('%s', function() { return id; }),
+            type: 'danger',
+            confirmText: PreviewConfig.i18n?.delete || 'Delete',
+            action: async function() {
+                try {
+                    var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
+                    var result = response.data || {};
+                    if (!response.ok) return { ok: false, message: result.message || 'Failed to delete' };
+                } catch (error) {
+                    console.error('[PreviewJsInteractions] Delete state store error:', error);
+                    return { ok: false, message: error.message };
+                }
+                if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreDeleted || 'State store deleted', 'success');
+                await loadStateStores();
+                // Tell the data-attribute picker its cached store list is
+                // stale — next pick of a store-field attribute (data-state-*)
+                // will refetch and see the just-written change. Otherwise
+                // the user has to hard-refresh the editor to see a new /
+                // imported / deleted store in the picker dropdown.
+                if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
+                    window.QSComplexWizard.invalidateDataAttrStoresCache();
+                }
+                if (reloadPreviewFn) reloadPreviewFn();
+                return true;
             }
-            if (reloadPreviewFn) reloadPreviewFn();
-        } catch (error) {
-            console.error('[PreviewJsInteractions] Delete state store error:', error);
-            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
-        }
+        });
     }
 
     /**
@@ -4982,13 +4946,9 @@
         if (name) nameInput.value = name;
         nameInput.addEventListener('input', updateStateStorePreview);
         head.appendChild(nameInput);
-        var removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'preview-contextual-js-page-events__delete ss-field-remove';
-        removeBtn.title = PreviewConfig.i18n?.delete || 'Remove';
-        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 12));
-        removeBtn.addEventListener('click', function() { row.remove(); updateStateStorePreview(); });
-        head.appendChild(removeBtn);
+        // The field's ×: it leaves the store's form (nothing is written until Save store)
+        head.appendChild(QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove',
+            function() { row.remove(); updateStateStorePreview(); }, { className: 'ss-field-remove' }));
         row.appendChild(head);
 
         // Direction
@@ -5585,10 +5545,26 @@
     }
 
     /**
-     * Show/hide the response bindings section and populate it when an endpoint is selected.
+     * Whether this role is offered the Response Mapping: its rows are saved into the API's endpoint with
+     * editApi, so a role without that command is not shown them, and its Save writes the interaction alone
+     * (no row, no editApi). The server still decides what runs; this decides what the editor offers.
+     */
+    function _canBindResponses() {
+        return !!(window.QuickSiteAdmin && QuickSiteAdmin.permissions && QuickSiteAdmin.permissions.loaded
+            && typeof QuickSiteAdmin.canRun === 'function' && QuickSiteAdmin.canRun('editApi'));
+    }
+
+    /**
+     * Show/hide the response bindings section and populate it when an endpoint is selected (never for a
+     * role that cannot save them: _canBindResponses()).
      */
     function showBindingsForEndpoint(endpointSelect, container, rowsEl) {
         if (!container || !rowsEl) return;
+        if (!_canBindResponses()) {
+            container.style.display = 'none';
+            rowsEl.replaceChildren();
+            return;
+        }
 
         // Determine which API select to use based on context
         var apiSelect = (container.id && container.id.indexOf('page-event') !== -1)
@@ -6310,7 +6286,7 @@
      * For scalar fields:        [field] [selector]   [attribute input]
      * For array fields (list):  [field] [container]  [empty text + hint]
      * For array fields (compL): [field] [container]  [component + fieldMap + warnings + empty]
-     * Delete button floats top-right on hover.
+     * The row's × ends its top line.
      */
     function addBindingRow(rowsEl, apiSelect, endpointSelect, existing) {
         if (!rowsEl) return;
@@ -6662,15 +6638,10 @@
         row.appendChild(modeRow);
         row.appendChild(bottomRow);
 
-        // ── Delete button ──
-        var deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'preview-contextual-js-response-bindings__row-delete';
-        deleteBtn.title = PreviewConfig.i18n?.delete || 'Remove';
-        deleteBtn.appendChild(QSDom.iconEl(ICON_ROW_DELETE, 0));
-        deleteBtn.addEventListener('click', function() { row.remove(); });
-        row.appendChild(deleteBtn);
-        
+        // ── The row's × (nothing is written until Save), at the end of its top line ──
+        topRow.appendChild(QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove', function() { row.remove(); },
+            { className: 'preview-contextual-js-response-bindings__row-delete' }));
+
         rowsEl.appendChild(row);
     }
     

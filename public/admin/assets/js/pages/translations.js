@@ -144,10 +144,14 @@
         }
         dom.notice.hidden = !state.failed;
         if (state.failed) dom.notice.replaceChildren(t('loadFailed') + ' ', _renderRetry());
+        // A reload under the focus (a delete, a word saved in another tab) gives it to the control that took its place.
+        const at = document.activeElement;
+        const focusBack = at && (dom.table.contains(at) || dom.languages.contains(at)) ? window.QSDom.rememberFocus(at) : null;
         drawLanguages();
         drawScope();
         drawAddForm();
         drawTable();
+        if (focusBack) focusBack.restore();
     }
 
     function permissionsKnown() {
@@ -209,15 +213,13 @@
         const actions = [];
         if (list.multilingual && !lang.isDefault && state.can.setDefault) {
             actions.push(el('button', {
-                type: 'button', class: 'admin-btn admin-btn--ghost', text: t('makeDefault'),
+                type: 'button', class: 'admin-btn admin-btn--ghost', text: t('makeDefault'), 'data-focus-key': 'lang-default:' + lang.code,
                 onclick: function () { askMakeDefault(lang); },
             }));
         }
         if (list.multilingual && !lang.isDefault && state.can.deleteLang) {
-            actions.push(el('button', {
-                type: 'button', class: 'admin-btn admin-btn--ghost translations-language__remove', text: t('removeLanguage'),
-                onclick: function (e) { askRemoveLanguage(lang, words, e.currentTarget); },
-            }));
+            actions.push(window.QSControls.bin(t('removeLanguageNamed', { language: lang.name }),
+                function (e) { askRemoveLanguage(lang, words, e.currentTarget); }, { focusKey: 'lang-delete:' + lang.code }));
         }
         return el('div', { class: 'translations-language' + (lang.isDefault ? ' translations-language--default' : '') }, [
             head,
@@ -405,20 +407,9 @@
         ]);
         const cells = row.cells.map(function (cell) { return _renderCell(row, cell); });
         const actions = state.can.remove ? [el('td', { class: 'translations-table__actions' }, [
-            _renderIconButton(QuickSiteUtils.ICON_PATHS.trash, t('deleteKey', { key: row.key }), 'translations-row__delete',
-                function () { askDelete(row); }),
+            window.QSControls.bin(t('deleteKey', { key: row.key }), function () { askDelete(row); }, { focusKey: 'key-delete:' + row.key }),
         ])] : [];
         return el('tr', { 'data-key': row.key }, [keyCell].concat(cells, actions));
-    }
-
-    function _renderIconButton(icon, label, cls, onClick) {
-        const btn = el('button', {
-            type: 'button', class: 'admin-btn admin-btn--ghost admin-btn--icon-only ' + cls, 'aria-label': label, title: label,
-            onclick: onClick,
-        });
-        const svg = window.QSDom.iconEl(icon, 0);
-        if (svg) btn.appendChild(svg);
-        return btn;
     }
 
     /** One language's word for a key: the word as stored, or the gap; its edit button; or its editor. */
@@ -438,8 +429,8 @@
         }
         const parts = [shown];
         if (state.can.write) {
-            parts.push(_renderIconButton(QuickSiteUtils.ICON_PATHS.edit, t('editIn', { language: cell.lang.name }), 'translations-cell__edit',
-                function () { startEdit(row.key, cell); }));
+            parts.push(window.QSControls.edit(t('editIn', { language: cell.lang.name }), function () { startEdit(row.key, cell); },
+                { className: 'translations-cell__edit', focusKey: 'key-edit:' + row.key + '|' + cell.lang.file }));
         }
         if (cell.same) {
             parts.push(el('span', { class: 'translations-cell__same', text: t('sameMark', { language: languageName(defaultFile()) }) }));
@@ -530,70 +521,23 @@
     // ------------------------------------------------------------------------------------------------ dialogs
 
     /**
-     * A question in the panel's one modal (QuickSiteUtils.openModal): a title with its × at the top right, what
-     * the question needs to say, and Cancel / the action. The action's answer {ok, message} closes it, or shows the
-     * server's words and keeps it open.
+     * A question in the panel's one confirm (QuickSiteUtils.confirm): its title, what the question needs to say (the
+     * body), Cancel and the action's verb. The action runs with the question open: its answer {ok, message} closes it,
+     * or shows the server's words and keeps it open, so a choice made in the body is not lost.
      */
     function ask(opts) {
-        const id = 'translations-dialog-' + Date.now();
-        const error = el('p', { class: 'translations-dialog__error', role: 'alert' });
-        const closeBtn = el('button', {
-            type: 'button', class: 'admin-modal__close', 'aria-label': t('common.close'), title: t('common.close'), text: '×',
-        });
-        const cancelBtn = el('button', { type: 'button', class: 'admin-btn', text: t('common.cancel') });
-        const actBtn = el('button', {
-            type: 'button', class: 'admin-btn admin-btn--' + (opts.danger ? 'danger' : 'primary'), text: opts.action,
-        });
-        const modal = _renderDialog(id, opts.title, opts.body, error, closeBtn, cancelBtn, actBtn);
-        let shown = null;
-        const close = function () {
-            if (!shown) return;
-            const s = shown;
-            shown = null;
-            s.close();
-        };
-        closeBtn.addEventListener('click', close);
-        cancelBtn.addEventListener('click', close);
-        actBtn.addEventListener('click', async function () {
-            error.textContent = '';
-            window.QSDom.setButtonBusy(actBtn, opts.action);
-            actBtn.disabled = true;
-            cancelBtn.disabled = true;
-            let done;
-            try {
-                done = await opts.run(modal);
-            } finally {
-                actBtn.disabled = false;
-                cancelBtn.disabled = false;
-                actBtn.textContent = opts.action;
-            }
-            if (done && done.ok) {
-                close();
+        return window.QuickSiteUtils.confirm('', {
+            title: opts.title,
+            body: opts.body,
+            type: opts.danger ? 'danger' : 'info',
+            confirmText: opts.action,
+            action: async function () {
+                const done = await opts.run();
+                if (!done || !done.ok) return { ok: false, message: (done && done.message) || '' };
                 if (done.toast) window.QuickSiteAdmin.showToast(done.toast, done.toastType || 'success');
-                return;
-            }
-            error.textContent = (done && done.message) || '';
-        });
-        shown = window.QuickSiteUtils.openModal(modal, {
-            focusable: function () {
-                return [closeBtn].concat(Array.from(modal.querySelectorAll('input, select')), [cancelBtn, actBtn]);
+                return true;
             },
-            first: opts.danger ? cancelBtn : actBtn,
-            dismiss: close,
         });
-    }
-
-    function _renderDialog(id, title, body, error, closeBtn, cancelBtn, actBtn) {
-        return el('div', {
-            class: 'admin-modal-dialog translations-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id,
-        }, [
-            el('div', { class: 'translations-dialog__header' }, [
-                el('h2', { class: 'admin-modal-dialog__title translations-dialog__title', id: id, text: title }),
-                closeBtn,
-            ]),
-            el('div', { class: 'translations-dialog__body' }, body.concat([error])),
-            el('div', { class: 'admin-modal-dialog__actions translations-dialog__actions' }, [cancelBtn, actBtn]),
-        ]);
     }
 
     function _renderParagraph(text) {

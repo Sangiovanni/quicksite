@@ -166,25 +166,6 @@
     function _slug(s) {
         return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     }
-    function _svgIcon(pathD) {
-        var ns = 'http://www.w3.org/2000/svg';
-        var svg = document.createElementNS(ns, 'svg');
-        svg.setAttribute('viewBox', '0 0 24 24');
-        svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
-        svg.setAttribute('stroke-width', '2'); svg.setAttribute('width', '14'); svg.setAttribute('height', '14');
-        svg.setAttribute('aria-hidden', 'true');
-        var p = document.createElementNS(ns, 'path'); p.setAttribute('d', pathD); svg.appendChild(p);
-        return svg;
-    }
-    var ICON_EDIT = 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z';
-    var ICON_TRASH = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2';
-
-    function _iconBtn(pathD, label, onClick) {
-        var b = QSDom.el('button', { class: 'admin-btn admin-btn--ghost privacy-collected__action', 'aria-label': label, title: label, type: 'button', onclick: onClick });
-        b.appendChild(_svgIcon(pathD));
-        return b;
-    }
-
     function _renderCollectedSection(list) {
         var s = QSDom.el('section', { class: 'privacy-section' });
         var head = QSDom.el('div', { class: 'privacy-section__head' });
@@ -201,7 +182,7 @@
             langSel.addEventListener('change', function () { setLanguage(langSel.value); });
             actions.appendChild(langSel);
         }
-        actions.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', onclick: function () { openDatumModal(null); } }), 'setCollectedDatum'));
+        actions.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', 'data-focus-key': 'datum-add', onclick: function () { openDatumModal(null); } }), 'setCollectedDatum'));
         head.appendChild(actions);
         s.appendChild(head);
 
@@ -214,8 +195,11 @@
             var card = QSDom.el('div', { class: 'privacy-collected__card' });
             card.appendChild(_renderDatumWords(d));
             var acts = QSDom.el('div', { class: 'privacy-collected__actions' });
-            acts.appendChild(_mark(_iconBtn(ICON_EDIT, 'Edit', function () { openDatumModal(d); }), 'setCollectedDatum'));
-            acts.appendChild(_mark(_iconBtn(ICON_TRASH, 'Delete', function () { onDeleteDatum(d); }), 'deleteCollectedDatum'));
+            var name = (storedWords(d.id, state.lang) || {}).label || d.id;
+            acts.appendChild(QSControls.edit(t('privacy.actions.edit', { name: name }), function () { openDatumModal(d); },
+                { command: 'setCollectedDatum', focusKey: 'datum-edit:' + d.id }));
+            acts.appendChild(QSControls.bin(t('privacy.actions.delete', { name: name }), function () { onDeleteDatum(d); },
+                { command: 'deleteCollectedDatum', focusKey: 'datum-delete:' + d.id }));
             card.appendChild(acts);
             wrap.appendChild(card);
         });
@@ -253,10 +237,7 @@
     function _openDialog(opts) {
         var id = 'privacy-dialog-' + Date.now();
         var errorLine = QSDom.el('p', { class: 'privacy-dialog__error', role: 'alert', hidden: 'hidden' });
-        var closeBtn = QSDom.el('button', {
-            type: 'button', class: 'admin-modal__close', text: '×',
-            'aria-label': QuickSiteUtils.tCommon('close'), title: QuickSiteUtils.tCommon('close'),
-        });
+        var closeBtn = QSControls.close(null, null);
         var cancelBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', text: 'Cancel' });
         var saveBtn = _mark(QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary', text: opts.action }), opts.command);
         var modal = QSDom.el('div', {
@@ -467,13 +448,19 @@
         });
     }
 
-    async function onDeleteDatum(d) {
-        if (!(await QuickSiteUtils.confirm(t('privacy.dialogs.deleteDatum', { name: d.label || d.id }), { type: 'danger' }))) return;
-        try {
-            var r = await api('deleteCollectedDatum', 'POST', { id: d.id });
-            if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.deleteFailed')); return; }
-            await refresh();
-        } catch (e) { showError((e && e.message) || t('privacy.errors.network')); }
+    /** A datum's delete, asked first: a refusal stays in the dialog, and the cards are drawn again before it closes. */
+    function onDeleteDatum(d) {
+        return QuickSiteUtils.confirm(t('privacy.dialogs.deleteDatumText'), {
+            title: t('privacy.dialogs.deleteDatum', { name: d.label || d.id }),
+            type: 'danger',
+            confirmText: t('privacy.dialogs.delete'),
+            action: async function () {
+                var r = await api('deleteCollectedDatum', 'POST', { id: d.id });
+                if (!r || !r.ok) return { ok: false, message: _serverWords(r, t('privacy.errors.deleteFailed')) };
+                await refresh();
+                return true;
+            },
+        });
     }
 
     // ---- atom -> datum mapping (click an atom chip) -----------------------
@@ -507,7 +494,10 @@
         });
         menu.appendChild(listing);
         if (currentDatum) {
-            menu.appendChild(QSDom.el('button', { type: 'button', class: 'privacy-atom-menu__action', text: 'Unset', onclick: function () { _closeAtomMenu(); setMapping(endpoint, field, null); } }));
+            var unset = QSDom.el('button', { type: 'button', class: 'privacy-atom-menu__action privacy-atom-menu__action--delete', onclick: function () { _closeAtomMenu(); askUnset(endpoint, field, currentDatum); } });
+            unset.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.trash, 14));
+            unset.appendChild(document.createTextNode(' ' + t('privacy.mapping.unset')));
+            menu.appendChild(unset);
         }
         menu.appendChild(_mark(QSDom.el('button', {
             type: 'button', class: 'privacy-atom-menu__action privacy-atom-menu__action--new',
@@ -519,10 +509,33 @@
         _filterControls(menu);
         var rect = anchorEl.getBoundingClientRect();
         menu.style.position = 'fixed';
-        menu.style.top = (rect.bottom + 4) + 'px';
+        // Under the chip when it fits, else above it; never past the window's edge.
+        var below = rect.bottom + 4;
+        var room = window.innerHeight - 8;
+        var top = below + menu.offsetHeight <= room ? below : rect.top - 4 - menu.offsetHeight;
+        menu.style.top = Math.max(8, Math.min(top, room - menu.offsetHeight)) + 'px';
         menu.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 12)) + 'px';
         _atomMenuEl = menu;
         setTimeout(function () { document.addEventListener('mousedown', _onMenuOutside, true); }, 0);
+    }
+
+    /** Unset a field's datum, asked first: the field stops counting as that datum on the privacy page. */
+    function askUnset(endpoint, field, datumId) {
+        var datum = (state.status && state.status.collectedData || []).filter(function (d) { return d.id === datumId; })[0];
+        var name = datum ? ((storedWords(datum.id, state.lang) || {}).label || datum.id) : datumId;
+        return QuickSiteUtils.confirm(t('privacy.dialogs.unsetMappingText', { datum: name }), {
+            title: t('privacy.dialogs.unsetMapping', { field: field }),
+            type: 'danger',
+            confirmText: t('privacy.mapping.unset'),
+            // The menu that opened the question is gone: the focus goes back to the field's chip, drawn again after a save.
+            returnFocus: function () { return QSDom.byFocusKey('atom:' + endpoint + '/' + field); },
+            action: async function () {
+                var r = await api('setPrivacyMapping', 'POST', { endpoint: endpoint, field: field, datum: '__unset__' });
+                if (!r || !r.ok) return { ok: false, message: _serverWords(r, t('privacy.errors.mappingFailed')) };
+                await refresh();
+                return true;
+            },
+        });
     }
 
     function setMapping(endpoint, field, datumId) {
@@ -551,11 +564,13 @@
             main.appendChild(kind);
             main.appendChild(QSDom.el('span', { class: 'privacy-host__apis', text: (h.apiIds || []).join(', ') }));
             row.appendChild(main);
-            row.appendChild(_mark(QSDom.el('button', {
-                class: 'admin-btn admin-btn--ghost privacy-host__classify', type: 'button',
-                text: h.kind ? 'Edit' : 'Classify',
-                onclick: function () { openHostModal(h); },
-            }), 'setPrivacyHost'));
+            row.appendChild(h.kind
+                ? QSControls.edit(t('privacy.actions.editHost', { host: h.baseUrl }), function () { openHostModal(h); },
+                    { command: 'setPrivacyHost', focusKey: 'host-edit:' + h.baseUrl, className: 'privacy-host__classify' })
+                : _mark(QSDom.el('button', {
+                    class: 'admin-btn admin-btn--ghost privacy-host__classify', type: 'button', text: 'Classify',
+                    'data-focus-key': 'host-edit:' + h.baseUrl, onclick: function () { openHostModal(h); },
+                }), 'setPrivacyHost'));
             wrap.appendChild(row);
         });
         return wrap;
@@ -583,7 +598,7 @@
                     var mapped = f.datum != null;
                     var cls = 'privacy-atom' + (mapped ? ' privacy-atom--mapped' : ' privacy-atom--unset');
                     var chip = mayMap
-                        ? QSDom.el('button', { type: 'button', class: cls, title: 'Click to map' })
+                        ? QSDom.el('button', { type: 'button', class: cls, title: 'Click to map', 'data-focus-key': 'atom:' + ep.key + '/' + f.field })
                         : QSDom.el('span', { class: cls + ' privacy-atom--static' });
                     chip.appendChild(QSDom.el('span', { class: 'privacy-atom__field', text: f.field }));
                     chip.appendChild(QSDom.el('span', { class: 'privacy-atom__datum', text: mapped ? '→ ' + f.datum : 'unset' }));
@@ -652,7 +667,7 @@
             sec.appendChild(routeRow);
             var acts = QSDom.el('div', { class: 'privacy-page-actions' });
             acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Update', onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }), 'generatePrivacyPolicy'));
-            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Delete', onclick: onDeletePrivacy }), 'deletePrivacyPolicy'));
+            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--danger', type: 'button', text: t('privacy.dialogs.delete'), onclick: onDeletePrivacy }), 'deletePrivacyPolicy'));
             sec.appendChild(acts);
             sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).' }));
         } else {
@@ -678,7 +693,9 @@
         return api('generatePrivacyPolicy', 'POST', body).then(function (r) {
             var d = (r && r.data && (r.data.data || r.data)) || {};
             if (r && !r.ok && d.needsConfirm) {
-                return QuickSiteUtils.confirm(t('privacy.dialogs.overwritePage', { route: route }), { type: 'danger' }).then(function (ok) {
+                return QuickSiteUtils.confirm(t('privacy.dialogs.overwritePage', { route: route }), {
+                    type: 'danger', confirmText: t('privacy.dialogs.overwrite'),
+                }).then(function (ok) {
                     if (!ok) return;
                     return api('generatePrivacyPolicy', 'POST', { route: route, overwrite: true }).then(function (r2) {
                         if (!r2 || !r2.ok) { showError((r2 && r2.data && r2.data.message) || t('privacy.errors.generateFailed')); return; }
@@ -692,7 +709,7 @@
     }
 
     function onDeletePrivacy() {
-        return QuickSiteUtils.confirm(t('privacy.dialogs.deletePage'), { type: 'danger' }).then(function (ok) {
+        return QuickSiteUtils.confirm(t('privacy.dialogs.deletePage'), { type: 'danger', confirmText: t('privacy.dialogs.delete') }).then(function (ok) {
             if (!ok) return;
             return api('deletePrivacyPolicy', 'POST', {}).then(function (r) {
                 if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.deleteFailed')); return; }
@@ -720,6 +737,13 @@
     function render() {
         var root = document.getElementById('privacy-root');
         if (!root) return;
+        // A redraw under the focus (a language, a save, a delete) gives it to the control that took its place.
+        var focusBack = root.contains(document.activeElement) ? QSDom.rememberFocus() : null;
+        _draw(root);
+        if (focusBack) focusBack.restore();
+    }
+
+    function _draw(root) {
         root.textContent = '';
         root.className = 'privacy-root';
         var s = state.status;

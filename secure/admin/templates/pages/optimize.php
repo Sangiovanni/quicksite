@@ -167,7 +167,7 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
         <div class="admin-modal__content optimize-modal">
             <div class="admin-modal__header">
                 <h3 class="admin-modal__title"><?= __admin('optimize.cssRefiner.autoRefineModal.title') ?></h3>
-                <button type="button" class="admin-modal__close" id="optimize-modal-close">&times;</button>
+                <button type="button" class="admin-modal__close" id="optimize-modal-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
             </div>
             <div class="admin-modal__body" id="optimize-modal-body">
                 <!-- Summary list populated by JS -->

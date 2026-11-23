@@ -21,7 +21,8 @@
         <?php if ($router->isEmbedSecurityShown()): ?>
         <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link"><?= __admin('preview.iframeWarningLink') ?> &rarr;</a>
         <?php endif; ?>
-        <button type="button" class="preview-iframe-warning__close" id="preview-iframe-warning-close" title="<?= __admin('preview.iframeWarningDismiss') ?>">&times;</button>
+        <button type="button" class="admin-modal__close" id="preview-iframe-warning-close" data-qs-icon="close"
+                aria-label="<?= adminAttr(__admin('preview.iframeWarningDismiss')) ?>" title="<?= adminAttr(__admin('preview.iframeWarningDismiss')) ?>"></button>
     </div>
 
     <!-- Source canvas (full-CSS code editor host). Hidden by default;

@@ -40,7 +40,7 @@ The requirement lives at the shared account-creation path rather than in the pag
 
 1. Inline `<script>` — the language bootstrap. Reads the admin language from browser storage and may redirect before anything else runs.
 2. `core/storage-keys.js` → defines `window.QuickSiteStorageKeys` (single source of truth for localStorage / sessionStorage key strings).
-3. `core/dom.js` → defines `window.QSDom`, in `<head>` so page scripts can use it at parse time.
+3. `core/dom.js` → defines `window.QSDom`, in `<head>` so page scripts can use it at parse time; then `core/controls.js` → defines `window.QSControls` (the panel's edit, delete and close controls, §5.1).
 4. `core/searchable-select.js` → the type-ahead select widget.
 5. `core/bubble.js` → the panel's hover bubble (§5.1, *Tooltips*). Defines no global: it listens on the document and builds its element on first use.
 6. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST come before the scripts below, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
@@ -64,6 +64,7 @@ Any reorder breaks the chain. Treat the load order as a published contract.
 | `window.QuickSiteStorageKeys` | `js/core/storage-keys.js` | `api.js`, `utils.js`, all pages that touch storage |
 | `window.QuickSiteAPI` | `js/core/api.js` | `admin.js`, every page module |
 | `window.QuickSiteUtils` | `js/core/utils.js` | `admin.js`, `history.js`, `sitemap.js`, preview modules |
+| `window.QSControls` | `js/core/controls.js` | every page and editor module that draws an item's edit or delete, a dialog's × or a form row's × (§5.1) |
 | `window.QuickSiteAdmin` | `admin.js` | every page module (most broadly coupled global) |
 | `window.PreviewConfig` | `templates/pages/preview-config.php` | `preview.js`, all `pages/preview/*` modules |
 | `window.PreviewState` | `pages/preview/preview-state.js` | all `pages/preview/*` modules |
@@ -101,7 +102,8 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/api.js` | `QuickSiteAPI.request` + `upload`; announces each answered command on the page (`quicksite:command-answered`: its name, whether it succeeded, the project and its sender's mark, nothing it carried or answered); in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
-| `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `icon(name)` (the panel's named icons: one map of names to drawings, each built with `createElementNS` in the text's colour; a new icon is one entry) + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM — and `followPointer()`, the one drag routine of the panel's handles (the editor's options panel, the device frame's edges), on pointer events. Loaded in `<head>` so page scripts can use it at parse time. |
+| `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `icon(name)` (the panel's named icons: one map of names to drawings, each built with `createElementNS` in the text's colour; a new icon is one entry) + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM — and `followPointer()`, the one drag routine of the panel's handles (the editor's options panel, the device frame's edges), on pointer events, and `rememberFocus()` / `byFocusKey()`, which give the focus back to a control a redraw put in place of the one that held it. Loaded in `<head>` so page scripts can use it at parse time. |
+| `js/core/controls.js` | `window.QSControls`: the panel's edit, delete and close controls, one look each (*Edit, delete and close: one look each*, above): `edit()` and `bin()` (an item's pencil and bin), `close()` (a dialog's ×), `removeRow()` (the small × of a form row), and `drawIcons()`, which gives a template's `data-qs-icon` buttons their icon once the page has loaded. Every icon is `QuickSiteUtils.ICON_PATHS`'. Loaded in `<head>`. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge, and each share on its entry (My memberships, Project members); the queue's count also per project (`adjudicationByProject`), which the Project members page names; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). An option of empty value is the list's placeholder, never a row, unless the list makes it a choice of its own (`emptyChoice`: Social previews' *The whole site* or *No territory*, chosen again after another, §9.19). |
@@ -230,8 +232,8 @@ editor's height and the Optimize page's sidebar read it. The header itself never
 (`QSDom.tableWrapper()`), which scrolls by itself and takes the keyboard's focus. A shadow at its
 edge says there is more on that side, and goes when the end is reached; no script is involved. A
 dialog fits the screen at any width: its body scrolls, its header and its buttons stay, and its
-buttons wrap. What a pointer reveals on a computer (a sitemap route's actions, a media card's
-star, favicon, rename and actions) is in view from the tablet down, as a finger has no hover.
+buttons wrap. What a pointer reveals on a computer (a media card's star and favicon) is in view
+from the tablet down, as a finger has no hover.
 On a phone a row wraps rather than run past the edge: a membership's or a member's
 buttons go under its text, and a long value with no space in it (an id, an address, a path) breaks
 where it must.
@@ -244,16 +246,35 @@ reads muted with a not-allowed cursor.
 and `QuickSiteUtils.prompt(message, options)`, a promise of the text typed (`''` when left empty)
 or `null`. A failure it must report goes to the error toast (`showToast(text, 'error')`). Because
 the answer comes later, the action a question guards runs only once the answer is yes: a link
-whose click it holds is followed afterwards, a mode or tab switch happens afterwards.
+whose click it holds is followed afterwards, a mode or tab switch happens afterwards. It is the
+panel's one question: no page builds a confirm of its own, and every delete asks through it first.
 
 | | The panel's dialog |
 |---|---|
 | Where | Above every layer of the panel, a modal included (the keyframe editor, the resolver modals), and under the bubble. |
-| Focus | It takes the focus: the confirm button, **Cancel** for a `type: 'danger'` one (a question before a delete or an overwrite: its button is red), the text field of a prompt (Enter there is OK). Tab stays inside. Closing gives the focus back where it was. |
-| Keys | While it is open no key reaches the page: not the editor's shortcuts (Delete, Escape), not the panel's (`g d`, `?`), not a modal underneath. Escape and a click on the backdrop answer no. |
-| Words | Its message keeps its line breaks and is shown as text. Default title *Confirm Action* and buttons *Confirm* / *Cancel* (`common`), or the `title`, `confirmText`, `cancelText` given; a prompt has no title unless given, its question is the field's label, and `defaultValue` / `placeholder` fill the field. |
-| The one modal | Both are drawn in `QuickSiteUtils.openModal(box, options)`, which does the layer, the focus, Tab and the keys for any content; the mode chooser uses it with no dismissal, so Escape and the backdrop do nothing there and only its own buttons close it. |
+| Focus | It takes the focus: the confirm button, **Cancel** for a `type: 'danger'` one (a question before a delete or an overwrite: its button is red), the text field of a prompt (Enter there is OK), or the field of its body that `focus` names. Tab stays inside. Closing gives the focus back where it was, or, when the page drew that again while the dialog was open (a save, a delete), to what took its place: the same control, else the next one of its kind. |
+| Keys | While it is open no key reaches the page: not the editor's shortcuts (Delete, Escape), not the panel's (`g d`, `?`), not a modal underneath. The × at its top right, Escape and a click on the backdrop answer no, as **Cancel** does. |
+| Words | The question's own: its `title` names the thing (*Delete the key “cartItems”?*), or, with none, its message is the question; its button says the verb (`confirmText`: *Delete*, *Remove*, *Unset*), never *Confirm* on a red one. The message keeps its line breaks and is shown as text; **Cancel** is `common`'s, or the `cancelText` given. A prompt has no title unless given, its question is the field's label, and `defaultValue` / `placeholder` fill the field. |
+| Body and action | A question may carry a `body` under its message: what it is about (a word in each language, the links a removal breaks) or what it asks to choose (a language, a role, a reason, a date). With an `action`, its button runs it with the question still open and busy: the question closes when it succeeds, and stays open with the server's words when it is refused, so a choice made in its body is not lost. A question that needs something first (a date picked and what it would delete read) keeps its button disabled until its body allows it (`onOpen`). |
+| The one modal | Both are drawn in `QuickSiteUtils.openModal(box, options)`, which does the layer, the focus, Tab and the keys for any content; the keyboard-shortcuts help (`?`), the Storage page's item and consent dialogs and the Privacy page's dialogs are drawn in it too, and the mode chooser uses it with no dismissal, so Escape and the backdrop do nothing there and only its own buttons close it. |
 | The one exception | Leaving the page with unsaved CSS Source edits (closing the tab, reloading) is the browser's own `beforeunload` question: a page cannot replace it (§8.10). |
+
+**Edit, delete and close: one look each.** The panel draws them in one place, `core/controls.js`
+(`QSControls`), every icon from `QuickSiteUtils.ICON_PATHS`:
+
+| Control | Look | Where |
+|---|---|---|
+| An item's edit and delete | The **pencil** and the **bin**: ghost buttons holding the icon alone, grey; the bin turns red on hover and on keyboard focus. Each carries its word as its tooltip and its screen-reader label (*Delete “cartItems”*). Always visible: none waits for a hover, which a phone does not have. | A list's rows, a card's actions (`QSControls.edit()`, `bin()`). |
+| The button that confirms a delete, a page's destructive action | The red button that says its verb (*Delete*, *Remove*, *Clear All*), with no icon. | The question's verb; *Delete my account*, *Delete Selected*, *Clear History*. |
+| A dialog's close | One × at its top right, at every width (`QSControls.close()`, or a template's button carrying `data-qs-icon="close"`). A dialog has no *Close* button at its foot. | Every dialog, the confirm and the prompt included. |
+| A row taken out of a form | The small ×, grey, red on hover. Nothing is written until the form is saved, so it asks nothing. | A parameter row, a CSS property before Save, a srcset row. |
+| A menu's edit and delete | The menu's own item, its word beside the same pencil or bin; the delete is grey and red on hover. | Sitemap's ⋮ menu, Privacy's field menu. |
+| The visual editor's actions on an element | A button each, its icon and its name: **Edit Params** orange with the same pencil, **Delete** red with the same bin (a template's buttons carrying `data-qs-icon`). With the tools' **Show names** off, the icon alone, its tooltip and its screen-reader label naming it. | Select's panel, and the Text tool's **Delete this text node** (§8.1). |
+
+Every delete asks first, in its own words, through `QuickSiteUtils.confirm()` (*Dialogs* above): the
+question names the thing and the red button says the verb. Where a page runs the delete in the
+question itself, the question stays open while it runs and a refusal stays in it; elsewhere the page
+acts once the answer is yes, and a refusal is its error toast.
 
 ### 5.2 Shared components
 
@@ -392,9 +413,9 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
 | `sidebarWidth` | localStorage | `preview-sidebar-resize.js` — the visual editor's options panel's width in pixels, as its handle left it; stored as `quicksite_sidebar_width` |
 | `previewFrame` | localStorage | `preview.js` — the visual editor's device and each device frame's last size, as JSON (`{"device": "mobile", "sizes": {"mobile": [375, 667], "tablet": [768, 1024]}}`); one per browser, for every project. A missing, malformed or out-of-range part gives that part's default (§8.3) |
-| `toolsShowNames` | localStorage | `preview.js` — whether the editor's tool row shows each tool's name beside its icon (**Show names**): `'false'` hides them, anything else shows them; stored as `quicksite-tools-show-names` |
+| `toolsShowNames` | localStorage | `preview.js` — whether the editor's tool row, and the actions of its Select and Text panels, show each button's name beside its icon (**Show names**): `'false'` hides them, anything else shows them; stored as `quicksite-tools-show-names` |
 | `emulateComponent`, `emulatePage` | localStorage | `preview.js` — the sample values an Emulation fills the preview with, as JSON: per component (`qs_emulate_<component>`) and per page (`qs_emulate_page_<route>`); kept in this browser, nothing written to the project |
-| `addLastTab` | localStorage | `preview.js` — the tab the advanced Add form last opened on |
+| `addLastTab` | localStorage | `preview.js` — the tab the advanced Add form last opened on, any of its five, Text included; with none kept, the form opens on HTML Tag, its first tab |
 | `addPreviewExpanded`, `addPositionExpanded`, `addAdvancedExpanded` | localStorage | `preview.js` — whether each folding section of the Add form is open (`'1'`) or folded (`'0'`); `contextual-add.php` names each on its header (`data-storage-key`) |
 | `tagShowHtmlCode`, `addFavoriteTags` | localStorage | `preview.js` — the Add form's HTML Tag tab: whether a tag's example is shown as its HTML (`'true'`) or drawn, and the tags starred as favourites, newest first, as a JSON list of ten at most; stored as `tagSelector_showHtmlCode` and `qs-add-favorite-tags` |
 | `editorLanguage` | localStorage | `site-words.js` — the language a site's words are edited in, per project (`:<project>` appended): the visual editor's toolbar **Language**, its Translations tool, the Translations page and the Storage and Privacy pages start on it, and a change in any of them is kept; a language the project no longer has reads as its default (§8.9, §9.10, §9.11, §9.20) |
@@ -417,8 +438,8 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/apis.php` | `window.QS_APIS_I18N` | the `apis` and `common` sub-trees, verbatim |
 | `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `window.QS_EMBED_SECURITY_I18N` | `baseUrl`; the `embedSecurity` sub-tree, verbatim |
 | `templates/pages/media.php` | `window.QS_MEDIA_I18N` | the `media` and `common` sub-trees, verbatim |
-| `templates/pages/privacy.php` | `window.QS_PRIVACY_I18N` | the `privacy` sub-tree, verbatim: the words of the page's dialogs and error toasts (the rest of the page is written in the code) |
-| `templates/pages/storage.php` | `window.QS_STORAGE_I18N` | the `storage` sub-tree, verbatim: the words of the page's dialogs and error toasts (likewise) |
+| `templates/pages/privacy.php` | `window.QS_PRIVACY_I18N` | the `privacy` sub-tree, verbatim: the page's words, its dialogs', its controls' labels and its error toasts (the rest of the page is written in the code) |
+| `templates/pages/storage.php` | `window.QS_STORAGE_I18N` | the `storage` sub-tree, verbatim: the page's words, its dialogs', its controls' labels and its error toasts (likewise) |
 | `templates/pages/sitemap.php` | `window.QS_SITEMAP_I18N` | the `sitemapPage` sub-tree, verbatim: the words `sitemap.js` builds, read by its own `t(key, fallback)` — a key no language holds shows the code's English fallback |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields), plus `tagInfo` (`TagRegistry::editorPayload()` — the tag classification, mandatory params, per-tag defaults and translation-key params the editor works from) |
 | `templates/pages/ai-connections.php` | `window.QSAC_ASSET_BASE` + `window.QS_AI_CONNECTIONS_I18N` | the asset base the provider logos load from, so they resolve when the panel is not served from the domain root; the `aiConnections` and `common` sub-trees, verbatim |
@@ -462,7 +483,7 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 
 | Button | Mode | What it does |
 |---|---|---|
-| **Select** | `select` | Click an element → inspect node, add a sibling/child (a child only where the element can hold one: not a text, a component or a void element such as an image), **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
+| **Select** | `select` | Click an element → inspect node, add a sibling/child (a child only where the element can hold one: not a text, a component or a void element such as an image), **edit its params + class + mandatory attrs in place** (via **Edit Params**), duplicate, save as snippet / component, or delete (after a question): each action is its icon and its name, one per line, **Add** green, **Edit Params** orange with the shared pencil, **Delete** red with the shared bin. With **Show names** (at the start of the tools' row) off, each action is its icon alone, in one row that wraps, its tooltip and its screen-reader label naming it; the Text tool's **Delete this text node**, red as well, follows the same choice. |
 | **Drag** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. A press selects an element, and **Lock** keeps it selected through any number of drops. A finger scrolls the page: a tap selects, and only a locked element is dragged, by a press on it. |
 | **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. A paste is plain text on one line — the clipboard's text, each run of line breaks a space — inserted as typing is, so Ctrl+Z undoes it; when an edit ends, the element holds exactly the text saved. |
 | **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. In advanced mode, designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
@@ -470,7 +491,7 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **Workflows** | `ai-tools` | In-editor workflow runner. A searchable list of the workflows, grouped by what you want to do, each row saying in words what a run does; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
-**Which tools a role sees.** Each tool, and each of Select's buttons, is offered only to a role that holds the commands it sends, in either mode: one definition, `secure/admin/functions/editorTools.php` (`qs_editor_controls()`), draws them as `data-requires-command`, which the role filter reads once permissions load (§5.1). Select reads, so every role has it. A viewer has Select alone, with none of its buttons; an editor has every tool but CSS; a designer and the roles above it have them all. Workflows needs what adding an element needs: every shipped workflow but one writes the site, and the one left runs what is pasted into it. A tool not offered cannot be entered (`switchMode()` goes to Select instead), and the Delete key acts only where the Delete button is offered. The server still checks each command's role. The toolbar's **Title** and **Description** fields are in the same definition (`toolbar.title`, `toolbar.description`): each is shown only to a role that holds the command it saves with, `editTitle` and `setSocialPreview`, so a viewer sees neither.
+**Which tools a role sees.** Each tool, and each of Select's buttons, is offered only to a role that holds the commands it sends, in either mode: one definition, `secure/admin/functions/editorTools.php` (`qs_editor_controls()`), draws them as `data-requires-command`, which the role filter reads once permissions load (§5.1). Select reads, so every role has it. A viewer has Select alone, with none of its buttons; an editor has every tool but CSS; a designer and the roles above it have them all. Workflows needs what adding an element needs: every shipped workflow but one writes the site, and the one left runs what is pasted into it. A tool not offered cannot be entered (`switchMode()` goes to Select instead), and the Delete key acts only where Select's bin is offered. The server still checks each command's role. The toolbar's **Title** and **Description** fields are in the same definition (`toolbar.title`, `toolbar.description`): each is shown only to a role that holds the command it saves with, `editTitle` and `setSocialPreview`, so a viewer sees neither.
 
 **The simple view.** In simple mode (§5.1) the editor leaves out what a beginner does not need: the **Interactions** tool, CSS's **Source** and **Motion** (the tab, and a selected selector's **Animate**), and Select's **Save as Snippet** and **Save as Component**. Select's **Add** opens the simple Add in place of the five tabs. The same definition marks each of these `data-editor-advanced`, which the page's simple class hides, so a switch shows or hides them at once. A switch that would close the tool in use (Interactions, Source, Motion) or start an open Add form again first asks, **Switch** or **Stay**, saying what not saved there would be lost; **Stay** changes nothing. After **Switch** the editor leaves a tool the mode no longer shows for Select (Motion for Theme, Source for the page), and an open Add form starts again in the new mode on the same element and position. With nothing open, the switch happens at once. The mode decides what is drawn and nothing else.
 
@@ -505,11 +526,11 @@ There is no class, no ID and no key-or-literal choice: each text gets a translat
 
 **The tag preview.** Picking a tag in the **HTML Tag** tab shows a small example of it under the picker, and its **`</>`** button switches to the example's HTML as the page holds it once parsed: a boolean attribute reads `open=""`, a table row sits in the `<tbody>` the browser adds, an `<option>` is closed. A tag that renders nothing visible (`script`, `meta`, `template`…) reads "No visual preview". The examples come with the page, one `<template>` per tag written by `_tag-selector.php` from `_tag-examples.php`, so picking a tag copies its example and parses nothing.
 
-**The Selectors tab and `@media`.** The **Selectors** tab of the CSS mode lists every rule of the stylesheet: tags, classes, ids and attributes outside any `@media` block, and under **Media Queries** each block with the rules it holds. A chip is one rule: a chip under `@media (max-width: 768px)` is the rule inside that block, not the rule of the same selector outside it. Selecting it marks that chip, the box under the list shows `@media (max-width: 768px)` beside the selector, and **Edit Styles**, **Copy From…** and **Animate** read and write the rule inside its block — the style editor's and the State & Animation Editor's headers show the query too, and the style editor's live preview applies only where the rule does. **Copy From…** offers every other rule, a rule inside a block with its query; from a rule inside a block, the rule of the same selector outside it is one of them. A selector holding `+` (`h1 + p`) is read as written. The editor's own script in the preview is never listed as an id.
+**The Selectors tab and `@media`.** The **Selectors** tab of the CSS mode lists every rule of the stylesheet: tags, classes, ids and attributes outside any `@media` block, and under **Media Queries** each block with the rules it holds. A chip is one rule: a chip under `@media (max-width: 768px)` is the rule inside that block, not the rule of the same selector outside it. Selecting it marks that chip, the box under the list shows `@media (max-width: 768px)` beside the selector, and **Edit Styles** (its pencil), **Copy From…** and **Animate** read and write the rule inside its block — the style editor's and the State & Animation Editor's headers show the query too, and the style editor's live preview applies only where the rule does. **Copy From…** offers every other rule, a rule inside a block with its query; from a rule inside a block, the rule of the same selector outside it is one of them. A selector holding `+` (`h1 + p`) is read as written. The editor's own script in the preview is never listed as an id.
 
 **A slider's number.** A property the editor sets with a slider (`opacity`, from 0 to 1) has a number field beside it, and the two move together: a number typed within the slider's bounds moves it at once; on leaving the field, a number outside them becomes the nearest bound, and anything that is not a number goes back to the last value. In a narrow sidebar the slider gives way and the number field keeps its width. The slider shows in the style editor's new property row (Selectors → **Edit Styles** → **Add Property**) and in the State & Animation Editor's add rows; a property the style editor already holds is a text field.
 
-**Add-Element conveniences.** The HTML Tag flow carries an optional **ID** field beside CSS Class — validated against CSS-safe id rules (starts with a letter or underscore; then letters, digits, hyphens, underscores; no spaces), flagged red on blur and hard-blocked at add time. A **Save & add another** button (beside Add) keeps the form open for repeated adds — available for HTML Tag, Component, and Complex (not Text or Snippet). For **Tag** it clears the id + params but keeps the tag + class; for **Component** and **Complex** it leaves the previous values in place so the next instance starts pre-filled. In all three the target selection is preserved, so repeated adds land at the same anchor.
+**Add-Element conveniences.** The advanced Add form's five tabs are HTML Tag, Component, Snippet, Complex and Text; it opens on the tab last used in this browser (`addLastTab`, §6), HTML Tag the first time; the Text tab starts on **Inside**, the others on **After**. The HTML Tag flow carries an optional **ID** field beside CSS Class — validated against CSS-safe id rules (starts with a letter or underscore; then letters, digits, hyphens, underscores; no spaces), flagged red on blur and hard-blocked at add time. A **Save & add another** button (beside Add) keeps the form open for repeated adds — available for HTML Tag, Component, and Complex (not Text or Snippet). For **Tag** it clears the id + params but keeps the tag + class; for **Component** and **Complex** it leaves the previous values in place so the next instance starts pre-filled. In all three the target selection is preserved, so repeated adds land at the same anchor.
 
 ### 8.2 Context selectors
 
@@ -803,8 +824,8 @@ for separators / one-off labels like `" / "`, `"—"`). Both are first-class.
 
 **Tag elements add empty.** A new tag has no text child. To add text to a tag, use **Add → Text** (below) or **Text mode** inline.
 
-**Add → "Text" tab.** A 5th tab in the Add panel (alongside Snippet / Component /
-Complex / HTML Tag). Pick the type:
+**Add → "Text" tab.** A 5th tab in the Add panel (after HTML Tag / Component /
+Snippet / Complex), remembered as the others are (`addLastTab`, §6). Pick the type:
 - **Translation key** — opens a searchable picker (the same
   `QSComplexWizard.createTextKeyPicker` the variables panel uses): type to
   filter existing keys; if your query doesn't match an existing key, an inline
@@ -886,8 +907,8 @@ These three are mutually exclusive — a key never appears in more than one buck
 | Toolbar — Coverage strip | `Coverage: 78% (142/172)` text. Recomputed per-scope. |
 | Filter row — substring | Case-insensitive contains-match on key name. Counts in chips narrow with substring. |
 | Filter row — status chips | 🟢 Used / 🔴 Unset / 🟡 Unused, each with a count + visible label. Toggle to filter rows. Counts are scope-aware (and substring-aware) but NOT status-aware (a chip can't depend on its own checked state). |
-| Row list | One row per filtered key: status dot · `<code>key.name</code>` · value preview (100-char truncate, full value in `title=`) · hover-revealed Edit + Delete icon buttons. Alphabetical by key name. |
-| Bottom action | "Remove all unused (site-wide)" button. Enabled iff site-wide unused count > 0. Opens the bulk-confirm panel (replaces row list temporarily). |
+| Row list | One row per filtered key: status dot · `<code>key.name</code>` · value preview (100-char truncate, full value in `title=`) · its edit (a pencil, or `+` on an unset key) and its bin, always in view. Alphabetical by key name. |
+| Bottom action | "Remove all unused (site-wide)" button. Enabled iff site-wide unused count > 0. Asks first, listing the keys (below). |
 
 **Inline edit (row expansion, not modal)** — clicking the pencil icon on a row expands an editor panel directly below: textarea pre-filled with current value, Save + Cancel buttons. Saves through the one list (`QSSiteWords.write()`: `setTranslationKeys`, its answer checked, a refusal's words shown and nothing changed). Keyboard: **Esc** = cancel, **Ctrl/Cmd+Enter** = save. The textarea auto-focuses with cursor at the end of existing text.
 
@@ -895,13 +916,13 @@ For unset rows the Edit icon becomes a `+` (Set value) icon and the panel pre-fi
 
 After save success the panel reads the list again so the row's status flips naturally (unset → used, etc. — the "stale-sibling sweep"), then calls `PreviewState.reloadPreview()` so the iframe shows the new value live.
 
-**Per-row delete (list-first confirm, no bare prompt)** — clicking the trash icon expands a red-bordered confirm panel below the row: `Delete {key} from {LANG}.json?` plus a value preview, then Cancel + Delete buttons. Multi-language opt-in checkbox appears beneath when ≥2 languages exist (default OFF — you're usually editing one language). Confirm runs `deleteTranslationKeys` for the target language(s) via `Promise.all`; 404 from a non-current language is treated as success (key already absent in that file).
+**Per-row delete** — the row's bin asks first, in the panel's confirm (§5.1): its title `Delete {key} from {LANG}.json?`, the word it holds as its message (cut at 200 characters), for a key a page may never have shown, and, when ≥2 languages exist, the multi-language checkbox in its body (default OFF — you're usually editing one language); its red **Delete** runs `deleteTranslationKeys` for the target language(s) via `Promise.all`; 404 from a non-current language is treated as success (key already absent in that file).
 
-**Bulk remove-unused** — same list-first pattern applied at scale. Button opens a full-panel confirm that replaces the row list: header `These {n} unused keys will be deleted from {LANG}.json:`, scrollable list of every unused key + truncated value preview, multi-language opt-in (default ON — orphaned keys are orphaned everywhere), then Cancel + Delete-N buttons. Single `deleteTranslationKeys` call per target language, parallel. It offers only keys nothing on the site names, so it never removes a word a page, the consent layer, Media or a registry still uses.
+**Bulk remove-unused** — the same question applied at scale, list first: its title `Delete the {n} unused keys?`, its message `These {n} unused keys will be deleted from {LANG}.json:`, and in its body the list of every unused key with its word (cut at 120 characters), which scrolls inside the question, and the multi-language checkbox (default ON — orphaned keys are orphaned everywhere); its red button says `Delete {n} keys`. Single `deleteTranslationKeys` call per target language, parallel. It offers only keys nothing on the site names, so it never removes a word a page, the consent layer, Media or a registry still uses.
 
 **Deleting an element keeps a word something else still uses** — the editor's element delete and its text-only delete (`deleteNode`) remove a word the deleted element named only when nothing else on the site uses it: a text shown by another element, a picture's description another page or Media holds, keep their words in every language. The text-only delete's *Keep translation keys* box keeps every word.
 
-Partial failure (some languages succeed, others fail) is surfaced inline: `Failed for 1/2 languages: FR: <details>`. State stays restorable — user can retry without losing the confirm context.
+Both deletes run with the question open, and the list is read again before it closes. Partial failure (some languages succeed, others fail) is said in the question, which stays open: `Failed for 1/2 languages: FR: <details>`. The user can retry without losing the choice made in it.
 
 **Scope-aware counts** — chip counts + coverage % reflect the active scope + substring filter (status excluded). Site-wide totals drive ONLY: the "no translation keys yet" empty state, and the bulk-button enabled gate. So `Used 8` next to the chip when scoped to `home` page is correct ("8 keys on the home page are used"); the bulk button stays enabled iff *any* unused keys exist site-wide, not just on the scoped page.
 
@@ -973,8 +994,8 @@ The **conflict notice** sits between the toolbar and the editor, in the draft ba
 | File row | Static `File: style.css` label. |
 | Status indicator | Green dot + "All saved" when the content is the version it was read or saved as; amber dot + "Unsaved changes" otherwise, or "Changed elsewhere" while the conflict notice stands. |
 | Save button | Disabled when clean, and while the conflict notice stands. Asks first when the text is empty (see *An empty stylesheet is asked about first*), checks the file first (see *How a save checks first*), saves via `editStyles` (whole-file write), then hot-reloads the iframe's `<link rel="stylesheet">`. |
-| Cancel button | Disabled when clean. After a confirm, discards the edits and loads the file as it is now — the conflict notice's Reload, with a confirm. |
-| "Refine in CSS Refiner →" link | Same-tab navigation to `/admin/optimize`. When dirty, a custom confirm says the edits leave the editor and come back as a draft on return; the draft is written at once, and the native `beforeunload` prompt is suppressed once to avoid a double-prompt. Modifier-clicks (Ctrl/Cmd/Shift/middle) skip the confirm — they don't leave the current page. |
+| Cancel button | Disabled when clean. Asks first (*Discard unsaved changes and reload style.css from the server?*, a red **Discard**), then discards the edits and loads the file as it is now — the conflict notice's Reload, asked first. |
+| "Refine in CSS Refiner →" link | Same-tab navigation to `/admin/optimize`. When dirty, the panel's question (*Leave the page with unsaved Source edits?*, its button **Leave**) says the edits leave the editor and come back as a draft on return; the draft is written at once, and the native `beforeunload` prompt is suppressed once to avoid a double-prompt. Modifier-clicks (Ctrl/Cmd/Shift/middle) skip the question — they don't leave the current page. |
 
 **Search bar:**
 
@@ -1002,7 +1023,7 @@ Match highlighting paints into a separate `<pre>` overlay layer (between the hig
 Selectors, media queries, variable names, and declaration blocks additionally may not contain a raw `{` or `}` (which would break out of the rule) — the `>` child combinator, pseudo-classes, and attribute selectors are all fine.
 
 **Dirty guards.** Leaving Source discards nothing: the edits stay in the editor, in the draft and in the preview.
-- Closing Source while dirty — its **Source** button again, the way back to Theme / Selectors / Motion, whose tabs are hidden while Source is shown → the panel's confirmation dialog says the edits are not saved and stay in Source, shown in the preview, until they are saved or cancelled. Source closes (and the tab opens) once the answer is yes; Cancel stays in Source.
+- Closing Source while dirty — its **Source** button again, the way back to Theme / Selectors / Motion, whose tabs are hidden while Source is shown → the panel's question (*Switch away from Source with unsaved edits?*) says the edits are not saved and stay in Source, shown in the preview, until they are saved or cancelled. Source closes (and the tab opens) on its **Switch**; Cancel stays in Source.
 - Switching to another tool while dirty → the same question (`setMode`'s guard); the mode switches once the answer is yes.
 - Closing the browser tab / refreshing while dirty → the draft is written at once, then the native `beforeunload` prompt.
 
@@ -1046,22 +1067,22 @@ The third tab of CSS mode — manages CSS transitions, animations, and the `@key
 
 Clicking any row opens the existing State & Animation Editor (`modals/transition.php`) scoped to that selector.
 
-In the State & Animation Editor (reached too from Selectors → a selector → **Animate**), each state lists its properties. **+ Add Property** opens a row — the property, its value, then **Cancel** and **+ Add** — and a property is written the moment it is added or removed (✕), the preview refreshing. **Save** first adds what an open row still holds, then writes the `transition` declaration only when the transition line under the settings changed since the editor opened: with nothing else to do it closes, so a rule never gains a transition nobody set, and an untouched rule keeps its own as written.
+In the State & Animation Editor (reached too from Selectors → a selector → **Animate**), each state lists its properties. **+ Add Property** opens a row — the property, its value, then **Cancel** and **+ Add** — and a property is written the moment it is added or removed, the preview refreshing. A property's bin, always in view, asks first, naming the property and the state's selector (*Remove “opacity” from .btn:hover?*, a red **Remove**); a state's animation has its bin too, which asks the same way (*Remove the animation “fadeIn” from .btn?*). Each removal runs with its question open, and a refusal stays in it. **Save** first adds what an open row still holds, then writes the `transition` declaration only when the transition line under the settings changed since the editor opened: with nothing else to do it closes, so a rule never gains a transition nobody set, and an untouched rule keeps its own as written.
 
-Its **Properties** setting is **All Properties** — one duration, delay and timing for every property — or **Specific Properties**: a row per property, each with its own property (the searchable picker of every CSS property; one already in a row is not offered again), duration and delay with their units, timing (a `cubic-bezier()` in its four fields) and ✕, with **+ Add Property** under the rows, which adds a row with the settings of the row above it; ✕ on the last row leaves one empty row. Switching to Specific gives a row to each property the rule's states set, each with All's settings (none set: one empty row); switching back to All keeps the first row's settings. The editor reads the rule's own transition as written: a single transition of `all` opens as All, anything else as Specific, a row for each transition with its own settings (`all` inside a list as one row's property), its parts in any order, its units kept; a timing the picker does not offer (`steps(4, end)`, `step-start`) stays in its row as written, one more choice of that row's timing list. The line under the settings shows the whole value (`color 300ms linear, background-color 1s ease`), and the rows keep what the author changes while properties are added to or removed from the states.
+Its **Properties** setting is **All Properties** — one duration, delay and timing for every property — or **Specific Properties**: a row per property, each with its own property (the searchable picker of every CSS property; one already in a row is not offered again), duration and delay with their units, timing (a `cubic-bezier()` in its four fields) and its small × (the row leaves the form; nothing is written until **Save**), with **+ Add Property** under the rows, which adds a row with the settings of the row above it; the × on the last row leaves one empty row. Switching to Specific gives a row to each property the rule's states set, each with All's settings (none set: one empty row); switching back to All keeps the first row's settings. The editor reads the rule's own transition as written: a single transition of `all` opens as All, anything else as Specific, a row for each transition with its own settings (`all` inside a list as one row's property), its parts in any order, its units kept; a timing the picker does not offer (`steps(4, end)`, `step-start`) stays in its row as written, one more choice of that row's timing list. The line under the settings shows the whole value (`color 300ms linear, background-color 1s ease`), and the rows keep what the author changes while properties are added to or removed from the states.
 
 **Keyframes library** lists `@keyframes` rules with four row actions:
 
 | Action | What it does |
 |---|---|
-| ▶ Preview | Opens the existing Animation Preview modal (`modals/animation-preview.php`) running the keyframe over a sample logo. |
+| ▶ Preview | Opens the existing Animation Preview modal (`modals/animation-preview.php`) running the keyframe over a sample logo; the × at its top right closes it. |
 | → Apply to selector… | Opens the **Apply-keyframe modal** — pick a selector from a searchable list; writes `animation: <name> 1s ease;` to that rule via `setStyleRule`. Default value is one-shot; users can refine via Selectors → Edit Styles. |
-| ✎ Edit | Opens the keyframe editor (`modals/keyframe.php`) on this keyframe. |
-| 🗑 Delete | Removes the `@keyframes` rule via `deleteKeyframes`. |
+| The pencil (*Edit “fadeIn”*) | Opens the keyframe editor (`modals/keyframe.php`) on this keyframe. |
+| The bin (*Delete “fadeIn”*) | Asks first (*Delete the keyframe “fadeIn”?*, a red **Delete**), then removes the `@keyframes` rule via `deleteKeyframes`. |
 
-The editor shows one frame per position on the timeline. A key naming several positions (`0%, 100%`, `from, to`) opens as one frame per position, each with the same declarations — the same animation — and is saved that way, `from` and `to` as `0%` and `100%`. A position named by two keys becomes one frame, the later key winning for a property both set. A decimal position (`12.5%`) is kept, and a frame's position can be typed as a decimal. An animation with a key the editor cannot place — neither `from`, `to` nor a percentage up to 100% — does not open.
+The editor shows one frame per position on the timeline. A key naming several positions (`0%, 100%`, `from, to`) opens as one frame per position, each with the same declarations — the same animation — and is saved that way, `from` and `to` as `0%` and `100%`. A position named by two keys becomes one frame, the later key winning for a property both set. A decimal position (`12.5%`) is kept, and a frame's position can be typed as a decimal. An animation with a key the editor cannot place — neither `from`, `to` nor a percentage up to 100% — does not open. A frame's × and a property's × take it out of the form, written only on **Save**; saving under a name another keyframe already holds asks first (*Replace the keyframe “fadeIn”?*, a red **Replace**).
 
-If the keyframe is used by ≥ 1 selector, a **used by N** chip appears next to the frame count. Clicking it expands an inline list below the row, each line showing a selector + an ✕ remove button that strips the `animation:` declaration from that rule (via `setStyleRule` with `removeProperties: ['animation']`). The data is pivoted from the same `animatedSelectorsData.animations` cache that drives the Animations sub-group, so the badge count updates immediately on any apply / remove inside the session.
+If the keyframe is used by ≥ 1 selector, a **used by N** chip appears next to the frame count. Clicking it expands an inline list below the row, each line showing a selector and its bin, which asks first (*Remove animation from .btn?*, a red **Remove**) and strips the `animation:` declaration from that rule (via `setStyleRule` with `removeProperties: ['animation']`). The data is pivoted from the same `animatedSelectorsData.animations` cache that drives the Animations sub-group, so the badge count updates immediately on any apply / remove inside the session.
 
 **Transition wizard** (modal opened from "+ Add transition" at the top of the Transitions sub-group):
 
@@ -1251,7 +1272,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id" with a button copying the id, *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename**, **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any and you own it (their count and size are *My total space*'s own figures for that project): the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. An account that owns no project but can read the build or the backups sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures the card. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
+| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id" with a button copying the id, *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename** (a pencil, whose tooltip says *Change the name of this project*), **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any and you own it (their count and size are *My total space*'s own figures for that project): the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. The build and each backup there have their bin, and the exports a red **Clear All**: each asks first, naming what goes (*Delete the backup “…”?*). An account that owns no project but can read the build or the backups sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures the card. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **Restore** lists the project's backups, the × at the list's top right closing it; each backup has its own **Restore** and its bin, each asking first, naming the backup. The restore's question holds the warning and two boxes (back up the current project first; delete this backup once it is restored), and the restore runs with it open: a refusal, such as the storage quota, stays in it in the server's words. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks first, naming it. When an action reloads the page, its success message is shown after the reload. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
@@ -1307,9 +1328,12 @@ an edit. Another id is a new API.
 an endpoint of its own takes one, and then the row names that token.
 
 **What a rank sees.** The page opens for whoever may read the registry (`listApiEndpoints`, editor and up). **Add API**, **Import**, a
-card's add, edit and delete, an endpoint's test, edit and delete, and the token row show only to a rank that can run them (`addApi`,
+card's add, pencil and bin, an endpoint's test, pencil and bin, and the token row show only to a rank that can run them (`addApi`,
 `editApi`, `deleteApi`, `testApiEndpoint`, admin and up), and with no action on a row there is no Actions column. This is what the page
 shows: the commands' own refusals stay the authority.
+
+**A bin asks first.** The question names the API or the endpoint (*Delete the API “Shop”?*, saying how many endpoints go with an
+API), and its red **Delete** deletes with the question open: a refusal stays in it, in the server's words.
 
 **A token only ever comes from the project's own namespace.** `QS.fetch` reads a token's key under `qsp_<projectId>_`, whatever the
 source names, so a key written with no prefix or another project's slot named whole is never read, and a page that does not know its
@@ -1525,7 +1549,9 @@ field list is exactly what you declared.
 **Persisted shape**
 
 The picker writes to the endpoint's `responseBindings` array via
-`editApi`. A binding that sets an attribute (its **Attribute** field) names
+`editApi`, so the Response Mapping section is offered only to a role that may
+run `editApi`: for another role it does not show, and Save writes the
+interaction alone. A binding that sets an attribute (its **Attribute** field) names
 one an author could write on the page: an event handler (`onclick` and the
 like), `srcdoc`, any `data-consent-*` name (what a click on the consent
 banner records) or a malformed name is refused, and the save stops with
@@ -2503,9 +2529,10 @@ section directly under **Page Events** (both are page-level, independent of the
 selected element). It lists the current page's stores and opens the wizard.
 
 **Store card.** Each store is a row: the store id, its `@apiId/endpointId` + field
-count (plus an "onload" marker when `fetchOnLoad` is set), with edit and delete
-actions. Delete is read-modify-write — it re-saves the route's remaining stores
-(clearing the route entirely when the last store goes).
+count (plus an "onload" marker when `fetchOnLoad` is set), with its pencil and its
+bin. The bin asks first, naming the store, and deletes with the question open, a
+refusal staying in it. Delete is read-modify-write — it re-saves the route's
+remaining stores (clearing the route entirely when the last store goes).
 
 **Wizard (new / edit).**
 - **Store id** — starts with a letter, then letters / digits / `_` / `-`.
@@ -2957,12 +2984,13 @@ panel (extended from the param-route emulation) provides:
 Sitemap → context menu ⋯ → "Configure resolver" opens the **list
 view** modal (`sitemap-resolver-list.php`). Single-resolver routes
 show with one entry; multi-resolver routes show all entries; routes
-without a resolver show an empty state with "+ Add resolver".
+without a resolver show an empty state with "+ Add resolver". The × at its top
+right, or the backdrop, closes it.
 
 | Action | Effect |
 |---|---|
-| Per-row Edit | Opens the per-config modal (`sitemap-resolver.php`) scoped to that index. Save patches that slot via `setRouteResolver { route, resolver, index: N }`. Cancel / X / backdrop return to the list view. |
-| Per-row × Remove | Confirms (with stronger wording on last-resolver removal), POSTs `setRouteResolver { route, index: N }` (no `resolver` body = remove-at-index). |
+| A row's pencil | Opens the per-config modal (`sitemap-resolver.php`) scoped to that index. Save patches that slot via `setRouteResolver { route, resolver, index: N }`. Cancel, the × at its top right or the backdrop return to the list view. |
+| A row's bin | Asks first, naming the resolver and the route (*Remove the resolver r0 of /blog?*), and says so when it is the route's only one: the route then renders without server-side data. Its red **Remove** POSTs `setRouteResolver { route, index: N }` (no `resolver` body = remove-at-index). |
 | Drag handle ⋮⋮ | Drag-and-drop reorder. Applies immediately via `setRouteResolver { route, resolver: [reorderedArray] }` — no separate "Save order" button. |
 | + Add resolver | Opens the per-config modal in append mode (`editIndex = current length`). Save inserts at end. |
 
@@ -3000,9 +3028,11 @@ covers the editor UX.
   global **menu** / **footer** (calls `setRouteLayout`). Optimistic UI;
   the reachability section re-renders after each toggle since visibility
   affects which routes count as reachable.
-- **Actions** (hover-revealed) — `+` to add a child, `⋯` to open the
+- **Actions** (always in view) — `+` to add a child, `⋯` to open the
   context menu (Add child / View in editor / Open page / Edit title /
-  Configure resolver / Delete route, with Delete greyed for the home route).
+  Configure resolver / Delete route, with Delete disabled for the home route).
+  Delete route asks first, naming the route (*Delete route /blog?*), and a route
+  with children says how many go with it; its red button says *Delete route*.
   View in editor opens the editor on that page: the **Edit:** list set to it
   and the preview showing it.
   Home is the site's root, so its children are the top-level routes: on home,
@@ -3366,6 +3396,12 @@ group.
 `domain` / `path` / `secure` / `sameSite`. `consentRequired` is derived —
 `essential` never needs consent; everything else does. Commands:
 `listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.
+A card's pencil opens the item dialog, in the panel's one modal (§5.1): the × at its
+top right, Escape or the backdrop close it, and the focus stays inside it and goes
+back where it was. A card's bin asks first, naming the key: the key leaves the
+registry, the code that reads or writes it is not touched (the scan flags a key still
+in use that is no longer declared), and a refusal stays in the question in the
+server's words.
 Every control of the page that sends a command (add, edit, delete, declare, scan,
 generate) is drawn only for a role that runs that command.
 
@@ -3479,9 +3515,10 @@ registry into four buckets:
 | **Dangling read** | read by a binding but never written | review (likely a leftover) — not a GDPR item |
 | **Orphan** | declared but unreferenced | ignore (collapsible) — never nagged to delete |
 
-**Generate the consent layer.** The **Generate consent layer** button (modal)
-runs `generateConsentLayer`, which seeds two global structures —
-`consent-banner.json` + `consent-popup.json` — from the registry (one popup
+**Generate the consent layer.** The **Generate consent layer** button (a dialog in
+the panel's one modal, its × at the top right) runs `generateConsentLayer`, which
+seeds two global structures — `consent-banner.json` + `consent-popup.json` — from
+the registry (one popup
 toggle row per category a visitor can choose, shown on a page exactly while that
 category has a declared key, so a category declared later brings its row with no
 generation again; Essential is always-on, locked)
@@ -3577,8 +3614,8 @@ routes use — named as the installation's provider list names them and linked t
 their `privacy_url` (§9.5), a provider without one listed by name; a route that takes
 its provider from the address lists every provider the project has keys for, in
 either set — and a legal-review note. The route is recorded in `consent.json`; once a page
-exists the modal locks the route and offers **Update** + **Delete page**
-(`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
+exists the modal locks the route and offers **Update** + a red **Delete page**,
+asked first (`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
 policy page and no accidental duplicates. A policy page's route deleted any other way, on the sitemap or by
 Fresh Start, is forgotten the same way, and the banner loses its link. Overwriting an existing route asks for
 confirmation. Left empty, the layer is generated with no page and a banner links to
@@ -3660,19 +3697,24 @@ words, the purpose's label naming the language shown; what was typed in a langua
 kept while another shows, until **Save**, which writes each language edited
 (`setCollectedDatum` with its `lang`, a label required in each) and leaves every other
 language's words as they are. Commands: `setCollectedDatum` / `deleteCollectedDatum`. A
-save that would clash with the shape of a translation file is refused with the server's
-words and changes nothing, as on the storage registry (§9.10). Every control of the page
+datum's card has its pencil, which opens the dialog, and its bin, which asks first, naming
+the datum, and says that every field mapped to it becomes unset; a refusal stays in the
+question. A save that would clash with the shape of a translation file is refused with
+the server's words and changes nothing, as on the storage registry (§9.10). Every control of the page
 that sends a command is drawn only for a role that runs it; for another role a field's
 mapping shows without opening a menu.
 
 **Mapping.** Each scanned atom is mapped to a collected datum by clicking it and
 picking from a menu — or creating a new datum from that field in one step;
-`setPrivacyMapping` records `(endpoint, field) → datum`, or unsets it.
+`setPrivacyMapping` records `(endpoint, field) → datum`, or unsets it. The menu of a
+mapped field offers **Unset**, which asks first: the field no longer counts as that
+datum on the privacy page, and the API is not changed.
 
 **Host classification.** Each API `baseUrl` is classified as a **server you
 operate** or a **third party** (with a name + privacy-policy URL). QuickSite can't
-derive this, so it is author-declared (`setPrivacyHost`). A datum's recipient is
-*derived* from the atom → endpoint → host chain, never stored on the mapping.
+derive this, so it is author-declared (`setPrivacyHost`): **Classify** on a host not yet
+classified, its pencil once it is. A datum's recipient is *derived* from the atom →
+endpoint → host chain, never stored on the mapping.
 
 **Coverage.** A summary reports mapped atoms, unverifiable endpoints, and
 unclassified hosts, and reads **Complete** only when none remain. OAuth and
@@ -3688,8 +3730,8 @@ a third-party sign-in section (the wired OAuth providers), a **cookies** section
 and a legal-review note. The cookies section links the cookie-policy page when one
 exists, hints to create one when it doesn't, or is omitted when the author ticks
 *"Don't mention cookies on this page"* (`setPrivacyCookieSection`). Once a page
-exists the section offers **Update** + **Delete** (`deletePrivacyPolicy`) and the
-route is recorded in `privacy.json`. The page's own words reach every language as the
+exists the section offers **Update** + a red **Delete**, asked first
+(`deletePrivacyPolicy`), and the route is recorded in `privacy.json`. The page's own words reach every language as the
 cookie policy's do (§9.10); the labels and purposes of collected data are the author's, each language's own. Descriptions render live from `translate/`;
 regeneration is only needed after data changes (new mappings, host
 re-classification).
@@ -3699,8 +3741,9 @@ re-classification).
 `{ host, name, url, collects: [{label, purpose}] }` and per-endpoint
 `{ fields: { <field>: <label> } }`. Labels resolve to collected-data entries
 (deduped across APIs); an endpoint field referencing a label the API didn't declare
-is flagged in the import preview and skipped. Native format only — OpenAPI / Swagger
-imports classify and map afterward in the UI.
+is flagged in the import preview and skipped. A part the server refuses does not stop the
+import: once it is done, a warning names each refusal in the server's words. Native format
+only — OpenAPI / Swagger imports classify and map afterward in the UI.
 
 ### 9.12 Memberships (/admin/memberships) & Project members (/admin/members)
 
@@ -3720,14 +3763,14 @@ commands (zero 403 noise). Every project is named "Name #id"; a project you
 have only asked to join shows its id alone, its name not being yours to see.
 Sections: **My projects** (`listProjects` — your starred projects first, then
 the others by name, each row starting with its ☆ / ★ toggle (§8.0); role chip,
-OWNED badge, *editing* chip on the current edit target, per-row *Edit this
-project* = the selected-project write + reload, *Leave* with confirm — hidden on
-owned rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`
+OWNED badge, *editing* chip on the current edit target, per-row pencil (*Edit this
+project*) = the selected-project write + reload, *Leave*, asked first — hidden on
+owned rows), **Invitation inbox** (accept, or decline after a question; inviter + note + `sponsored_by`
 shown; accepting opens the project: the selected-project write + reload, the message
 naming it carried across, and should that write fail you are a member and the page
 stays; a voided invitation surfaces the server's 409 message), **My join
-requests** (withdraw), **My proposals** (`GET /admin/self/proposals` — pending validation
-vs. awaiting the person's answer; withdraw while pending), **Notices**
+requests** (withdraw: a request's bin, asked first), **My proposals** (`GET /admin/self/proposals` — pending validation
+vs. awaiting the person's answer; withdraw while pending, by its bin, asked first), **Notices**
 (refused / removed / deleted with the recorded reason → dismiss, which also
 unblocks re-requesting; and **Join request accepted**, in green, when a request
 of yours was approved — dismissing it takes the notice away and leaves you a
@@ -3739,7 +3782,9 @@ the notice away, and the one who makes a change is never told of it. A project c
 hold both of these at once, one row each, each dismissed on its own; the menu's dot
 and the dashboard count each row), and a **Request to join** form (project id, with or
 without the `#` it is shown with, + mandatory note; every error code mapped to a
-human message). Reading the inbox repairs your own copy of each pending entry from
+human message). Leaving, declining and withdrawing run from their question in the panel's
+confirm (§5.1), which stays open while the command runs, a refusal staying in it in the
+server's words. Reading the inbox repairs your own copy of each pending entry from
 its project's roster, by the rule the header's menu is repaired with (§8.0): an
 entry the roster contradicts takes the roster's side and keeps its own date, one it
 no longer lists goes, and a roster that cannot be read is left alone. An accepted
@@ -3755,27 +3800,35 @@ waits for you: its number, its name and **Switch to this project**, which reopen
 it, as the Members count covers every project you run and the page only the edited one. It is
 absent when none waits. Access requires membership of the edited project (`PAGE_PERMISSIONS`);
 sections render by role server-side: every rank sees the **Roster**
-(`getProjectRoster` — rank-ordered, "you" marker, `user_id` shown; change-role /
-remove actions only on rows the caller strictly outranks) and the **Propose**
+(`getProjectRoster` — rank-ordered, "you" marker, `user_id` shown; a pencil that
+changes the role and a bin that removes the member, with an optional reason shown to
+them, only on rows the caller strictly outranks) and the **Propose**
 form (look the person up by exact public name → pick the `{user_id, name}` match → suggested
 role + mandatory vouch). Admin/owner additionally get the **Pending queue**
 (`listMembers` — invitation / join request / proposal chips with notes and
-attribution; cancel for invites, approve / deny with mandatory reason for
+attribution; a bin that withdraws an invitation, approve / deny with mandatory reason for
 requests — approve of a proposal reports the conversion to an invitation), the
 **Invite** form (role picker limited to strictly below the caller's rank), and
 the **Who can ask to join** toggle (open/closed; flipping it to
 open first shows the knockable-by-id privacy advisory, and the warning stays
 visible while the policy is open; the section says it opens no site: only members
 ever view a project's site). The owner alone gets **Transfer ownership** (member picker + departing-owner role +
-checkbox + final confirm modal; the page reloads after transfer since the
+checkbox + a final question; the page reloads after transfer since the
 caller's role changed).
+
+Changing a role, removing a member, approving (with the role to grant), denying (with its
+reason), withdrawing an invitation and transferring ownership each run from a question in the
+panel's confirm (§5.1), which stays open while the command runs: a refusal stays in it in the
+server's words, with what was chosen or typed in it, and a reason left empty is asked for
+there. Opening the join policy is asked the same way, and set once the answer is yes.
 
 **People you have worked with** sits above the lookup on both the Invite and the
 Propose form, and is the same list on each: everyone the caller has already
 invited or proposed, in one searchable dropdown (each person by name, with their
 `user_id` under it; the search matches either). Choosing someone selects them
-exactly as a search match does, and the *Forget* button beside it drops the person
-chosen. The block is hidden
+exactly as a search match does, and the bin beside it (*Forget this contact*) drops the
+person chosen, after a question: they leave the list, and their account and their
+memberships are not touched. The block is hidden
 entirely until there is somebody on it, so a new account never sees an empty
 panel above the search box. Somebody who is not on the list is still found the
 way they always were — by their exact public name — and succeeding at that, then
@@ -3850,9 +3903,11 @@ project unownable and undeletable; the page lists the blocking projects by name
 and member count so the next step is obvious. An externally-managed account (no
 local password) is told so up front and is shown neither password-gated form.
 
-All dynamic structure — the confirm modals and the blocking-project list — is
-built with `QSDom` helpers; the static shell and every label live in
-`templates/pages/account.php` (en/fr).
+The two questions, signing out everywhere and the deletion's final one, are the
+panel's confirm (§5.1): each stays open while its request runs, and a refusal stays
+in it (a wrong password or username, the wait, the projects you still own, which the
+page lists behind it). The blocking-project list is built with `QSDom` helpers; the
+static shell and every label live in `templates/pages/account.php` (en/fr).
 
 ---
 
@@ -3918,7 +3973,7 @@ Clicking marks the card immediately and then reconciles against the server's ans
 
 `editFavicon` stores a **pointer** — it writes the asset's path into the project config and copies nothing. Renaming the chosen asset follows the pointer; deleting it clears the pointer. So the grid can never show a favicon that is no longer there, and choosing one does not leave duplicate or backup images cluttering the library.
 
-A batch delete can delete some files and not others: the answer lists both, and the page says so in a warning, *1 of 2 files deleted. Not deleted: logo.png*. A file that is gone leaves the grid as it reloads, and one that was not deleted stays.
+A card's bin asks first, naming the file (*Delete logo.png?*, *This cannot be undone.*), and **Delete Selected** asks first too, counting the files (*Delete 2 files?*); the delete runs with the question open, and a refusal stays in it in the server's words. A batch delete can delete some files and not others: the answer lists both, and the page says so in a warning, *1 of 2 files deleted. Not deleted: logo.png*. A file that is gone leaves the grid as it reloads, and one that was not deleted stays.
 
 A delete is a delete once the file is gone. If the asset list (each file's description, alt text and star) cannot be saved after it, or the favicon setting still names a deleted image and cannot be cleared, `deleteAsset` answers `500 server.file_write_failed`: the page shows that answer's message as an error, then does what a delete does — the edit area of a deleted file closes, a selection is cleared, the grid reloads without the file. A rename or an edit whose asset list (or, for the favicon image, whose favicon setting) cannot be saved changes nothing, and an upload the asset list cannot record is not kept: each is an ordinary failure, its message shown.
 
@@ -3926,7 +3981,7 @@ A page links its icon only when the icon's file exists: the chosen asset, or `as
 
 #### A picture's alt text, per language
 
-A picture's **Alt Text** is what the picture shows, read by screen readers and search engines, and a page reads it in its own language. The edit form (a card's ✏️ *Edit alt/description*) shows it for a picture alone; a font, a sound or a video has none. It is a language selector and a text: the selector lists the **project's** languages, never the panel's (the panel can be in French while the site runs English, Spanish and German), and starts on the project's default language; a one-language project has no selector. What is typed in one language is kept while another is shown, and **Save Changes** writes each language typed in, and only those.
+A picture's **Alt Text** is what the picture shows, read by screen readers and search engines, and a page reads it in its own language. The edit form (a card's pencil, *Edit the details of “logo.png”*) shows it for a picture alone; a font, a sound or a video has none. It is a language selector and a text: the selector lists the **project's** languages, never the panel's (the panel can be in French while the site runs English, Spanish and German), and starts on the project's default language; a one-language project has no selector. What is typed in one language is kept while another is shown, and **Save Changes** writes each language typed in, and only those.
 
 Media keeps the text in the project's word files under a translation key, which the author never sees:
 
@@ -3946,11 +4001,11 @@ The upload queue and the address import have no alt field: a picture's alt text 
 
 #### A picture shown large
 
-A click on a picture's thumbnail — a raster or an SVG — shows it in the panel's dialog: the picture, its file name, and an × at the top right; Escape, the × or a click beside it closes it, and the focus goes back to the thumbnail. The thumbnail is a button, so Tab reaches it and Enter or Space opens it. The picture shows at its own size, or smaller to fit the window, sized by the stylesheet alone; an SVG, which has no size in pixels, shows 24rem wide, or the window's width when that is narrower. A video and a sound keep their play buttons, a font its specimen. In **Select** mode a click selects the card and nothing opens; the ✏️ button keeps opening the details.
+A click on a picture's thumbnail — a raster or an SVG — shows it in the panel's dialog: the picture, its file name, and an × at the top right; Escape, the × or a click beside it closes it, and the focus goes back to the thumbnail. The thumbnail is a button, so Tab reaches it and Enter or Space opens it. The picture shows at its own size, or smaller to fit the window, sized by the stylesheet alone; an SVG, which has no size in pixels, shows 24rem wide, or the window's width when that is narrower. A video and a sound keep their play buttons, a font its specimen. In **Select** mode a click selects the card and nothing opens; the pencil keeps opening the details.
 
 #### What each role sees
 
-Each control that sends a command is drawn only for a role that can run it: the upload card (`uploadAsset`); **Select**, the batch bar and a card's 🗑️ (`deleteAsset`); a card's rename and star, and the edit form's Description and **Save Changes** (`editAsset`); the favicon radio (`editFavicon`); the alt text (`setTranslationKeys`, `deleteTranslationKeys` and `editAsset`, all three). Every role that opens Media sees the grid, the badges, the viewer and the details: a viewer's ✏️ opens a picture's preview and its size, type and date, with nothing to change.
+Each control that sends a command is drawn only for a role that can run it: the upload card (`uploadAsset`); **Select**, the batch bar and a card's bin (`deleteAsset`); a card's rename pencil and star, and the edit form's Description and **Save Changes** (`editAsset`); the favicon radio (`editFavicon`); the alt text (`setTranslationKeys`, `deleteTranslationKeys` and `editAsset`, all three). Every role that opens Media sees the grid, the badges, the viewer and the details: a viewer's pencil opens a picture's preview and its size, type and date, with nothing to change.
 
 ### 9.16 Builds (/admin/builds)
 
@@ -4004,7 +4059,7 @@ The reason it works this way: the build on disk is the only copy. Overwriting on
 
 #### Deleting offers a download first
 
-The confirmation says two things — that this is the only copy, and that deleting is how you make room for the next build — and puts **Download it first** in the dialog beside Cancel and Delete. Deleting is the normal step in a rebuild, so the moment you are about to lose the archive is exactly the moment to be offered it.
+The question says two things — that this is the only copy, and that deleting is how you make room for the next build — and puts **Download it first** inside it, above **Cancel** and the red **Delete**. Deleting is the normal step in a rebuild, so the moment you are about to lose the archive is exactly the moment to be offered it. The build is deleted with the question still open, and a refusal stays in it in the server's words.
 
 #### The space panel, and the warning
 
@@ -4068,7 +4123,7 @@ A parameter `help` names in braces (`{lang}`, `{name}`) travels in the command's
 
 #### A command that asks first
 
-Before it runs, the console asks about a command whose name begins `delete`, `remove`, `clear`, `reset` or `purge`, and about one whose `help` entry says `'destructive' => true`: *Confirm Action*, *You are about to execute "deleteAlias". This action may make permanent changes. Continue?*, with **Cancel** and **Execute**.
+Before it runs, the console asks about a command whose name begins `delete`, `remove`, `clear`, `reset` or `purge`, and about one whose `help` entry says `'destructive' => true`: *Run “deleteAlias”?*, *This command may make changes that cannot be taken back.*, with **Cancel** (which takes the focus) and a red **Execute**.
 
 The flag is for a command whose name does not say so, and the test is what is lost if it runs by mistake, not how alarming the name sounds:
 
@@ -4172,11 +4227,11 @@ A cell whose value would otherwise begin with `=`, `+`, `-`, `@`, tab or carriag
 
 #### Clearing
 
-**Clear history** deletes stored history for the current project. It is irreversible, so the dialog does not ask over an unknown quantity: choosing a date asks the command what it *would* delete and shows the answer — how many entries, in how many days, and how many kilobytes — and the confirm button stays disabled until that preview has come back.
+**Clear History**, a red button, deletes stored history for the current project. It is irreversible, so its question (*Delete this project's command history?*) does not ask over an unknown quantity: choosing a date asks the command what it *would* delete and shows the answer — how many entries, in how many days, and how many kilobytes — and the red **Delete permanently** stays disabled until that preview has come back. The history is deleted with the question still open, and a refusal stays in it in the server's words.
 
 ⚠ **A whole day at a time.** History is stored one file per day, and clearing removes whole days from **before** the chosen date. A day's date is the one in its **file name**, not the `timestamp` inside any record — so editing a record's timestamp does not move it into another day, and it cannot be cleared separately from the day it was written in.
 
-Today is always kept: the command refuses a future date and deletes strictly before the one given, so there is no way to clear the day in progress. On a project whose only stored day is today, clearing therefore has nothing to remove — which is why, when nothing matches, the dialog **lists the days that are actually stored** and says how the date is applied, instead of only reporting that there was nothing to delete.
+Today is always kept: the command refuses a future date and deletes strictly before the one given, so there is no way to clear the day in progress. On a project whose only stored day is today, clearing therefore has nothing to remove — which is why, when nothing matches, the question **lists the days that are actually stored** and says how the date is applied, instead of only reporting that there was nothing to delete.
 
 Clearing is available here whether or not the command console is switched on. That is the point of it being on this page: the same command is reachable through the console's generic runner, and an installation that has turned the console off would otherwise be able to read its history and never clear it.
 
@@ -4238,7 +4293,7 @@ site shows its one language, its words read from `default.json`, the file its pa
 |---|---|
 | **Add a language** | A searchable list of the installation's languages the site does not have, and **Add**. Asked first: its words start as a copy of the default language's (`addLang`). On a one-language site the question says the site becomes multilingual, each page then having an address per language (`/about` becomes `/en/about` and `/fr/about`, and `/about` still shows the default language), and that the site's words are kept as its pages show them: `addLang` carries `default.json`'s words into the default language's file before it copies that file. |
 | **Make default** | `setDefaultLang`, asked first: an address with no language in it shows the site in that language, and a language added later starts as a copy of its words. On every language but the default. On a one-language site it sits beside **Add** instead: the language picked becomes the site's one language, in place of the one it had, its words and its addresses as they were. |
-| **Remove** | `deleteLang`, asked first: the question names the language and how many words go, and says nothing is kept (the file is deleted). On every language but the default, which `deleteLang` refuses. Removing the second language of two leaves the site one language: the question also says its addresses lose their language (`/en/about` becomes `/about`, and an old `/en/…` or `/fr/…` link stops working) and lists the site's own links that name a language, by where they are (`checkStructureMulti`), or says there are none; the remaining language's words are kept as its pages show them (`deleteLang` carries them into `default.json`). |
+| The bin (*Remove French*) | `deleteLang`, asked first: the question names the language and how many words go, and says nothing is kept (the file is deleted); its red button says **Remove**. On every language but the default, which `deleteLang` refuses. Removing the second language of two leaves the site one language: the question also says its addresses lose their language (`/en/about` becomes `/about`, and an old `/en/…` or `/fr/…` link stops working) and lists the site's own links that name a language, by where they are (`checkStructureMulti`), or says there are none; the remaining language's words are kept as its pages show them (`deleteLang` carries them into `default.json`). |
 
 **Words.** A row per key, a column per language (on a one-language site the one column of `default.json`), each word as it is
 stored (its markers and placeholders written out), a gap where a language has none: **Unset** where the site needs a word there,
@@ -4270,7 +4325,7 @@ markers, …). Every attribute on this page is **catalogued in
 of truth read by `GET /management/p/<projectId>/listDataBindings` and by the in-editor
 autocomplete + smart widgets, available on **both** the Add Element
 wizard's Advanced custom-params section AND the Edit Params surface
-(action panel button next to Add / Duplicate). The same picker —
+(the action panel's **Edit Params**, between Add and Duplicate). The same picker —
 autocomplete dropdown, per-attribute description box, smart widgets
 (store/field cascader, enum select, the storage attributes' widget) — applies
 whether you're authoring a new element OR editing an existing one's bindings.
@@ -4386,8 +4441,8 @@ as in Scenarios A–C.
 Admin Panel → Visual Editor → Select mode
   → Click any element that already has data-* attrs (or a class, or a
     mandatory attr like src/href)
-  → Sidebar action panel → "Edit Params" button (primary blue, between
-    Add and Duplicate)
+  → Sidebar action panel → "Edit Params" (orange, with the pencil,
+    between Add and Duplicate)
   → Form opens pre-populated:
     - Class tokens land in the CSS Class combobox as chips
     - Per-tag mandatory attrs (src for img, href for a, …) fill their widgets
@@ -4396,7 +4451,7 @@ Admin Panel → Visual Editor → Select mode
   → Edit any value → Save
     `editNode` receives a diff (addParams = new + changed, removeParams =
     keys removed from the form); the iframe updates in place, no full reload
-  → Cancel or Back prompts before discarding if the form is dirty
+  → Cancel or Back asks first, with a red Discard, if the form is dirty
 ```
 
 **Out of scope on this surface**: tag swap (`<div>` → `<section>`),

@@ -93,7 +93,8 @@
     .preview-tools__buttons {
         display: contents;
     }
-    .preview-tools--icons-only .preview-tool {
+    .preview-tools--icons-only .preview-tool,
+    .preview-contextual-info__actions--icons-only .admin-btn {
         width: 2.75rem;
         height: 2.75rem;
     }
@@ -232,23 +233,11 @@
     }
 
     /* A finger has no hover: what a pointer reveals on a computer is in view from here down */
-    .sitemap-actions,
     .sitemap__route-external,
-    .asset-card__actions,
-    .asset-card__rename,
     .asset-card__star,
     .asset-card__favicon,
-    .asset-video-overlay,
-    .preview-style-property__delete,
-    .preview-contextual-js-response-bindings__row-delete,
-    .preview-contextual-translation__row-actions {
+    .asset-video-overlay {
         opacity: 1;
-    }
-    .preview-contextual-js-page-events__delete {
-        opacity: 0.7;
-    }
-    .transition-editor__property-actions {
-        display: flex;
     }
 
     /* Social previews: the list at the top and the language take the whole row, as wide as the page */
@@ -594,7 +583,6 @@
     }
     .sitemap-edit-title-modal__footer,
     .sitemap-resolver-modal__footer,
-    .sitemap-resolver-list-modal__footer,
     .dashboard-memberships__links,
     .dashboard-current__line {
         flex-wrap: wrap;

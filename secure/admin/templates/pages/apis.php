@@ -142,7 +142,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h2 class="admin-modal__title" id="modal-api-title"><?= __admin('apis.addApi') ?></h2>
-            <button type="button" class="admin-modal__close" data-dismiss="modal">&times;</button>
+            <button type="button" class="admin-modal__close" data-dismiss="modal" data-qs-icon="close" aria-label="<?= adminEscape(__admin('common.close')) ?>" title="<?= adminEscape(__admin('common.close')) ?>"></button>
         </div>
         <form id="form-api">
             <div class="admin-modal__body">
@@ -261,7 +261,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h2 class="admin-modal__title" id="modal-endpoint-title"><?= __admin('apis.addEndpoint') ?></h2>
-            <button type="button" class="admin-modal__close" data-dismiss="modal">&times;</button>
+            <button type="button" class="admin-modal__close" data-dismiss="modal" data-qs-icon="close" aria-label="<?= adminEscape(__admin('common.close')) ?>" title="<?= adminEscape(__admin('common.close')) ?>"></button>
         </div>
         <form id="form-endpoint">
             <div class="admin-modal__body">
@@ -421,7 +421,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h2 class="admin-modal__title"><?= __admin('apis.testEndpoint') ?></h2>
-            <button type="button" class="admin-modal__close" data-dismiss="modal">&times;</button>
+            <button type="button" class="admin-modal__close" data-dismiss="modal" data-qs-icon="close" aria-label="<?= adminEscape(__admin('common.close')) ?>" title="<?= adminEscape(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div class="admin-grid admin-grid--cols-2 apis-test-grid">
@@ -486,7 +486,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
     <div class="admin-modal__content">
         <div class="admin-modal__header">
             <h2 class="admin-modal__title" id="import-title"><?= __admin('apis.importJson') ?></h2>
-            <button type="button" class="admin-modal__close" data-dismiss="modal">&times;</button>
+            <button type="button" class="admin-modal__close" data-dismiss="modal" data-qs-icon="close" aria-label="<?= adminEscape(__admin('common.close')) ?>" title="<?= adminEscape(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div class="admin-alert admin-alert--icon admin-alert--warning apis-import-warning">
@@ -545,24 +545,6 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
             <button type="button" class="admin-btn admin-btn--ghost" id="btn-import-back" style="display:none;"><?= __admin('common.back', 'Back') ?></button>
             <button type="button" class="admin-btn admin-btn--primary" id="btn-import-next"><?= __admin('common.next', 'Next →') ?></button>
             <button type="button" class="admin-btn admin-btn--primary" id="btn-import-confirm" style="display:none;"><?= __admin('apis.importModal.button') ?></button>
-        </div>
-    </div>
-</div>
-
-<!-- Confirm Delete Modal -->
-<div id="modal-confirm-delete" class="admin-modal admin-modal--apis admin-modal--small" style="display: none;">
-    <div class="admin-modal__backdrop"></div>
-    <div class="admin-modal__content">
-        <div class="admin-modal__header">
-            <h2 class="admin-modal__title"><?= __admin('common.confirmDelete') ?></h2>
-            <button type="button" class="admin-modal__close" data-dismiss="modal">&times;</button>
-        </div>
-        <div class="admin-modal__body">
-            <p id="confirm-delete-message"></p>
-        </div>
-        <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-dismiss="modal"><?= __admin('common.cancel') ?></button>
-            <button type="button" class="admin-btn admin-btn--danger" id="btn-confirm-delete"><?= __admin('common.delete') ?></button>
         </div>
     </div>
 </div>

@@ -519,15 +519,15 @@
         return span;
     }
 
-    /** The remove (×) button for row `index`. Returns ONE Element. */
-    function _renderQueueRemoveButton(index) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'asset-queue__remove';
-        btn.dataset.remove = String(index);
-        btn.title = t('media.remove');
-        btn.textContent = '×';   // × — matches the old `&times;` entity
-        return btn;
+    /**
+     * The small × that takes row `index` out of the queue: nothing is uploaded before Upload All, so it asks nothing.
+     * Returns ONE Element.
+     */
+    function _renderQueueRemoveButton(item, index) {
+        return QSControls.removeRow(t('media.removeNamed', { name: item.name }), null, {
+            focusKey: 'queue-remove:' + item.type + ':' + item.name,
+            attrs: { 'data-remove': String(index) }
+        });
     }
 
     /** One metadata input (the description) for row `index`. Returns ONE Element. */
@@ -555,7 +555,7 @@
         row.appendChild(_renderQueueCell('asset-queue__name', item.name));
         row.appendChild(_renderQueueCell('asset-queue__size', item.size ? formatSize(item.size) : 'URL'));
         row.appendChild(_renderQueueCell('asset-queue__category', item.category));
-        row.appendChild(_renderQueueRemoveButton(index));
+        row.appendChild(_renderQueueRemoveButton(item, index));
         li.appendChild(row);
 
         const meta = document.createElement('div');
@@ -582,7 +582,10 @@
             ? 'media.queueReadyMany' : 'media.queueReadyOne', { count: uploadQueue.length });
         btn.disabled = false;
 
+        // A row taken out under the focus gives it to the × that took its place.
+        const focusBack = list.contains(document.activeElement) ? QSDom.rememberFocus() : null;
         list.replaceChildren(...uploadQueue.map(_renderQueueItem));
+        if (focusBack) focusBack.restore();
     }
 
     function initQueueControls() {
@@ -939,8 +942,9 @@
         wrap.appendChild(text);
 
         if (!selectMode && can('editAsset')) {
-            wrap.appendChild(_renderCardButton(
-                'asset-card__action asset-card__rename', 'rename', asset.filename, 'Rename', '✏️'));
+            wrap.appendChild(QSControls.edit(t('media.rename', { name: asset.filename }), null, {
+                focusKey: 'rename:' + asset.filename, attrs: { 'data-rename': asset.filename }
+            }));
         }
         return wrap;
     }
@@ -965,12 +969,14 @@
         if (!selectMode) {
             const actions = document.createElement('div');
             actions.className = 'asset-card__actions';
-            // The edit button opens the details for every role; what the details let a role change is its own.
-            actions.appendChild(_renderCardButton(
-                'asset-card__action', 'edit', asset.filename, t('media.editMeta'), '✏️'));
+            // The pencil opens the details for every role; what the details let a role change is its own.
+            actions.appendChild(QSControls.edit(t('media.editDetails', { name: asset.filename }), null, {
+                focusKey: 'edit:' + asset.filename, attrs: { 'data-edit': asset.filename }
+            }));
             if (can('deleteAsset')) {
-                actions.appendChild(_renderCardButton(
-                    'asset-card__action asset-card__delete', 'delete', asset.filename, t('common.delete'), '🗑️'));
+                actions.appendChild(QSControls.bin(t('media.deleteNamed', { name: asset.filename }), null, {
+                    focusKey: 'delete:' + asset.filename, attrs: { 'data-delete': asset.filename }
+                }));
             }
             wrap.appendChild(actions);
         }
@@ -1268,9 +1274,7 @@
         }, [
             QSDom.el('div', { class: 'asset-viewer__header' }, [
                 QSDom.el('h2', { class: 'admin-modal-dialog__title asset-viewer__title', id: id, text: asset.filename }),
-                QSDom.el('button', {
-                    type: 'button', class: 'admin-modal__close', 'aria-label': t('common.close'), title: t('common.close'), text: '×'
-                })
+                QSControls.close(null, null)
             ]),
             QSDom.el('div', { class: 'asset-viewer__body' }, [
                 QSDom.el('img', {
@@ -1561,13 +1565,26 @@
     }
 
     // ─── Single Delete ───────────────────────────────────────────────────────
+    /**
+     * A file's delete, asked first: a refusal stays in the dialog with its words, and the grid is drawn again before
+     * the dialog closes, so the focus goes to the next card's bin.
+     */
     async function deleteSingle(filename) {
-        if (!(await QuickSiteUtils.confirm(t('media.confirmDeleteOne', { name: filename }), { type: 'danger' }))) return;
-
-        try {
-            const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filename });
-            const listNotSaved = deletedButListNotSaved(result);
-            if (result.ok || listNotSaved) {
+        await QuickSiteUtils.confirm(t('media.cannotUndo'), {
+            title: t('media.confirmDeleteOne', { name: filename }),
+            type: 'danger',
+            confirmText: t('common.delete'),
+            action: async () => {
+                let result;
+                try {
+                    result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filename });
+                } catch (error) {
+                    return { ok: false, message: t('media.deleteFailedDetail', { message: error.message }) };
+                }
+                const listNotSaved = deletedButListNotSaved(result);
+                if (!result.ok && !listNotSaved) {
+                    return { ok: false, message: result.data?.message || t('media.deleteFailed') };
+                }
                 if (listNotSaved) {
                     QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
                 } else {
@@ -1575,12 +1592,9 @@
                 }
                 if (editingAsset?.filename === filename) closeEditArea();
                 await loadAssets();
-            } else {
-                QuickSiteAdmin.showToast(result.data?.message || t('media.deleteFailed'), 'error');
+                return true;
             }
-        } catch (error) {
-            QuickSiteAdmin.showToast(t('media.deleteFailedDetail', { message: error.message }), 'error');
-        }
+        });
     }
 
     // ─── Star Toggle ───────────────────────────────────────────────────────
@@ -1711,17 +1725,29 @@
         renderGrid();
     }
 
+    /**
+     * The selected files' delete, asked first: a refusal stays in the dialog with its words. Done, select mode ends
+     * (its bar hides with its Delete Selected), so the focus goes to the Select toggle.
+     */
     async function deleteSelected() {
         if (selectedFiles.size === 0) return;
         const filenames = Array.from(selectedFiles);
-        if (!(await QuickSiteUtils.confirm(t(filenames.length !== 1
-            ? 'media.confirmDeleteManyMany'
-            : 'media.confirmDeleteManyOne', { count: filenames.length }), { type: 'danger' }))) return;
-
-        try {
-            const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filenames });
-            const listNotSaved = deletedButListNotSaved(result);
-            if (result.ok || listNotSaved) {
+        await QuickSiteUtils.confirm(t('media.cannotUndo'), {
+            title: t(filenames.length !== 1 ? 'media.deleteManyTitleMany' : 'media.deleteManyTitleOne', { count: filenames.length }),
+            type: 'danger',
+            confirmText: t('common.delete'),
+            returnFocus: () => document.getElementById('asset-select-mode'),
+            action: async () => {
+                let result;
+                try {
+                    result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filenames });
+                } catch (error) {
+                    return { ok: false, message: t('media.deleteFailedDetail', { message: error.message }) };
+                }
+                const listNotSaved = deletedButListNotSaved(result);
+                if (!result.ok && !listNotSaved) {
+                    return { ok: false, message: result.data?.message || t('media.deleteFailed') };
+                }
                 const failed = result.data?.data?.failed || [];
                 if (listNotSaved) {
                     QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
@@ -1740,12 +1766,9 @@
                 toggleSelectMode();
                 if (editingAsset && filenames.includes(editingAsset.filename)) closeEditArea();
                 await loadAssets();
-            } else {
-                QuickSiteAdmin.showToast(result.data?.message || t('media.deleteFailed'), 'error');
+                return true;
             }
-        } catch (error) {
-            QuickSiteAdmin.showToast(t('media.deleteFailedDetail', { message: error.message }), 'error');
-        }
+        });
     }
 
     // ─── Bootstrap ───────────────────────────────────────────────────────────

@@ -11,12 +11,7 @@
             <h3 class="add-transition-modal__title" id="add-transition-modal-title">
                 <?= __admin('preview.addTransitionTitle', 'Add transition') ?>
             </h3>
-            <button type="button" class="add-transition-modal__close" id="add-transition-modal-close" title="<?= __admin('common.close') ?? 'Close' ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
+            <button type="button" class="admin-modal__close" id="add-transition-modal-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="add-transition-modal__body">
             <!-- Selector picker -->

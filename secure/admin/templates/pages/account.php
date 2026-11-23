@@ -205,5 +205,3 @@ window.QS_ACCOUNT_I18N = <?= json_encode([
     </div>
 </section>
 <?php endif; ?>
-
-<div id="account-modal-root"></div>

@@ -2269,12 +2269,7 @@ window.PreviewAiTools = (function () {
             window.removeEventListener('message', onMessage);
             if (shown) shown.close();
         };
-        var close = document.createElement('button');
-        close.type = 'button';
-        close.className = 'preview-contextual-ai-tools__template-close admin-modal__close';
-        close.textContent = '×';
-        close.setAttribute('aria-label', _commonWord('close'));
-        close.addEventListener('click', shut);
+        var close = window.QSControls.close(null, shut, { className: 'preview-contextual-ai-tools__template-close' });
         head.appendChild(close);
         modal.appendChild(head);
 

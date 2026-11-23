@@ -181,14 +181,14 @@ code,
 }
 
 .admin-security-warning__dismiss {
+    display: inline-flex;
+    align-items: center;
     margin-left: auto;
     background: none;
     border: none;
     cursor: pointer;
-    font-size: var(--font-size-xl);
     color: var(--admin-text-muted);
     padding: 0 4px;
-    line-height: 1;
 }
 
 .admin-security-warning__dismiss:hover {
@@ -631,8 +631,7 @@ code,
 }
 
 .admin-btn__icon,
-.preview-nav-btn svg,
-.preview-contextual-form__close svg {
+.preview-nav-btn svg {
     width: 16px;
     height: 16px;
 }
@@ -657,6 +656,38 @@ code,
 .admin-btn--outline:hover:where(:not(:disabled, [aria-disabled="true"])) {
     color: var(--admin-text);
     border-color: var(--admin-text-muted);
+}
+
+/* An item's pencil and bin (QSControls.edit / bin): a ghost button holding the icon alone, the bin red on hover and on
+   keyboard focus. After the ghost hover, which it overrides for the bin. */
+.admin-action {
+    flex-shrink: 0;
+    padding: 6px;
+}
+
+.admin-action--delete:hover:where(:not(:disabled, [aria-disabled="true"])),
+.admin-action--delete:focus-visible {
+    color: var(--admin-error);
+    border-color: var(--admin-error);
+}
+
+/* The small × that takes a row out of a form before Save (QSControls.removeRow): grey, red on hover. */
+.admin-row-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 2px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+
+.admin-row-remove:hover:where(:not(:disabled)),
+.admin-row-remove:focus-visible {
+    color: var(--admin-error);
 }
 
 .admin-btn--lg,
@@ -1042,6 +1073,37 @@ input.admin-checkbox {
     min-width: 150px;
 }
 
+/* What Restore asks (the body of its confirm on the dashboard): the backup, the warning, the two choices. */
+.dashboard-restore {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.dashboard-restore p {
+    margin: 0;
+}
+
+.dashboard-restore__warning {
+    margin-top: var(--space-xs);
+    font-size: var(--font-size-sm);
+}
+
+.dashboard-restore__choice {
+    cursor: pointer;
+}
+
+/* What Clear History asks (the body of its confirm): the warning, the date, what it would delete. */
+.history-clear {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.history-clear p {
+    margin: 0;
+}
+
 .admin-filter-group--actions {
     display: flex;
     gap: var(--space-sm);
@@ -1171,6 +1233,7 @@ input.admin-checkbox {
 .admin-details__summary::-webkit-details-marker,
 .admin-btn--icon-only span,
 .preview-tools--icons-only .preview-tool span,
+.preview-contextual-info__actions--icons-only .admin-btn span,
 .preview-contextual-section,
 .preview-keyframe-modal__property-name--hidden,
 .preview-contextual-js-form-api-section,
@@ -1226,14 +1289,10 @@ input.admin-checkbox {
 .sitemap__route:hover .sitemap__route-external,
 .admin-toast__close:hover,
 .preview-selector-item--dom-only:hover,
-.preview-style-property:hover .preview-style-property__delete,
 .preview-keyframe-modal__frame-percent-input:hover::-webkit-inner-spin-button,
 .preview-keyframe-modal__frame-percent-input:focus::-webkit-inner-spin-button,
-.preview-contextual-js-response-bindings__row:hover .preview-contextual-js-response-bindings__row-delete,
 .position-picker__option:hover .position-picker__new,
 .position-picker__option input:checked + .position-picker__visual .position-picker__new,
-.asset-queue__remove:hover,
-.asset-card:hover .asset-card__actions,
 .asset-card:hover .asset-video-overlay {
     opacity: 1;
 }
@@ -1501,9 +1560,15 @@ kbd {
     border-bottom: 1px solid var(--admin-border);
 }
 
+/* A dialog's ×, at its top right (QSControls.close, or a template's button with data-qs-icon="close"). */
 .admin-modal__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
     background: none;
     border: none;
+    border-radius: var(--radius-sm);
     color: var(--admin-text-muted);
     cursor: pointer;
     padding: 4px;
@@ -1561,8 +1626,7 @@ kbd {
     box-shadow: none;
 }
 
-.admin-schema-editor--invalid .admin-input--code,
-.asset-card__delete:hover {
+.admin-schema-editor--invalid .admin-input--code {
     background: var(--admin-error-bg);
 }
 
@@ -1818,8 +1882,7 @@ kbd {
     flex-shrink: 0;
 }
 
-.sitemap__tree-toggle:hover,
-.preview-contextual-js-form-close:hover {
+.sitemap__tree-toggle:hover {
     background: var(--admin-bg-tertiary);
     color: var(--admin-text);
 }
@@ -1847,17 +1910,12 @@ kbd {
 .sitemap__route--leaf {
     position: relative;
 }
+/* A route's add-child and actions menu, always in view: a finger has no hover, and the keyboard reaches what it sees */
 .sitemap-actions {
     display: inline-flex;
     gap: 2px;
     margin-left: auto;
-    opacity: 0;
-    transition: opacity var(--transition-fast);
     position: relative;
-}
-.sitemap__tree-header:hover .sitemap-actions,
-.sitemap__route--leaf:hover .sitemap-actions {
-    opacity: 1;
 }
 .sitemap-action {
     display: flex;
@@ -1909,10 +1967,10 @@ kbd {
 .sitemap-ctx__item:hover {
     background: var(--admin-bg-tertiary);
 }
-.sitemap-ctx__item--danger {
+/* The delete item: grey at rest like every item, red on hover and on keyboard focus */
+.sitemap-ctx__item--danger:hover,
+.sitemap-ctx__item--danger:focus-visible {
     color: var(--admin-error);
-}
-.sitemap-ctx__item--danger:hover {
     background: var(--admin-error-bg);
 }
 .sitemap-ctx__item--disabled {
@@ -2663,60 +2721,16 @@ kbd {
     vertical-align: middle;
 }
 
-.manage-space__delete-btn,
-.manage-space__download-btn {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    background: none;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.manage-space__delete-btn:hover {
-    color: var(--admin-error);
-    border-color: var(--admin-error);
-    background: #ef444414;
-}
-
-/* The download button looks like what it does: the accent on hover, where the delete button shows red. */
+/* The download button, in the frame of the bin beside it, looks like what it does: the accent on hover, where the bin shows red. */
 .manage-space__download-btn:hover {
     color: var(--admin-accent);
     border-color: var(--admin-accent);
     background: var(--admin-accent-subtle);
 }
 
-.manage-space__delete-btn:disabled,
-.manage-space__download-btn:disabled,
-.manage-space__clear-btn:disabled,
 .preview-nav-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
-}
-
-.manage-space__clear-btn {
-    flex-shrink: 0;
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    color: var(--admin-error);
-    background: none;
-    border: 1px solid var(--admin-error);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.manage-space__clear-btn:hover,
-.preview-toolbar__delete-btn:hover {
-    background: var(--admin-error);
-    color: #ffffff;
 }
 
 .manage-space__project-label {
@@ -2781,11 +2795,6 @@ kbd {
     margin-bottom: var(--space-md);
 }
 
-.preview-keyframe-modal__delete-frame:hover {
-    background: #ef44441a;
-    color: #ef4444;
-}
-
 .admin-btn--success:disabled {
     background: var(--admin-border);
     color: var(--admin-text-muted);
@@ -2802,7 +2811,6 @@ kbd {
     white-space: nowrap;
 }
 
-.preview-keyframe-modal__delete-property:hover,
 .preview-contextual-js-form-label .required {
     color: #ef4444;
 }
@@ -3182,7 +3190,9 @@ kbd {
     flex: 0 0 auto;
 }
 
-.qs-wizard-row__tools button {
+/* Move up and move down; the row's × is the shared one (QSControls.removeRow). */
+.qs-wizard-row__up,
+.qs-wizard-row__down {
     appearance: none;
     border: 1px solid transparent;
     background: transparent;
@@ -3194,13 +3204,10 @@ kbd {
     border-radius: var(--radius-sm);
 }
 
-.qs-wizard-row__tools button:hover {
+.qs-wizard-row__up:hover,
+.qs-wizard-row__down:hover {
     background: var(--admin-surface);
     color: var(--admin-text);
-}
-
-.qs-wizard-row__tools .qs-wizard-row__delete:hover {
-    color: var(--admin-error);
 }
 
 .qs-wizard-row__add {
@@ -3722,13 +3729,14 @@ kbd {
 }
 
 .admin-toast__close {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
     background: none;
     border: none;
     color: var(--admin-text-muted);
     cursor: pointer;
-    font-size: var(--font-size-lg);
     padding: 0;
-    line-height: 1;
     opacity: 0.7;
     transition: opacity var(--transition-fast);
 }
@@ -3771,6 +3779,7 @@ kbd {
 }
 
 .admin-modal-dialog {
+    position: relative;
     background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-lg);
@@ -3783,6 +3792,30 @@ kbd {
 
 .admin-modal-overlay--visible .admin-modal-dialog {
     transform: scale(1);
+}
+
+/* A question's ×, at the dialog's top right whatever the width; it answers Cancel. */
+.admin-modal-dialog > .admin-modal__close {
+    position: absolute;
+    top: var(--space-sm);
+    right: var(--space-sm);
+    z-index: 1;
+}
+
+/* What a question shows or asks to choose (QuickSiteUtils.confirm's body), and why its action was refused. */
+.admin-modal-dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-height: 0;
+    margin: 0 0 var(--space-lg);
+    overflow-y: auto;
+    text-align: left;
+}
+
+.admin-modal-dialog__error {
+    margin: 0 0 var(--space-md);
+    color: var(--admin-error);
 }
 
 .admin-modal-dialog__icon {
@@ -4445,11 +4478,6 @@ kbd {
     min-width: 0;
     overflow-wrap: anywhere;
 }
-.preview-description-dialog__header .admin-modal__close {
-    flex-shrink: 0;
-    font-size: var(--font-size-xl);
-    line-height: 1;
-}
 .preview-description-dialog__body {
     min-height: 0;
     overflow-y: auto;
@@ -4501,36 +4529,17 @@ kbd {
     background: var(--admin-surface);
 }
 
-.preview-toolbar__add-btn:active,
-.preview-toolbar__delete-btn:active {
+.preview-toolbar__add-btn:active {
     transform: scale(0.95);
 }
 
 .preview-toolbar__add-btn svg,
-.preview-toolbar__delete-btn svg,
 .preview-theme-actions .admin-btn svg,
 .transition-editor__anim-checkbox input,
 .preview-contextual-js-page-events__chevron,
 .preview-contextual-form__back-btn svg {
     width: 14px;
     height: 14px;
-}
-
-/* Delete Component Button (trash icon, shown only when editing a component) */
-.preview-toolbar__delete-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: 1px solid var(--admin-error);
-    border-radius: var(--radius-md);
-    background: transparent;
-    color: var(--admin-error);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
 }
 
 /* Route Layout Toggles (menu/footer visibility per page) */
@@ -4594,8 +4603,6 @@ kbd {
 .preview-element-info__toggle:hover,
 .preview-selectors-search__clear:hover,
 .preview-style-editor__back:hover,
-.preview-keyframe-modal__close:hover,
-.transition-editor__property-btn:hover,
 .asset-tabs__tab:hover {
     color: var(--admin-text);
     background: var(--admin-surface-hover);
@@ -5172,14 +5179,12 @@ kbd {
 .preview-animated-selector--clickable:hover,
 .preview-animated-selector-group__header:hover,
 .preview-animated-selector-state:hover,
-.preview-animated-selector-group__header--clickable:hover,
-.asset-card__action:hover {
+.preview-animated-selector-group__header--clickable:hover {
     background: var(--admin-surface-hover);
 }
 
 .preview-element-info--expanded + .preview-workspace > .preview-element-info__details,
 .preview-keyframe-modal.preview-keyframe-modal--visible,
-.transition-editor__property:hover .transition-editor__property-actions,
 .preview-contextual-js-page-events__actions {
     display: flex;
 }
@@ -5289,11 +5294,6 @@ kbd {
     text-overflow: ellipsis;
 }
 
-.preview-keyframe-modal__close svg {
-    width: 20px;
-    height: 20px;
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════════
    COMPONENT WARNING BANNER - Shown when editing a component template
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -5346,22 +5346,6 @@ kbd {
     color: var(--admin-info);
     text-decoration: underline;
     white-space: nowrap;
-}
-
-.preview-iframe-warning__close {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    color: var(--admin-info);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 0 4px;
-    line-height: 1;
-    opacity: 0.7;
-}
-
-.preview-iframe-warning__close:hover {
-    opacity: 1;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -5470,6 +5454,21 @@ kbd {
     width: 100%;
     padding: var(--space-sm) var(--space-md);
     font-size: var(--font-size-sm);
+}
+
+/* With the tools' names off (Show names), the actions are their icon alone, in one row that wraps, sized as the
+   tools are (.preview-tools--icons-only); after the two rules above, which they override at equal specificity. */
+.preview-contextual-info__actions--icons-only {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.preview-contextual-info__actions--icons-only .admin-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    justify-content: center;
 }
 
 /* Style Mode — Source (advanced row above the tabs) */
@@ -5933,8 +5932,7 @@ kbd {
 }
 
 .preview-contextual-style-tab:hover,
-.preview-contextual-form__tab:hover,
-.preview-contextual-form__close:hover {
+.preview-contextual-form__tab:hover {
     color: var(--admin-text);
     background: var(--admin-surface-hover);
 }
@@ -5987,8 +5985,7 @@ kbd {
     letter-spacing: 0.5px;
 }
 
-.preview-theme-section__title svg,
-.asset-card:hover .asset-card__rename {
+.preview-theme-section__title svg {
     opacity: 0.6;
 }
 
@@ -6505,23 +6502,6 @@ kbd {
     color: var(--admin-text);
 }
 
-.apply-keyframe-modal__close {
-    background: transparent;
-    border: 0;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.apply-keyframe-modal__close:hover {
-    background: var(--admin-surface-hover);
-    color: var(--admin-text);
-}
-
 .apply-keyframe-modal__body {
     flex: 1 1 auto;
     min-height: 0;
@@ -6675,24 +6655,6 @@ kbd {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: var(--font-size-xs);
     color: var(--admin-text);
-}
-
-.preview-keyframe-item__user-remove {
-    flex: 0 0 auto;
-    background: transparent;
-    border: 0;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    padding: 2px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.preview-keyframe-item__user-remove:hover {
-    color: #d97766;
-    background: #d977661f;
 }
 
 /* QSEasingPicker — cubic-bezier easing picker. */
@@ -7042,23 +7004,6 @@ kbd {
     margin: 0;
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-semibold);
-    color: var(--admin-text);
-}
-
-.add-transition-modal__close {
-    background: transparent;
-    border: 0;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.add-transition-modal__close:hover {
-    background: var(--admin-surface-hover);
     color: var(--admin-text);
 }
 
@@ -7504,26 +7449,6 @@ kbd {
     color: #c4b5fd;
 }
 
-.preview-selector-copy-picker__close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    background: none;
-    border: none;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: color 0.2s, background 0.2s;
-}
-
-.preview-selector-copy-picker__close:hover {
-    color: var(--admin-text);
-    background: #ffffff1a;
-}
-
 .preview-selector-copy-picker__search {
     width: 100%;
     padding: var(--space-xs) var(--space-sm);
@@ -7780,26 +7705,6 @@ kbd {
     flex-shrink: 0;
 }
 
-.preview-style-property__delete {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: transparent;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    opacity: 0;
-    transition: all 0.2s;
-}
-
-.preview-style-property__delete:hover {
-    background: #ef444433;
-    color: #ef4444;
-}
-
 /* Add Property Button */
 .preview-style-editor__add {
     padding: var(--space-xs) var(--space-sm);
@@ -7862,8 +7767,7 @@ kbd {
     transition: all 0.2s;
 }
 
-.preview-style-property__var-btn:hover,
-.preview-keyframe-item__btn--edit:hover {
+.preview-style-property__var-btn:hover {
     border-color: var(--admin-accent);
     color: var(--admin-accent);
     background: #8b5cf61a;
@@ -8412,18 +8316,6 @@ kbd {
     background: #10b9811a;
 }
 
-.preview-keyframe-item__btn--preview.preview-keyframe-item__btn--active {
-    color: #10b981;
-    border-color: #10b981;
-    background: #10b98133;
-}
-
-.preview-keyframe-item__btn--delete:hover {
-    color: #ef4444;
-    border-color: #ef4444;
-    background: #ef44441a;
-}
-
 /* Keyframe Editor Modal */
 .preview-keyframe-modal {
     position: fixed;
@@ -8474,17 +8366,6 @@ kbd {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
-}
-
-.preview-keyframe-modal__close,
-.preview-keyframe-modal__delete-frame {
-    background: none;
-    border: none;
-    padding: var(--space-xs);
-    cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-    transition: all 0.15s;
 }
 
 .preview-keyframe-modal__body {
@@ -8683,17 +8564,6 @@ kbd {
     border-radius: var(--radius-sm);
     background: var(--admin-card-bg);
     color: var(--admin-text);
-}
-
-.preview-keyframe-modal__delete-property {
-    background: none;
-    border: none;
-    padding: var(--space-2xs);
-    cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-    transition: all 0.15s;
-    flex-shrink: 0;
 }
 
 .preview-keyframe-modal__add-property {
@@ -9074,28 +8944,11 @@ kbd {
     min-width: 0;
 }
 
+/* A state property's bin, always in view (a finger has no hover, the keyboard reaches what it sees) */
 .transition-editor__property-actions {
-    display: none;
+    display: flex;
     gap: 2px;
     flex-shrink: 0;
-}
-
-.transition-editor__property-btn {
-    padding: 2px;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.transition-editor__property-btn--delete:hover,
-.transition-editor__animation-remove:hover {
-    background: #ef444426;
-    color: var(--admin-error);
 }
 
 /* Animation Sections */
@@ -9186,8 +9039,7 @@ kbd {
     flex: 1;
 }
 
-.transition-editor__animation-preview,
-.transition-editor__animation-remove {
+.transition-editor__animation-preview {
     padding: 4px;
     background: transparent;
     border: none;
@@ -9724,37 +9576,6 @@ kbd {
     white-space: nowrap;
 }
 
-.preview-contextual-js-page-events__delete {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    background: none;
-    border: none;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.15s, color 0.15s;
-    flex-shrink: 0;
-}
-
-.preview-contextual-js-page-events__delete svg,
-.preview-contextual-js-response-bindings__row-delete svg {
-    width: 12px;
-    height: 12px;
-}
-
-.preview-contextual-js-page-events__item:hover .preview-contextual-js-page-events__delete {
-    opacity: 0.7;
-}
-
-.preview-contextual-js-page-events__delete:hover {
-    opacity: 1 !important;
-    color: #ef4444;
-}
-
 .preview-contextual-js-element {
     display: flex;
     align-items: center;
@@ -9810,11 +9631,6 @@ kbd {
 
 .preview-contextual-js-state-stores__field-head .ss-field-name {
     flex: 1;
-}
-
-/* Remove button lives in the wizard (not an __item), so keep it visible. */
-.ss-field-remove {
-    opacity: 0.6 !important;
 }
 
 .preview-contextual-js-state-stores__field-head,
@@ -9928,16 +9744,6 @@ kbd {
 .preview-contextual-js-form-header strong {
     font-size: var(--font-size-sm);
     color: #f59e0b;
-}
-
-.preview-contextual-js-form-close {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: var(--admin-text-muted);
-    padding: 4px;
-    border-radius: var(--radius-sm);
-    transition: all 0.2s;
 }
 
 .preview-contextual-js-form-row {
@@ -10457,22 +10263,6 @@ kbd {
     flex-direction: column;
     gap: 4px;
 }
-.preview-contextual-js-form-action-delete {
-    width: 22px;
-    height: 22px;
-    border: none;
-    background: none;
-    color: var(--admin-text-muted);
-    font-size: var(--font-size-base);
-    line-height: 1;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
-}
-.preview-contextual-js-form-action-delete:hover {
-    color: var(--admin-error);
-    background: #ef44441a;
-}
 .preview-contextual-js-form-actions-add {
     align-self: flex-start;
     margin-top: 4px;
@@ -10638,29 +10428,6 @@ kbd {
 }
 .preview-contextual-js-response-bindings__count-fallback {
     width: 80px;
-}
-
-.preview-contextual-js-response-bindings__row-delete {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    background: none;
-    border: none;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
-    opacity: 0;
-}
-
-.preview-contextual-js-response-bindings__row-delete:hover {
-    color: var(--admin-error);
-    background: #ef44441a;
 }
 
 /* Selector picker dropdown within binding row */
@@ -10831,20 +10598,6 @@ kbd {
 
 .preview-js-picker-chip-label {
     font-family: var(--font-mono);
-}
-
-.preview-js-picker-chip-remove {
-    background: transparent;
-    border: none;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    font-size: var(--font-size-xs);
-    padding: 0 2px;
-    line-height: 1;
-}
-
-.preview-js-picker-chip-remove:hover {
-    color: var(--admin-text);
 }
 
 /* ================================================
@@ -11273,22 +11026,6 @@ kbd {
 .preview-contextual-form__param-key,
 .preview-contextual-form__param-value {
     font-size: var(--font-size-xs);
-}
-
-.preview-contextual-form__remove-param {
-    background: transparent;
-    border: none;
-    padding: 4px;
-    cursor: pointer;
-    color: var(--admin-error);
-    border-radius: var(--radius-sm);
-    opacity: 0.7;
-    transition: all 0.2s;
-}
-
-.preview-contextual-form__remove-param:hover {
-    background: var(--admin-error-bg);
-    opacity: 1;
 }
 
 /* Custom params container */
@@ -11740,26 +11477,9 @@ kbd {
     white-space: nowrap;
 }
 
+/* A chip's small × (admin-row-remove), no wider than the chip's line */
 .class-combobox__chip-remove {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 14px;
-    height: 14px;
     padding: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-    line-height: 1;
-    color: var(--admin-text-muted);
-    border-radius: 50%;
-    transition: background 0.1s, color 0.1s;
-}
-
-.class-combobox__chip-remove:hover {
-    background: var(--admin-error);
-    color: #ffffff;
 }
 
 .class-combobox__input {
@@ -11829,16 +11549,6 @@ kbd {
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
-}
-
-.preview-contextual-form__close {
-    background: transparent;
-    border: none;
-    padding: var(--space-xs);
-    cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-    transition: all 0.15s;
 }
 
 .save-snippet-form__preview {
@@ -12085,7 +11795,6 @@ kbd {
     cursor: default;
 }
 
-.preview-enum-card__edit-name-btn,
 .preview-enum-card__name-confirm,
 .preview-enum-card__name-cancel {
     background: none;
@@ -12096,10 +11805,6 @@ kbd {
     line-height: 1;
     border-radius: 3px;
     transition: color 0.15s;
-}
-
-.preview-enum-card__edit-name-btn:hover {
-    color: var(--admin-accent);
 }
 
 .preview-enum-card__name-confirm,
@@ -12197,22 +11902,6 @@ kbd {
     font-size: var(--font-size-xs) !important;
     padding: 2px 6px !important;
     font-family: monospace;
-}
-
-.preview-enum-card__remove-row {
-    background: transparent;
-    border: none;
-    color: var(--admin-error);
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-    padding: 0 2px;
-    opacity: 0.6;
-    transition: opacity 0.15s;
-}
-
-.preview-enum-card__remove-row:hover {
-    opacity: 1;
 }
 
 .preview-enum-card__add-option {
@@ -12939,10 +12628,6 @@ kbd {
     border-top: 1px solid var(--admin-border);
 }
 
-.snippet-selector__preview-actions .admin-btn {
-    gap: var(--space-xs);
-}
-
 /* Snippet CSS Status */
 .snippet-selector__css-status {
     margin-top: var(--space-sm);
@@ -13270,18 +12955,6 @@ kbd {
     text-transform: capitalize;
 }
 
-.asset-queue__remove {
-    background: none;
-    border: none;
-    color: var(--admin-error);
-    cursor: pointer;
-    font-size: var(--font-size-lg);
-    padding: 0 var(--space-xs);
-    line-height: 1;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-}
-
 .asset-queue__meta {
     font-size: var(--font-size-xs);
     color: var(--admin-text-light);
@@ -13382,13 +13055,6 @@ kbd {
     flex: 1 1 0;
     min-width: 0;
     overflow-wrap: anywhere;
-}
-
-.asset-edit-area__close,
-.asset-viewer__header .admin-modal__close {
-    flex-shrink: 0;
-    font-size: var(--font-size-xl);
-    line-height: 1;
 }
 
 /* A picture's alt text: the project's language, then its text; they wrap under each other where the row is short */
@@ -13718,16 +13384,6 @@ kbd {
     min-height: 1.6em;
 }
 
-.asset-card__rename {
-    font-size: var(--font-size-xs);
-    opacity: 0;
-    transition: opacity 0.15s;
-}
-
-.asset-card__rename:hover {
-    opacity: 1 !important;
-}
-
 /* Inline rename */
 .asset-card__rename-wrapper {
     display: flex;
@@ -13755,10 +13411,13 @@ kbd {
 }
 
 /* Card info row */
+/* The size, then the pencil and the bin, always in view: a narrow card (two to a phone's row) wraps them under the size */
 .asset-card__info {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 2px var(--space-xs);
     margin-top: 2px;
 }
 
@@ -13772,19 +13431,7 @@ kbd {
 .asset-card__actions {
     display: flex;
     gap: 2px;
-    opacity: 0;
-    transition: opacity 0.15s;
-}
-
-.asset-card__action {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px 4px;
-    font-size: var(--font-size-sm);
-    border-radius: var(--radius-sm);
-    transition: background 0.15s;
-    line-height: 1;
+    margin-left: auto;
 }
 
 /* --- Font Preview --- */
@@ -13943,13 +13590,6 @@ kbd {
     margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
 }
-.preview-translate-csv-modal__close {
-    background: transparent; border: none;
-    padding: var(--space-xs); cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-}
-.preview-translate-csv-modal__close svg { width: 18px; height: 18px; }
 .preview-translate-csv-modal__body {
     padding: var(--space-md) var(--space-lg);
     overflow-y: auto;
@@ -13989,17 +13629,12 @@ kbd {
     padding: var(--space-md) var(--space-lg);
     border-bottom: 1px solid var(--admin-border);
 }
+/* The title shrinks and wraps inside its line (a long route too), so the × keeps its place at the top right */
 .sitemap-edit-title-modal__header h3 {
+    flex: 1 1 0; min-width: 0; overflow-wrap: anywhere;
     margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
 }
-.sitemap-edit-title-modal__close {
-    background: transparent; border: none;
-    padding: var(--space-xs); cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-}
-.sitemap-edit-title-modal__close svg { width: 18px; height: 18px; }
 .sitemap-edit-title-modal__body {
     padding: var(--space-md) var(--space-lg);
     overflow-y: auto;
@@ -14059,16 +13694,10 @@ kbd {
     border-bottom: 1px solid var(--admin-border);
 }
 .sitemap-resolver-modal__header h3 {
+    flex: 1 1 0; min-width: 0; overflow-wrap: anywhere;
     margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
 }
-.sitemap-resolver-modal__close {
-    background: transparent; border: none;
-    padding: var(--space-xs); cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-}
-.sitemap-resolver-modal__close svg { width: 18px; height: 18px; }
 .sitemap-resolver-modal__body {
     padding: var(--space-md) var(--space-lg);
     overflow-y: auto;
@@ -14142,11 +13771,6 @@ kbd {
 .sitemap-resolver-input-row__value { flex: 1 1 40%; min-width: 0; }
 .sitemap-resolver-input-row__name-cell > *,
 .sitemap-resolver-input-row__value > * { width: 100%; }
-.sitemap-resolver-input-row__remove {
-    flex: 0 0 auto;
-    padding: 4px 8px;
-    line-height: 1;
-}
 
 /* Expose editor rows.
    Layout: varName ← dotPath × (in one flex line). The varName field
@@ -14166,11 +13790,6 @@ kbd {
     padding: 0 2px;
 }
 .sitemap-resolver-expose-row__path { flex: 1 1 50%; min-width: 0; }
-.sitemap-resolver-expose-row__remove {
-    flex: 0 0 auto;
-    padding: 4px 8px;
-    line-height: 1;
-}
 
 /* Same --error treatment as inputs rows — see comment above for
    why both fields turn red. For expose, the empty-path case is
@@ -14262,6 +13881,7 @@ kbd {
     border-bottom: 1px solid var(--admin-border);
 }
 .sitemap-resolver-list-modal__header h3 {
+    flex: 1 1 0; min-width: 0; overflow-wrap: anywhere;
     margin: 0; font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold);
     color: var(--admin-text);
     display: flex; align-items: center; gap: var(--space-xs);
@@ -14272,22 +13892,10 @@ kbd {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
 }
-.sitemap-resolver-list-modal__close {
-    background: transparent; border: none;
-    padding: var(--space-xs); cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-}
-.sitemap-resolver-list-modal__close svg { width: 18px; height: 18px; }
 .sitemap-resolver-list-modal__body {
     padding: var(--space-md) var(--space-lg);
     overflow-y: auto;
     flex: 1;
-}
-.sitemap-resolver-list-modal__footer {
-    display: flex; justify-content: flex-end; gap: var(--space-sm);
-    padding: var(--space-md) var(--space-lg);
-    border-top: 1px solid var(--admin-border);
 }
 
 .sitemap-resolver-list-rows {
@@ -14298,7 +13906,7 @@ kbd {
 }
 
 /* One row per resolver. Drag handle + index label + endpoint reference
-   + Edit + × Remove. Drag-targeting visuals (--drag-target / --dragging)
+   + pencil + bin. Drag-targeting visuals (--drag-target / --dragging)
    give the author live feedback during reorder. */
 .sitemap-resolver-list-row {
     display: flex;
@@ -14350,12 +13958,6 @@ kbd {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-.sitemap-resolver-list-row__edit { flex: 0 0 auto; }
-.sitemap-resolver-list-row__remove {
-    flex: 0 0 auto;
-    padding: 4px 8px;
-    line-height: 1;
 }
 
 .sitemap-resolver-list__empty {
@@ -14602,16 +14204,12 @@ kbd {
     font-style: italic;
 }
 
+/* A row's edit and bin, always in view (a finger has no hover, and the keyboard reaches what it sees) */
 .preview-contextual-translation__row-actions {
     display: flex;
+    align-items: center;
     gap: var(--space-2xs);
     flex: 0 0 auto;
-    opacity: 0;
-    transition: opacity 120ms;
-}
-.preview-contextual-translation__row:hover .preview-contextual-translation__row-actions,
-.preview-contextual-translation__row:focus-within .preview-contextual-translation__row-actions {
-    opacity: 1;
 }
 
 .preview-contextual-translation__row-action {
@@ -14630,10 +14228,6 @@ kbd {
 .preview-contextual-translation__row-action:hover {
     background: var(--admin-bg-tertiary);
     color: var(--admin-text);
-}
-.preview-contextual-translation__row-action--danger:hover {
-    background: var(--admin-error-bg);
-    color: var(--admin-error);
 }
 .preview-contextual-translation__row-action svg {
     width: 14px;
@@ -14725,62 +14319,19 @@ kbd {
     align-items: center;
 }
 
-/* Per-row delete confirm (mirrors editor mechanism with a
-   warning-tinted border instead of accent). */
-.preview-contextual-translation__row-confirm {
-    background: var(--admin-bg-secondary);
-    border-left: 3px solid var(--admin-error);
-    padding: 0.6rem 0.75rem 0.6rem 1.4rem;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    margin: -1px 0 0.4rem 0;
-}
-.preview-contextual-translation__row-confirm-prompt {
-    color: var(--admin-text);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-}
-.preview-contextual-translation__row-confirm-value {
-    color: var(--admin-text-muted);
-    font-size: var(--font-size-xs);
-    font-style: italic;
-    padding: 0.25rem 0.5rem;
-    background: var(--admin-bg);
-    border-radius: var(--radius-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-}
-
-/* Bulk delete confirm view (replaces the row list). */
-.preview-contextual-translation__bulk-confirm {
-    display: flex;
-    flex-direction: column;
-    padding: 1rem 1rem 0.75rem;
-    gap: 0.75rem;
-    background: var(--admin-bg-secondary);
-    border-left: 3px solid var(--admin-error);
-    margin: 0.25rem 0.5rem;
-    border-radius: var(--radius-sm);
-}
-.preview-contextual-translation__bulk-confirm-header {
-    color: var(--admin-text);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-}
-.preview-contextual-translation__bulk-confirm-list {
+/* A bulk delete's list, in its question (QuickSiteUtils.confirm's body): every unused key with its word, the list
+   scrolling inside the dialog so the choice under it stays in view */
+.preview-contextual-translation__unused-list {
     list-style: none;
     margin: 0;
     padding: 0;
-    max-height: 320px;
+    max-height: min(20rem, 40vh);
     overflow-y: auto;
     background: var(--admin-bg);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-sm);
 }
-.preview-contextual-translation__bulk-confirm-item {
+.preview-contextual-translation__unused-item {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -14788,10 +14339,10 @@ kbd {
     border-bottom: 1px solid var(--admin-border);
     min-height: 28px;
 }
-.preview-contextual-translation__bulk-confirm-item:last-child {
+.preview-contextual-translation__unused-item:last-child {
     border-bottom: 0;
 }
-.preview-contextual-translation__bulk-confirm-key {
+.preview-contextual-translation__unused-key {
     font-family: ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
     font-size: var(--font-size-xs);
     color: var(--admin-text);
@@ -14801,7 +14352,7 @@ kbd {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.preview-contextual-translation__bulk-confirm-value {
+.preview-contextual-translation__unused-value {
     color: var(--admin-text-muted);
     font-size: var(--font-size-xs);
     overflow: hidden;
@@ -14810,17 +14361,8 @@ kbd {
     flex: 1 1 auto;
     min-width: 0;
 }
-.preview-contextual-translation__bulk-confirm-actions {
-    display: flex;
-    gap: var(--space-sm);
-    justify-content: flex-end;
-    align-items: center;
-    padding-top: var(--space-xs);
-    border-top: 1px solid var(--admin-border);
-}
 
-/* "Delete from all N languages" opt-in checkbox.
-   Used in both per-row and bulk confirm panels. */
+/* A delete question's "Delete from all N languages" choice, in its body */
 .preview-contextual-translation__multi-lang {
     display: inline-flex;
     align-items: center;
@@ -14834,12 +14376,6 @@ kbd {
     margin: 0;
     accent-color: var(--admin-error);
     cursor: pointer;
-}
-.preview-contextual-translation__multi-lang input[type="checkbox"]:disabled {
-    cursor: not-allowed;
-}
-.preview-contextual-translation__multi-lang input[type="checkbox"]:disabled + span {
-    opacity: 0.5;
 }
 
 /* =============================================================================

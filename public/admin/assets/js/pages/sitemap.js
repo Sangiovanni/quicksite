@@ -14,7 +14,8 @@
     let sitemapData = null;
     let reachabilityData = null;
     let expandedNodes = new Set();      // track which tree nodes are open
-    let openContextMenu = null;         // currently open [⋯] menu element
+    let openContextMenu = null;
+    let contextMenuOpener = null;       // the ⋮ that opened it: where a question asked from it gives the focus back         // currently open [⋯] menu element
 
     // ========================================================================
     // Helpers
@@ -100,7 +101,6 @@
         actions: '<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
         allReachable: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
         viewInEditor: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
-        editTitle: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
         resolver: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
     };
 
@@ -862,6 +862,7 @@
 
     function showContextMenu(button) {
         closeContextMenu();
+        contextMenuOpener = button;
 
         const route = button.dataset.route;
         const isHome = button.dataset.isHome === 'true';
@@ -892,10 +893,11 @@
             icon: QuickSiteUtils.ICON_PATHS.externalLink,
         }));
 
+        // The panel's pencil, as every edit control draws it.
         menu.appendChild(_ctxMenuItem({
             action: 'edit-title', route,
             label: t('editTitle', 'Edit title'),
-            icon: ICONS.editTitle,
+            icon: QuickSiteUtils.ICON_PATHS.edit,
         }));
 
         // Configure-resolver opens the per-route data
@@ -974,11 +976,17 @@
 
     async function deleteRoute(route, hasChildren) {
         const childCount = hasChildren ? countDescendantsForRoute(route) : 0;
+        // The question names the route; a route with children says they go with it.
         const message = hasChildren
-            ? t('deleteConfirmChildren', 'Delete route and children?').replace('{route}', route).replace('{count}', childCount)
-            : t('deleteConfirm', 'Delete route?').replace('{route}', route);
+            ? t('deleteConfirmChildren', 'Route /{route} has {count} children. Delete all?').replace('{route}', route).replace('{count}', childCount)
+            : '';
 
-        if (!(await QuickSiteUtils.confirm(message, { type: 'danger' }))) return;
+        if (!(await QuickSiteUtils.confirm(message, {
+            title: t('deleteConfirm', 'Delete route /{route}?').replace('{route}', route),
+            type: 'danger',
+            confirmText: t('deleteRoute', 'Delete route'),
+            returnFocus: () => (contextMenuOpener && contextMenuOpener.isConnected ? contextMenuOpener : null),
+        }))) return;
 
         try {
             const body = { route };
@@ -1154,7 +1162,7 @@
                 // Always go through the list view.
                 // For single-resolver routes the list shows ONE entry +
                 // "+ Add resolver"; for multi it shows them all. The
-                // per-resolver modal opens FROM the list (Edit / + Add).
+                // per-resolver modal opens FROM the list (a row's pencil / + Add).
                 openResolverListModal(route);
                 break;
         }
@@ -1190,24 +1198,12 @@
         if (_editTitleRefs.cancel) _editTitleRefs.cancel.addEventListener('click', closeEditTitleModal);
         if (_editTitleRefs.save)   _editTitleRefs.save.addEventListener('click', submitEditTitleModal);
         if (_editTitleRefs.modal) {
+            // A click on the backdrop (outside the content) closes the dialog.
             _editTitleRefs.modal.addEventListener('click', (e) => {
                 if (e.target && e.target.classList && e.target.classList.contains('sitemap-edit-title-modal__backdrop')) {
                     closeEditTitleModal();
                 }
             });
-            // Stop click + mousedown bubbling on the CONTENT card so the
-            // event can't reach a higher-up handler somewhere in the
-            // admin chrome that triggers a page reload (observed during
-            // testing: clicking inputs caused the sitemap to reload
-            // before this guard was added). The actual offender isn't
-            // identified. The
-            // backdrop sits OUTSIDE the content, so backdrop clicks
-            // still close the modal (via the listener above).
-            const content = _editTitleRefs.modal.querySelector('.sitemap-edit-title-modal__content');
-            if (content) {
-                content.addEventListener('click',     (e) => e.stopPropagation());
-                content.addEventListener('mousedown', (e) => e.stopPropagation());
-            }
         }
         return _editTitleRefs;
     }
@@ -1640,20 +1636,12 @@
             _resolverRefs.endpoint.addEventListener('change', _onResolverEndpointChange);
         }
         if (_resolverRefs.modal) {
+            // A click on the backdrop (outside the content) closes the dialog.
             _resolverRefs.modal.addEventListener('click', (e) => {
                 if (e.target && e.target.classList && e.target.classList.contains('sitemap-resolver-modal__backdrop')) {
                     closeResolverModal();
                 }
             });
-            // Same admin-chrome-click-eater guard as edit-title — see the
-            // _ensureEditTitleRefs comment above for context. Stop clicks
-            // on the content card from bubbling to the mystery listener
-            // that page-reloads the sitemap.
-            const content = _resolverRefs.modal.querySelector('.sitemap-resolver-modal__content');
-            if (content) {
-                content.addEventListener('click',     (e) => e.stopPropagation());
-                content.addEventListener('mousedown', (e) => e.stopPropagation());
-            }
         }
         return _resolverRefs;
     }
@@ -2035,14 +2023,8 @@
             renderValue(oldValue);
         });
 
-        // Remove button (× icon).
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'sitemap-resolver-input-row__remove admin-btn admin-btn--ghost';
-        removeBtn.title = t('resolverRemoveInput', 'Remove input');
-        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
-        removeBtn.addEventListener('click', () => row.remove());
-        row.appendChild(removeBtn);
+        // The small ×: the row leaves the form, nothing is written before Save.
+        row.appendChild(QSControls.removeRow(t('resolverRemoveInput', 'Remove input'), () => row.remove()));
 
         return row;
     }
@@ -2335,13 +2317,8 @@
         // the schema paths change).
         row._refreshPathCell = _refreshPathCell;
 
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'sitemap-resolver-expose-row__remove admin-btn admin-btn--ghost';
-        removeBtn.title = t('resolverRemoveExpose', 'Remove expose');
-        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
-        removeBtn.addEventListener('click', () => row.remove());
-        row.appendChild(removeBtn);
+        // The small ×: the row leaves the form, nothing is written before Save.
+        row.appendChild(QSControls.removeRow(t('resolverRemoveExpose', 'Remove expose'), () => row.remove()));
 
         return row;
     }
@@ -2683,7 +2660,7 @@
 
         refs.route.textContent = '"' + route + '"';
         refs.save.disabled = true;
-        // Clear button hidden in list-view mode — per-row × Remove on
+        // Clear button hidden in list-view mode — each row's bin on
         // the list view handles individual removal; the Done button on
         // the list closes everything cleanly.
         if (_resolverEditFromList) {
@@ -2919,7 +2896,11 @@
     async function clearResolverFromModal() {
         const refs = _ensureResolverRefs();
         if (!_resolverCurrentRoute) return;
-        if (!(await QuickSiteUtils.confirm(t('resolverClearConfirm', 'Clear the resolver from this route? The route will render again without server-side data.'), { type: 'danger' }))) {
+        if (!(await QuickSiteUtils.confirm(t('resolverClearText', 'The route will render again without server-side data.'), {
+            title: t('resolverClearTitle', 'Clear the resolver of /{route}?').replace('{route}', _resolverCurrentRoute),
+            type: 'danger',
+            confirmText: t('resolverClear', 'Clear resolver'),
+        }))) {
             return;
         }
 
@@ -2958,9 +2939,9 @@
     // ========================================================================
     // The entry point for ALL resolver authoring. Opens from the sitemap
     // context menu (⋮ → "Configure resolver") with a row per resolver
-    // configured on the route + a "+ Add resolver" button. Per-row Edit
-    // opens the existing per-config modal scoped to that index; × removes
-    // a single slot; drag-and-drop reorders.
+    // configured on the route + a "+ Add resolver" button. A row's pencil
+    // opens the existing per-config modal scoped to that index; its bin
+    // removes that slot (asked first); drag-and-drop reorders.
     //
     // Backward compat: single-resolver routes show with ONE entry. They
     // grow to multi by clicking "+ Add resolver" — no extra setup needed.
@@ -2986,7 +2967,6 @@
         _resolverListRefs = {
             modal:  document.getElementById('sitemap-resolver-list-modal'),
             close:  document.getElementById('sitemap-resolver-list-close'),
-            done:   document.getElementById('sitemap-resolver-list-done'),
             add:    document.getElementById('sitemap-resolver-list-add'),
             route:  document.getElementById('sitemap-resolver-list-route'),
             count:  document.getElementById('sitemap-resolver-list-count'),
@@ -2995,20 +2975,14 @@
             status: document.getElementById('sitemap-resolver-list-status'),
         };
         if (_resolverListRefs.close) _resolverListRefs.close.addEventListener('click', closeResolverListModal);
-        if (_resolverListRefs.done)  _resolverListRefs.done.addEventListener('click', closeResolverListModal);
         if (_resolverListRefs.add)   _resolverListRefs.add.addEventListener('click', _handleResolverListAdd);
         if (_resolverListRefs.modal) {
+            // A click on the backdrop (outside the content) closes the dialog.
             _resolverListRefs.modal.addEventListener('click', (e) => {
                 if (e.target && e.target.classList && e.target.classList.contains('sitemap-resolver-list-modal__backdrop')) {
                     closeResolverListModal();
                 }
             });
-            // Same admin-chrome-click-eater guard as the other modals.
-            const content = _resolverListRefs.modal.querySelector('.sitemap-resolver-list-modal__content');
-            if (content) {
-                content.addEventListener('click',     (e) => e.stopPropagation());
-                content.addEventListener('mousedown', (e) => e.stopPropagation());
-            }
         }
         return _resolverListRefs;
     }
@@ -3116,20 +3090,11 @@
         if (!endpoint) endpointLabel.style.color = 'var(--admin-warning, #b3691e)';
         row.appendChild(endpointLabel);
 
-        const editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.className = 'sitemap-resolver-list-row__edit admin-btn admin-btn--ghost';
-        editBtn.textContent = t('resolverListEdit', 'Edit');
-        editBtn.addEventListener('click', () => _handleResolverListEdit(idx));
-        row.appendChild(editBtn);
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'sitemap-resolver-list-row__remove admin-btn admin-btn--ghost';
-        removeBtn.title = t('resolverListRemove', 'Remove this resolver');
-        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
-        removeBtn.addEventListener('click', () => _handleResolverListRemove(idx));
-        row.appendChild(removeBtn);
+        const name = 'r' + idx;
+        row.appendChild(QSControls.edit(t('resolverListEditNamed', 'Edit the resolver {name}').replace('{name}', name),
+            () => _handleResolverListEdit(idx), { focusKey: 'resolver-edit:' + name }));
+        row.appendChild(QSControls.bin(t('resolverListRemoveNamed', 'Remove the resolver {name}').replace('{name}', name),
+            () => _handleResolverListRemove(idx), { focusKey: 'resolver-remove:' + name }));
 
         // Drag-and-drop handlers — native HTML5. Reorder applies
         // immediately on drop (no separate "Save order" button, by
@@ -3211,12 +3176,16 @@
         const refs = _ensureResolverListRefs();
         const route = _resolverListCurrentRoute;
         if (!route) return;
-        const totalBefore = _resolverListCurrentConfigs.length;
-        const isLast = totalBefore === 1;
+        const isLast = _resolverListCurrentConfigs.length === 1;
+        // The question names the resolver; the route's only one says what the route loses.
         const confirmMsg = isLast
-            ? t('resolverListRemoveLastConfirm', 'Remove the only resolver on this route? The route will render without server-side data.')
-            : t('resolverListRemoveConfirm', 'Remove resolver r' + idx + ' from this route?');
-        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
+            ? t('resolverListRemoveLastText', 'It is the only resolver of this route: the route will render without server-side data.')
+            : '';
+        if (!(await QuickSiteUtils.confirm(confirmMsg, {
+            title: t('resolverListRemoveTitle', 'Remove the resolver {name} of /{route}?').replace('{name}', 'r' + idx).replace('{route}', route),
+            type: 'danger',
+            confirmText: t('remove', 'Remove'),
+        }))) return;
 
         refs.status.textContent = t('removing', 'Removing…');
         refs.status.style.color = '';

@@ -139,7 +139,7 @@
             type: 'button',
             class: 'admin-mode-bubble__close',
             'aria-label': word('bubbleClose', 'Close')
-        }, [QSDom.iconEl('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>', 14)]);
+        }, [QSDom.iconEl(window.QuickSiteUtils.ICON_PATHS.close, 14)]);
         return QSDom.el('div', { class: 'admin-mode-bubble', id: 'admin-mode-bubble', role: 'status' }, [
             QSDom.el('p', { class: 'admin-mode-bubble__text', text: word('bubble', 'You can switch between Simple and Advanced here at any time.') }),
             close

@@ -29,12 +29,9 @@
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
             </button>
-            <button type="button" id="preview-delete-component" class="preview-toolbar__delete-btn" style="display: none;" title="<?= __admin('preview.deleteComponent') ?? 'Delete component' ?>">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-            </button>
+            <!-- The component being edited: its bin, shown while a component is the target (preview.js names it) -->
+            <button type="button" id="preview-delete-component" class="admin-btn admin-btn--ghost admin-action admin-action--delete" data-qs-icon="trash" style="display: none;"
+                    title="<?= adminAttr(__admin('preview.deleteComponent')) ?>" aria-label="<?= adminAttr(__admin('preview.deleteComponent')) ?>"></button>
         </div>
         
         <!-- Language Selector: shown for a project with more than one language. A run can change that while the page is open, so it is always there (preview.js rebuildLanguageList()) -->

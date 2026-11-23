@@ -139,5 +139,3 @@ window.QS_BUILDS_I18N = <?= json_encode([
         </div>
     </div>
 </section>
-
-<div id="builds-modal-root"></div>

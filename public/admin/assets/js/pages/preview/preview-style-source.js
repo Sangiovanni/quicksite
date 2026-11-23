@@ -325,7 +325,10 @@
         // The panel's dialog answers later, so the click is held and the link followed once confirmed.
         e.preventDefault();
         var href = _refineLink.href;
-        QuickSiteUtils.confirm(t('styleSourceLeaveConfirm')).then(function (ok) {
+        QuickSiteUtils.confirm(t('styleSourceLeaveConfirm'), {
+            title: t('styleSourceLeaveTitle'),
+            confirmText: t('styleSourceLeave')
+        }).then(function (ok) {
             if (!ok) return;
             // The draft takes the edits (Source offers them back on return), and the browser's
             // beforeunload prompt is suppressed so they are not asked twice.
@@ -449,7 +452,12 @@
 
     function cancelEdit() {
         if (!_isDirty || _isSaving) return;
-        QuickSiteUtils.confirm(t('styleSourceCancelConfirm'), { type: 'danger' }).then(function (ok) {
+        // The question is its title; its red button says Discard (the draft offer's word for the same act)
+        QuickSiteUtils.confirm('', {
+            title: t('styleSourceCancelConfirm'),
+            type: 'danger',
+            confirmText: t('styleSourceRestoreDecline')
+        }).then(function (ok) {
             if (ok) reloadFromServer();
         });
     }
@@ -678,7 +686,10 @@
     }
 
     function confirmLeave() {
-        return QuickSiteUtils.confirm(t('styleSourceSwitchConfirm'));
+        return QuickSiteUtils.confirm(t('styleSourceSwitchConfirm'), {
+            title: t('styleSourceSwitchTitle'),
+            confirmText: t('styleSourceSwitch')
+        });
     }
 
     // ── Search ──

@@ -909,15 +909,12 @@ const QuickSiteAdmin = {
      */
     async confirmDestructiveCommand(command, form) {
         if (!this.isDestructiveCommand(command, form)) return true;
-        return this.confirm(
-            String(this.t('commands.confirmDestructive.message')).replace(':command', command),
-            {
-                title: this.t('commands.confirmDestructive.title'),
-                type: 'warning',
-                confirmText: this.t('common.execute'),
-                confirmClass: 'primary'
-            }
-        );
+        // A danger, as every question before a change that cannot be taken back: Cancel takes the focus, the verb is red.
+        return this.confirm(this.t('commands.confirmDestructive.text'), {
+            title: String(this.t('commands.confirmDestructive.question')).split(':command').join(command),
+            type: 'danger',
+            confirmText: this.t('common.execute')
+        });
     },
 
     /**
@@ -1454,9 +1451,10 @@ const QuickSiteAdmin = {
      * another. The documentation follows the behaviour, not the other way
      * round: the bindings are as initKeyboardShortcuts has them.
      *
+     * @param {HTMLElement} closeBtn  its × (QSControls.close), at the top right
      * @returns {HTMLElement}
      */
-    _renderShortcutsModal() {
+    _renderShortcutsModal(closeBtn) {
         const nav = QSDom.el('div', { class: 'admin-shortcut-group' }, [
             QSDom.el('h4', { text: this.t('shortcuts.navGroup') }),
             this._renderShortcutRow(['g', 'd'], this.t('nav.dashboard')),
@@ -1472,50 +1470,37 @@ const QuickSiteAdmin = {
             this._renderShortcutRow(['Esc'], this.t('shortcuts.closeModal'))
         ]);
 
-        return QSDom.el('div', { class: 'admin-modal-dialog admin-modal-dialog--shortcuts' }, [
+        return QSDom.el('div', {
+            class: 'admin-modal-dialog admin-modal-dialog--shortcuts',
+            role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'admin-shortcuts-title'
+        }, [
+            closeBtn,
             QSDom.el('div', { class: 'admin-modal-dialog__content' }, [
-                QSDom.el('h3', { class: 'admin-modal-dialog__title', text: this.t('shortcuts.title') }),
-                QSDom.el('div', { class: 'admin-shortcuts-grid' }, [nav, actions]),
-                QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [
-                    QSDom.el('button', {
-                        class: 'admin-btn admin-btn--primary admin-modal-dialog__close',
-                        text: this.t('common.close')
-                    })
-                ])
+                QSDom.el('h3', { class: 'admin-modal-dialog__title', id: 'admin-shortcuts-title', text: this.t('shortcuts.title') }),
+                QSDom.el('div', { class: 'admin-shortcuts-grid' }, [nav, actions])
             ])
         ]);
     },
 
     /**
-     * Show keyboard shortcuts help modal
+     * The keyboard-shortcuts help, in the panel's one modal (QuickSiteUtils.openModal): its × at the top right, and
+     * Escape and the backdrop close it, the focus given back where it was.
      */
     showShortcutsHelp() {
-        const overlay = document.createElement('div');
-        overlay.className = 'admin-modal-overlay admin-modal-overlay--visible';
-        
-        const modal = this._renderShortcutsModal();
-
-        overlay.appendChild(modal);
-        document.body.appendChild(overlay);
-
+        let shown = null;
         const close = () => {
-            overlay.classList.remove('admin-modal-overlay--visible');
-            setTimeout(() => overlay.remove(), 300);
+            if (!shown) return;
+            const s = shown;
+            shown = null;
+            s.close();
         };
-
-        modal.querySelector('.admin-modal-dialog__close').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) close();
+        const closeBtn = window.QSControls.close(null, close);
+        const modal = this._renderShortcutsModal(closeBtn);
+        shown = window.QuickSiteUtils.openModal(modal, {
+            focusable: () => [closeBtn],
+            first: closeBtn,
+            dismiss: close
         });
-
-        // Close on escape
-        const escHandler = (e) => {
-            if (e.key === 'Escape') {
-                close();
-                document.removeEventListener('keydown', escHandler);
-            }
-        };
-        document.addEventListener('keydown', escHandler);
     },
 
 };

@@ -62,10 +62,6 @@
     color: var(--admin-warning);
 }
 
-.translations-language__remove {
-    color: var(--admin-error);
-}
-
 .translations-languages__add {
     margin-top: var(--space-lg);
 }
@@ -184,8 +180,7 @@
 }
 
 .translations-add__error,
-.translations-cell__error,
-.translations-dialog__error {
+.translations-cell__error {
     color: var(--admin-error);
     font-size: var(--font-size-sm);
     overflow-wrap: anywhere;
@@ -300,23 +295,9 @@
     color: var(--admin-warning);
 }
 
-.translations-cell__edit,
-.translations-row__delete {
+.translations-cell__edit {
     margin-left: var(--space-xs);
     vertical-align: middle;
-}
-
-.translations-cell__edit svg,
-.translations-row__delete svg {
-    width: 14px;
-    height: 14px;
-    stroke: currentColor;
-    fill: none;
-    stroke-width: 2;
-}
-
-.translations-row__delete {
-    color: var(--admin-error);
 }
 
 .translations-cell__editor {
@@ -339,37 +320,7 @@
     gap: var(--space-xs);
 }
 
-/* ── the questions (QuickSiteUtils.openModal) ──────────────────────────────── */
-
-.translations-dialog {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-    max-height: 90vh;
-    overflow: auto;
-    padding: var(--space-lg);
-}
-
-/* The title with its x on one line at every width, the x at the top right */
-.translations-dialog__header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-md);
-}
-
-.translations-dialog__title {
-    flex: 1 1 0;
-    min-width: 0;
-    margin: 0;
-    overflow-wrap: anywhere;
-}
-
-.translations-dialog__header .admin-modal__close {
-    flex-shrink: 0;
-    font-size: var(--font-size-xl);
-    line-height: 1;
-}
+/* ── what the questions show (the body of QuickSiteUtils.confirm) ──────────── */
 
 .translations-dialog__text {
     margin: 0;
@@ -406,12 +357,5 @@
 .translations-dialog__option {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-}
-
-.translations-dialog__actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
     gap: var(--space-sm);
 }

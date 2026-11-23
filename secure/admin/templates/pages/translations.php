@@ -25,7 +25,7 @@ $__trProject = (string) ($router->getCurrentProject() ?: '');
 $__trWords = [];
 foreach (['loadFailed', 'loadFailedNone', 'retry', 'noProject',
           'languageDefault', 'languageWords', 'languageUnset', 'languageSame', 'languageFile', 'languageEditing',
-          'makeDefault', 'removeLanguage', 'addLanguageButton', 'addLanguageNone',
+          'makeDefault', 'removeLanguage', 'removeLanguageNamed', 'addLanguageButton', 'addLanguageNone',
           'addLanguageTitle', 'addLanguageCopy', 'addLanguageEmpty', 'addLanguageSwitch', 'addLanguageAddresses',
           'addLanguageDone', 'removeLanguageTitle', 'removeLanguageText', 'removeLanguageDone',
           'removeLanguageToOne', 'removeLanguageLinks', 'removeLanguageLinksNone', 'removeLanguageLinksUnread',
@@ -43,7 +43,7 @@ foreach (['loadFailed', 'loadFailedNone', 'retry', 'noProject',
 foreach (['consent', 'media', 'api', 'link-previews', 'storage', 'privacy'] as $__trSource) {
     $__trWords['source.' . $__trSource] = __admin('translations.source.' . $__trSource);
 }
-foreach (['save', 'cancel', 'close', 'loading', 'edit', 'delete'] as $__trKey) {
+foreach (['save', 'cancel', 'loading', 'edit', 'delete'] as $__trKey) {
     $__trWords['common.' . $__trKey] = __admin('common.' . $__trKey);
 }
 ?>

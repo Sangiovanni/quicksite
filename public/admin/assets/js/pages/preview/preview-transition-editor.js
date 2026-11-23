@@ -536,10 +536,12 @@ window.PreviewTransitionEditor = (function() {
 
     /**
      * One Specific Properties row, cloned from the page's template: the property picker the add rows
-     * use (every CSS property, or a custom name), its own duration, delay and timing, and ✕.
+     * use (every CSS property, or a custom name), its own duration, delay and timing, and its × (the
+     * template's button draws its icon once cloned: a template's content is not in the page drawIcons reads).
      */
     function _renderTransitionRow(item) {
         const row = transitionRowTemplate.content.querySelector('.transition-editor__row').cloneNode(true);
+        QSControls.drawIcons(row);
         const controls = _rowControls(row);
         _setSettings(controls, item);
         if (typeof QSPropertySelector !== 'undefined') {
@@ -613,9 +615,10 @@ window.PreviewTransitionEditor = (function() {
 
     /**
      * One property of a state (`target`: base or trigger): its name, its value (whole in the
-     * tooltip too) and its delete button.
+     * tooltip too) and its bin, which asks before it removes the property (deleteTransitionProperty).
      */
     function _renderPropertyRow(prop, value, target) {
+        const label = (PreviewConfig.i18n.removeNamed || 'Remove “{name}”').replace('{name}', () => prop);
         return QSDom.el('div', { class: 'transition-editor__property', 'data-property': prop, 'data-target': target }, [
             QSDom.el('div', { class: 'transition-editor__property-info' }, [
                 QSDom.el('span', { class: 'transition-editor__property-name', text: prop }),
@@ -623,12 +626,8 @@ window.PreviewTransitionEditor = (function() {
                 QSDom.el('span', { class: 'transition-editor__property-value', title: value, text: value })
             ]),
             QSDom.el('div', { class: 'transition-editor__property-actions' }, [
-                QSDom.el('button', {
-                    type: 'button',
-                    class: 'transition-editor__property-btn transition-editor__property-btn--delete',
-                    'data-action': 'delete',
-                    title: PreviewConfig.i18n.delete || 'Delete'
-                }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 12)])
+                QSControls.bin(label, () => deleteTransitionProperty(target, prop),
+                    { focusKey: 'property-' + target + ':' + prop, attrs: { 'data-action': 'delete' } })
             ])
         ]);
     }
@@ -660,15 +659,6 @@ window.PreviewTransitionEditor = (function() {
         }
 
         transitionBasePropsEl.replaceChildren(...props.map(([prop, value]) => _renderPropertyRow(prop, value, 'base')));
-
-        // Add event listeners for delete buttons
-        transitionBasePropsEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const propEl = e.target.closest('.transition-editor__property');
-                const prop = propEl?.dataset.property;
-                if (prop) deleteTransitionProperty('base', prop);
-            });
-        });
     }
 
     /**
@@ -685,46 +675,47 @@ window.PreviewTransitionEditor = (function() {
         }
 
         transitionHoverPropsEl.replaceChildren(...props.map(([prop, value]) => _renderPropertyRow(prop, value, 'trigger')));
-
-        // Add event listeners for delete buttons
-        transitionHoverPropsEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const propEl = e.target.closest('.transition-editor__property');
-                const prop = propEl?.dataset.property;
-                if (prop) deleteTransitionProperty('trigger', prop);
-            });
-        });
     }
 
     /**
-     * Delete a property from base or trigger state
+     * Remove a property from the base or the trigger state of the saved rule. It asks first, naming the
+     * property and the state's selector; the setStyleRule runs on the verb, the lists drawn again before
+     * the question closes (a refusal keeps it open with its words). Cancel and × write nothing.
      */
     async function deleteTransitionProperty(target, property) {
         const selector = target === 'base'
             ? transitionEditorSelector
             : transitionEditorSelector + transitionEditorCurrentPseudo;
+        const i18n = PreviewConfig.i18n;
+        const failed = i18n.deletePropertyFailed || 'Failed to delete property';
 
-        try {
-            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
-                ...ruleMediaQuery(),
-                selector: selector,
-                styles: '',
-                removeProperties: [property]
-            });
-
-            const result = response.data || {};
-
-            if (result.status === 200) {
-                showToast(PreviewConfig.i18n.propertyDeleted || 'Property deleted', 'success');
+        await QuickSiteUtils.confirm('', {
+            title: (i18n.transitionRemovePropertyTitle || 'Remove “{property}” from {selector}?')
+                .replace('{property}', () => property).replace('{selector}', () => selector),
+            type: 'danger',
+            confirmText: i18n.remove || 'Remove',
+            // The last property of a state gone, the focus goes to that state's Add Property
+            returnFocus: () => (target === 'base' ? transitionBaseAddToggle : transitionTriggerAddToggle),
+            action: async () => {
+                try {
+                    const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                        ...ruleMediaQuery(),
+                        selector: selector,
+                        styles: '',
+                        removeProperties: [property]
+                    });
+                    const result = response.data || {};
+                    if (result.status !== 200) return { ok: false, message: result.message || failed };
+                } catch (error) {
+                    console.error('Failed to delete property:', error);
+                    return { ok: false, message: failed };
+                }
+                showToast(i18n.propertyDeleted || 'Property deleted', 'success');
                 await loadTransitionSelectorStates(transitionEditorSelector);
                 refreshPreviewFrame();
-            } else {
-                throw new Error(result.message || 'Failed to delete property');
+                return true;
             }
-        } catch (error) {
-            console.error('Failed to delete property:', error);
-            showToast(PreviewConfig.i18n.deletePropertyFailed || 'Failed to delete property', 'error');
-        }
+        });
     }
 
     /**
@@ -1090,24 +1081,40 @@ window.PreviewTransitionEditor = (function() {
     }
 
     /**
-     * Remove animation from selector
+     * Remove the base or the trigger state's animation from the saved rule. It asks first, naming the
+     * animation and the state's selector; the setStyleRule runs on the verb, the section drawn again
+     * before the question closes (a refusal keeps it open with its words). Cancel and × write nothing.
      */
     async function removeAnimation(target) {
+        const animation = target === 'base' ? transitionEditorBaseAnimation : transitionEditorTriggerAnimation;
+        if (!animation) return;
         const selector = target === 'base' ? transitionEditorSelector :
             `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
+        const i18n = PreviewConfig.i18n;
+        const failed = i18n.errorRemovingAnimation || 'Error removing animation';
 
-        try {
-            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
-                ...ruleMediaQuery(),
-                selector: selector,
-                styles: '',
-                removeProperties: ['animation']
-            });
-
-            const result = response.data || {};
-            if (result.status === 200) {
-                showToast(PreviewConfig.i18n.animationRemoved || 'Animation removed', 'success');
-
+        await QuickSiteUtils.confirm('', {
+            title: (i18n.transitionRemoveAnimationTitle || 'Remove the animation “{name}” from {selector}?')
+                .replace('{name}', () => animation.name).replace('{selector}', () => selector),
+            type: 'danger',
+            confirmText: i18n.remove || 'Remove',
+            // The bin goes with the animation: the focus goes to the state's Add Animation, shown in its place
+            returnFocus: () => (target === 'base' ? transitionBaseAnimAddBtn : transitionTriggerAnimAddBtn),
+            action: async () => {
+                try {
+                    const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                        ...ruleMediaQuery(),
+                        selector: selector,
+                        styles: '',
+                        removeProperties: ['animation']
+                    });
+                    const result = response.data || {};
+                    if (result.status !== 200) return { ok: false, message: result.message || failed };
+                } catch (error) {
+                    console.error('Failed to remove animation:', error);
+                    return { ok: false, message: failed };
+                }
+                showToast(i18n.animationRemoved || 'Animation removed', 'success');
                 if (target === 'base') {
                     transitionEditorBaseAnimation = null;
                     delete transitionEditorBaseProperties.animation;
@@ -1115,16 +1122,11 @@ window.PreviewTransitionEditor = (function() {
                     transitionEditorTriggerAnimation = null;
                     delete transitionEditorHoverProperties.animation;
                 }
-
                 renderAnimationSection(target);
                 refreshPreviewFrame();
-            } else {
-                showToast(result.message || PreviewConfig.i18n.errorRemovingAnimation || 'Error removing animation', 'error');
+                return true;
             }
-        } catch (error) {
-            console.error('Failed to remove animation:', error);
-            showToast(PreviewConfig.i18n.errorRemovingAnimation || 'Error removing animation', 'error');
-        }
+        });
     }
 
     /**

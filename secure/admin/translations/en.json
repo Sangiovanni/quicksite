@@ -1,6 +1,5 @@
 {
     "common": {
-        "confirmAction": "Confirm Action",
         "appName": "QuickSite Admin",
         "loading": "Loading...",
         "current": "Current:",
@@ -10,7 +9,6 @@
         "success": "Success",
         "warning": "Warning",
         "confirm": "Confirm",
-        "confirmDelete": "Confirm Delete",
         "cancel": "Cancel",
         "save": "Save",
         "delete": "Delete",
@@ -119,9 +117,14 @@
     },
     "privacy": {
         "dialogs": {
-            "deleteDatum": "Delete \":name\"? Any field mapped to it becomes unset.",
             "overwritePage": "Route /:route already exists. Overwrite its content with the privacy-policy page?",
-            "deletePage": "Delete the generated privacy page? This removes the route and its page."
+            "deletePage": "Delete the generated privacy page? This removes the route and its page.",
+            "deleteDatum": "Delete “:name”?",
+            "deleteDatumText": "Every field mapped to it becomes unset.",
+            "delete": "Delete",
+            "overwrite": "Overwrite",
+            "unsetMapping": "Unset the field “:field”?",
+            "unsetMappingText": "It no longer counts as “:datum” on the privacy page. The API is not changed."
         },
         "languages": {
             "shownIn": "Labels and purposes shown in",
@@ -142,6 +145,14 @@
             "generateFailed": "Generate failed",
             "cookieSectionFailed": "Failed to update cookie section",
             "routeRequired": "Enter a route, e.g. privacy"
+        },
+        "mapping": {
+            "unset": "Unset"
+        },
+        "actions": {
+            "edit": "Edit “:name”",
+            "delete": "Delete “:name”",
+            "editHost": "Edit “:host”"
         }
     },
     "register": {
@@ -246,13 +257,17 @@
             "decline": "Decline",
             "acceptedMsg": "Invitation accepted — welcome aboard",
             "acceptedOpenedMsg": "Invitation accepted — welcome aboard. You are now editing {project}.",
-            "declinedMsg": "Invitation declined"
+            "declinedMsg": "Invitation declined",
+            "declineTitle": "Decline this invitation?"
         },
         "requests": {
             "title": "My join requests",
             "empty": "No pending join requests.",
             "withdraw": "Withdraw",
-            "withdrawnMsg": "Request withdrawn"
+            "withdrawnMsg": "Request withdrawn",
+            "withdrawOf": "Withdraw the request to join {project}",
+            "withdrawTitle": "Withdraw your request to join {project}?",
+            "withdrawText": "It leaves the project's waiting list. You can send a new one later."
         },
         "proposals": {
             "title": "My proposals",
@@ -261,7 +276,9 @@
             "for": "for",
             "pendingValidation": "awaiting validation",
             "awaitingAnswer": "invitation sent — awaiting their answer",
-            "withdrawnMsg": "Proposal withdrawn"
+            "withdrawnMsg": "Proposal withdrawn",
+            "withdrawOf": "Withdraw the proposal of {name} for {project}",
+            "withdrawTitle": "Withdraw your proposal of {name} for {project}?"
         },
         "notices": {
             "title": "Notices",
@@ -304,7 +321,6 @@
             "title": "Roster",
             "empty": "No members (this should not happen — a project always has its owner).",
             "you": "you",
-            "changeRole": "Change role",
             "changeRoleTitle": "Change role",
             "newRoleLabel": "New role",
             "apply": "Apply",
@@ -312,7 +328,9 @@
             "remove": "Remove",
             "removeTitle": "Remove member",
             "removeNoteLabel": "Reason (optional — shown to them)",
-            "removedMsg": "Member removed"
+            "removedMsg": "Member removed",
+            "changeRoleOf": "Change the role of {name}",
+            "removeOf": "Remove {name}"
         },
         "queue": {
             "title": "Pending — invitations, requests & proposals",
@@ -325,7 +343,6 @@
             "proposedBy": "proposed by",
             "approve": "Approve",
             "deny": "Deny",
-            "cancelInvite": "Cancel",
             "approveTitle": "Approve this request?",
             "approveRoleLabel": "Role to grant",
             "approvedMsg": "Approved — they are now a member",
@@ -334,11 +351,13 @@
             "denyNoteLabel": "Reason (required — shown to the requester)",
             "denyNoteRequired": "The refusal reason is required.",
             "deniedMsg": "Request denied",
-            "cancelTitle": "Cancel this invitation?",
             "cancelledMsg": "Invitation cancelled",
             "elsewhereTitle": "Join requests are waiting in your other projects",
             "elsewhereSwitch": "Switch to this project",
-            "elsewhereSwitchFailed": "Could not switch project"
+            "elsewhereSwitchFailed": "Could not switch project",
+            "cancelInviteOf": "Cancel the invitation of {name}",
+            "withdrawInvite": "Withdraw the invitation",
+            "withdrawInviteTitle": "Withdraw the invitation of {name}?"
         },
         "invite": {
             "title": "Invite someone",
@@ -364,7 +383,10 @@
             "forgotten": "Removed from your list",
             "forgetFailed": "Could not remove that person from your list.",
             "saveFailed": "They were added to the project, but could not be saved to your list.",
-            "full": "Your list is full, so this person was not added to it."
+            "full": "Your list is full, so this person was not added to it.",
+            "forgetOne": "Forget this contact",
+            "forgetTitle": "Forget {name}?",
+            "forgetText": "They leave your contacts list. Their account and their memberships are not touched."
         },
         "propose": {
             "title": "Propose a member",
@@ -482,14 +504,12 @@
             "restore_incomplete": "The backup was only partly restored: :items could not be restored completely. The backup itself is untouched; fix the cause (most often a file held open by another process, or a permission the web server does not have) and restore it again.",
             "restore_warning": "A pre-restore backup will be created automatically.",
             "confirm_restore": "Restore from backup",
-            "confirmRestore": "Confirm Restore",
             "restoreFrom": "Restore from backup",
             "restoreWarningTitle": "Warning",
             "restoreWarningWithBackup": "A backup of your current project will be created before restoring.",
             "restoreWarningNoBackup": "Your current project state will be lost! Make sure you have a backup if needed.",
             "createBackupBeforeRestore": "Create a backup of the current project before restoring",
             "deleteBackupAfterRestore": "Delete this backup once it is restored",
-            "restoring": "Restoring...",
             "no_backups": "No backups yet",
             "backup_hint": "Click \"Backup\" to create your first backup",
             "backups_count": "backup(s)",
@@ -497,7 +517,6 @@
             "files": "files",
             "pre_restore": "Pre-restore",
             "backup_deleted": "Backup deleted",
-            "confirm_delete_backup": "Delete backup",
             "clone": "Clone",
             "cloneTitle": "Clone Project",
             "cloneBtn": "Clone Project",
@@ -522,7 +541,6 @@
             "languageLabel": "Language",
             "languagePlaceholder": "Select a language...",
             "languageHelp": "The site's first language. You can add others later.",
-            "rename": "Rename",
             "renameTooltip": "Change the name of this project (its owner only)",
             "renameTitle": "Rename Project",
             "renameNameLabel": "New name",
@@ -531,7 +549,8 @@
             "renaming": "Renaming...",
             "renamed": "Project renamed",
             "active": "Active",
-            "error": "Failed to load project info"
+            "error": "Failed to load project info",
+            "restoreQuestion": "Restore the backup “:name”?"
         },
         "storage": {
             "backups": "Backups",
@@ -541,7 +560,6 @@
             "buildsPage": "Open builds page",
             "noItems": "No items",
             "deleted": "Deleted",
-            "confirmDelete": "Delete this item?",
             "exportFiles": "export file(s)",
             "clearAll": "Clear All",
             "confirmClearExports": "Clear all export files?",
@@ -562,7 +580,12 @@
             "searchProjectsLabel": "Search your projects",
             "showAll": "Show all ({n})",
             "showTop": "Show the {n} largest",
-            "noMatch": "No project matches “{query}”."
+            "noMatch": "No project matches “{query}”.",
+            "deleteBuild": "Delete the build “:name”",
+            "deleteBuildTitle": "Delete the build “:name”?",
+            "deleteBackup": "Delete the backup “:name”",
+            "deleteBackupTitle": "Delete the backup “:name”?",
+            "delete": "Delete"
         },
         "structure": {
             "viewFull": "View Full Structure",
@@ -591,10 +614,6 @@
         "failedMsg": "Command failed",
         "errorPrefix": "Error: ",
         "downloadedPrefix": "Downloaded: ",
-        "confirmDestructive": {
-            "title": "Confirm Action",
-            "message": "You are about to execute \":command\". This action may make permanent changes. Continue?"
-        },
         "jsonEditor": {
             "format": "Format JSON",
             "valid": "Valid JSON",
@@ -642,7 +661,11 @@
             "file": "File"
         },
         "responseCopied": "Response copied to clipboard!",
-        "selectPlaceholder": "Select..."
+        "selectPlaceholder": "Select...",
+        "confirmDestructive": {
+            "question": "Run “:command”?",
+            "text": "This command may make changes that cannot be taken back."
+        }
     },
     "commandForm": {
         "hint": {
@@ -980,7 +1003,11 @@
             "noDays": "This project has no stored history at all.",
             "storedDays": "Days currently stored:",
             "dayGranularHint": "History is stored one file per day and is deleted a whole day at a time, so a day only disappears once the date you pick is after it. Today cannot be cleared.",
-            "done": "Command history cleared"
+            "done": "Command history cleared",
+            "title": "Delete this project's command history?",
+            "preview": ":entries entries in :days day(s), :size KB will be permanently deleted.",
+            "previewFailed": "Could not read what would be deleted.",
+            "failed": "The history could not be deleted."
         },
         "errors": {
             "loadFailed": "Failed to load history:"
@@ -1166,7 +1193,6 @@
         "save": "Save",
         "saved": "Keys saved",
         "clear": "Remove these keys",
-        "clearConfirm": "Remove {set} for {provider}? Sign-in with {provider} stops working where these keys are used, until new ones are entered.",
         "cleared": "Keys removed",
         "saveFailed": "The keys could not be saved.",
         "readOnly": "Only the project's owner or admin can enter keys.",
@@ -1181,7 +1207,9 @@
         "noteGoogle": "Google accepts a plain http address only on localhost; anywhere else the address must use https on a public domain. While the app is in Testing, add your own account as a test user.",
         "noteGithub": "A GitHub OAuth app holds one callback address: create one app for the preview keys and another for the build keys.",
         "noteAmazon": "Login with Amazon asks for a privacy notice address, and expects its return addresses to use https.",
-        "noteMeta": "Add the email permission, and keep the app in Development mode while you test: only accounts with a role on the app can sign in."
+        "noteMeta": "Add the email permission, and keep the app in Development mode while you test: only accounts with a role on the app can sign in.",
+        "clearTitle": "Remove {set} for {provider}?",
+        "clearText": "Sign-in with {provider} stops working where these keys are used, until new ones are entered."
     },
     "panelMode": {
         "bubble": "You can switch between Simple and Advanced here at any time.",
@@ -1504,7 +1532,8 @@
             "link-previews": "Link previews",
             "storage": "Storage descriptions",
             "privacy": "Privacy texts"
-        }
+        },
+        "removeLanguageNamed": "Remove {language}"
     },
     "sitemapPage": {
         "resolverKindSessionNothing": "(reads nothing: a resolver is given no session)",
@@ -1568,7 +1597,14 @@
         "toggleInclude": "Toggle include/exclude",
         "langs": "langs",
         "languageCoverage": "Language Coverage",
-        "none": "none"
+        "none": "none",
+        "resolverListEditNamed": "Edit the resolver {name}",
+        "resolverListRemoveNamed": "Remove the resolver {name}",
+        "resolverListRemoveTitle": "Remove the resolver {name} of /{route}?",
+        "resolverListRemoveLastText": "It is the only resolver of this route: the route will render without server-side data.",
+        "remove": "Remove",
+        "resolverClearTitle": "Clear the resolver of /{route}?",
+        "resolverClearText": "The route will render again without server-side data."
     },
     "interactions": {
         "title": "Interactions",
@@ -1788,7 +1824,12 @@
     "storage": {
         "dialogs": {
             "deletePage": "Delete the cookie-policy page at :route? This removes the route and its page.",
-            "overwritePage": "Route /:route already exists. Overwrite its content with the cookie-policy page?"
+            "overwritePage": "Route /:route already exists. Overwrite its content with the cookie-policy page?",
+            "deleteKey": "Delete the key “:id”?",
+            "deleteKeyText": "It leaves the registry. The code that reads or writes it is not touched: the storage scan flags a key still in use that is no longer declared.",
+            "delete": "Delete",
+            "deleteFailed": "The key could not be deleted.",
+            "overwrite": "Overwrite"
         },
         "languages": {
             "shownIn": "Descriptions shown in",
@@ -1812,6 +1853,13 @@
             "essentialOnlyLimit": "No banner does not mean nothing to disclose: third-party embeds and scripts you wrote yourself are not in the registry, and a banner never gated them. That is a reason to keep a cookie-policy page.",
             "essentialBanner": "Create a banner anyway (it is not mandatory)",
             "noBanner": "No banner was created: only essential keys are declared, so there is nothing to ask a visitor. A banner appears by itself once a functional, analytics or marketing key is declared."
+        },
+        "actions": {
+            "edit": "Edit “:id”",
+            "delete": "Delete “:id”"
+        },
+        "scan": {
+            "dismiss": "Close the scan results"
         }
     },
     "structure": {
@@ -2439,7 +2487,6 @@
         "componentNameInvalid": "Invalid name. Use only letters, numbers, hyphens, and underscores.",
         "componentNameExists": "A component with this name already exists.",
         "deleteComponent": "Delete",
-        "confirmDeleteComponent": "Delete component \"%s\"? This cannot be undone.",
         "componentDeleted": "Component deleted",
         "componentDeleteFailed": "Failed to delete component",
         "deleteLastTextWarning": "This is the last element containing text content. Deleting it will create a text-less component (styling shape only). The resulting element must have dimensions set via CSS to remain visible.\n\nContinue?",
@@ -2719,7 +2766,6 @@
         "translationRemoveUnused": "Remove all unused (site-wide)",
         "translationRemoveUnusedHint": "Delete all unused keys across the whole site (site-wide, not just current scope).",
         "translationActionEdit": "Edit",
-        "translationActionDelete": "Delete",
         "translationActionSetValue": "Set value",
         "translationUnsetPlaceholder": "(not set)",
         "translationNoMatches": "No keys match the current filters.",
@@ -2736,7 +2782,6 @@
         "translationEditSaveError": "Failed to save: {error}",
         "translationDeletePrompt": "Delete {key} from {lang}.json?",
         "translationConfirmDelete": "Delete",
-        "translationDeleting": "Deleting…",
         "translationDeleteError": "Failed to delete: {error}",
         "translationBulkDeleteHeader": "These {n} unused keys will be deleted from {lang}.json:",
         "translationBulkDeleteConfirm": "Delete {n} keys",
@@ -2845,7 +2890,6 @@
         "snippetIdRequired": "Snippet ID is required",
         "snippetIdInvalid": "ID must start with a letter and contain only letters, numbers, dashes",
         "deleteSnippet": "Delete Snippet",
-        "confirmDeleteSnippet": "Delete snippet \"%s\"? This action cannot be undone.",
         "switchToMenuConfirm": "This element belongs to the Menu (shared across all pages). Switch to Menu editing?",
         "switchToFooterConfirm": "This element belongs to the Footer (shared across all pages). Switch to Footer editing?",
         "switchToPageConfirm": "This element belongs to the page \"{page}\". Switch to page editing?",
@@ -3599,7 +3643,6 @@
         "editSelector": "Edit selector",
         "previewingAnimation": "Previewing animation...",
         "keyframeEditorComingSoon": "Keyframe editor coming soon",
-        "confirmDeleteKeyframe": "Are you sure you want to delete this keyframe?",
         "keyframeDeleted": "Keyframe deleted successfully",
         "deleteKeyframeFailed": "Failed to delete keyframe",
         "loadAnimationsFailed": "Failed to load animations",
@@ -3861,7 +3904,6 @@
         "nodeDeleted": "Element deleted",
         "textNodeDeleted": "Text node deleted",
         "confirmDeleteTextNode": "Delete this text node?",
-        "deleteText": "Delete Text",
         "deleteTextNode": "Delete this text node",
         "textKey": "Text key",
         "keepTranslationKeys": "Keep translation keys",
@@ -3895,7 +3937,26 @@
         "themeDefault": "Default mode",
         "themeUserToggle": "Visitor can switch",
         "saveThemeConfig": "Save Settings",
-        "themeConfigSaved": "Theme settings saved successfully"
+        "themeConfigSaved": "Theme settings saved successfully",
+        "deleteComponentNamed": "Delete the component “{name}”",
+        "deleteComponentTitle": "Delete the component “{name}”?",
+        "deleteSnippetTitle": "Delete the snippet “{name}”?",
+        "discard": "Discard",
+        "snippetCssConfirmAction": "Change the stylesheet",
+        "translationBulkDeleteTitle": "Delete the {n} unused keys?",
+        "editNamed": "Edit “{name}”",
+        "deleteNamed": "Delete “{name}”",
+        "removeNamed": "Remove “{name}”",
+        "transitionRemovePropertyTitle": "Remove “{property}” from {selector}?",
+        "transitionRemoveAnimationTitle": "Remove the animation “{name}” from {selector}?",
+        "keyframeDeleteTitle": "Delete the keyframe “{name}”?",
+        "keyframeReplaceTitle": "Replace the keyframe “{name}”?",
+        "keyframeReplace": "Replace",
+        "styleSourceLeaveTitle": "Leave the page with unsaved Source edits?",
+        "styleSourceLeave": "Leave",
+        "styleSourceSwitchTitle": "Switch away from Source with unsaved edits?",
+        "styleSourceSwitch": "Switch",
+        "translateCsv": "Translate from CSV"
     },
     "apis": {
         "title": "API Registry",
@@ -4137,7 +4198,6 @@
             "endpointSaveFailedDetail": "Failed to save endpoint: :message",
             "deleted": "Deleted successfully",
             "deleteFailed": "Failed to delete",
-            "deleteFailedDetail": "Failed to delete: :message",
             "endpointNotFound": "Endpoint not found",
             "tokenSourceMissing": "The token source needs a name: pick or create a storage key, or type the name this location asks for.",
             "tokenSaved": "Token saved",
@@ -4157,7 +4217,8 @@
             "exported": "APIs exported successfully",
             "templateInserted": "Template inserted",
             "jsonFormatted": "JSON formatted",
-            "cannotFormat": "Cannot format: invalid JSON"
+            "cannotFormat": "Cannot format: invalid JSON",
+            "privacyRefused": "The API is imported, but part of its privacy details was refused: :reasons"
         },
         "refreshMissing": {
             "endpoint": "endpoint",
@@ -4177,10 +4238,11 @@
             "invalidJson": "✗ Invalid JSON"
         },
         "confirm": {
-            "deleteApi": "Are you sure you want to delete the API \":name\"?",
             "deleteApiEndpointsOne": "This will also delete :count endpoint.",
             "deleteApiEndpointsMany": "This will also delete :count endpoints.",
-            "deleteEndpoint": "Are you sure you want to delete the endpoint \":name\"?"
+            "deleteApi": "Delete the API “:name”?",
+            "deleteEndpoint": "Delete the endpoint “:name”?",
+            "delete": "Delete"
         }
     },
     "aiConnections": {
@@ -4209,7 +4271,6 @@
         "modelCountMany": ":count models",
         "setDefaultTitle": "Set as default",
         "testTitle": "Click to test now",
-        "edit": "Edit",
         "setDefault": "Set default",
         "delete": "Delete",
         "neverTested": "Never tested",
@@ -4258,7 +4319,9 @@
         "probeOkMany": "✅ Connected. :count models found.",
         "probeErr": "❌ :message",
         "probeErrCategory": "❌ :message [:category]",
-        "failed": "Failed"
+        "failed": "Failed",
+        "editNamed": "Edit “:name”",
+        "deleteNamed": "Delete “:name”"
     },
     "media": {
         "uploadingProgress": "Uploading :current/:total...",
@@ -4281,7 +4344,6 @@
         "dataUriUnsupported": "Data URIs not supported — save the file locally first, then upload it",
         "unsupportedType": "Unsupported file type: :name",
         "overLimit": ":name is :size — the limit for :category on this server is :max.",
-        "remove": "Remove",
         "descriptionPlaceholder": "Description",
         "queueReadyOne": ":count file ready",
         "queueReadyMany": ":count files ready",
@@ -4306,7 +4368,6 @@
         "faviconUse": "Use as the site favicon",
         "faviconUseAria": "Use :name as the site favicon",
         "play": "Play",
-        "editMeta": "Edit alt/description",
         "unstar": "Unstar (used in AI prompts)",
         "star": "Star for AI prompts",
         "renamed": "Renamed to :name ✓",
@@ -4346,11 +4407,16 @@
         "selectAll": "Select All",
         "deselectAll": "Deselect All",
         "deleteSelected": "Delete Selected",
-        "confirmDeleteManyOne": "Delete :count asset? This cannot be undone.",
-        "confirmDeleteManyMany": "Delete :count assets? This cannot be undone.",
         "deletedManyOne": ":count file deleted ✓",
         "deletedManyMany": ":count files deleted ✓",
-        "deletedPartial": ":deleted of :total files deleted. Not deleted: :names"
+        "deletedPartial": ":deleted of :total files deleted. Not deleted: :names",
+        "rename": "Rename “:name”",
+        "editDetails": "Edit the details of “:name”",
+        "deleteNamed": "Delete “:name”",
+        "removeNamed": "Remove “:name”",
+        "cannotUndo": "This cannot be undone.",
+        "deleteManyTitleOne": "Delete :count file?",
+        "deleteManyTitleMany": "Delete :count files?"
     },
     "complexWizard": {
         "rowEditor": {

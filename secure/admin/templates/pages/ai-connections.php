@@ -96,11 +96,7 @@ window.QS_AI_CONNECTIONS_I18N = <?= json_encode($qsAiConnectionsI18n, JSON_HEX_T
     <div class="admin-modal__content" style="max-width:560px;">
         <div class="admin-modal__header">
             <h3 class="admin-modal__title" id="qsac-modal-title"><?= __admin('aiConnections.modalTitle') ?></h3>
-            <button type="button" class="admin-modal__close" data-qsac-close>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-            </button>
+            <button type="button" class="admin-modal__close" data-qsac-close data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body" id="qsac-modal-body">
             <!-- step content rendered by JS -->

@@ -117,11 +117,6 @@
     margin: 0;
     overflow-wrap: anywhere;
 }
-.privacy-dialog__header .admin-modal__close {
-    flex-shrink: 0;
-    font-size: var(--font-size-xl);
-    line-height: 1;
-}
 .privacy-dialog__body {
     display: flex;
     flex-direction: column;
@@ -252,6 +247,10 @@
 .privacy-atom-menu__item--active { font-weight: var(--font-weight-bold); color: var(--admin-success); }
 .privacy-atom-menu__action { border-top: 0.5px solid var(--admin-border); margin-top: 2px; color: var(--admin-text-muted); }
 .privacy-atom-menu__action--new { color: var(--admin-accent); }
+/* The menu's Unset: the shared bin beside its word, grey, red on hover as the bin is. */
+.privacy-atom-menu__action--delete { display: flex; align-items: center; gap: 4px; }
+.privacy-atom-menu__action--delete:hover,
+.privacy-atom-menu__action--delete:focus-visible { color: var(--admin-error); }
 
 /* Pills */
 .privacy-pill {

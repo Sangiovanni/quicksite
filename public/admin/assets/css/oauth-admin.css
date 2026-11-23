@@ -238,7 +238,6 @@
     flex-wrap: wrap;
     gap: 8px;
 }
-.oauth-keyset__clear { color: var(--admin-error); }
 .oauth-keyset__status {
     font-size: 12px;
     color: var(--admin-error);

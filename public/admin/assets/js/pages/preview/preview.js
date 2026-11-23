@@ -162,9 +162,10 @@
     // Back to Select button (in add form)
     const addBackToSelect = document.getElementById('add-back-to-select');
     
-    // Tools show names checkbox
+    // Tools show names checkbox: it governs the tools' row and the actions of the Select and Text panels
     const toolsRow = document.getElementById('preview-tools');
     const toolsShowNames = document.getElementById('preview-tools-show-names');
+    const actionRows = [document.getElementById('ctx-node-actions'), document.getElementById('ctx-text-actions')].filter(Boolean);
     
     // Drag tool options — DOM refs and logic extracted to preview-drag.js (window.PreviewDrag)
     
@@ -1836,9 +1837,14 @@
         // Update Text mode button visibility - hide when editing components
         updateTextModeVisibility(editType);
         
-        // Show/hide delete component button in toolbar
+        // Show/hide the toolbar's bin of the component being edited, named for it
         if (deleteComponentBtn) {
             deleteComponentBtn.style.display = editType === 'component' ? 'inline-flex' : 'none';
+            if (editType === 'component' && PreviewConfig.i18n.deleteComponentNamed) {
+                const label = PreviewConfig.i18n.deleteComponentNamed.split('{name}').join(editName);
+                deleteComponentBtn.title = label;
+                deleteComponentBtn.setAttribute('aria-label', label);
+            }
         }
         
         // Show/hide Variables button (component-only)
@@ -2039,8 +2045,12 @@
             if (currentEditType !== 'component' || !currentEditName) return;
             
             const name = currentEditName;
-            const msg = (PreviewConfig.i18n.confirmDeleteComponent || 'Delete component "%s"? This cannot be undone.').replace('%s', name);
-            if (!(await QuickSiteUtils.confirm(msg, { type: 'danger' }))) return;
+            const asked = await QuickSiteUtils.confirm(PreviewConfig.i18n.deleteCannotBeUndone || 'This action cannot be undone.', {
+                title: (PreviewConfig.i18n.deleteComponentTitle || 'Delete the component “{name}”?').split('{name}').join(name),
+                type: 'danger',
+                confirmText: PreviewConfig.i18n.delete || 'Delete'
+            });
+            if (!asked) return;
             
             try {
                 // Send empty structure to delete
@@ -2323,7 +2333,7 @@
         }, [
             QSDom.el('div', { class: 'preview-description-dialog__header' }, [
                 QSDom.el('h3', { class: 'admin-modal-dialog__title', id: id + '-title', text: title }),
-                QSDom.el('button', { type: 'button', class: 'admin-modal__close', 'data-dialog': 'close', 'aria-label': i18n.cancel, text: '×' })
+                QSControls.close(null, null, { attrs: { 'data-dialog': 'close' } })
             ]),
             QSDom.el('div', { class: 'preview-description-dialog__body' }, [
                 QSDom.el('p', { class: 'admin-hint', id: id + '-hint', text: i18n.pageDescriptionDialogHint }),
@@ -4756,8 +4766,12 @@
         const { struct, node, textKeys } = textOnlySelection;
         if (!struct || node == null) return;
         
-        const confirmMsg = PreviewConfig.i18n.confirmDeleteTextNode || 'Delete this text node?';
-        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
+        const asked = await QuickSiteUtils.confirm('', {
+            title: PreviewConfig.i18n.confirmDeleteTextNode || 'Delete this text node?',
+            type: 'danger',
+            confirmText: PreviewConfig.i18n.delete || 'Delete'
+        });
+        if (!asked) return;
         
         const structInfo = parseStruct(struct);
         if (!structInfo || !structInfo.type) {
@@ -4809,7 +4823,8 @@
             return;
         }
         
-        // Smart textKey check: warn before deleting the last child with a textKey
+        // Smart textKey check: the last child of a component with a textKey says so, in the delete's one question
+        let lastTextWarning = '';
         if (currentEditType === 'component') {
             try {
                 const structInfo = parseStruct(selectedStruct);
@@ -4838,9 +4853,8 @@
                         const deletingNode = children[deletingIndex];
                         
                         if (deletingNode && hasTextKey(deletingNode) && childrenWithText.length <= 1) {
-                            const forceMsg = PreviewConfig.i18n?.deleteLastTextWarning 
+                            lastTextWarning = PreviewConfig.i18n?.deleteLastTextWarning
                                 || 'This is the last element containing text content. Deleting it will create a text-less component (styling shape only). The resulting element must have dimensions set via CSS to remain visible.\n\nContinue?';
-                            if (!(await QuickSiteUtils.confirm(forceMsg, { type: 'danger' }))) return;
                         }
                     }
                 }
@@ -4850,8 +4864,12 @@
         }
         
         // Confirm deletion
-        const confirmMsg = PreviewConfig.i18n.confirmDeleteNode;
-        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
+        const asked = await QuickSiteUtils.confirm(lastTextWarning, {
+            title: PreviewConfig.i18n.confirmDeleteNode,
+            type: 'danger',
+            confirmText: PreviewConfig.i18n.delete || 'Delete'
+        });
+        if (!asked) return;
         
         // Parse struct to get type and name
         const structInfo = parseStruct(selectedStruct);
@@ -5005,29 +5023,30 @@
                 if (_isEditModeDirty()) {
                     const msg = PreviewConfig.i18n.discardUnsavedParams
                         || 'You have unsaved param changes. Discard?';
-                    if (!(await QuickSiteUtils.confirm(msg, { type: 'danger' }))) return;
+                    if (!(await QuickSiteUtils.confirm(msg, { type: 'danger', confirmText: PreviewConfig.i18n.discard || 'Discard' }))) return;
                 }
                 setMode('select');
             });
         }
         
-        // Tools show names checkbox
+        // Tools show names checkbox: the tools and the Select and Text panels' actions show each name beside
+        // its icon, or the icon alone (an action's title stays its tooltip, its aria-label its name).
         if (toolsShowNames && toolsRow) {
+            const applyShowNames = function(showNames) {
+                toolsRow.classList.toggle('preview-tools--icons-only', !showNames);
+                actionRows.forEach(function(row) {
+                    row.classList.toggle('preview-contextual-info__actions--icons-only', !showNames);
+                });
+            };
             // Restore state from localStorage (default: show names = true). A browser that refuses the
             // site's storage shows the names and keeps no change of them.
             let showNames = true;
             try { showNames = localStorage.getItem(QuickSiteStorageKeys.toolsShowNames) !== 'false'; } catch (e) { showNames = true; }
             toolsShowNames.checked = showNames;
-            if (!showNames) {
-                toolsRow.classList.add('preview-tools--icons-only');
-            }
+            applyShowNames(showNames);
             
             toolsShowNames.addEventListener('change', function() {
-                if (this.checked) {
-                    toolsRow.classList.remove('preview-tools--icons-only');
-                } else {
-                    toolsRow.classList.add('preview-tools--icons-only');
-                }
+                applyShowNames(this.checked);
                 try { localStorage.setItem(QuickSiteStorageKeys.toolsShowNames, this.checked); } catch (e) { /* not kept */ }
             });
         }
@@ -5260,12 +5279,12 @@
         if (simple) {
             sidebarAddNodeType = 'simple';
         } else {
-            // Reset form state — use remembered tab or default to 'snippet'. A browser that refuses the
+            // Reset form state — use remembered tab or default to 'tag' (HTML Tag). A browser that refuses the
             // site's storage opens the form on the default tab.
             let rememberedTab = null;
             try { rememberedTab = localStorage.getItem(QuickSiteStorageKeys.addLastTab); } catch (e) { rememberedTab = null; }
-            const VALID_TABS = ['tag', 'component', 'snippet', 'complex'];
-            sidebarAddNodeType = VALID_TABS.includes(rememberedTab) ? rememberedTab : 'snippet';
+            const VALID_TABS = ['tag', 'component', 'snippet', 'complex', 'text'];
+            sidebarAddNodeType = VALID_TABS.includes(rememberedTab) ? rememberedTab : 'tag';
         }
         sidebarAddCustomParamsCount = 0;
         sidebarAddSelectedComponentData = null;
@@ -5278,7 +5297,8 @@
         } else if (addTagSelect) {
             addTagSelect.value = 'div';
         }
-        setAddPosition('after');
+        // The Text tab starts on Inside, the other tabs on After, as a click on the tab does
+        setAddPosition(sidebarAddNodeType === 'text' ? 'inside' : 'after');
         if (classCombobox) classCombobox.reset();
         else if (addClassInput) addClassInput.value = '';
         if (addIdInput) addIdInput.value = '';
@@ -5301,13 +5321,15 @@
         // Refresh contextual suggestions for new selection context
         if (addTagSelector) addTagSelector.refreshSuggestions();
         
-        // Load list for the active tab
+        // Load what the active tab shows, as a click on the tab does
         if (sidebarAddNodeType === 'component') {
             loadSidebarComponentsList();
         } else if (sidebarAddNodeType === 'snippet') {
             loadSidebarSnippetsList();
         } else if (sidebarAddNodeType === 'complex') {
             populateComplexKindPicker();
+        } else if (sidebarAddNodeType === 'text') {
+            updateAddTextFieldsForType();
         }
     }
     
@@ -5499,8 +5521,8 @@
 
         // Edit-mode visual cues: form gets a class for the header accent
         // strip (admin.css), and the Save button switches from
-        // admin-btn--success (creation green) to admin-btn--primary (the
-        // same blue as the Edit Params button — chains the two visually).
+        // admin-btn--success (creation green) to admin-btn--primary (a save,
+        // not a creation).
         if (contextualAddForm) contextualAddForm.classList.add('preview-contextual-form--edit-mode');
         if (addConfirmBtn) {
             addConfirmBtn.classList.remove('admin-btn--success');
@@ -7184,9 +7206,12 @@
         }
         
         const snippetName = selectedSnippetData.name || selectedSnippetId;
-        const confirmMsg = (PreviewConfig.i18n.confirmDeleteSnippet || 'Delete snippet "%s"?').replace('%s', snippetName);
-        
-        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
+        const asked = await QuickSiteUtils.confirm(PreviewConfig.i18n.deleteCannotBeUndone || 'This action cannot be undone.', {
+            title: (PreviewConfig.i18n.deleteSnippetTitle || 'Delete the snippet “{name}”?').split('{name}').join(snippetName),
+            type: 'danger',
+            confirmText: PreviewConfig.i18n.delete || 'Delete'
+        });
+        if (!asked) return;
         
         try {
             const response = await QuickSiteAdmin.apiRequest('deleteSnippet', 'DELETE', null, [], { id: selectedSnippetId });
@@ -8012,7 +8037,7 @@
                 chip.className = 'class-combobox__chip';
                 chip.append(
                     QSDom.el('span', { class: 'class-combobox__chip-text', text: cls }),
-                    QSDom.el('button', { type: 'button', class: 'class-combobox__chip-remove', 'data-class': cls, title: PreviewConfig.i18n.remove }, ['×'])
+                    QSControls.removeRow(PreviewConfig.i18n.remove, null, { className: 'class-combobox__chip-remove', attrs: { 'data-class': cls } })
                 );
                 chipsEl.appendChild(chip);
             });
@@ -8186,12 +8211,9 @@
         if (index) valueInput.dataset.paramIndex = index;
         if (value) valueInput.value = value;
 
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'preview-contextual-form__remove-param';
-        removeBtn.title = PreviewConfig.i18n.remove || 'Remove';
-        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
-        removeBtn.addEventListener('click', () => row.remove());
+        // Its class is data-attr-picker.js's hook: the row's description box goes with the row
+        const removeBtn = QSControls.removeRow(PreviewConfig.i18n.remove || 'Remove', () => row.remove(),
+            { className: 'preview-contextual-form__remove-param' });
 
         row.appendChild(keyInput);
         row.appendChild(valueInput);
@@ -8222,7 +8244,7 @@
         if (_isEditModeDirty()) {
             const msg = PreviewConfig.i18n.discardUnsavedParams
                 || 'You have unsaved param changes. Discard?';
-            if (!(await QuickSiteUtils.confirm(msg, { type: 'danger' }))) return;
+            if (!(await QuickSiteUtils.confirm(msg, { type: 'danger', confirmText: PreviewConfig.i18n.discard || 'Discard' }))) return;
         }
         hideSidebarAddForm();
     });
@@ -8693,7 +8715,10 @@
         const cssAction = getSelectedCssAction();
         let cssWasInjected = false;
         if (cssAction === 'missing' || cssAction === 'replace') {
-            const confirmed = await QuickSiteUtils.confirm(PreviewConfig.i18n.snippetCssConfirm, { type: 'danger' });
+            const confirmed = await QuickSiteUtils.confirm(PreviewConfig.i18n.snippetCssConfirm, {
+                type: 'danger',
+                confirmText: PreviewConfig.i18n.snippetCssConfirmAction || 'Change the stylesheet'
+            });
             if (!confirmed) return;
 
             // Perform CSS injection first
@@ -9921,10 +9946,10 @@
      * │ Default: [select ▾]                    │
      * │ ┌──────────────────────────────────┐   │
      * │ │ Key     │ Value                  │   │
-     * │ │ get     │ get-style              │ 🗑│
-     * │ │ post    │ post-style             │ 🗑│
+     * │ │ get     │ get-style              │ × │
+     * │ │ post    │ post-style             │ × │
      * │ └──────────────────────────────────┘   │
-     * │ [+ Add Option]            [Save] [🗑]  │
+     * │ [+ Add Option]          [Save] [bin]   │
      * └────────────────────────────────────────┘
      */
     /**
@@ -9983,11 +10008,9 @@
         nameSpan.className = 'preview-enum-card__name';
         nameSpan.textContent = varName;
 
-        const editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.className = 'preview-enum-card__edit-name-btn';
-        editBtn.title = PreviewConfig.i18n?.enumRenameTip || 'Rename';
-        editBtn.appendChild(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.edit, 12));
+        // The name's pencil; its class is addNewEnum()'s hook, which opens a new card's rename
+        const editBtn = QSControls.edit(PreviewConfig.i18n?.enumRenameTip || 'Rename', null,
+            { className: 'preview-enum-card__edit-name-btn' });
 
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
@@ -10172,15 +10195,8 @@
         saveBtn.textContent = PreviewConfig.i18n?.save || 'Save';
         saveBtn.addEventListener('click', () => saveEnumCard(card, varName));
         
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'admin-btn admin-btn--danger';
-        deleteBtn.appendChild(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.trash, 14));
-        deleteBtn.title = PreviewConfig.i18n?.delete || 'Delete';
-        deleteBtn.addEventListener('click', () => deleteEnumCard(varName));
-        
         actions.appendChild(saveBtn);
-        actions.appendChild(deleteBtn);
+        actions.appendChild(QSControls.bin(PreviewConfig.i18n?.delete || 'Delete', () => deleteEnumCard(varName)));
         card.appendChild(actions);
         
         return card;
@@ -10294,22 +10310,19 @@
         typeTd.appendChild(typeLabel);
         typeTd.appendChild(typeSelect);
         
-        // Remove cell
+        // Remove cell: the row's small × (nothing is written until the card's Save)
         const removeTd = document.createElement('td');
-        removeTd.appendChild(QSDom.el('button', { type: 'button', class: 'preview-enum-card__remove-row', title: PreviewConfig.i18n?.remove || 'Remove' }, ['×']));
-        
-        tr.appendChild(keyTd);
-        tr.appendChild(valueTd);
-        tr.appendChild(typeTd);
-        tr.appendChild(removeTd);
-        
-        // Remove row button
-        removeTd.querySelector('.preview-enum-card__remove-row').addEventListener('click', () => {
+        removeTd.appendChild(QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove', () => {
             const card = tr.closest('.preview-enum-card');
             const tbody = tr.closest('tbody');
             tr.remove();
             if (card && tbody) refreshDefaultSelect(card, tbody);
-        });
+        }));
+
+        tr.appendChild(keyTd);
+        tr.appendChild(valueTd);
+        tr.appendChild(typeTd);
+        tr.appendChild(removeTd);
         
         // Update default select when key changes
         keyTd.querySelector('.preview-enum-card__key-input').addEventListener('change', () => {
@@ -10469,8 +10482,12 @@
     async function deleteEnumCard(varName) {
         if (!enumsPanelStructure) return;
         
-        const confirmMsg = (PreviewConfig.i18n?.enumConfirmDelete || 'Delete enum "%s"?').replace('%s', varName);
-        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
+        const asked = await QuickSiteUtils.confirm('', {
+            title: (PreviewConfig.i18n?.enumConfirmDelete || 'Delete enum "%s"?').split('%s').join(varName),
+            type: 'danger',
+            confirmText: PreviewConfig.i18n?.delete || 'Delete'
+        });
+        if (!asked) return;
         
         try {
             if (enumsPanelStructure.__enums__) {

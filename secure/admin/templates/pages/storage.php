@@ -2,7 +2,7 @@
 /**
  * Storage registry admin page.
  *
- * Lean PHP shell — header + toolbar + list + modal root + script include.
+ * Lean PHP shell — header + toolbar + list + script include (its dialogs open in the panel's one modal).
  * All rendering of the item cards, the add/edit modal, and CRUD
  * orchestration lives in storage.js (calls listStorageItems /
  * addStorageItem / editStorageItem / deleteStorageItem).
@@ -74,5 +74,3 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
 <div id="storage-list" class="storage-list" role="region" aria-label="Storage registry list">
     <div style="padding: 24px; color: var(--admin-text-muted, #555);">Loading storage registry…</div>
 </div>
-
-<div id="storage-modal-root" data-storage-modal-root></div>
