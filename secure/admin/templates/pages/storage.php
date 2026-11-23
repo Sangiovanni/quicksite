@@ -7,7 +7,9 @@
  * orchestration lives in storage.js (calls listStorageItems /
  * addStorageItem / editStorageItem / deleteStorageItem).
  *
- * The registry is the GDPR / cookie-consent data layer.
+ * The registry is the GDPR / cookie-consent data layer. Each control that sends
+ * a command carries its role mark (data-requires-command): a role without it
+ * does not see it. storage.js marks the controls it draws the same way.
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
@@ -29,23 +31,24 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
     <p class="admin-page-header__subtitle">Every browser-storage key the site uses (localStorage / sessionStorage / cookie). The GDPR / cookie-consent data layer and the storageKey picker source.</p>
 </div>
 
+<!-- What a language's description is and where it shows (multilingual projects only): storage.js writes it. -->
 <p id="storage-desclang-hint" class="admin-hint storage-desclang-hint" hidden></p>
 
 <div>
     <div>
-        <button type="button" class="admin-btn admin-btn--primary" id="btn-add-storage-item">
+        <button type="button" class="admin-btn admin-btn--primary" id="btn-add-storage-item" data-requires-command="addStorageItem">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
             Add storage key
         </button>
-        <button type="button" class="admin-btn admin-btn--ghost" id="btn-scan-storage">
+        <button type="button" class="admin-btn admin-btn--ghost" id="btn-scan-storage" data-requires-command="scanStorageUsage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
             Scan / reconcile
         </button>
-        <button type="button" class="admin-btn admin-btn--ghost" id="btn-generate-consent">
+        <button type="button" class="admin-btn admin-btn--ghost" id="btn-generate-consent" data-requires-command="generateConsentLayer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
             </svg>
@@ -60,6 +63,7 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
         </button>
     </div>
     <div>
+        <!-- The language the page shows (multilingual projects only), in step with the item dialog's picker. -->
         <div id="storage-desc-lang-bar" class="storage-desc-lang-bar"></div>
         <div id="storage-filter-bar"></div>
     </div>

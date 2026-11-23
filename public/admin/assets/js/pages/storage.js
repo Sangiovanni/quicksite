@@ -5,6 +5,16 @@
  * deleteStorageItem via QuickSiteAdmin.apiRequest. The registry is the
  * GDPR / cookie-consent data layer.
  *
+ * A description is each language's own word (storage.desc.<id> in that language's
+ * word file). The page shows one language at a time, the panel's editing language
+ * (QSSiteWords.editingLanguage() / rememberLanguage(), shared with the editor and the
+ * Translations page): the top selector and the item dialog's picker choose it, in
+ * step. Each of the project's languages is read with listStorageItems' `lang`; a
+ * save writes the languages edited and only them.
+ *
+ * Every control that sends a command carries that command's role mark
+ * (data-requires-command), filtered once the role is known.
+ *
  * Built with createElement + textContent + named _render* helpers per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing. Styling
  * lives in public/admin/assets/css/storage-admin.css.
@@ -12,8 +22,7 @@
 (function () {
     'use strict';
 
-    // The author's description is authored in the project's default language
-    // (the locked "one language now" decision; a later workflow fills the rest).
+    // Until the registry answers: the project's languages come from listStorageItems.
     var DEFAULT_LANG = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.defaultLang) || 'en';
 
     var RETENTION_PRESETS = ['session', '1d', '7d', '30d', '90d', '1y', 'persistent'];
@@ -52,8 +61,11 @@
         items: [],
         scopes: ['localStorage', 'sessionStorage', 'cookie'],
         categories: ['essential', 'functional', 'analytics', 'marketing'],
-        languages: [DEFAULT_LANG],
-        descLang: DEFAULT_LANG,   // registry-level: language descriptions are authored in
+        languages: [DEFAULT_LANG],     // the PROJECT's languages, never the panel's
+        languageNames: {},             // {code: name}, as listStorageItems names them
+        defaultLanguage: DEFAULT_LANG,
+        lang: DEFAULT_LANG,            // the language the page shows (the editing language)
+        words: {},                     // {code: {id: description}}: each language read, as its pages show it
         filter: 'all',
     };
 
@@ -72,6 +84,66 @@
             return Promise.reject(new Error('QuickSiteAdmin not available'));
         }
         return adminApi.apiRequest(cmd, method, body);
+    }
+
+    /** A refusal in the server's own words (QSSiteWords.serverWords()), else its message. */
+    function _serverWords(r, fallback) {
+        if (window.QSSiteWords && typeof window.QSSiteWords.serverWords === 'function' && r && r.data) {
+            return window.QSSiteWords.serverWords(r);
+        }
+        return (r && r.data && r.data.message) || fallback;
+    }
+
+    /** The role mark of the command a control sends: the panel's filter hides it from a role without it. */
+    function _mark(el, command) {
+        el.setAttribute('data-requires-command', command);
+        return el;
+    }
+
+    /** Hide, under `root`, every control whose command the role cannot run. */
+    function _filterControls(root) {
+        if (root && window.QuickSiteAdmin && typeof window.QuickSiteAdmin.filterByPermissions === 'function') {
+            window.QuickSiteAdmin.filterByPermissions(root);
+        }
+    }
+
+    function multilingual() { return state.languages.length > 1; }
+
+    /** A language as the selectors name it: its name and its code. */
+    function langLabel(code) {
+        var name = state.languageNames[code];
+        return name && name !== code ? name + ' (' + code + ')' : code;
+    }
+    function langName(code) { return state.languageNames[code] || code; }
+
+    /** The project's languages as a select, `selected` chosen. */
+    function _renderLanguageSelect(selected) {
+        var sel = QSDom.el('select', { class: 'admin-input' });
+        state.languages.forEach(function (code) {
+            var o = QSDom.el('option', { value: code, text: langLabel(code) });
+            if (code === selected) o.selected = true;
+            sel.appendChild(o);
+        });
+        return sel;
+    }
+
+    /** Show the page in a language and remember it as the editing language: the cards and the top selector follow. */
+    function setLanguage(code) {
+        if (state.languages.indexOf(code) === -1) return;
+        state.lang = code;
+        if (window.QSSiteWords && typeof window.QSSiteWords.rememberLanguage === 'function') {
+            window.QSSiteWords.rememberLanguage(code);
+        }
+        renderList();
+        var sel = document.getElementById('storage-shown-language');
+        if (sel && sel.value !== code) sel.value = code;
+    }
+
+    /** What a language says now for an item (null when that language could not be read). */
+    function storedDescription(id, code) {
+        var words = state.words[code];
+        if (!words) return null;
+        return Object.prototype.hasOwnProperty.call(words, id) ? words[id] : '';
     }
 
     function _renderLabel(text, required) {
@@ -157,21 +229,26 @@
         return line;
     }
 
-    function _descOf(item) {
-        var d = item.description;
-        if (!d || typeof d !== 'object') return '';
-        if (d[state.descLang]) return d[state.descLang];
-        var keys = Object.keys(d);
-        return keys.length ? String(d[keys[0]] || '') : '';
+    /** The card's description line: the shown language's word, or what that language lacks. */
+    function _renderDescription(item) {
+        var desc = storedDescription(item.id, state.lang);
+        var text = desc
+            || (desc === null ? t('storage.languages.unread', { language: langName(state.lang) })
+                : multilingual() ? t('storage.languages.noDescriptionIn', { language: langName(state.lang) })
+                : t('storage.languages.noDescription'));
+        return QSDom.el('div', {
+            class: 'storage-card__summary' + (desc ? '' : ' storage-card__summary--none'),
+            text: text,
+        });
     }
 
-    function _renderActionBtn(iconD, label, onClick) {
+    function _renderActionBtn(iconD, label, onClick, command) {
         var b = QSDom.el('button', {
             class: 'admin-btn admin-btn--ghost storage-card__action',
             'aria-label': label, title: label, type: 'button', onclick: onClick,
         });
         b.appendChild(_renderSvgIcon(iconD, 14));
-        return b;
+        return _mark(b, command);
     }
 
     function _renderCard(item) {
@@ -196,16 +273,12 @@
         var physical = _renderPhysicalKey(item);
         if (physical) main.appendChild(physical);
 
-        var desc = _descOf(item);
-        main.appendChild(QSDom.el('div', {
-            class: 'storage-card__summary',
-            text: desc || 'No description yet.',
-        }));
+        main.appendChild(_renderDescription(item));
         row.appendChild(main);
 
         var actions = QSDom.el('div', { class: 'storage-card__actions' });
-        actions.appendChild(_renderActionBtn(ICON_EDIT, 'Edit', function () { openEditModal(item); }));
-        actions.appendChild(_renderActionBtn(ICON_TRASH, 'Delete', function () { openDeleteConfirm(item); }));
+        actions.appendChild(_renderActionBtn(ICON_EDIT, 'Edit', function () { openEditModal(item); }, 'editStorageItem'));
+        actions.appendChild(_renderActionBtn(ICON_TRASH, 'Delete', function () { openDeleteConfirm(item); }, 'deleteStorageItem'));
         row.appendChild(actions);
 
         card.appendChild(row);
@@ -256,6 +329,7 @@
         } else {
             filtered.forEach(function (it) { root.appendChild(_renderCard(it)); });
         }
+        _filterControls(root);
 
         var filterBar = document.getElementById('storage-filter-bar');
         if (filterBar) {
@@ -264,82 +338,85 @@
         }
     }
 
-    async function refresh() {
+    /** One language's read of the registry ({items, …}), or null when it failed. */
+    async function _readLanguage(code) {
         try {
-            var r = await api('listStorageItems', 'POST');
-            var payload = (r && r.data && (r.data.data || r.data)) || {};
-            state.items = Array.isArray(payload.items) ? payload.items : [];
-            if (Array.isArray(payload.scopes) && payload.scopes.length) state.scopes = payload.scopes;
-            if (Array.isArray(payload.categories) && payload.categories.length) state.categories = payload.categories;
-            if (Array.isArray(payload.languages) && payload.languages.length) state.languages = payload.languages;
-            if (typeof payload.descLang === 'string' && payload.descLang) state.descLang = payload.descLang;
+            var r = await api('listStorageItems', 'POST', code ? { lang: code } : {});
+            var payload = r && r.ok && r.data && (r.data.data || r.data);
+            return payload && Array.isArray(payload.items) ? payload : null;
         } catch (e) {
             console.warn('[storage] load failed:', e);
+            return null;
+        }
+    }
+
+    /** {id: description} of one language's read. */
+    function _descriptionsOf(items, code) {
+        var out = {};
+        items.forEach(function (it) {
+            var d = it.description;
+            out[it.id] = (d && typeof d === 'object' && typeof d[code] === 'string') ? d[code] : '';
+        });
+        return out;
+    }
+
+    /**
+     * Read the registry: the project's default language first (the items, the scopes and categories, the
+     * project's languages), then each other language's descriptions. The page shows the editing language.
+     */
+    async function refresh() {
+        // The controls drawn depend on the role: wait for it, as every page that draws them does.
+        try { await (QuickSiteAdmin.permissionsReady || Promise.resolve()); } catch (e) { /* drawn as a role without them */ }
+        var first = await _readLanguage(null);
+        state.words = {};
+        if (first) {
+            state.items = first.items;
+            if (Array.isArray(first.scopes) && first.scopes.length) state.scopes = first.scopes;
+            if (Array.isArray(first.categories) && first.categories.length) state.categories = first.categories;
+            if (Array.isArray(first.languages) && first.languages.length) state.languages = first.languages;
+            if (first.languageNames && typeof first.languageNames === 'object') state.languageNames = first.languageNames;
+            var answered = typeof first.lang === 'string' && first.lang ? first.lang : state.languages[0];
+            state.defaultLanguage = typeof first.defaultLanguage === 'string' && first.defaultLanguage ? first.defaultLanguage : answered;
+            state.words[answered] = _descriptionsOf(first.items, answered);
+            var others = state.languages.filter(function (code) { return code !== answered; });
+            var reads = await Promise.all(others.map(function (code) { return _readLanguage(code); }));
+            reads.forEach(function (read, i) { if (read) state.words[others[i]] = _descriptionsOf(read.items, others[i]); });
+        } else {
             state.items = [];
         }
+        var remembered = window.QSSiteWords && typeof window.QSSiteWords.editingLanguage === 'function'
+            ? window.QSSiteWords.editingLanguage(state.languages, state.defaultLanguage) : state.defaultLanguage;
+        state.lang = state.languages.indexOf(remembered) !== -1 ? remembered : state.defaultLanguage;
         renderList();
-        renderDescLangBar();
-        renderDescLangHint();
+        renderLanguageBar();
+        renderLanguageHint();
     }
 
     // ====================================================================
-    // Description-language selector (page-level; multilingual projects only)
+    // The language shown (multilingual projects only)
     // ====================================================================
 
-    // Persistent hint above the toolbar: descriptions are authored + generated in
-    // the description language; other languages translate via the language tool.
-    function renderDescLangHint() {
+    /** The hint above the toolbar: what a language's description is and where it shows. */
+    function renderLanguageHint() {
         var host = document.getElementById('storage-desclang-hint');
         if (!host) return;
-        if (state.languages.length <= 1) { host.hidden = true; host.textContent = ''; return; }
+        if (!multilingual()) { host.hidden = true; host.textContent = ''; return; }
         host.hidden = false;
-        host.textContent = 'Descriptions are authored in your description language ("' + state.descLang
-            + '") and generated onto the cookie/privacy page in that language. Translate the other languages '
-            + 'with the visual-editor language tool — edits are live, no need to regenerate.';
+        host.textContent = t('storage.languages.hint');
     }
 
-    function renderDescLangBar() {
+    /** The top selector: the language the cards show, the item dialog's picker in step with it. */
+    function renderLanguageBar() {
         var host = document.getElementById('storage-desc-lang-bar');
         if (!host) return;
         host.textContent = '';
-        if (state.languages.length <= 1) return; // monolingual: nothing to choose
-        host.appendChild(QSDom.el('span', { class: 'storage-desc-lang-bar__label', text: 'Description language:' }));
-        var sel = _renderSelect(state.languages, state.descLang);
+        if (!multilingual()) return; // one language: nothing to choose
+        host.appendChild(QSDom.el('label', { class: 'storage-desc-lang-bar__label', for: 'storage-shown-language', text: t('storage.languages.shownIn') }));
+        var sel = _renderLanguageSelect(state.lang);
+        sel.id = 'storage-shown-language';
         sel.classList.add('storage-desc-lang-bar__select');
-        sel.addEventListener('change', function () { onDescLangChange(sel); });
+        sel.addEventListener('change', function () { setLanguage(sel.value); });
         host.appendChild(sel);
-    }
-
-    async function onDescLangChange(sel) {
-        var target = sel.value;
-        var current = state.descLang;
-        if (target === current) return;
-        sel.disabled = true;
-        try {
-            // First call previews (409 needsConfirm) — report the move + overwrites.
-            var preview = await api('setStorageDescLang', 'POST', { lang: target });
-            var pdata = (preview && preview.data && (preview.data.data || preview.data)) || {};
-            var moved = pdata.moved || 0;
-            var overwrites = pdata.overwrites || 0;
-            var msg = t('storage.dialogs.descLangChange', { from: current, to: target }) + '\n\n'
-                + t(moved === 1 ? 'storage.dialogs.descLangMovesOne' : 'storage.dialogs.descLangMovesMany', { n: moved, to: target });
-            if (overwrites > 0) {
-                msg += '\n\n' + t(overwrites === 1 ? 'storage.dialogs.descLangOverwritesOne' : 'storage.dialogs.descLangOverwritesMany', { n: overwrites, to: target });
-            }
-            if (!(await QuickSiteUtils.confirm(msg, { type: overwrites > 0 ? 'danger' : 'warning' }))) {
-                sel.value = current; sel.disabled = false; return;
-            }
-            var done = await api('setStorageDescLang', 'POST', { lang: target, confirm: true });
-            if (!done || !done.ok) {
-                sel.value = current; sel.disabled = false;
-                showError((done && done.data && done.data.message) || t('storage.errors.descLangFailed'));
-                return;
-            }
-            await refresh();
-        } catch (e) {
-            sel.value = current; sel.disabled = false;
-            console.warn('[storage] descLang change failed:', e);
-        }
     }
 
     // ====================================================================
@@ -449,17 +526,10 @@
         dialog.appendChild(_renderGroup(_renderLabel('Retention'), retentionWrap,
             _renderHint('How long the key lives — disclosed on the cookie/privacy page.')));
 
-        // description — authored in the registry's description language (the
-        // page-level selector). Value lives in translate/ (keyed); editing is
-        // live (no regenerate needed). Other languages are translated separately
-        // via the visual-editor language tool.
-        var descInput = QSDom.el('input', {
-            type: 'text', class: 'admin-input', autocomplete: 'off',
-            placeholder: 'What this key is used for',
-            value: isEdit ? _descOf(item) : '',
-        });
-        dialog.appendChild(_renderGroup(_renderLabel('Description (' + state.descLang + ')'), descInput,
-            _renderHint('Shown on the generated cookie/privacy page, in the description language. Edits are live — no regenerate needed. Other languages: use the visual-editor language tool.')));
+        // description — each language's own word (translate/, keyed; edits are live). One language shows at a
+        // time, the page's; what was typed in another is kept until Save, which writes the languages edited.
+        var description = _renderDescriptionField(isEdit ? item.id : null, isEdit ? 'editStorageItem' : 'addStorageItem');
+        dialog.appendChild(description.group);
 
         // cookie-only conditional fields
         var cookieWrap = QSDom.el('div', { class: 'storage-cookie-fields' });
@@ -482,20 +552,22 @@
         scopeSelect.addEventListener('change', syncCookieFields);
         dialog.appendChild(cookieWrap);
 
+        // The error sits in the dialog's flow, above the buttons, never in their sticky row: it covers no field.
+        var errBox = _renderModalError();
+        dialog.appendChild(errBox.el);
+
         // Actions
         var actionsRow = QSDom.el('div', { class: 'storage-modal-actions' });
-        var errBox = QSDom.el('div', { class: 'storage-modal-actions__error' });
-        actionsRow.appendChild(errBox);
         actionsRow.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
         var saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save changes' : 'Add storage key' });
         actionsRow.appendChild(saveBtn);
         dialog.appendChild(actionsRow);
 
         saveBtn.addEventListener('click', async function () {
-            errBox.textContent = '';
+            errBox.clear();
             var id = idInput.value.trim();
-            if (id === '') { errBox.textContent = 'Key name is required.'; return; }
-            if (/\s/.test(id)) { errBox.textContent = 'Key name cannot contain spaces.'; return; }
+            if (id === '') { errBox.show('Key name is required.'); return; }
+            if (/\s/.test(id)) { errBox.show('Key name cannot contain spaces.'); return; }
 
             var body = {
                 id: id,
@@ -505,15 +577,10 @@
             var retention = retentionSelect.value === '__custom__' ? retentionCustom.value.trim() : retentionSelect.value;
             if (retention) body.retention = retention;
 
-            // Description is a plain string in the registry's description language.
-            // On edit, always send it (empty clears — replace-all); on add, only
-            // when non-empty.
-            var descText = descInput.value.trim();
-            if (isEdit) {
-                body.description = descText;
-            } else if (descText) {
-                body.description = descText;
-            }
+            // The description of each language edited, and only those: on an edit an emptied language
+            // removes that language's word; a language not edited keeps its word.
+            var descriptions = description.changes(isEdit);
+            if (Object.keys(descriptions).length) body.description = descriptions;
             if (scopeSelect.value === 'cookie') {
                 if (domainInput.value.trim()) body.domain = domainInput.value.trim();
                 if (pathInput.value.trim()) body.path = pathInput.value.trim();
@@ -529,7 +596,7 @@
             try {
                 var r = await api(isEdit ? 'editStorageItem' : 'addStorageItem', 'POST', body);
                 if (!r || !r.ok) {
-                    errBox.textContent = (r && r.data && r.data.message) || 'Save failed';
+                    errBox.show(_serverWords(r, 'Save failed'));
                     saveBtn.disabled = false;
                     return;
                 }
@@ -537,10 +604,88 @@
                 await refresh();
                 if (scan.data) await runScan();
             } catch (e) {
-                errBox.textContent = (e && e.message) || 'Network error';
+                errBox.show((e && e.message) || 'Network error');
                 saveBtn.disabled = false;
             }
         });
+        _filterControls(dialog);
+    }
+
+    /** A dialog's error line, in its flow: show() brings it into view above the sticky buttons. */
+    function _renderModalError() {
+        var el = QSDom.el('p', { class: 'storage-modal-error', role: 'alert', hidden: 'hidden' });
+        return {
+            el: el,
+            show: function (text) {
+                el.textContent = text;
+                el.hidden = false;
+                if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+            },
+            clear: function () { el.textContent = ''; el.hidden = true; },
+        };
+    }
+
+    /**
+     * The item dialog's description, one language at a time: the project's languages in a picker beside the field
+     * (a project of two or more, a role that runs the dialog's command), which moves the page's language with it;
+     * what was typed in a language is kept while another shows, until Save. changes(isEdit) answers {code: text}:
+     * on an edit each language whose text differs from its word ('' removes it), on an add each language typed in.
+     *
+     * @param {?string} id       the item edited (null for a new one)
+     * @param {string}  command  the dialog's command (its role mark)
+     */
+    function _renderDescriptionField(id, command) {
+        var drafts = {};
+        var shown = state.lang;
+        var inputId = 'storage-desc-' + Date.now();
+        var stored = function (code) { return id === null ? '' : storedDescription(id, code); };
+        var input = QSDom.el('input', {
+            type: 'text', class: 'admin-input storage-desc-row__input', autocomplete: 'off', id: inputId,
+            placeholder: 'What this key is used for',
+        });
+        var hint = _renderHint('');
+        function showLanguage(code) {
+            shown = code;
+            var word = stored(code);
+            input.disabled = word === null && !Object.prototype.hasOwnProperty.call(drafts, code);
+            input.value = Object.prototype.hasOwnProperty.call(drafts, code) ? drafts[code] : (word || '');
+            hint.textContent = word === null
+                ? t('storage.languages.unread', { language: langName(code) })
+                : t(multilingual() ? 'storage.languages.descriptionHint' : 'storage.languages.descriptionHintOne');
+        }
+        input.addEventListener('input', function () { drafts[shown] = input.value; });
+        var row = QSDom.el('div', { class: 'storage-desc-row' });
+        if (multilingual() && window.QuickSiteAdmin && window.QuickSiteAdmin.canRun(command)) {
+            var picker = _mark(_renderLanguageSelect(shown), command);
+            picker.classList.add('storage-desc-row__lang');
+            picker.setAttribute('aria-label', t('storage.languages.descriptionLanguage'));
+            picker.title = t('storage.languages.descriptionLanguage');
+            picker.addEventListener('change', function () {
+                showLanguage(picker.value);
+                setLanguage(picker.value);
+            });
+            row.appendChild(picker);
+        }
+        row.appendChild(input);
+        var label = _renderLabel(t('storage.languages.descriptionLabel'));
+        label.setAttribute('for', inputId);
+        showLanguage(shown);
+        return {
+            group: _renderGroup(label, row, hint),
+            changes: function (isEdit) {
+                var out = {};
+                Object.keys(drafts).forEach(function (code) {
+                    var text = String(drafts[code]).trim();
+                    var word = stored(code);
+                    if (isEdit) {
+                        if (word !== null && text !== String(word).trim()) out[code] = text;
+                    } else if (text !== '') {
+                        out[code] = text;
+                    }
+                });
+                return out;
+            },
+        };
     }
 
     function openAddModal() { _openModal('add', null); }
@@ -563,7 +708,7 @@
 
         var actions = QSDom.el('div', { class: 'storage-modal-actions' });
         actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var confirmBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary storage-modal-actions__btn--danger', type: 'button', text: 'Delete key' });
+        var confirmBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary storage-modal-actions__btn--danger', type: 'button', text: 'Delete key' }), 'deleteStorageItem');
         actions.appendChild(confirmBtn);
         dialog.appendChild(actions);
 
@@ -631,10 +776,10 @@
 
         if (opts && opts.declare) {
             var act = QSDom.el('div', { class: 'storage-scan-row__action' });
-            var btn = QSDom.el('button', {
+            var btn = _mark(QSDom.el('button', {
                 class: 'admin-btn admin-btn--primary',
                 type: 'button', text: 'Declare',
-            });
+            }), 'addStorageItem');
             btn.addEventListener('click', function () { declareIncomplete(row, btn); });
             act.appendChild(btn);
             r.appendChild(act);
@@ -745,6 +890,7 @@
             'Declared and written in the build — nothing to do.'));
         root.appendChild(_renderCollapsibleSection('orphan', 'Orphans', b.orphan || [],
             'Declared but not referenced in the build. Safe to keep — may be parked.'));
+        _filterControls(root);
     }
 
     async function runScan() {
@@ -918,7 +1064,7 @@
         actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Close', onclick: closeModal }));
 
         if (hasPage) {
-            var delBtn = QSDom.el('button', { class: 'admin-btn admin-btn--ghost storage-modal-actions__btn--danger', type: 'button', text: 'Delete page' });
+            var delBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--ghost storage-modal-actions__btn--danger', type: 'button', text: 'Delete page' }), 'deleteCookiePolicy');
             delBtn.addEventListener('click', async function () {
                 if (!(await QuickSiteUtils.confirm(t('storage.dialogs.deletePage', { route: status.policyRoute }), { type: 'danger' }))) return;
                 delBtn.disabled = true; errBox.hidden = true;
@@ -940,9 +1086,10 @@
             actions.appendChild(delBtn);
         }
 
-        var genBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: hasPage ? 'Update' : 'Generate' });
+        var genBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: hasPage ? 'Update' : 'Generate' }), 'generateConsentLayer,generateCookiePolicy');
         actions.appendChild(genBtn);
         content.appendChild(actions);
+        _filterControls(content);
 
         genBtn.addEventListener('click', function () {
             var policyRoute = hasPage

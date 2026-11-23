@@ -23,8 +23,7 @@
     /* A dialog: a long value gives way to the width it has */
     .admin-modal__content,
     .admin-modal-dialog,
-    .storage-modal-dialog,
-    .privacy-modal-dialog {
+    .storage-modal-dialog {
         overflow-wrap: anywhere;
     }
 

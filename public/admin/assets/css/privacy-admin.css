@@ -57,11 +57,13 @@
 .privacy-section__actions {
     margin-left: auto;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
 }
-.privacy-desclang__label { font-size: 12px; color: var(--admin-text-muted); }
-.privacy-desclang__select { width: auto; min-width: 64px; }
+/* The language the cards show, in step with the datum dialog's picker */
+.privacy-desclang__label { font-size: 13px; font-weight: var(--font-weight-semibold); color: var(--admin-text); }
+.privacy-desclang__select { width: auto; max-width: 100%; min-width: 64px; }
 .privacy-add-btn { white-space: nowrap; }
 .privacy-section__title { font-size: 14px; font-weight: var(--font-weight-semibold); margin: 0; }
 .privacy-section__count {
@@ -86,46 +88,62 @@
 .privacy-collected__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .privacy-collected__label { font-weight: var(--font-weight-semibold); font-size: 13px; }
 .privacy-collected__purpose { font-size: 12px; color: var(--admin-text-muted); }
+/* The language shown has no word for the datum: said, not left blank */
+.privacy-collected__purpose--none { font-style: italic; }
 .privacy-collected__actions { display: flex; gap: 4px; flex-shrink: 0; }
 .privacy-collected__action { padding: 4px 6px; }
 
-/* Modal */
-.privacy-modal-backdrop {
-    position: fixed; inset: 0; z-index: 1000;
-    background: #00000073;
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px;
+/* The dialogs (QuickSiteUtils.openModal): the title with its x on one line at every width, the x at the top
+   right; the body scrolls between the header and the buttons. */
+.privacy-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    max-width: 30rem;
+    max-height: 90vh;
+    box-sizing: border-box;
+    padding: var(--space-lg);
+    text-align: left;
 }
-.privacy-modal-dialog {
-    width: 100%; max-width: 460px;
-    /* The backdrop's padding, top and bottom: the dialog scrolls inside the screen. */
-    max-height: calc(100vh - 40px);
+.privacy-dialog__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+.privacy-dialog__title {
+    flex: 1 1 0;
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.privacy-dialog__header .admin-modal__close {
+    flex-shrink: 0;
+    font-size: var(--font-size-xl);
+    line-height: 1;
+}
+.privacy-dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    min-height: 0;
     overflow-y: auto;
-    overflow-wrap: break-word;
-    background: var(--admin-bg);
-    border: 0.5px solid var(--admin-border);
-    border-radius: 10px;
-    padding: 0 20px;
-    display: flex; flex-direction: column; gap: 8px;
-    box-shadow: 0 12px 40px #0000004d;
 }
-/* The title and the buttons stay while the rest scrolls. Each holds the dialog's padding at its end. */
-.privacy-modal__title {
-    position: sticky; top: 0; z-index: 1;
-    flex-shrink: 0;
-    font-size: 16px; font-weight: var(--font-weight-semibold);
-    margin: 0 0 6px;
-    padding-top: 18px;
-    background: var(--admin-bg);
+.privacy-dialog__field { margin: 0; }
+/* The label's field: the project's language, then the label; they wrap under each other where the row is short */
+.privacy-dialog__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
 }
-.privacy-modal__error { color: var(--admin-error); font-size: 12px; }
-.privacy-modal__actions {
-    position: sticky; bottom: 0; z-index: 1;
-    flex-shrink: 0;
-    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
-    margin-top: 10px;
-    padding-bottom: 18px;
-    background: var(--admin-bg);
+.privacy-dialog__lang { width: auto; max-width: 100%; }
+.privacy-dialog__label-input { flex: 1 1 14rem; min-width: 0; }
+.privacy-dialog__error { margin: 0; color: var(--admin-error); font-size: 12px; }
+.privacy-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-sm);
 }
 
 /* Hosts */
@@ -172,7 +190,9 @@
     font-family: inherit;
     cursor: pointer;
 }
-.privacy-atom:hover { border-color: var(--admin-accent); }
+.privacy-atom:not(.privacy-atom--static):hover { border-color: var(--admin-accent); }
+/* A field's mapping shown to a role that cannot change it: not a button */
+.privacy-atom--static { cursor: default; }
 .privacy-atom--unset { border-style: dashed; color: var(--admin-warning); }
 .privacy-atom--mapped { border-color: var(--admin-success); }
 .privacy-atom__field { font-weight: var(--font-weight-semibold); }

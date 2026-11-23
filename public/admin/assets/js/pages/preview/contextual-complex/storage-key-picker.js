@@ -26,6 +26,8 @@
  *    declared for the other scope, or declared as a cookie; nothing while the list is unknown.
  *  - Create is offered only to a role that may run addStorageItem, once the list has answered (its
  *    categories come from there). A refused Create changes nothing and shows the server's words.
+ *    Its description is written in the panel's editing language (QSSiteWords.editingLanguage(),
+ *    among the project's languages the read answered), the one the Storage page shows.
  *
  * The prefix chip is QuickSiteUtils.renderStorageKeyPrefixChip() (core/utils.js), which the Storage
  * page shows too. Its rules, like this picker's, are in css/storage-admin.css.
@@ -46,7 +48,8 @@
     // -------- module-scope cache (shared across all picker instances) -----
     let _items = null;          // every declared item, cookies included; null until a read answers
     let _categories = [];       // the registry's categories, from the same answer
-    let _descLang = 'en';       // the language the registry's descriptions are written in, likewise
+    let _languages = [];        // the project's language codes, likewise
+    let _defaultLanguage = '';  // and its default
     let _reading = null;        // the read in flight
     let _generation = 0;        // a created key makes an older read's answer out of date
 
@@ -68,7 +71,8 @@
                 if (generation === _generation) {
                     _items = _normalizeItems(payload.items);
                     _categories = Array.isArray(payload.categories) ? payload.categories : [];
-                    if (typeof payload.descLang === 'string' && payload.descLang) _descLang = payload.descLang;
+                    if (Array.isArray(payload.languages)) _languages = payload.languages.slice();
+                    if (typeof payload.defaultLanguage === 'string') _defaultLanguage = payload.defaultLanguage;
                 }
             })
             .catch(function (err) {
@@ -76,6 +80,13 @@
             })
             .then(function () { _reading = null; });
         return _reading;
+    }
+
+    /** The language a created key's description is written in: the editing language, else the default. */
+    function descriptionLanguage() {
+        const fallback = _defaultLanguage || _languages[0] || '';
+        const words = window.QSSiteWords;
+        return words && typeof words.editingLanguage === 'function' ? words.editingLanguage(_languages, fallback) : fallback;
     }
 
     function rememberCreated(id, scope, category) {
@@ -258,7 +269,7 @@
             const description = descInput.value.trim();
             if (description) {
                 body.description = {};
-                body.description[_descLang] = description;
+                body.description[descriptionLanguage()] = description;
             }
             createBtn.disabled = true;
             try {

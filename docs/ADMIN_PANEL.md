@@ -395,7 +395,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `addLastTab` | localStorage | `preview.js` — the tab the advanced Add form last opened on |
 | `addPreviewExpanded`, `addPositionExpanded`, `addAdvancedExpanded` | localStorage | `preview.js` — whether each folding section of the Add form is open (`'1'`) or folded (`'0'`); `contextual-add.php` names each on its header (`data-storage-key`) |
 | `tagShowHtmlCode`, `addFavoriteTags` | localStorage | `preview.js` — the Add form's HTML Tag tab: whether a tag's example is shown as its HTML (`'true'`) or drawn, and the tags starred as favourites, newest first, as a JSON list of ten at most; stored as `tagSelector_showHtmlCode` and `qs-add-favorite-tags` |
-| `editorLanguage` | localStorage | `site-words.js` — the language a site's words are edited in, per project (`:<project>` appended): the visual editor's toolbar **Language**, its Translations tool and the Translations page start on it, and a change in any of them is kept; a language the project no longer has reads as its default (§8.9, §9.20) |
+| `editorLanguage` | localStorage | `site-words.js` — the language a site's words are edited in, per project (`:<project>` appended): the visual editor's toolbar **Language**, its Translations tool, the Translations page and the Storage and Privacy pages start on it, and a change in any of them is kept; a language the project no longer has reads as its default (§8.9, §9.10, §9.11, §9.20) |
 | `socialPreviewDevice` | localStorage | `social-previews.js` — the device the Social previews page draws its cards for: `'phone'`, or anything else (or nothing) for a computer; one per browser, for every project (§9.19) |
 | `workflowsList` | localStorage | `preview-ai-tools.js` — the Workflows panel's workflows last opened, newest first (three kept), and the groups left open once the list folds, as JSON (`{"recent": ["restyle"], "open": ["look"]}`); one per browser, for every project. A missing or malformed part reads as empty, and a failure to read or write is silent (§8.12) |
 | `workflowsBackupNoteHidden` | localStorage | `preview-ai-tools.js` — the Workflows panel's backup message put away for good (`'1'`); stored as `quicksite-ai-tools-backup-note-hidden`, its name from before the registry (§8.12) |
@@ -3356,10 +3356,12 @@ group.
 
 **Registry CRUD.** Each entry has `id` (the key name), `scope`, a GDPR `category`
 (`essential` / `functional` / `analytics` / `marketing`), an optional `retention`
-(enum + custom), and a `description`. Picking `cookie` scope reveals
+(enum + custom), and a `description` in each language. Picking `cookie` scope reveals
 `domain` / `path` / `secure` / `sameSite`. `consentRequired` is derived —
 `essential` never needs consent; everything else does. Commands:
 `listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.
+Every control of the page that sends a command (add, edit, delete, declare, scan,
+generate) is drawn only for a role that runs that command.
 
 **The storage-key picker.** The fields of the panel that name a storage key take it
 from one picker, never as typed text: the `data-storage-show`, `data-storage-value`
@@ -3379,7 +3381,7 @@ refresh token source (§9.1).
   offered by the next without a reload.
 - **Create new key…**, or a search that finds nothing, opens a form: the key's name,
   after the same chip, its scope (the one chosen beside it to start with), its category and an optional
-  description, in the language the registry's descriptions are written in. Creating declares the key with
+  description, in the language a site's words are edited in (`editorLanguage`, §6). Creating declares the key with
   `addStorageItem`, picks it, and moves the scope beside it to the new key's. What the
   server refuses (a name already declared, whitespace, `__proto__`) is shown in the
   server's words, and nothing changes. Only a role that may run `addStorageItem` is
@@ -3432,23 +3434,31 @@ used and is never written into the registry: the declared id is what consent
 categories are matched on, so an id baked into the stored key would stop matching
 the moment the project was imported under a different name.
 
-**Descriptions + language.** Descriptions are authored in one registry-level
-**description language** — a selector at the top of the page, defaulting to the
-site default — and stored as translation keys, not inline. Editing a description
-is therefore live (it updates the generated policy page without regenerating), and
-the other languages are filled with the visual-editor language tool. Changing the
-description language moves every description to the new language, keeping the old
-one as an empty (missing) translation so it can be re-done; it warns before
-overwriting existing values (`setStorageDescLang`).
+**Descriptions and languages.** A description is each language's own word, stored
+as the translation key `storage.desc.<id>`, not inline: each language keeps its own,
+and each language's cookie-policy page shows its own, live, with no need to generate
+the page again. On a project of two or more languages the page shows one language
+at a time: **Descriptions shown in**, above the list, picks it, and the cards show
+that language's descriptions, or say that the language has none yet. The language is
+the panel's editing language (`editorLanguage`, §6): the page opens on the language
+last edited anywhere in the panel, and a choice here carries to the visual editor and
+the Translations page. Changing it reads and moves nothing.
 
-A save or a language change whose description would not fit the shape of a
+In the item dialog the **Description** field has the project's languages in a picker
+beside it (on a project of two or more languages, for a role that may save the item),
+as Media's alt text has (§9.15): one language shows at a time, the picker and the page's
+selector move together, and what was typed in a language is kept while another shows,
+until **Save**. A save writes the languages edited and only them: an emptied language
+loses its word, and every other language keeps its own. A rename keeps every
+language's description. On a one-language project there is no picker and no selector:
+the description is the one language's, as its pages show it.
+
+A save whose description would not fit the shape of a
 translation file (a word where that file holds a group of words, or a group where
 it holds a word, in the language's own file or in `default.json`) is refused with
 the server's words, the clash's own, as `setTranslationKeys` gives them, and
-changes nothing: the item, its descriptions and the description language stay as
-they were, and a change of language moves no description at all. The warning
-before a change of language counts the descriptions and does not look for a clash:
-the change itself names it.
+changes nothing: the item and its descriptions stay as they were. The dialog's error
+shows in its body, above the buttons, where it covers no field.
 
 **Scan / reconcile.** The toolbar's **Scan / reconcile** button runs
 `scanStorageUsage`, which walks the build (structure `data-storage-*` attrs +
@@ -3609,10 +3619,12 @@ title is one of them: `page.titles.<route>` takes the policy's own title word
 come from `<secure>/src/translations/<lang>.json`, read by key: a language with no file
 there takes English's, and a new language is a new file there, with no code. A language
 added after a generation starts from the default language's texts (`addLang`), which a
-later generation leaves, as it leaves any text. Per-key descriptions in
-the policy table are rendered live from the registry's description language, so
-editing a description updates the page immediately — regeneration is only needed
-for data changes (new keys, category / retention edits).
+later generation leaves, as it leaves any text. The policy table's descriptions are
+each language's own, rendered live on that language's page, so editing a description
+updates the page immediately — regeneration is only needed for data changes (new keys,
+category / retention edits). A key gets its description cell when any of the project's
+languages has a description for it; in a language without one, the page shows the word
+as missing, and the Translations page lists it (§9.20).
 
 ---
 
@@ -3632,13 +3644,20 @@ a body-bearing endpoint (POST/PUT/PATCH) that declares no fields at all is flagg
 **unverifiable** rather than assumed empty.
 
 **Data collected.** The author declares "data collected" entries — a **label** +
-**purpose** — authored in a registry-level description language (a page-level
-selector, defaulting to the site default) and stored as translation keys, so
-editing is live and other languages translate via the language tool. Commands:
-`setCollectedDatum` / `deleteCollectedDatum`; `setPrivacyDescLang` moves the prose
-to a new authoring language with an overwrite-warning confirm. A save or a change
-of language that would clash with the shape of a translation file is refused with
-the server's words and changes nothing, as on the storage registry (§9.10).
+**purpose** — stored as translation keys (`privacy.collected.<id>.label` and
+`.purpose`), each language keeping its own, so editing is live and each language's
+privacy page shows its own. On a project of two or more languages the page shows one
+language at a time, as the storage registry does (§9.10): **Labels and purposes shown
+in**, in the section's header, picks it, the panel's editing language (`editorLanguage`,
+§6). The dialog (its × at the top right) has one picker beside the **Label** for both
+words, the purpose's label naming the language shown; what was typed in a language is
+kept while another shows, until **Save**, which writes each language edited
+(`setCollectedDatum` with its `lang`, a label required in each) and leaves every other
+language's words as they are. Commands: `setCollectedDatum` / `deleteCollectedDatum`. A
+save that would clash with the shape of a translation file is refused with the server's
+words and changes nothing, as on the storage registry (§9.10). Every control of the page
+that sends a command is drawn only for a role that runs it; for another role a field's
+mapping shows without opening a menu.
 
 **Mapping.** Each scanned atom is mapped to a collected datum by clicking it and
 picking from a menu — or creating a new datum from that field in one step;
@@ -3665,7 +3684,7 @@ exists, hints to create one when it doesn't, or is omitted when the author ticks
 *"Don't mention cookies on this page"* (`setPrivacyCookieSection`). Once a page
 exists the section offers **Update** + **Delete** (`deletePrivacyPolicy`) and the
 route is recorded in `privacy.json`. The page's own words reach every language as the
-cookie policy's do (§9.10); the labels and purposes of collected data are the author's. Descriptions render live from `translate/`;
+cookie policy's do (§9.10); the labels and purposes of collected data are the author's, each language's own. Descriptions render live from `translate/`;
 regeneration is only needed after data changes (new mappings, host
 re-classification).
 
@@ -4055,7 +4074,7 @@ The flag is for a command whose name does not say so, and the test is what is lo
 | `setOAuthCredentials` | A stored secret, when it clears a key set. A provider will not show it again. |
 | `transferOwnership` | The caller's top role: only the new owner can give it back. |
 
-A command run many times in a sitting stays unflagged (`editStructure`, `editStyles`, `setTranslationKeys`, `editApi`), and so does one that already asks in its own way (`generateCookiePolicy` and `generatePrivacyPolicy` refuse an existing route without `overwrite`; `setStorageDescLang` and `setPrivacyDescLang` preview without `confirm`). A flag belongs to a command, not to one way of calling it, so it cannot ask only when `setRouteResolver` clears a route or `editApi` replaces every endpoint.
+A command run many times in a sitting stays unflagged (`editStructure`, `editStyles`, `setTranslationKeys`, `editApi`), and so does one that already asks in its own way (`generateCookiePolicy` and `generatePrivacyPolicy` refuse an existing route without `overwrite`). A flag belongs to a command, not to one way of calling it, so it cannot ask only when `setRouteResolver` clears a route or `editApi` replaces every endpoint.
 
 The prompt is a second look, not a control. A role sees no difference and the dispatcher does not read the flag: a caller of `/management/` gets `destructive` in `help` and nothing else. The one other reader is a workflow run (§8.12), which warns of a flagged step as a delete.
 

@@ -591,35 +591,11 @@ function translationGetKey(string $lang, string $dotKey): ?string {
 }
 
 /**
- * Set a single dot-notation key in translate/<lang>.json to a literal value,
- * creating parents as needed. Edits ONLY that language file — no default.json
- * sync (unlike writeTranslationsToFile) — used to empty/patch one key in place.
+ * Unset a single dot-notation key from translate/<lang>.json (best-effort), and every
+ * group the removal leaves empty above it, so no empty group stays behind. The size
+ * check, write by write: these run inside chains of helpers; a refusal leaves the file
+ * as it is and is answered by the command (qs_small_write_refused).
  */
-function translationSetKey(string $lang, string $dotKey, string $value): void {
-    $file = PROJECT_PATH . '/translate/' . $lang . '.json';
-    if (!file_exists($file)) return;
-    $decoded = json_decode((string) @file_get_contents($file), true);
-    if (!is_array($decoded)) return;
-    $parts = explode('.', $dotKey);
-    $leaf  = array_pop($parts);
-    $cur = &$decoded;
-    foreach ($parts as $part) {
-        if (!isset($cur[$part]) || !is_array($cur[$part])) { $cur[$part] = []; }
-        $cur = &$cur[$part];
-    }
-    $cur[$leaf] = $value;
-    unset($cur);
-    // The size check, write by write: these run inside chains of helpers. A refusal
-    // leaves the file as it is and is answered by the command (qs_small_write_refused).
-    require_once __DIR__ . '/quota.php';
-    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-    if (!qs_small_write_guard($file, qs_json_size($decoded, $flags))) {
-        return;
-    }
-    qs_json_write($file, $decoded, $flags, LOCK_EX);
-}
-
-/** Unset a single dot-notation key from translate/<lang>.json (best-effort). */
 function translationUnsetKey(string $lang, string $dotKey): void {
     $file = PROJECT_PATH . '/translate/' . $lang . '.json';
     if (!file_exists($file)) return;
@@ -635,12 +611,77 @@ function translationUnsetKey(string $lang, string $dotKey): void {
     if (!array_key_exists($leaf, $cur)) return;
     unset($cur[$leaf]);
     unset($cur);
+    // The groups left empty, deepest first.
+    for ($depth = count($parts); $depth > 0; $depth--) {
+        $path = array_slice($parts, 0, $depth);
+        $last = array_pop($path);
+        $parent = &$decoded;
+        foreach ($path as $part) {
+            $parent = &$parent[$part];
+        }
+        if (is_array($parent[$last]) && $parent[$last] === []) {
+            unset($parent[$last]);
+            unset($parent);
+            continue;
+        }
+        unset($parent);
+        break;
+    }
     require_once __DIR__ . '/quota.php';
     $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
     if (!qs_small_write_guard($file, qs_json_size($decoded, $flags))) {
         return;
     }
     qs_json_write($file, $decoded, $flags, LOCK_EX);
+}
+
+/**
+ * The word file a language's pages read, as the Translator picks it: default.json on a one-language project; on a
+ * multilingual one the language's own file, or default.json when it has none.
+ *
+ * @return string a language code, or 'default'
+ */
+function qs_translation_shown_file(string $lang): string {
+    require_once __DIR__ . '/projectLanguage.php';
+    if (!qs_project_is_multilingual()) {
+        return 'default';
+    }
+    return is_file(PROJECT_PATH . '/translate/' . $lang . '.json') ? $lang : 'default';
+}
+
+/**
+ * The word a language's pages show at a key (qs_translation_shown_file()), or null when that file holds none. A
+ * reader that offers a site's word in a language reads this, so it says what the page says.
+ */
+function qs_translation_shown_word(string $lang, string $dotKey): ?string {
+    return translationGetKey(qs_translation_shown_file($lang), $dotKey);
+}
+
+/**
+ * Whether any of the project's languages shows a word at a key (an empty word is none).
+ */
+function qs_translation_any_shown_word(string $dotKey): bool {
+    require_once __DIR__ . '/projectLanguage.php';
+    foreach (array_unique(qs_project_language_codes()) as $lang) {
+        $word = qs_translation_shown_word((string) $lang, $dotKey);
+        if ($word !== null && trim($word) !== '') {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Remove one language's word at a key: from the language's file and, where the shared writer copies a write of that
+ * language (every write on a one-language project, the default language's on a multilingual one), from default.json,
+ * so the word the pages show goes too and the two files never part. Every other language's word stays.
+ */
+function qs_translation_remove_word(string $lang, string $dotKey): void {
+    require_once __DIR__ . '/projectLanguage.php';
+    translationUnsetKey($lang, $dotKey);
+    if (!qs_project_is_multilingual() || $lang === qs_project_default_language()) {
+        translationUnsetKey('default', $dotKey);
+    }
 }
 
 // ---------------------------------------------------------------------------

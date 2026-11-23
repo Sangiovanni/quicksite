@@ -6150,10 +6150,12 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'listStorageItems' => [
-        'description' => 'List the project storage registry — every declared browser-storage key (localStorage / sessionStorage / cookie) with category, retention, translatable description, and derived consentRequired. Drives /admin/storage + the storageKey picker. The GDPR / cookie-consent data layer.',
+        'description' => 'List the project storage registry — every declared browser-storage key (localStorage / sessionStorage / cookie) with category, retention, its description in one language, and derived consentRequired. Drives /admin/storage + the storageKey picker. The GDPR / cookie-consent data layer.',
         'method' => 'POST',
-        'parameters' => [],
-        'example_post' => 'POST /management/p/<projectId>/listStorageItems',
+        'parameters' => [
+            'lang' => ['required' => false, 'type' => 'string', 'description' => 'The language each description is answered in, as that language\'s pages show it. Left out, the project\'s default language.', 'validation' => 'One of the project\'s languages (getLangList returns them)', 'example' => 'fr']
+        ],
+        'example_post' => 'POST /management/p/<projectId>/listStorageItems with body: {"lang":"fr"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -6162,21 +6164,25 @@ $GLOBALS['__help_commands'] = [
                 'count' => 0,
                 'scopes' => ['localStorage', 'sessionStorage', 'cookie'],
                 'categories' => ['essential', 'functional', 'analytics', 'marketing'],
+                'lang' => 'fr',
+                'defaultLanguage' => 'en',
                 'languages' => ['en', 'fr'],
-                'descLang' => 'en'
+                'languageNames' => ['en' => 'English', 'fr' => 'Français']
             ]
         ],
-        'error_responses' => [],
-        'notes' => 'consentRequired is derived (essential => false, else => true), never stored. The key VALUE is provided by the site visitor at runtime; the registry never holds it.'
+        'error_responses' => [
+            '400.validation.unsupported_language' => 'lang is not one of the project\'s languages; errors[0].allowed lists what it takes'
+        ],
+        'notes' => 'consentRequired is derived (essential => false, else => true), never stored. The key VALUE is provided by the site visitor at runtime; the registry never holds it. Each language keeps its own description: an item is answered with description {lang: text} for the language asked, and without description when that language has none (another language\'s word is never answered in its place). On a one-language project the word is the one its pages read (default.json).'
     ],
     'addStorageItem' => [
-        'description' => 'Declare a new storage key in the project registry. id is the key name; scope + category required. Cookie scope accepts domain/path/secure/sameSite. description is a translatable {lang: text} map.',
+        'description' => 'Declare a new storage key in the project registry. id is the key name; scope + category required. Cookie scope accepts domain/path/secure/sameSite. description is each language\'s own word, as a {lang: text} map.',
         'method' => 'POST',
         'parameters' => [
             'id' => ['required' => true, 'type' => 'string', 'description' => 'Storage key name: no whitespace, and never __proto__ (a page\'s consent map would lose it, so it could be neither read under its category nor removed when the category is refused).', 'example' => 'cartSession'],
             'scope' => ['required' => true, 'type' => 'string', 'enum' => ['localStorage', 'sessionStorage', 'cookie'], 'description' => 'Where the browser keeps the key: localStorage, sessionStorage or cookie.'],
             'category' => ['required' => true, 'type' => 'string', 'enum' => ['essential', 'functional', 'analytics', 'marketing'], 'description' => 'What the key is for, which decides the consent it needs: essential (none), functional, analytics or marketing.'],
-            'description' => ['required' => false, 'type' => 'object', 'description' => 'What the key is for, as {lang: text}, or as plain text in the registry\'s description language.'],
+            'description' => ['required' => false, 'type' => 'object', 'description' => 'What the key is for, as {lang: text} (each language its own word), or as plain text, the default language\'s word. An empty text is no word.', 'validation' => 'Every language one of the project\'s (getLangList returns them)'],
             'retention' => ['required' => false, 'type' => 'string', 'description' => 'How long the key is kept, as text: session, 30d, 1y or your own wording. It is shown, never enforced.'],
             'domain' => ['required' => false, 'type' => 'string', 'description' => 'Cookie scope only.'],
             'path' => ['required' => false, 'type' => 'string', 'description' => 'Cookie scope only.'],
@@ -6202,7 +6208,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'id is missing.',
-            '400.validation.invalid' => 'A field is refused; errors[] names each with its reason, and what it expects where that applies: the id (whitespace, or the reserved name), scope, category, description, retention or sameSite.',
+            '400.validation.invalid' => 'A field is refused; errors[] names each with its reason, and what it expects where that applies: the id (whitespace, or the reserved name), scope, category, description (a language that is not one of the project\'s: reason not_a_project_language, allowed listing them), retention or sameSite. Nothing was written.',
             '409.storage.duplicate' => 'An item with this id already exists; use editStorageItem. data.id names it.',
             '400.validation.invalid_format' => 'A word of the description clashes with the shape of a words file (a word where a group of words is, or a group where a word is), in the language\'s file or in default.json: the message is the clash\'s own words, as setTranslationKeys gives them, and errors[] and data.collisions name each clash. Nothing was written: the registry and every words file are as they were.',
             '500.server.file_write_failed' => 'A words file could not be written (500 server.internal_error when the words could not be encoded). What the command had written is put back.',
@@ -6213,14 +6219,14 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Writes data/storage.json. consentRequired is derived from category.'
     ],
     'editStorageItem' => [
-        'description' => 'Update (replace-all on fields) and optionally rename a storage item. Pass newId to rename. Read the current entry first if you want a field-level merge.',
+        'description' => 'Update (replace-all on the registry fields) and optionally rename a storage item. Pass newId to rename. Read the current entry first if you want a field-level merge. The description is each language\'s own word, and an edit touches only the languages it names.',
         'method' => 'POST',
         'parameters' => [
             'id' => ['required' => true, 'type' => 'string', 'description' => 'Existing key name.'],
             'newId' => ['required' => false, 'type' => 'string', 'description' => 'New key name (rename). The same rule as addStorageItem\'s id: no whitespace, never __proto__.'],
             'scope' => ['required' => true, 'type' => 'string', 'enum' => ['localStorage', 'sessionStorage', 'cookie'], 'description' => 'Where the browser keeps the key: localStorage, sessionStorage or cookie.'],
             'category' => ['required' => true, 'type' => 'string', 'enum' => ['essential', 'functional', 'analytics', 'marketing'], 'description' => 'What the key is for, which decides the consent it needs: essential (none), functional, analytics or marketing.'],
-            'description' => ['required' => false, 'type' => 'object', 'description' => 'What the key is for, as {lang: text}, or as plain text in the registry\'s description language. Left out or empty, the description is cleared: an edit replaces every field.'],
+            'description' => ['required' => false, 'type' => 'object', 'description' => 'What the key is for, as {lang: text}: each language named gets its word, and an empty text removes that language\'s word alone. Plain text is the default language\'s word (empty: that word removed). Left out, every language keeps its word, a rename included.', 'validation' => 'Every language one of the project\'s (getLangList returns them)'],
             'retention' => ['required' => false, 'type' => 'string', 'description' => 'How long the key is kept, as text: session, 30d, 1y or your own wording. It is shown, never enforced. Left out, it is cleared.']
         ],
         'example_post' => 'POST /management/p/<projectId>/editStorageItem with body: {"id":"cartSession","scope":"localStorage","category":"functional","retention":"90d"}',
@@ -6241,7 +6247,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '404.storage.not_found' => 'No item with this id. data.id names it.',
             '409.storage.duplicate' => 'newId is already taken. data.id names it.',
-            '400.validation.invalid' => 'A field is refused; errors[] names each with its reason, and what it expects where that applies. A newId is held to the rule of addStorageItem\'s id.',
+            '400.validation.invalid' => 'A field is refused; errors[] names each with its reason, and what it expects where that applies (a description language that is not one of the project\'s: reason not_a_project_language, allowed listing them). A newId is held to the rule of addStorageItem\'s id. Nothing was written.',
             '400.validation.required' => 'Storage item id is required.',
             '400.validation.invalid_format' => 'A word of the description clashes with the shape of a words file (a word where a group of words is, or a group where a word is), in the language\'s file or in default.json: the message is the clash\'s own words, as setTranslationKeys gives them, and errors[] and data.collisions name each clash. Nothing was written: the registry and every words file are as they were.',
             '500.server.file_write_failed' => 'A words file could not be written (500 server.internal_error when the words could not be encoded). What the command had written is put back.',
@@ -6249,7 +6255,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.operation_failed' => 'Failed to write the storage registry.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Cookie-only fields (domain, path, secure, sameSite) are read when scope is cookie, and dropped otherwise. renamedFrom holds the old id after a rename and null otherwise.'
+        'notes' => 'Cookie-only fields (domain, path, secure, sameSite) are read when scope is cookie, and dropped otherwise. renamedFrom holds the old id after a rename and null otherwise. A rename carries every language\'s description to the new key. item.description echoes the words written.'
     ],
     'deleteStorageItem' => [
         'description' => 'Remove a storage item from the project registry.',
@@ -6269,31 +6275,6 @@ $GLOBALS['__help_commands'] = [
             '500.server.operation_failed' => 'Failed to write the storage registry.'
         ],
         'notes' => 'Does not check in-use references: scanStorageUsage surfaces dangling reads. Also clears the item description key from translate/.'
-    ],
-    'setStorageDescLang' => [
-        'description' => 'Change the language storage descriptions are authored in (registry-level descLang on data/storage.json). MOVES every item description from the current language to the target in the translate files (true move — source cleared), OVERWRITING any existing target-language values. Two-step: call without confirm to preview (409 needsConfirm with moved/overwrites counts), then re-call with confirm:true to execute. Descriptions are page content (textKeys) so the move is live — no regenerate needed.',
-        'method' => 'POST',
-        'parameters' => [
-            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language', 'validation' => 'One of the project\'s languages (getLangList returns them)'],
-            'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
-        ],
-        'example_post' => 'POST /management/p/<projectId>/setStorageDescLang with body: {"lang":"fr","confirm":true}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'success',
-            'data' => ['descLang' => 'fr', 'moved' => 3, 'overwrites' => 1]
-        ],
-        'error_responses' => [
-            '409.storage.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
-            '400.validation.invalid_format' => 'The move meets a clash in the target language\'s words (a word where a group of words is, or a group where a word is), in its file or in default.json: the message is the clash\'s own words, as setTranslationKeys gives them, and errors[] and data.collisions name each clash. Nothing is moved or emptied and the description language is unchanged. The preview (no confirm) does not look for a clash: the confirmed call names it.',
-            '500.server.file_write_failed' => 'A words file could not be written (500 server.internal_error when the words could not be encoded). Every word already moved is put back and the description language is unchanged.',
-            '400.validation.invalid' => 'The language is not one of the project\'s. data.supported lists them.',
-            '400.validation.required' => 'lang is missing.',
-            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
-            '500.server.operation_failed' => 'Failed to write the storage registry.',
-            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
-        ],
-        'notes' => 'No-op (200) when lang already active. Drives the /admin/storage description-language selector.'
     ],
     'scanStorageUsage' => [
         'description' => 'Scan the build for storage-key references and reconcile against the declared registry. Triggered, warn-style check (not blocking). Walks structures (data-storage-* attrs + saveToken/store/clearToken chains), api-endpoints auth sources, page-events handler chains, and state-store init. Buckets keys into ok / incomplete (used but undeclared) / dangling_read (read but never written) / orphan (declared but unreferenced).',
@@ -6415,14 +6396,18 @@ $GLOBALS['__help_commands'] = [
     'getPrivacyStatus' => [
         'description' => 'Full privacy-helper state for /admin/privacy: the privacy registry (collected data, per-baseUrl host classifications, cookieSection, privacyRoute) joined with a live scan of the API registry (data/api-endpoints.json) for outbound data atoms — (endpoint, field) pairs from declared parameters + requestSchema.properties (response schemas ignored) — plus coverage (unmapped atoms, body-bearing endpoints with no request schema, unclassified hosts) and the cookie-page cross-link signal. Read-only; the scan never guesses undeclared fields.',
         'method' => 'POST',
-        'parameters' => [],
-        'example_post' => 'POST /management/p/<projectId>/getPrivacyStatus',
+        'parameters' => [
+            'lang' => ['required' => false, 'type' => 'string', 'description' => 'The language the collected data\'s label and purpose are answered in, as that language\'s pages show them. Left out, the project\'s default language.', 'validation' => 'One of the project\'s languages (getLangList returns them)', 'example' => 'fr']
+        ],
+        'example_post' => 'POST /management/p/<projectId>/getPrivacyStatus with body: {"lang":"fr"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
             'data' => [
-                'descLang' => 'en',
+                'lang' => 'fr',
+                'defaultLanguage' => 'en',
                 'languages' => ['en', 'fr'],
+                'languageNames' => ['en' => 'English', 'fr' => 'Français'],
                 'collectedData' => '[{id, label, purpose}]',
                 'hosts' => '[{baseUrl, kind:self|third-party|null, apiIds, name?, privacyUrl?}]',
                 'endpoints' => '[{apiId, endpointId, key, name, method, path, baseUrl, fields:[{field, datum|null}], undeclaredBody}]',
@@ -6434,27 +6419,31 @@ $GLOBALS['__help_commands'] = [
                 'cookie' => '{policyRoute, policyRouteExists}'
             ]
         ],
-        'error_responses' => [],
-        'notes' => 'Drives the /admin/privacy page. An atom = a (endpoint, field) the site is configured to send outward; map it to a collected datum to cover it. undeclaredBody flags POST/PUT/PATCH endpoints with no requestSchema.'
+        'error_responses' => [
+            '400.validation.unsupported_language' => 'lang is not one of the project\'s languages; errors[0].allowed lists what it takes'
+        ],
+        'notes' => 'Drives the /admin/privacy page. An atom = a (endpoint, field) the site is configured to send outward; map it to a collected datum to cover it. undeclaredBody flags POST/PUT/PATCH endpoints with no requestSchema. Each language keeps its own label and purpose: a datum with none in the language asked answers \'\' (another language\'s word is never answered in its place); on a one-language project the words are the ones its pages read (default.json).'
     ],
 
     'setCollectedDatum' => [
-        'description' => 'Create or update a "data collected" entry in data/privacy.json. The id is a stable slug (atoms map to it); label + purpose are prose authored in the registry description language and stored in translate/ under privacy.collected.<id>.label / .purpose. Editing label/purpose is live (no regenerate).',
+        'description' => 'Create or update a "data collected" entry in data/privacy.json. The id is a stable slug (atoms map to it); label + purpose are prose stored in translate/ under privacy.collected.<id>.label / .purpose, each language keeping its own: a call writes one language\'s words and leaves every other language\'s as they are. Editing label/purpose is live (no regenerate).',
         'method' => 'POST',
         'parameters' => [
             'id' => ['required' => true, 'type' => 'string', 'description' => 'Stable slug: letters, numbers, hyphens, underscores.'],
-            'label' => ['required' => true, 'type' => 'string', 'description' => 'Display name, e.g. "Email address".'],
-            'purpose' => ['required' => false, 'type' => 'string', 'description' => 'What you do with it (empty clears).']
+            'label' => ['required' => true, 'type' => 'string', 'description' => 'Display name in lang, e.g. "Email address".'],
+            'purpose' => ['required' => false, 'type' => 'string', 'description' => 'What you do with it, in lang (empty removes that language\'s purpose).'],
+            'lang' => ['required' => false, 'type' => 'string', 'description' => 'The language the label and purpose are written in. Left out, the project\'s default language.', 'validation' => 'One of the project\'s languages (getLangList returns them)', 'example' => 'fr']
         ],
-        'example_post' => 'POST /management/p/<projectId>/setCollectedDatum with body: {"id":"email","label":"Email address","purpose":"To send login links"}',
+        'example_post' => 'POST /management/p/<projectId>/setCollectedDatum with body: {"id":"email","label":"Adresse e-mail","purpose":"Pour envoyer les liens de connexion","lang":"fr"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
-            'data' => ['datum' => ['id' => 'email', 'label' => 'Email address', 'purpose' => 'To send login links']]
+            'data' => ['datum' => ['id' => 'email', 'label' => 'Adresse e-mail', 'purpose' => 'Pour envoyer les liens de connexion', 'lang' => 'fr']]
         ],
         'error_responses' => [
             '400.validation.invalid' => 'The id is not a slug: letters, numbers, hyphens and underscores only.',
             '400.validation.required' => 'id or label is missing.',
+            '400.validation.unsupported_language' => 'lang is not one of the project\'s languages; errors[0].allowed lists what it takes. Nothing was written.',
             '400.validation.invalid_format' => 'The label or the purpose clashes with the shape of a words file (a word where a group of words is, or a group where a word is), in the language\'s file or in default.json: the message is the clash\'s own words, as setTranslationKeys gives them, and errors[] and data.collisions name each clash. Nothing was written: the registry and every words file are as they were.',
             '500.server.file_write_failed' => 'A words file could not be written (500 server.internal_error when the words could not be encoded). What the command had written is put back.',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
@@ -6482,31 +6471,6 @@ $GLOBALS['__help_commands'] = [
             '500.server.operation_failed' => 'Failed to write the privacy registry.'
         ],
         'notes' => 'Mappings that referenced it become unset (null), not deleted.'
-    ],
-    'setPrivacyDescLang' => [
-        'description' => 'Change the language collected-data prose is authored in (descLang on data/privacy.json). Mirrors setStorageDescLang: MOVES every datum label + purpose from the current language to the target in translate/ (empty-not-delete on the source), OVERWRITING existing target values. Two-step: call without confirm to preview (409 needsConfirm with moved/overwrites), then re-call with confirm:true.',
-        'method' => 'POST',
-        'parameters' => [
-            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language', 'validation' => 'One of the project\'s languages (getLangList returns them)'],
-            'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
-        ],
-        'example_post' => 'POST /management/p/<projectId>/setPrivacyDescLang with body: {"lang":"fr","confirm":true}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'success',
-            'data' => ['descLang' => 'fr', 'moved' => 4, 'overwrites' => 0]
-        ],
-        'error_responses' => [
-            '409.privacy.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
-            '400.validation.invalid_format' => 'The move meets a clash in the target language\'s words (a word where a group of words is, or a group where a word is), in its file or in default.json: the message is the clash\'s own words, as setTranslationKeys gives them, and errors[] and data.collisions name each clash. Nothing is moved or emptied and the description language is unchanged. The preview (no confirm) does not look for a clash: the confirmed call names it.',
-            '500.server.file_write_failed' => 'A words file could not be written (500 server.internal_error when the words could not be encoded). Every word already moved is put back and the description language is unchanged.',
-            '400.validation.invalid' => 'The language is not one of the project\'s. data.supported lists them.',
-            '400.validation.required' => 'lang is missing.',
-            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
-            '500.server.operation_failed' => 'Failed to write the privacy registry.',
-            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
-        ],
-        'notes' => 'No-op (200) when lang already active. Drives the /admin/privacy description-language selector.'
     ],
     'setPrivacyMapping' => [
         'description' => 'Map a scanned atom (endpoint, field) to a collected datum, or unset it. The atom comes from the API request-schema scan (getPrivacyStatus); the datum must already exist (setCollectedDatum). The recipient (your server vs a third party) is derived from the endpoint host classification, never stored on the mapping.',

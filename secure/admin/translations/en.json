@@ -120,18 +120,24 @@
     "privacy": {
         "dialogs": {
             "deleteDatum": "Delete \":name\"? Any field mapped to it becomes unset.",
-            "descLangChange": "Change description language from \":from\" to \":to\"?",
-            "descLangMovesOne": "This moves :n value into \":to\".",
-            "descLangMovesMany": "This moves :n values into \":to\".",
-            "descLangOverwritesOne": "⚠ :n existing \":to\" value will be OVERWRITTEN.",
-            "descLangOverwritesMany": "⚠ :n existing \":to\" values will be OVERWRITTEN.",
             "overwritePage": "Route /:route already exists. Overwrite its content with the privacy-policy page?",
             "deletePage": "Delete the generated privacy page? This removes the route and its page."
+        },
+        "languages": {
+            "shownIn": "Labels and purposes shown in",
+            "hint": "Each language keeps its own label and purpose, and each language's privacy page shows its own, live: no need to generate it again. Nothing moves when you change the language shown. In a language with no label or purpose, the privacy page shows the word as missing, and the Translations page lists it.",
+            "language": "Language of the label and purpose",
+            "label": "Label",
+            "purpose": "Purpose",
+            "purposeIn": "Purpose (:language)",
+            "noLabelIn": "No label in :language yet.",
+            "noPurposeIn": "No purpose in :language yet.",
+            "labelRequiredIn": "A label is required in :language.",
+            "unread": "The words in :language could not be read: reload the page."
         },
         "errors": {
             "deleteFailed": "Delete failed",
             "network": "Network error",
-            "descLangFailed": "Failed to change language",
             "mappingFailed": "Mapping failed",
             "generateFailed": "Generate failed",
             "cookieSectionFailed": "Failed to update cookie section",
@@ -1781,16 +1787,19 @@
     },
     "storage": {
         "dialogs": {
-            "descLangChange": "Change the description language from \":from\" to \":to\"?",
-            "descLangMovesOne": "This moves :n description into \":to\".",
-            "descLangMovesMany": "This moves :n descriptions into \":to\".",
-            "descLangOverwritesOne": "⚠ :n existing \":to\" description will be OVERWRITTEN.",
-            "descLangOverwritesMany": "⚠ :n existing \":to\" descriptions will be OVERWRITTEN.",
             "deletePage": "Delete the cookie-policy page at :route? This removes the route and its page.",
             "overwritePage": "Route /:route already exists. Overwrite its content with the cookie-policy page?"
         },
-        "errors": {
-            "descLangFailed": "Failed to change description language"
+        "languages": {
+            "shownIn": "Descriptions shown in",
+            "hint": "Each language keeps its own description, and each language's cookie-policy page shows its own, live: no need to generate it again. Nothing moves when you change the language shown. In a language with no description, the cookie-policy page shows the word as missing, and the Translations page lists it.",
+            "descriptionLabel": "Description",
+            "descriptionLanguage": "Language of the description",
+            "descriptionHint": "Shown on the cookie-policy page in this language, live. Each language keeps its own: what you type in one is kept while you look at another, until you save.",
+            "descriptionHintOne": "Shown on the cookie-policy page, live: no need to generate it again.",
+            "noDescription": "No description yet.",
+            "noDescriptionIn": "No description in :language yet.",
+            "unread": "The descriptions in :language could not be read: reload the page."
         },
         "consent": {
             "askAgain": "Ask visitors again",

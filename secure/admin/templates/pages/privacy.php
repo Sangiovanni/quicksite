@@ -3,8 +3,9 @@
  * Privacy helper admin page (privacy / data-sharing surface).
  *
  * Lean PHP shell — header + hint host + content root + script include. All
- * rendering (collected-data, hosts, endpoint atoms, coverage) lives in
- * privacy.js, which calls getPrivacyStatus. Mirrors storage.php.
+ * rendering (collected-data, hosts, endpoint atoms, coverage) and the dialogs
+ * (the panel's one modal) live in privacy.js, which calls getPrivacyStatus and
+ * marks each control that sends a command with its role mark. Mirrors storage.php.
  *
  * The privacy helper is the data-SHARING half of the compliance story (what the
  * site sends to APIs / third parties); the storage registry is the browser-
@@ -30,10 +31,9 @@ window.QS_PRIVACY_I18N = <?= qs_inline_script_json(['privacy' => AdminTranslatio
     <p class="admin-page-header__subtitle">What this site sends out — built from your API registry (third-party data sharing) + sign-in providers. Map each field the site sends to a "data collected" entry to cover your privacy policy.</p>
 </div>
 
+<!-- What a language's words are and where they show (multilingual projects only): privacy.js writes it. -->
 <p id="privacy-desclang-hint" class="admin-hint privacy-desclang-hint" hidden></p>
 
 <div id="privacy-root" class="privacy-root" role="region" aria-label="Privacy helper">
     <div style="padding: 24px; color: var(--admin-text-muted, #555);">Loading privacy status…</div>
 </div>
-
-<div id="privacy-modal-root" data-privacy-modal-root></div>

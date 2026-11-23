@@ -5,12 +5,11 @@ require_once __DIR__ . '/projectLanguage.php';
  * privacyHelpers.php — read / write the per-project privacy registry
  * (data/privacy.json). Structure-only (mirrors storage.json): the human-readable
  * collected-data labels + purposes live in translate/ under convention keys
- * (privacy.collected.<id>.label / .purpose), authored in the registry description
- * language and translated via the project language tool.
+ * (privacy.collected.<id>.label / .purpose). Each language keeps its own words: a
+ * write names its language and touches that language's words alone.
  *
  * Shape:
  *   {
- *     "descLang": "en",                          // language labels/purposes authored in
  *     "collectedData": ["email", "full-name"],   // datum ids (prose keyed in translate/)
  *     "mappings": {                               // atom (endpoint, field) -> datum id | null
  *       "<apiId>/<endpointId>": { "email": "email", "userId": null }
@@ -66,10 +65,9 @@ function savePrivacyRegistry(array $reg): bool {
         ? array_values(array_unique(array_filter($reg['collectedData'], 'is_string'))) : [];
     sort($cd);
 
+    // A top-level field an older registry carries (a description language) is read as
+    // nothing and not written back.
     $out = [];
-    if (isset($reg['descLang']) && is_string($reg['descLang']) && $reg['descLang'] !== '') {
-        $out['descLang'] = $reg['descLang'];
-    }
     $out['collectedData'] = $cd;
     $out['mappings']      = (isset($reg['mappings']) && is_array($reg['mappings']) && !empty($reg['mappings'])) ? $reg['mappings'] : (object) [];
     $out['hosts']         = (isset($reg['hosts']) && is_array($reg['hosts']) && !empty($reg['hosts'])) ? $reg['hosts'] : (object) [];
@@ -88,18 +86,6 @@ function savePrivacyRegistry(array $reg): bool {
         @mkdir($dir, 0755, true);
     }
     return qs_json_write($path, $out, $flags, LOCK_EX);
-}
-
-/** Language the collected-data prose is authored in (defaults to website default). */
-function privacyDescLang(?array $reg = null): string {
-    if ($reg === null) {
-        $reg = loadPrivacyRegistry();
-    }
-    $l = $reg['descLang'] ?? null;
-    if (is_string($l) && $l !== '') {
-        return $l;
-    }
-    return qs_project_default_language();
 }
 
 /** Project languages plus the synthetic `default` bucket. */
@@ -121,17 +107,22 @@ function privacyPurposeKey(string $id): string {
     return 'privacy.collected.' . _privacySanitizeId($id) . '.purpose';
 }
 
-/** Resolve a datum's label / purpose in $lang (raw — no cross-language fallback). */
+/**
+ * A datum's label / purpose in $lang, as that language's pages show it
+ * (qs_translation_shown_word(): default.json on a one-language project); null when
+ * the language has none — another language's word is never offered in its place.
+ */
 function privacyDatumLabel(string $id, string $lang): ?string {
-    return translationGetKey($lang, privacyLabelKey($id));
+    return qs_translation_shown_word($lang, privacyLabelKey($id));
 }
 function privacyDatumPurpose(string $id, string $lang): ?string {
-    return translationGetKey($lang, privacyPurposeKey($id));
+    return qs_translation_shown_word($lang, privacyPurposeKey($id));
 }
 
 /**
- * Write a datum's label + purpose into translate/<lang> (skips empty values). Null
- * once written; else the shared writer's refusal, for the command to answer with
+ * Write a datum's label + purpose into translate/<lang> (skips empty values): $lang is
+ * one of the project's languages, checked by the caller. Null once written; else the
+ * shared writer's refusal, for the command to answer with
  * qs_translation_write_refusal_response().
  */
 function privacyWriteDatumText(string $id, string $lang, ?string $label, ?string $purpose): ?array {
@@ -209,42 +200,4 @@ function privacySetHost(array &$reg, string $baseUrl, string $kind, ?string $nam
 function privacyHostKind(array $reg, string $baseUrl): ?string {
     $k = $reg['hosts'][$baseUrl]['kind'] ?? null;
     return in_array($k, PRIVACY_HOST_KINDS, true) ? $k : null;
-}
-
-// ---- description-language move (mirrors storage; empty-not-delete) ---------
-
-/**
- * Move every datum's label + purpose from language $from to $to in the translate
- * files. EMPTIES the source key (keeps it as "") so the old language is flagged
- * as a missing translation rather than deleted (locked rule, shared with storage).
- * A write the shared writer refuses stops the move there, that key's source not
- * emptied: `refused` holds the writer's answer, which the command answers with
- * qs_translation_write_refusal_response() (putting back every word already moved).
- *
- * @return array{moved:int, overwrites:int, refused:?array}
- */
-function privacyMoveDescriptions(string $from, string $to, bool $execute = true): array {
-    if ($from === $to) {
-        return ['moved' => 0, 'overwrites' => 0, 'refused' => null];
-    }
-    $reg = loadPrivacyRegistry();
-    $moved = 0;
-    $overwrites = 0;
-    foreach ($reg['collectedData'] as $id) {
-        foreach ([privacyLabelKey((string) $id), privacyPurposeKey((string) $id)] as $key) {
-            $val = translationGetKey($from, $key);
-            if ($val === null || $val === '') continue;
-            $existing = translationGetKey($to, $key);
-            if ($existing !== null && $existing !== '') $overwrites++;
-            $moved++;
-            if ($execute) {
-                $written = writeTranslationsToFile($to, convertDotNotationToNested([$key => $val]), false);
-                if (!$written['ok']) {
-                    return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => $written];
-                }
-                translationSetKey($from, $key, '');
-            }
-        }
-    }
-    return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => null];
 }

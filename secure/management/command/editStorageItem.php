@@ -6,8 +6,14 @@
  * @route  /management/editStorageItem
  * @auth   required (write permission)
  *
- * Replace-all semantic on the item fields (read the current entry first if you
- * want a field-level merge). Pass `newId` to rename.
+ * Replace-all semantic on the item's registry fields (read the current entry
+ * first if you want a field-level merge). Pass `newId` to rename.
+ *
+ * The description is each language's own word, and a save touches only the
+ * languages it names: absent, every word stays (a rename carries every language's
+ * word to the new key); a plain string is the default language's word; a
+ * {lang: text} map writes each language named (every one a language of the
+ * project), an empty text removing that language's word alone.
  *
  * Body: { id, newId?, scope, category, description?, retention?, + cookie fields }
  *
@@ -81,29 +87,31 @@ if (!saveStorageRegistry($registry)) {
         ->send();
 }
 
-// Persist the description into translate/ (keyed). Replace-all semantic: a
-// missing/empty description clears the key. On rename the old key is left to
-// the orphan-translation cleanup (the new key carries the submitted copy). A
-// refused write takes back the registry above too, and every word written or
-// cleared.
+// The description in translate/ (keyed), language by language. A rename first
+// carries every language's word to the new key; then each language the save
+// names gets its word, or loses it for an empty text; a language not named keeps
+// its word. A refused write takes back the registry above too, and every word
+// written.
 if ($targetId !== $id) {
-    storageClearDescription($id);
+    $refused = storageRenameDescription($id, $targetId);
+    if ($refused !== null) {
+        qs_translation_write_refusal_response($refused)->send();
+    }
 }
-if (!empty($result['description'])) {
+if ($result['description'] !== null) {
     $refused = storageWriteDescription($targetId, $result['description']);
     if ($refused !== null) {
         qs_translation_write_refusal_response($refused)->send();
     }
-} else {
-    storageClearDescription($targetId);
 }
 qs_small_write_send_refusal();
 
 $stored = $result['item'];
 $stored['id'] = $targetId;
 $stored['consentRequired'] = storageConsentRequired($result['item']);
-if (!empty($result['description'])) {
-    $stored['description'] = $result['description']; // echo for the admin card
+$written = array_filter($result['description'] ?? [], fn($t) => $t !== '');
+if (!empty($written)) {
+    $stored['description'] = $written; // echo for the admin card
 }
 
 ApiResponse::create(200, 'storage.updated')

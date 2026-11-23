@@ -25,10 +25,10 @@ require_once __DIR__ . '/projectLanguage.php';
  *
  * DESCRIPTIONS ARE NOT STORED HERE. The registry is structure-only; the
  * human-readable description lives in `translate/<lang>.json` under the
- * convention key `storageDescKey($id)` (e.g. `storage.desc.<id>`), authored in
- * the project default language and translated with the project's language tool.
- * `storageItemDescription()` resolves it (with a transitional inline fallback
- * for not-yet-migrated registries).
+ * convention key `storageDescKey($id)` (e.g. `storage.desc.<id>`). Each language
+ * keeps its own word: a write names its language and touches that language's
+ * word alone. `storageItemDescription()` reads a language's word as its pages
+ * show it (with a transitional inline fallback for not-yet-migrated registries).
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {
@@ -65,17 +65,14 @@ function loadStorageRegistry(): array {
     return $decoded;
 }
 
-/** Write the registry. Creates `data/` if missing. Stable key order. Preserves
- *  the registry-level `descLang` (the language storage descriptions are authored
- *  in) when present. */
+/** Write the registry. Creates `data/` if missing. Stable key order. The registry
+ *  holds its items alone: a top-level field an older registry carries (a
+ *  description language) is read as nothing and not written back. */
 function saveStorageRegistry(array $registry): bool {
     $path = getStorageRegistryPath();
     $items = (isset($registry['items']) && is_array($registry['items'])) ? $registry['items'] : [];
     ksort($items);
     $out = [];
-    if (isset($registry['descLang']) && is_string($registry['descLang']) && $registry['descLang'] !== '') {
-        $out['descLang'] = $registry['descLang'];
-    }
     $out['items'] = empty($items) ? (object) [] : $items;
     $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
     // The size check, write by write (the registry is saved inside chains of
@@ -91,70 +88,12 @@ function saveStorageRegistry(array $registry): bool {
     return qs_json_write($path, $out, $flags, LOCK_EX);
 }
 
-/**
- * The language storage descriptions are authored in (registry-level setting).
- * Defaults to the website default until the author changes it on /admin/storage.
- */
-function storageDescLang(?array $registry = null): string {
-    if ($registry === null) {
-        $registry = loadStorageRegistry();
-    }
-    $l = $registry['descLang'] ?? null;
-    return (is_string($l) && $l !== '') ? $l : storageDefaultLang();
-}
-
-/**
- * Move every item's description from language $from to language $to in the
- * translate files (true move — the source value is removed). When $execute is
- * false, nothing is written; the return only reports what WOULD happen.
- *
- * A write the shared writer refuses stops the move there: that item's source is
- * not emptied, and `refused` holds the writer's answer, which the command answers
- * with qs_translation_write_refusal_response() (putting back every word already
- * moved).
- *
- * @return array{moved:int, overwrites:int, refused:?array} moved = items with a
- *               $from value; overwrites = of those, how many already had a $to value.
- */
-function storageMoveDescriptions(string $from, string $to, bool $execute = true): array {
-    $registry = loadStorageRegistry();
-    $moved = 0;
-    $overwrites = 0;
-    if ($from === $to) {
-        return ['moved' => 0, 'overwrites' => 0, 'refused' => null];
-    }
-    foreach (array_keys($registry['items']) as $id) {
-        $key = storageDescKey((string) $id);
-        $val = _storageReadTranslationKey($from, $key);
-        if ($val === null || $val === '') {
-            continue;
-        }
-        $existingTarget = _storageReadTranslationKey($to, $key);
-        if ($existingTarget !== null && $existingTarget !== '') {
-            $overwrites++;
-        }
-        $moved++;
-        if ($execute) {
-            $written = writeTranslationsToFile($to, convertDotNotationToNested([$key => $val]), false);
-            if (!$written['ok']) {
-                return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => $written];
-            }
-            // Empty the source key, don't delete it: keeping it present (as "")
-            // makes the translate tooling flag the old language as a MISSING
-            // translation (the desired re-translation signal) and avoids leaving
-            // an empty-object artifact. The privacy helper's move must do the same.
-            _storageSetTranslationKey($from, $key, '');
-        }
-    }
-    return ['moved' => $moved, 'overwrites' => $overwrites, 'refused' => null];
-}
-
 /** consentRequired is derived — essential never needs consent. */
 function storageConsentRequired(array $item): bool {
     return ($item['category'] ?? 'functional') !== 'essential';
 }
 
-/** The project default language (where single-language descriptions are authored). */
+/** The project default language (where a description given as a plain string goes). */
 function storageDefaultLang(): string {
     return qs_project_default_language();
 }
@@ -179,44 +118,85 @@ function _storageReadTranslationKey(string $lang, string $dotKey): ?string {
 function _storageUnsetTranslationKey(string $lang, string $dotKey): void {
     translationUnsetKey($lang, $dotKey);
 }
-function _storageSetTranslationKey(string $lang, string $dotKey, string $value): void {
-    translationSetKey($lang, $dotKey, $value);
-}
 
 /**
- * Resolve an item's description in $lang. Canonical home is translate/ under
- * storageDescKey(); falls back to translate/default.json, then to any inline
- * description still present on a not-yet-migrated item (transitional).
+ * An item's description in $lang, as that language's pages show it
+ * (qs_translation_shown_word(): default.json on a one-language project), else the
+ * inline $lang text of a not-yet-migrated item (transitional). '' when the
+ * language has none: another language's word is never offered in its place.
  */
 function storageItemDescription(string $id, array $item, string $lang): string {
-    $key = storageDescKey($id);
-    $v = _storageReadTranslationKey($lang, $key);
-    if ($v !== null && $v !== '') return $v;
-    $v = _storageReadTranslationKey('default', $key);
+    $v = qs_translation_shown_word($lang, storageDescKey($id));
     if ($v !== null && $v !== '') return $v;
     $d = $item['description'] ?? null;             // transitional inline fallback
-    if (is_array($d)) {
-        if (isset($d[$lang]) && is_string($d[$lang]) && $d[$lang] !== '') return $d[$lang];
-        foreach ($d as $t) { if (is_string($t) && $t !== '') return $t; }
-    }
+    if (is_array($d) && isset($d[$lang]) && is_string($d[$lang]) && $d[$lang] !== '') return $d[$lang];
     return '';
 }
 
 /**
- * Write an item's description (a {lang: text} map) into the translate files.
- * Null once every language is written; else the shared writer's refusal, at the
- * first language it refused (the languages after it are not written), for the
- * command to answer with qs_translation_write_refusal_response().
+ * Whether any of the project's languages has a description for the item (or a
+ * not-yet-migrated item carries an inline one): the cookie policy gives such an
+ * item its purpose cell.
+ */
+function storageItemHasDescription(string $id, array $item): bool {
+    if (qs_translation_any_shown_word(storageDescKey($id))) return true;
+    $d = $item['description'] ?? null;             // transitional inline copy
+    if (is_array($d)) {
+        foreach ($d as $t) { if (is_string($t) && trim($t) !== '') return true; }
+    }
+    return false;
+}
+
+/**
+ * Write an item's description, language by language: a {lang: text} map whose
+ * every language is one of the project's (validateStorageItem() refuses any
+ * other; a language that is not is skipped here too, so no other path builds a
+ * file name from it). A text writes that language's word through the shared
+ * writer; an empty text removes that language's word alone
+ * (qs_translation_remove_word()). A language not named keeps its word.
+ * Null once done; else the shared writer's refusal, at the first language it
+ * refused (the languages after it are not written), for the command to answer
+ * with qs_translation_write_refusal_response().
  */
 function storageWriteDescription(string $id, array $descMap): ?array {
+    require_once __DIR__ . '/languageRegistry.php';
     $key = storageDescKey($id);
     foreach ($descMap as $lang => $text) {
-        if (!is_string($lang) || $lang === '' || !is_string($text) || $text === '') continue;
+        if (!is_string($lang) || !qs_project_has_language($lang) || !is_string($text)) continue;
+        if (trim($text) === '') {
+            qs_translation_remove_word($lang, $key);
+            continue;
+        }
         $written = writeTranslationsToFile($lang, convertDotNotationToNested([$key => $text]), false);
         if (!$written['ok']) {
             return $written;
         }
     }
+    return null;
+}
+
+/**
+ * A renamed item keeps its description in every language: each word file's word
+ * under the old key is written under the new key in the same file (the project's
+ * languages through the shared writer, then default.json's own word last, so each
+ * file holds what it held), and the old key is removed everywhere. Null once
+ * done; else the shared writer's refusal (the old key is then left as it was).
+ */
+function storageRenameDescription(string $fromId, string $toId): ?array {
+    $from = storageDescKey($fromId);
+    $to = storageDescKey($toId);
+    if ($from === $to) return null;
+    $langs = array_values(array_filter(storageAllLangs(), fn($l) => $l !== 'default'));
+    $langs[] = 'default';
+    foreach ($langs as $lang) {
+        $word = _storageReadTranslationKey($lang, $from);
+        if ($word === null || $word === '') continue;
+        $written = writeTranslationsToFile($lang, convertDotNotationToNested([$to => $word]), false);
+        if (!$written['ok']) {
+            return $written;
+        }
+    }
+    storageClearDescription($fromId);
     return null;
 }
 
@@ -243,8 +223,11 @@ function storageMigrateInlineDescriptions(array &$registry): array {
     $changed = false;
     foreach ($registry['items'] as $id => $item) {
         if (!is_array($item) || !array_key_exists('description', $item)) continue;
-        if (is_array($item['description']) && !empty($item['description'])) {
-            $refused = storageWriteDescription((string) $id, $item['description']);
+        // Only an inline text is carried: an empty one is no word, and removes none.
+        $inline = is_array($item['description'])
+            ? array_filter($item['description'], fn($t) => is_string($t) && trim($t) !== '') : [];
+        if (!empty($inline)) {
+            $refused = storageWriteDescription((string) $id, $inline);
             if ($refused !== null) {
                 return ['changed' => $changed, 'refused' => $refused];
             }
@@ -293,27 +276,33 @@ function validateStorageItem(string $id, array $input): array {
         $item['category'] = $category;
     }
 
-    // description — authored prose for the storage description-language. Accepts
-    // a plain string (stored under storageDescLang()) or a {lang: string} map
-    // (API callers). NOT stored inline; returned separately so the caller
-    // persists it into translate/ via storageWriteDescription().
+    // description — each language's word, NOT stored inline: returned separately
+    // so the caller writes it into translate/ through storageWriteDescription().
+    // A plain string is the project's default language's word; a {lang: string}
+    // map names each language, every one a language of the project (a code is
+    // part of a file name, so nothing else is taken). An empty text means "no
+    // word in that language": an edit removes that language's word alone. Absent,
+    // null: the item's words are left as they are.
     $description = null;
     if (isset($input['description'])) {
+        require_once __DIR__ . '/languageRegistry.php';
         if (is_string($input['description'])) {
-            $t = trim($input['description']);
-            if ($t !== '') {
-                $description = [storageDescLang() => $t];
-            }
+            $description = [storageDefaultLang() => trim($input['description'])];
         } elseif (is_array($input['description'])) {
             $desc = [];
             foreach ($input['description'] as $lang => $text) {
-                if (is_string($lang) && is_string($text) && $text !== '') {
-                    $desc[$lang] = $text;
+                if (!qs_project_has_language($lang)) {
+                    $shown = qs_language_value_for_message($lang);
+                    $errors[] = ['field' => 'description', 'reason' => 'not_a_project_language', 'value' => $shown,
+                        'allowed' => qs_project_language_codes(),
+                        'hint' => "'{$shown}' is not one of this project's languages."];
+                } elseif (!is_string($text)) {
+                    $errors[] = ['field' => 'description', 'reason' => 'invalid_type', 'value' => (string) $lang, 'expected' => 'string'];
+                } else {
+                    $desc[(string) $lang] = trim($text) === '' ? '' : $text;
                 }
             }
-            if (!empty($desc)) {
-                $description = $desc;
-            }
+            $description = $desc;
         } else {
             $errors[] = ['field' => 'description', 'reason' => 'invalid_type', 'expected' => 'string or {lang: string}'];
         }

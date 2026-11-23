@@ -588,15 +588,20 @@ const FIELD_PICKERS = {
     // privacy.manage, and every role granted privacy.manage (editor and up) also
     // holds config.read. So a picker never shows its user what they cannot read.
     // An id that must exist is a dropdown; setCollectedDatum CREATES or edits, so
-    // its id is the existing ones as suggestions, with free entry.
+    // its id is the existing ones as suggestions, with free entry. The language a
+    // description is read or written in is one the project has; left blank, the
+    // command takes the default language.
     deleteStorageItem:    { kind: 'registry', param: 'id', source: 'storageItems' },
     editStorageItem:      { kind: 'registry', param: 'id', source: 'storageItems' },
     deleteCollectedDatum: { kind: 'registry', param: 'id', source: 'collectedData' },
-    setCollectedDatum:    { kind: 'registry', param: 'id', source: 'collectedData', freeEntry: true },
+    setCollectedDatum: [
+        { kind: 'registry', param: 'id', source: 'collectedData', freeEntry: true },
+        { kind: 'select', param: 'lang', source: 'languages' }
+    ],
+    listStorageItems:     { kind: 'select', param: 'lang', source: 'languages' },
+    getPrivacyStatus:     { kind: 'select', param: 'lang', source: 'languages' },
 
     // --- Language: the languages the project ALREADY HAS -------------------
-    setStorageDescLang: { kind: 'select', param: 'lang', source: 'languages' },
-    setPrivacyDescLang: { kind: 'select', param: 'lang', source: 'languages' },
     // Labelled with each language's name, and without the default: deleteLang
     // answers "Cannot remove default language", so offering it would offer a
     // choice the command refuses.

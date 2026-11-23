@@ -67,6 +67,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+/* The language shown has no description for the item: said, not left blank */
+.storage-card__summary--none { font-style: italic; }
 .storage-card__actions { display: flex; gap: 4px; flex-shrink: 0; }
 .storage-card__action { padding: 6px; }
 
@@ -176,6 +178,23 @@
     color: var(--admin-error);
     font-size: 13px;
 }
+/* The item dialog's error: in the dialog's flow above the sticky buttons, never in their row, so it covers
+   no field; brought into view clear of the buttons when it shows. */
+.storage-modal-error {
+    margin: 12px 0 0;
+    color: var(--admin-error);
+    font-size: 13px;
+    scroll-margin-bottom: 6rem;
+}
+
+/* A description: the project's language, then its text; they wrap under each other where the row is short */
+.storage-desc-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.storage-desc-row__lang { width: auto; max-width: 100%; }
+.storage-desc-row__input { flex: 1 1 14rem; min-width: 0; }
 .storage-modal-actions__btn--danger {
     background: var(--admin-error);
     border-color: var(--admin-error);
@@ -389,21 +408,24 @@
 .qs-storage-spec__controls .admin-select { width: auto; max-width: 100%; }
 .qs-storage-spec__colon { color: var(--admin-text-muted); }
 
-/* Page-level "description language" selector (multilingual projects only). The
-   language storage descriptions are authored in; changing it moves the values. */
+/* The language the page shows (multilingual projects only): the cards' descriptions, in step with the item
+   dialog's picker. Changing it moves nothing. */
 .storage-desc-lang-bar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    margin: 12px 0 8px;
 }
+.storage-desc-lang-bar:empty { display: none; }
 .storage-desc-lang-bar__label {
-    font-size: 12px;
-    color: var(--admin-text-muted);
-    white-space: nowrap;
+    font-size: 13px;
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
 }
-.storage-desc-lang-bar__select { width: auto; min-width: 64px; }
+.storage-desc-lang-bar__select { width: auto; max-width: 100%; min-width: 64px; }
 
-/* Persistent description-language hint above the toolbar. */
+/* The languages' hint above the toolbar. */
 .storage-desclang-hint { margin: 0 0 14px; }
 
 /* Active-project badge in the admin header (general admin chrome — lives here

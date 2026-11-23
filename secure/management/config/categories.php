@@ -109,10 +109,10 @@ return [
     'privacy.manage' => [
         'scope' => 'project',
         'commands' => [
-            'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'setStorageDescLang',
+            'addStorageItem', 'editStorageItem', 'deleteStorageItem',
             'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy',
             'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyMapping', 'setPrivacyHost',
-            'setPrivacyDescLang', 'setPrivacyCookieSection', 'generatePrivacyPolicy', 'deletePrivacyPolicy',
+            'setPrivacyCookieSection', 'generatePrivacyPolicy', 'deletePrivacyPolicy',
         ],
     ],
 

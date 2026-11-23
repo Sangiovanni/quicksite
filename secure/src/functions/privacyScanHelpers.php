@@ -166,18 +166,22 @@ function privacyAuthSeed(): array {
 /**
  * Build the full privacy status report — the registry state joined with the live
  * API scan + coverage counts + the auth auto-seed + the cookie cross-link signal.
+ * The collected data's label and purpose are $lang's, as its pages show them ('' where
+ * it has none): $lang is one of the project's languages (the caller checks it), the
+ * project's default language when null.
  */
-function privacyBuildStatus(): array {
+function privacyBuildStatus(?string $lang = null): array {
+    require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
     $reg = loadPrivacyRegistry();
-    $descLang = privacyDescLang($reg);
+    $default = qs_project_default_language();
+    $lang = $lang ?? $default;
 
-    // Collected data resolved in the description language.
     $collected = [];
     foreach ($reg['collectedData'] as $id) {
         $collected[] = [
             'id'      => (string) $id,
-            'label'   => privacyDatumLabel((string) $id, $descLang) ?? '',
-            'purpose' => privacyDatumPurpose((string) $id, $descLang) ?? '',
+            'label'   => privacyDatumLabel((string) $id, $lang) ?? '',
+            'purpose' => privacyDatumPurpose((string) $id, $lang) ?? '',
         ];
     }
 
@@ -229,12 +233,16 @@ function privacyBuildStatus(): array {
     $cookieRouteExists = (is_string($cookieRoute) && trim($cookieRoute, '/') !== '')
         ? consentRouteExists($cookieRoute) : false;
 
-    $languages = array_values(array_filter(qs_project_language_codes(), fn($l) => $l !== 'default'));
-    if (empty($languages)) $languages = [$descLang];
+    $languages = array_values(array_unique(array_filter(qs_project_language_codes(), fn($l) => $l !== 'default')));
+    if (empty($languages)) $languages = [$default];
+    $names = [];
+    foreach ($languages as $code) $names[$code] = qs_language_label($code);
 
     return [
-        'descLang'      => $descLang,
-        'languages'     => $languages,
+        'lang'            => $lang,
+        'defaultLanguage' => $default,
+        'languages'       => $languages,
+        'languageNames'   => $names,
         'collectedData' => $collected,
         'hosts'         => $hostsOut,
         'endpoints'     => $epOut,

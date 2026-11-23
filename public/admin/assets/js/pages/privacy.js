@@ -4,6 +4,17 @@
  * edits it: collected data, host classification, field mapping, the policy page
  * and its cookie section.
  *
+ * A datum's label and purpose are each language's own words. The page shows one
+ * language at a time, the panel's editing language (QSSiteWords.editingLanguage() /
+ * rememberLanguage(), shared with the editor and the Translations page): the top
+ * selector and the datum dialog's picker choose it, in step. Each of the project's
+ * languages is read with getPrivacyStatus' `lang`; a save writes the languages
+ * edited and only them, one setCollectedDatum each.
+ *
+ * Every control that sends a command carries that command's role mark
+ * (data-requires-command), filtered once the role is known. The dialogs are the
+ * panel's one modal (QuickSiteUtils.openModal()), each with its × at the top right.
+ *
  * Built with createElement + textContent + named _render* helpers per the
  * CLAUDE.md HTML-in-JS hygiene rule (no innerHTML string-glueing). Styling lives
  * in public/admin/assets/css/privacy-admin.css. Mirrors storage.js.
@@ -11,12 +22,16 @@
 (function () {
     'use strict';
 
+    // Until the status answers: the project's languages come from getPrivacyStatus.
     var DEFAULT_LANG = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.defaultLang) || 'en';
 
     var state = {
         status: null,
-        descLang: DEFAULT_LANG,
-        languages: [DEFAULT_LANG],
+        languages: [DEFAULT_LANG],     // the PROJECT's languages, never the panel's
+        languageNames: {},             // {code: name}, as getPrivacyStatus names them
+        defaultLanguage: DEFAULT_LANG,
+        lang: DEFAULT_LANG,            // the language the page shows (the editing language)
+        words: {},                     // {code: {id: {label, purpose}}}: each language read, as its pages show it
     };
 
     // The words of this page's dialogs and error toasts: window.QS_PRIVACY_I18N, the `privacy` translations
@@ -47,6 +62,68 @@
             return Promise.reject(new Error('QuickSiteAdmin not available'));
         }
         return adminApi.apiRequest(cmd, method, body);
+    }
+
+    /** A refusal in the server's own words (QSSiteWords.serverWords()), else its message. */
+    function _serverWords(r, fallback) {
+        if (window.QSSiteWords && typeof window.QSSiteWords.serverWords === 'function' && r && r.data) {
+            return window.QSSiteWords.serverWords(r);
+        }
+        return (r && r.data && r.data.message) || fallback;
+    }
+
+    /** The role mark of the command a control sends: the panel's filter hides it from a role without it. */
+    function _mark(el, command) {
+        el.setAttribute('data-requires-command', command);
+        return el;
+    }
+
+    /** Hide, under `root`, every control whose command the role cannot run. */
+    function _filterControls(root) {
+        if (root && window.QuickSiteAdmin && typeof window.QuickSiteAdmin.filterByPermissions === 'function') {
+            window.QuickSiteAdmin.filterByPermissions(root);
+        }
+    }
+
+    function _canRun(command) {
+        return !!(window.QuickSiteAdmin && typeof window.QuickSiteAdmin.canRun === 'function' && window.QuickSiteAdmin.canRun(command));
+    }
+
+    function multilingual() { return state.languages.length > 1; }
+
+    /** A language as the selectors name it: its name and its code. */
+    function langLabel(code) {
+        var name = state.languageNames[code];
+        return name && name !== code ? name + ' (' + code + ')' : code;
+    }
+    function langName(code) { return state.languageNames[code] || code; }
+
+    /** The project's languages as a select, `selected` chosen. */
+    function _renderLanguageSelect(selected) {
+        var sel = QSDom.el('select', { class: 'admin-input' });
+        state.languages.forEach(function (code) {
+            var o = QSDom.el('option', { value: code, text: langLabel(code) });
+            if (code === selected) o.selected = true;
+            sel.appendChild(o);
+        });
+        return sel;
+    }
+
+    /** Show the page in a language and remember it as the editing language: the cards and the top selector follow. */
+    function setLanguage(code) {
+        if (state.languages.indexOf(code) === -1) return;
+        state.lang = code;
+        if (window.QSSiteWords && typeof window.QSSiteWords.rememberLanguage === 'function') {
+            window.QSSiteWords.rememberLanguage(code);
+        }
+        render();
+    }
+
+    /** What a language says now for a datum ({label, purpose}), or null when that language could not be read. */
+    function storedWords(id, code) {
+        var words = state.words[code];
+        if (!words) return null;
+        return Object.prototype.hasOwnProperty.call(words, id) ? words[id] : { label: '', purpose: '' };
     }
 
     function _pill(text, kind) {
@@ -102,16 +179,6 @@
     var ICON_EDIT = 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z';
     var ICON_TRASH = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2';
 
-    function _renderSelect(options, selected) {
-        var sel = QSDom.el('select', { class: 'admin-input' });
-        options.forEach(function (opt) {
-            var o = QSDom.el('option', { value: opt, text: opt });
-            if (opt === selected) o.selected = true;
-            sel.appendChild(o);
-        });
-        return sel;
-    }
-
     function _iconBtn(pathD, label, onClick) {
         var b = QSDom.el('button', { class: 'admin-btn admin-btn--ghost privacy-collected__action', 'aria-label': label, title: label, type: 'button', onclick: onClick });
         b.appendChild(_svgIcon(pathD));
@@ -125,14 +192,16 @@
         head.appendChild(QSDom.el('span', { class: 'privacy-section__count', text: String(list.length) }));
 
         var actions = QSDom.el('div', { class: 'privacy-section__actions' });
-        if (state.languages.length > 1) {
-            actions.appendChild(QSDom.el('span', { class: 'privacy-desclang__label', text: 'Language:' }));
-            var langSel = _renderSelect(state.languages, state.descLang);
+        if (multilingual()) {
+            // The language the cards show, in step with the datum dialog's picker. Changing it moves nothing.
+            actions.appendChild(QSDom.el('label', { class: 'privacy-desclang__label', for: 'privacy-shown-language', text: t('privacy.languages.shownIn') }));
+            var langSel = _renderLanguageSelect(state.lang);
+            langSel.id = 'privacy-shown-language';
             langSel.classList.add('privacy-desclang__select');
-            langSel.addEventListener('change', function () { onDescLangChange(langSel); });
+            langSel.addEventListener('change', function () { setLanguage(langSel.value); });
             actions.appendChild(langSel);
         }
-        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', onclick: function () { openDatumModal(null); } }));
+        actions.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', onclick: function () { openDatumModal(null); } }), 'setCollectedDatum'));
         head.appendChild(actions);
         s.appendChild(head);
 
@@ -143,13 +212,10 @@
         var wrap = QSDom.el('div', { class: 'privacy-collected' });
         list.forEach(function (d) {
             var card = QSDom.el('div', { class: 'privacy-collected__card' });
-            var body = QSDom.el('div', { class: 'privacy-collected__body' });
-            body.appendChild(QSDom.el('span', { class: 'privacy-collected__label', text: d.label || d.id }));
-            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose', text: d.purpose || '—' }));
-            card.appendChild(body);
+            card.appendChild(_renderDatumWords(d));
             var acts = QSDom.el('div', { class: 'privacy-collected__actions' });
-            acts.appendChild(_iconBtn(ICON_EDIT, 'Edit', function () { openDatumModal(d); }));
-            acts.appendChild(_iconBtn(ICON_TRASH, 'Delete', function () { onDeleteDatum(d); }));
+            acts.appendChild(_mark(_iconBtn(ICON_EDIT, 'Edit', function () { openDatumModal(d); }), 'setCollectedDatum'));
+            acts.appendChild(_mark(_iconBtn(ICON_TRASH, 'Delete', function () { onDeleteDatum(d); }), 'deleteCollectedDatum'));
             card.appendChild(acts);
             wrap.appendChild(card);
         });
@@ -157,125 +223,248 @@
         return s;
     }
 
-    // ---- collected-data modal + actions -----------------------------------
-
-    function closeModal() {
-        var root = document.getElementById('privacy-modal-root');
-        if (root) root.textContent = '';
+    /** A card's words in the language shown: its label (the id when that language has none) and its purpose. */
+    function _renderDatumWords(d) {
+        var words = storedWords(d.id, state.lang);
+        var name = langName(state.lang);
+        var body = QSDom.el('div', { class: 'privacy-collected__body' });
+        body.appendChild(QSDom.el('span', { class: 'privacy-collected__label', text: (words && words.label) || d.id }));
+        if (words === null) {
+            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose privacy-collected__purpose--none', text: t('privacy.languages.unread', { language: name }) }));
+            return body;
+        }
+        if (!words.label && multilingual()) {
+            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose privacy-collected__purpose--none', text: t('privacy.languages.noLabelIn', { language: name }) }));
+        }
+        body.appendChild(QSDom.el('span', {
+            class: 'privacy-collected__purpose' + (words.purpose ? '' : ' privacy-collected__purpose--none'),
+            text: words.purpose || (multilingual() ? t('privacy.languages.noPurposeIn', { language: name }) : '—'),
+        }));
+        return body;
     }
 
+    // ---- collected-data modal + actions -----------------------------------
+
+    /**
+     * A dialog in the panel's one modal (QuickSiteUtils.openModal): its title with the × at the top right, its
+     * fields, the error line and Cancel / the action. opts.save() answers true to close, else shows its error and
+     * keeps the dialog open. Answers {modal, close, error(text)}.
+     */
+    function _openDialog(opts) {
+        var id = 'privacy-dialog-' + Date.now();
+        var errorLine = QSDom.el('p', { class: 'privacy-dialog__error', role: 'alert', hidden: 'hidden' });
+        var closeBtn = QSDom.el('button', {
+            type: 'button', class: 'admin-modal__close', text: '×',
+            'aria-label': QuickSiteUtils.tCommon('close'), title: QuickSiteUtils.tCommon('close'),
+        });
+        var cancelBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', text: 'Cancel' });
+        var saveBtn = _mark(QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary', text: opts.action }), opts.command);
+        var modal = QSDom.el('div', {
+            class: 'admin-modal-dialog privacy-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id,
+        }, [
+            QSDom.el('div', { class: 'privacy-dialog__header' }, [
+                QSDom.el('h2', { class: 'admin-modal-dialog__title privacy-dialog__title', id: id, text: opts.title }),
+                closeBtn,
+            ]),
+            QSDom.el('div', { class: 'privacy-dialog__body' }, opts.body.concat([errorLine])),
+            QSDom.el('div', { class: 'privacy-dialog__actions' }, [cancelBtn, saveBtn]),
+        ]);
+        var shown = null;
+        var close = function () {
+            if (!shown) return;
+            var s = shown;
+            shown = null;
+            s.close();
+        };
+        var error = function (text) {
+            errorLine.textContent = text || '';
+            errorLine.hidden = !text;
+            if (text && typeof errorLine.scrollIntoView === 'function') errorLine.scrollIntoView({ block: 'nearest' });
+        };
+        closeBtn.addEventListener('click', close);
+        cancelBtn.addEventListener('click', close);
+        saveBtn.addEventListener('click', async function () {
+            error('');
+            saveBtn.disabled = true;
+            var done = false;
+            try {
+                done = await opts.save(error);
+            } catch (e) {
+                error((e && e.message) || t('privacy.errors.network'));
+            }
+            saveBtn.disabled = false;
+            if (done) close();
+        });
+        _filterControls(modal);
+        shown = QuickSiteUtils.openModal(modal, {
+            focusable: function () {
+                return [closeBtn].concat(Array.prototype.slice.call(modal.querySelectorAll('input, select'))
+                    .filter(function (el) { return !el.disabled && el.offsetParent !== null; }), [cancelBtn, saveBtn]);
+            },
+            first: opts.first || saveBtn,
+            dismiss: close,
+        });
+        return { modal: modal, close: close, error: error };
+    }
+
+    /** A labelled field: `control` (the input, or a row holding it), its label naming `input`. */
+    function _renderField(labelText, input, control) {
+        var id = 'privacy-field-' + Math.random().toString(36).slice(2, 10);
+        input.id = id;
+        return QSDom.el('div', { class: 'admin-form-group privacy-dialog__field' }, [
+            QSDom.el('label', { class: 'admin-label', for: id, text: labelText }), control || input,
+        ]);
+    }
+
+    /**
+     * The datum dialog: the label and the purpose in one language at a time, the project's languages in one picker
+     * beside the label (a project of two or more, a role that runs setCollectedDatum), which moves the page's
+     * language with it; what was typed in a language is kept while another shows, until Save. Save writes each
+     * language edited (one setCollectedDatum each, a label required in each); a language not edited keeps its words.
+     */
     function openDatumModal(datum, opts) {
         opts = opts || {};
         var isEdit = !!datum;
-        var root = document.getElementById('privacy-modal-root');
-        if (!root) return;
-        root.textContent = '';
+        var drafts = {};   // {code: {label, purpose}}
+        var shown = state.lang;
+        var stored = function (code) { return isEdit ? storedWords(datum.id, code) : { label: '', purpose: '' }; };
+        if (!isEdit && opts.prefillLabel) drafts[shown] = { label: opts.prefillLabel, purpose: '' };
 
-        var backdrop = QSDom.el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
-        var dialog = QSDom.el('div', { class: 'privacy-modal-dialog' });
-        dialog.appendChild(QSDom.el('h2', { class: 'privacy-modal__title', text: isEdit ? 'Edit data collected' : 'Add data collected' }));
+        var labelInput = QSDom.el('input', { type: 'text', class: 'admin-input privacy-dialog__label-input', autocomplete: 'off', placeholder: 'e.g. Email address' });
+        var purposeInput = QSDom.el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'What you do with it' });
+        var purposeField = _renderField('', purposeInput);
+        var purposeLabel = purposeField.querySelector('label');
+        var hint = QSDom.el('p', { class: 'admin-hint' });
 
-        var labelInput = QSDom.el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'e.g. Email address', value: isEdit ? (datum.label || '') : (opts.prefillLabel || '') });
-        dialog.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Label (' + state.descLang + ')' }));
-        dialog.appendChild(labelInput);
+        function remember() { drafts[shown] = { label: labelInput.value, purpose: purposeInput.value }; }
+        function showLanguage(code) {
+            shown = code;
+            var words = stored(code);
+            var draft = Object.prototype.hasOwnProperty.call(drafts, code) ? drafts[code] : null;
+            labelInput.disabled = purposeInput.disabled = words === null && draft === null;
+            labelInput.value = draft ? draft.label : ((words && words.label) || '');
+            purposeInput.value = draft ? draft.purpose : ((words && words.purpose) || '');
+            purposeLabel.textContent = multilingual()
+                ? t('privacy.languages.purposeIn', { language: langName(code) }) : t('privacy.languages.purpose');
+            hint.textContent = words === null ? t('privacy.languages.unread', { language: langName(code) })
+                : (isEdit ? 'Editing is live — no regenerate needed.' : 'A stable id is derived from the label; the label stays editable afterwards.');
+        }
+        labelInput.addEventListener('input', remember);
+        purposeInput.addEventListener('input', remember);
 
-        var purposeInput = QSDom.el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'What you do with it', value: isEdit ? (datum.purpose || '') : '' });
-        dialog.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Purpose (' + state.descLang + ')' }));
-        dialog.appendChild(purposeInput);
-        dialog.appendChild(QSDom.el('p', { class: 'admin-hint', text: isEdit ? 'Editing is live — no regenerate needed.' : 'A stable id is derived from the label; the label stays editable afterwards.' }));
+        var labelRow = QSDom.el('div', { class: 'privacy-dialog__row' });
+        var picker = null;
+        if (multilingual() && _canRun('setCollectedDatum')) {
+            picker = _mark(_renderLanguageSelect(shown), 'setCollectedDatum');
+            picker.classList.add('privacy-dialog__lang');
+            picker.setAttribute('aria-label', t('privacy.languages.language'));
+            picker.title = t('privacy.languages.language');
+            picker.addEventListener('change', function () {
+                remember();
+                showLanguage(picker.value);
+                setLanguage(picker.value);
+            });
+            labelRow.appendChild(picker);
+        }
+        labelRow.appendChild(labelInput);
+        // The label's field holds the picker and the input on one row.
+        var labelField = _renderField(t('privacy.languages.label'), labelInput, labelRow);
+        showLanguage(shown);
 
-        var errBox = QSDom.el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
-        dialog.appendChild(errBox);
-
-        var actions = QSDom.el('div', { class: 'privacy-modal__actions' });
-        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save' : 'Add' });
-        actions.appendChild(saveBtn);
-        dialog.appendChild(actions);
-
-        saveBtn.addEventListener('click', async function () {
-            errBox.hidden = true; errBox.textContent = '';
-            var label = labelInput.value.trim();
-            if (!label) { errBox.hidden = false; errBox.textContent = 'A label is required.'; return; }
-            var id = isEdit ? datum.id : _slug(label);
-            if (!id) { errBox.hidden = false; errBox.textContent = 'Could not derive an id from that label — use letters or numbers.'; return; }
-            saveBtn.disabled = true;
-            try {
-                var r = await api('setCollectedDatum', 'POST', { id: id, label: label, purpose: purposeInput.value.trim() });
-                if (!r || !r.ok) {
-                    errBox.hidden = false; errBox.textContent = (r && r.data && r.data.message) || 'Save failed'; saveBtn.disabled = false; return;
+        /** The writes a save makes, {lang, label, purpose} each, or a refusal's words. */
+        function plan() {
+            remember();
+            var writes = [];
+            var codes = Object.keys(drafts);
+            for (var i = 0; i < codes.length; i++) {
+                var code = codes[i];
+                var label = String(drafts[code].label).trim();
+                var purpose = String(drafts[code].purpose).trim();
+                var words = stored(code);
+                if (words === null) continue;
+                if (isEdit ? (label === String(words.label || '').trim() && purpose === String(words.purpose || '').trim())
+                    : (label === '' && purpose === '')) continue;
+                if (label === '') {
+                    return { refused: multilingual() ? t('privacy.languages.labelRequiredIn', { language: langName(code) }) : 'A label is required.', lang: code };
                 }
-                closeModal();
+                writes.push({ lang: code, label: label, purpose: purpose });
+            }
+            if (!isEdit && writes.length === 0) return { refused: 'A label is required.', lang: shown };
+            // The default language first: a new datum's id comes from its label there when it has one.
+            writes.sort(function (a, b) { return (a.lang === state.defaultLanguage ? 0 : 1) - (b.lang === state.defaultLanguage ? 0 : 1); });
+            return { writes: writes };
+        }
+
+        _openDialog({
+            title: isEdit ? 'Edit data collected' : 'Add data collected',
+            action: isEdit ? 'Save' : 'Add',
+            command: 'setCollectedDatum',
+            body: [labelField, purposeField, hint],
+            first: labelInput,
+            save: async function (error) {
+                var p = plan();
+                if (p.refused) {
+                    if (p.lang !== shown && picker) { picker.value = p.lang; showLanguage(p.lang); setLanguage(p.lang); }
+                    error(p.refused);
+                    return false;
+                }
+                var id = isEdit ? datum.id : _slug(p.writes[0].label);
+                if (!id) { error('Could not derive an id from that label — use letters or numbers.'); return false; }
+                for (var i = 0; i < p.writes.length; i++) {
+                    var w = p.writes[i];
+                    var r = await api('setCollectedDatum', 'POST', { id: id, label: w.label, purpose: w.purpose, lang: w.lang });
+                    if (!r || !r.ok) {
+                        var said = _serverWords(r, 'Save failed');
+                        error(multilingual() ? langName(w.lang) + ': ' + said : said);
+                        if (i > 0) await refresh(true);
+                        return false;
+                    }
+                }
                 if (typeof opts.afterSave === 'function') { await opts.afterSave(id); }
                 else { await refresh(); }
-            } catch (e) {
-                errBox.hidden = false; errBox.textContent = (e && e.message) || 'Network error'; saveBtn.disabled = false;
-            }
+                return true;
+            },
         });
-
-        backdrop.appendChild(dialog);
-        root.appendChild(backdrop);
-        labelInput.focus();
     }
 
     function openHostModal(h) {
-        var root = document.getElementById('privacy-modal-root');
-        if (!root) return;
-        root.textContent = '';
-        var backdrop = QSDom.el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
-        var dialog = QSDom.el('div', { class: 'privacy-modal-dialog' });
-        dialog.appendChild(QSDom.el('h2', { class: 'privacy-modal__title', text: 'Classify host' }));
-        dialog.appendChild(QSDom.el('code', { class: 'privacy-host__url', text: h.baseUrl }));
-
         var kind = h.kind || 'self';
-        var selfRadio = QSDom.el('input', { type: 'radio', name: 'privacy-host-kind', value: 'self' });
+        var name = 'privacy-host-kind-' + Date.now();
+        var selfRadio = QSDom.el('input', { type: 'radio', name: name, value: 'self' });
         if (kind === 'self') selfRadio.checked = true;
-        var selfLabel = QSDom.el('label', { class: 'privacy-radio' }, [selfRadio, ' A server you operate']);
-        var thirdRadio = QSDom.el('input', { type: 'radio', name: 'privacy-host-kind', value: 'third-party' });
+        var thirdRadio = QSDom.el('input', { type: 'radio', name: name, value: 'third-party' });
         if (kind === 'third-party') thirdRadio.checked = true;
-        var thirdLabel = QSDom.el('label', { class: 'privacy-radio' }, [thirdRadio, ' A third party']);
-        dialog.appendChild(selfLabel);
-        dialog.appendChild(thirdLabel);
-
-        var tpWrap = QSDom.el('div', { class: 'privacy-host-tp' });
         var nameInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'Name, e.g. Mailchimp', value: h.name || '' });
         var urlInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'https://…/privacy', value: h.privacyUrl || '' });
-        tpWrap.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Third-party name' }));
-        tpWrap.appendChild(nameInput);
-        tpWrap.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Privacy-policy URL' }));
-        tpWrap.appendChild(urlInput);
-        dialog.appendChild(tpWrap);
+        var tpWrap = QSDom.el('div', { class: 'privacy-host-tp' }, [
+            _renderField('Third-party name', nameInput),
+            _renderField('Privacy-policy URL', urlInput),
+        ]);
         function syncTp() { tpWrap.style.display = thirdRadio.checked ? '' : 'none'; }
         selfRadio.addEventListener('change', syncTp);
         thirdRadio.addEventListener('change', syncTp);
         syncTp();
-
-        var errBox = QSDom.el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
-        dialog.appendChild(errBox);
-        var actions = QSDom.el('div', { class: 'privacy-modal__actions' });
-        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Save' });
-        actions.appendChild(saveBtn);
-        dialog.appendChild(actions);
-
-        saveBtn.addEventListener('click', async function () {
-            errBox.hidden = true; errBox.textContent = '';
-            var k = thirdRadio.checked ? 'third-party' : 'self';
-            var body = { baseUrl: h.baseUrl, kind: k };
-            if (k === 'third-party') { body.name = nameInput.value.trim(); body.privacyUrl = urlInput.value.trim(); }
-            saveBtn.disabled = true;
-            try {
+        _openDialog({
+            title: 'Classify host',
+            action: 'Save',
+            command: 'setPrivacyHost',
+            body: [
+                QSDom.el('code', { class: 'privacy-host__url', text: h.baseUrl }),
+                QSDom.el('label', { class: 'privacy-radio' }, [selfRadio, ' A server you operate']),
+                QSDom.el('label', { class: 'privacy-radio' }, [thirdRadio, ' A third party']),
+                tpWrap,
+            ],
+            first: kind === 'third-party' ? thirdRadio : selfRadio,
+            save: async function (error) {
+                var k = thirdRadio.checked ? 'third-party' : 'self';
+                var body = { baseUrl: h.baseUrl, kind: k };
+                if (k === 'third-party') { body.name = nameInput.value.trim(); body.privacyUrl = urlInput.value.trim(); }
                 var r = await api('setPrivacyHost', 'POST', body);
-                if (!r || !r.ok) { errBox.hidden = false; errBox.textContent = (r && r.data && r.data.message) || 'Save failed'; saveBtn.disabled = false; return; }
-                closeModal();
+                if (!r || !r.ok) { error(_serverWords(r, 'Save failed')); return false; }
                 await refresh();
-            } catch (e) {
-                errBox.hidden = false; errBox.textContent = (e && e.message) || 'Network error'; saveBtn.disabled = false;
-            }
+                return true;
+            },
         });
-
-        backdrop.appendChild(dialog);
-        root.appendChild(backdrop);
     }
 
     async function onDeleteDatum(d) {
@@ -285,24 +474,6 @@
             if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.deleteFailed')); return; }
             await refresh();
         } catch (e) { showError((e && e.message) || t('privacy.errors.network')); }
-    }
-
-    async function onDescLangChange(sel) {
-        var target = sel.value, current = state.descLang;
-        if (target === current) return;
-        sel.disabled = true;
-        try {
-            var preview = await api('setPrivacyDescLang', 'POST', { lang: target });
-            var pdata = (preview && preview.data && (preview.data.data || preview.data)) || {};
-            var moved = pdata.moved || 0, overwrites = pdata.overwrites || 0;
-            var msg = t('privacy.dialogs.descLangChange', { from: current, to: target })
-                + '\n\n' + t(moved === 1 ? 'privacy.dialogs.descLangMovesOne' : 'privacy.dialogs.descLangMovesMany', { n: moved, to: target });
-            if (overwrites > 0) msg += '\n\n' + t(overwrites === 1 ? 'privacy.dialogs.descLangOverwritesOne' : 'privacy.dialogs.descLangOverwritesMany', { n: overwrites, to: target });
-            if (!(await QuickSiteUtils.confirm(msg, { type: overwrites > 0 ? 'danger' : 'warning' }))) { sel.value = current; sel.disabled = false; return; }
-            var done = await api('setPrivacyDescLang', 'POST', { lang: target, confirm: true });
-            if (!done || !done.ok) { sel.value = current; sel.disabled = false; showError((done && done.data && done.data.message) || t('privacy.errors.descLangFailed')); return; }
-            await refresh();
-        } catch (e) { sel.value = current; sel.disabled = false; console.warn('[privacy] descLang change failed:', e); }
     }
 
     // ---- atom -> datum mapping (click an atom chip) -----------------------
@@ -338,13 +509,14 @@
         if (currentDatum) {
             menu.appendChild(QSDom.el('button', { type: 'button', class: 'privacy-atom-menu__action', text: 'Unset', onclick: function () { _closeAtomMenu(); setMapping(endpoint, field, null); } }));
         }
-        menu.appendChild(QSDom.el('button', {
+        menu.appendChild(_mark(QSDom.el('button', {
             type: 'button', class: 'privacy-atom-menu__action privacy-atom-menu__action--new',
             text: '+ New data collected from this field',
             onclick: function () { _closeAtomMenu(); openDatumModal(null, { prefillLabel: field, afterSave: function (id) { return setMapping(endpoint, field, id); } }); },
-        }));
+        }), 'setCollectedDatum'));
 
         document.body.appendChild(menu);
+        _filterControls(menu);
         var rect = anchorEl.getBoundingClientRect();
         menu.style.position = 'fixed';
         menu.style.top = (rect.bottom + 4) + 'px';
@@ -379,11 +551,11 @@
             main.appendChild(kind);
             main.appendChild(QSDom.el('span', { class: 'privacy-host__apis', text: (h.apiIds || []).join(', ') }));
             row.appendChild(main);
-            row.appendChild(QSDom.el('button', {
+            row.appendChild(_mark(QSDom.el('button', {
                 class: 'admin-btn admin-btn--ghost privacy-host__classify', type: 'button',
                 text: h.kind ? 'Edit' : 'Classify',
                 onclick: function () { openHostModal(h); },
-            }));
+            }), 'setPrivacyHost'));
             wrap.appendChild(row);
         });
         return wrap;
@@ -406,16 +578,16 @@
 
             if (ep.fields && ep.fields.length) {
                 var atoms = QSDom.el('div', { class: 'privacy-endpoint__atoms' });
+                var mayMap = _canRun('setPrivacyMapping');
                 ep.fields.forEach(function (f) {
                     var mapped = f.datum != null;
-                    var chip = QSDom.el('button', {
-                        type: 'button',
-                        class: 'privacy-atom' + (mapped ? ' privacy-atom--mapped' : ' privacy-atom--unset'),
-                        title: 'Click to map',
-                    });
+                    var cls = 'privacy-atom' + (mapped ? ' privacy-atom--mapped' : ' privacy-atom--unset');
+                    var chip = mayMap
+                        ? QSDom.el('button', { type: 'button', class: cls, title: 'Click to map' })
+                        : QSDom.el('span', { class: cls + ' privacy-atom--static' });
                     chip.appendChild(QSDom.el('span', { class: 'privacy-atom__field', text: f.field }));
                     chip.appendChild(QSDom.el('span', { class: 'privacy-atom__datum', text: mapped ? '→ ' + f.datum : 'unset' }));
-                    chip.addEventListener('click', function () { openAtomMenu(ep.key, f.field, f.datum, chip); });
+                    if (mayMap) chip.addEventListener('click', function () { openAtomMenu(ep.key, f.field, f.datum, chip); });
                     atoms.appendChild(chip);
                 });
                 card.appendChild(atoms);
@@ -479,15 +651,15 @@
             routeRow.appendChild(QSDom.el('code', { class: 'privacy-host__url', text: s.privacyRoute }));
             sec.appendChild(routeRow);
             var acts = QSDom.el('div', { class: 'privacy-page-actions' });
-            acts.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Update', onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }));
-            acts.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Delete', onclick: onDeletePrivacy }));
+            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Update', onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }), 'generatePrivacyPolicy'));
+            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Delete', onclick: onDeletePrivacy }), 'deletePrivacyPolicy'));
             sec.appendChild(acts);
             sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).' }));
         } else {
             var input = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'e.g. privacy', value: s.privacyRoute ? String(s.privacyRoute).replace(/^\/+/, '') : '' });
             var gen = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate', onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { showError(t('privacy.errors.routeRequired')); return; } onGeneratePrivacy(r, false); } });
-            sec.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Page route' }));
-            sec.appendChild(QSDom.el('div', { class: 'privacy-page-gen' }, [input, gen]));
+            sec.appendChild(_mark(QSDom.el('label', { class: 'admin-label', text: 'Page route' }), 'generatePrivacyPolicy'));
+            sec.appendChild(_mark(QSDom.el('div', { class: 'privacy-page-gen' }, [input, gen]), 'generatePrivacyPolicy'));
             if (s.privacyRoute && !s.privacyRouteExists) {
                 sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'The previous route "' + s.privacyRoute + '" no longer exists — generate to recreate it.' }));
             }
@@ -496,7 +668,7 @@
         var cb = QSDom.el('input', { type: 'checkbox' });
         if (s.cookieSection === 'omit') cb.checked = true;
         cb.addEventListener('change', function () { onToggleCookieSection(cb.checked); });
-        sec.appendChild(QSDom.el('label', { class: 'privacy-radio privacy-cookie-toggle' }, [cb, ' Don’t mention cookies on this page']));
+        sec.appendChild(_mark(QSDom.el('label', { class: 'privacy-radio privacy-cookie-toggle' }, [cb, ' Don’t mention cookies on this page']), 'setPrivacyCookieSection'));
         sec.appendChild(_renderCookieNote(s));
         return sec;
     }
@@ -536,13 +708,13 @@
         }).catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
     }
 
+    /** The hint above the page: what a language's words are and where they show (multilingual projects only). */
     function renderHint() {
         var host = document.getElementById('privacy-desclang-hint');
         if (!host) return;
-        if (state.languages.length <= 1) { host.hidden = true; host.textContent = ''; return; }
+        if (!multilingual()) { host.hidden = true; host.textContent = ''; return; }
         host.hidden = false;
-        host.textContent = 'Collected-data descriptions are authored in your description language ("' + state.descLang
-            + '"). Other languages are translated with the visual-editor language tool.';
+        host.textContent = t('privacy.languages.hint');
     }
 
     function render() {
@@ -561,21 +733,52 @@
         root.appendChild(_section('API hosts', String(s.hosts.length), _renderHosts(s.hosts)));
         root.appendChild(_section('Detected sign-in', null, _renderAuthSeed(s.authSeed)));
         root.appendChild(_section('Endpoints sending data', String(s.endpoints.length), _renderEndpoints(s.endpoints)));
+        _filterControls(root);
     }
 
-    async function refresh() {
+    /** One language's status, or null when the read failed. */
+    async function _readLanguage(code) {
         try {
-            var r = await api('getPrivacyStatus', 'POST');
-            var payload = (r && r.data && (r.data.data || r.data)) || null;
-            state.status = payload;
-            if (payload) {
-                if (typeof payload.descLang === 'string' && payload.descLang) state.descLang = payload.descLang;
-                if (Array.isArray(payload.languages) && payload.languages.length) state.languages = payload.languages;
-            }
+            var r = await api('getPrivacyStatus', 'POST', code ? { lang: code } : {});
+            var payload = r && r.ok && r.data && (r.data.data || r.data);
+            return payload && Array.isArray(payload.collectedData) ? payload : null;
         } catch (e) {
             console.warn('[privacy] load failed:', e);
-            state.status = null;
+            return null;
         }
+    }
+
+    /** {id: {label, purpose}} of one language's status. */
+    function _wordsOf(status) {
+        var out = {};
+        status.collectedData.forEach(function (d) { out[d.id] = { label: d.label || '', purpose: d.purpose || '' }; });
+        return out;
+    }
+
+    /**
+     * Read the status: in the project's default language first (everything the page shows, and the project's
+     * languages), then each other language's collected-data words. The page shows the editing language.
+     * `wordsOnly`: the status is kept, only the words are read again (a save stopped half-way).
+     */
+    async function refresh(wordsOnly) {
+        // The controls drawn depend on the role: wait for it, as every page that draws them does.
+        try { await (QuickSiteAdmin.permissionsReady || Promise.resolve()); } catch (e) { /* drawn as a role without them */ }
+        var first = await _readLanguage(null);
+        if (!wordsOnly || first) state.status = first;
+        state.words = {};
+        if (first) {
+            if (Array.isArray(first.languages) && first.languages.length) state.languages = first.languages;
+            if (first.languageNames && typeof first.languageNames === 'object') state.languageNames = first.languageNames;
+            var answered = typeof first.lang === 'string' && first.lang ? first.lang : state.languages[0];
+            state.defaultLanguage = typeof first.defaultLanguage === 'string' && first.defaultLanguage ? first.defaultLanguage : answered;
+            state.words[answered] = _wordsOf(first);
+            var others = state.languages.filter(function (code) { return code !== answered; });
+            var reads = await Promise.all(others.map(function (code) { return _readLanguage(code); }));
+            reads.forEach(function (read, i) { if (read) state.words[others[i]] = _wordsOf(read); });
+        }
+        var remembered = window.QSSiteWords && typeof window.QSSiteWords.editingLanguage === 'function'
+            ? window.QSSiteWords.editingLanguage(state.languages, state.defaultLanguage) : state.defaultLanguage;
+        state.lang = state.languages.indexOf(remembered) !== -1 ? remembered : state.defaultLanguage;
         render();
         renderHint();
     }

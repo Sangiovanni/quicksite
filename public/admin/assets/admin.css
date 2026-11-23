@@ -1429,8 +1429,7 @@ kbd {
 .sitemap-edit-title-modal,
 .sitemap-resolver-modal,
 .sitemap-resolver-list-modal,
-.storage-modal-backdrop,
-.privacy-modal-backdrop {
+.storage-modal-backdrop {
     box-sizing: border-box;
     max-width: 100vw;
     max-height: 100vh;

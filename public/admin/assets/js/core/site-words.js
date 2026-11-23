@@ -54,8 +54,7 @@ window.QSSiteWords = (function () {
         'deleteCollectedDatum', 'deleteLang', 'deleteNode', 'deleteStorageItem', 'deleteTranslationKeys',
         'duplicateNode', 'editNode', 'editStorageItem', 'editTitle', 'generateConsentLayer', 'generateCookiePolicy',
         'generatePrivacyPolicy', 'importStructureTranslations', 'insertSnippet', 'setCollectedDatum',
-        'setDefaultLang', 'setPrivacyDescLang', 'setSocialPreview', 'setStorageDescLang',
-        'setTranslationKeys',
+        'setDefaultLang', 'setSocialPreview', 'setTranslationKeys',
     ]);
     const LANGUAGE_COMMANDS = Object.freeze(['addLang', 'deleteLang', 'setDefaultLang']);
 

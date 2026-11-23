@@ -11,7 +11,9 @@
  *     "id":          "authToken",                      required (the key name)
  *     "scope":       "localStorage|sessionStorage|cookie", required
  *     "category":    "essential|functional|analytics|marketing", required
- *     "description": { "en": "..." },                  optional (translatable)
+ *     "description": { "en": "..." },                  optional: each language's word,
+ *                                                       every language one of the project's;
+ *                                                       a plain string is the default language's
  *     "retention":   "session" | "30d" | "1y" | "...", optional
  *     // cookie scope only:
  *     "domain": "auto", "path": "/", "secure": true, "sameSite": "Lax"
@@ -74,20 +76,23 @@ if (!saveStorageRegistry($registry)) {
         ->send();
 }
 
-// Persist the description (if any) into translate/, keyed — not inline. A
-// refused write takes back the registry above too, and every word written.
-if (!empty($result['description'])) {
-    $refused = storageWriteDescription($id, $result['description']);
+// Persist the description (if any) into translate/, keyed — not inline: each
+// language named gets its word (an empty text is no word). A refused write takes
+// back the registry above too, and every word written.
+$description = array_filter($result['description'] ?? [], fn($t) => $t !== '');
+if (!empty($description)) {
+    $refused = storageWriteDescription($id, $description);
     if ($refused !== null) {
         qs_translation_write_refusal_response($refused)->send();
     }
 }
+qs_small_write_send_refusal();
 
 $stored = $result['item'];
 $stored['id'] = $id;
 $stored['consentRequired'] = storageConsentRequired($result['item']);
-if (!empty($result['description'])) {
-    $stored['description'] = $result['description']; // echo for the admin card
+if (!empty($description)) {
+    $stored['description'] = $description; // echo for the admin card
 }
 
 ApiResponse::create(201, 'storage.created')
