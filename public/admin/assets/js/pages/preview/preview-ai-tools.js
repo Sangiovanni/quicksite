@@ -4109,30 +4109,9 @@ window.PreviewAiTools = (function () {
         return /^(https?:)?\/\//i.test(String(address).trim());
     }
 
-    /** The files of a srcset, split as the HTML standard splits one (its descriptors left out). */
+    /** The files of a srcset (their descriptors left out), split as the engine splits one: QSSrcset, core/srcset.js. */
     function _srcsetFiles(value) {
-        var s = String(value);
-        var files = [];
-        var i = 0;
-        while (i < s.length) {
-            while (i < s.length && /[\s,]/.test(s.charAt(i))) i++;
-            if (i >= s.length) break;
-            var start = i;
-            while (i < s.length && !/\s/.test(s.charAt(i))) i++;
-            var file = s.slice(start, i);
-            var ended = /,$/.test(file);
-            file = file.replace(/,+$/, '');
-            if (file) files.push(file);
-            if (ended) continue;
-            var depth = 0;
-            while (i < s.length) {
-                var c = s.charAt(i++);
-                if (c === '(') depth++;
-                else if (c === ')') depth = Math.max(0, depth - 1);
-                else if (c === ',' && depth === 0) break;
-            }
-        }
-        return files;
+        return QSSrcset.candidates(value).map(function (c) { return c.address; });
     }
 
     /** The addresses of a stylesheet text's url(…). */

@@ -5527,9 +5527,14 @@
         // For <input> the wizard uses 'type' + always-rendered 'name' as
         // mandatory, even though MANDATORY_PARAMS['input'] only lists 'type'.
         if (tag === 'input') mandatorySet.add('name');
+        // A group's choice follows what the node holds; then a field opens on it and takes its parameters (a srcset, and
+        // sizes / type where it shows them)
+        _openOneOfChoices(params);
+        const takenByFields = new Set(_openParamFields(params, tag));
 
         Object.keys(params).forEach(key => {
             const value = params[key];
+            if (takenByFields.has(key)) return;
             if (transKeyPickers[key]) {
                 // alt / title — the key picker owns this param in BOTH flows,
                 // so editing an existing value uses the same widget that
@@ -5592,6 +5597,7 @@
      *  - class combobox flushed + read into `class` (omitted if empty)
      *  - mandatory widgets read by id pattern (omitted if empty)
      *  - custom rows: empty key OR empty value → row is ignored
+     *  - the fields (a srcset's) answer their own parameters, read last
      *
      * Empty-value === "I don't want this attr set" — to actually keep an
      * attr with empty string the user has to type a single space (HTML
@@ -5607,9 +5613,8 @@
         const classes = (addClassInput?.value || '').trim();
         if (classes) params.class = classes;
 
-        // Mandatory params (per-tag widgets keyed by id "add-mandatory-<name>")
-        const mandatoryFields = addMandatoryParamsContainer?.querySelectorAll('input, select') || [];
-        mandatoryFields.forEach(field => {
+        // Mandatory params (per-tag widgets keyed by id "add-mandatory-<name>"; a field's own inputs left out)
+        _mandatoryParamInputs().forEach(field => {
             const name = field.id.replace('add-mandatory-', '');
             const value = (field.value || '').trim();
             if (value) params[name] = value;
@@ -5625,6 +5630,9 @@
             const value = row.querySelector('.preview-contextual-form__param-value')?.value?.trim();
             if (key && value) params[key] = value;
         });
+
+        // The fields: what the node held, byte for byte, while nothing in them changed
+        Object.assign(params, _paramFieldParams());
 
         return params;
     }
@@ -5694,6 +5702,10 @@
         if (!structInfo || !structInfo.type) {
             throw new Error('Invalid structure type');
         }
+
+        // A group with nothing chosen, or a field's problem (a duplicate, a width missing…), is never saved: said there and here
+        const fieldProblem = _paramFieldProblem();
+        if (fieldProblem) throw new Error(fieldProblem);
 
         const currentParams = _collectEditFormParams();
         const { addParams, removeParams } = _diffParams(contextualAddOriginalParams, currentParams);
@@ -5822,6 +5834,8 @@
     // Update mandatory params based on selected tag
     function updateSidebarAddMandatoryParams() {
         if (!addMandatoryParams || !addMandatoryParamsContainer) return;
+        // The fields drawn for the last tag go with its rows.
+        _destroyParamFields();
         
         const tag = addTagSelect?.value;
         const mandatoryParams = TAG_INFO?.MANDATORY_PARAMS?.[tag] || [];
@@ -5845,31 +5859,243 @@
         }
         // --------------------------------------------------------------
 
-        const rows = mandatoryParams.map(param => ({ param: param, group: null }));
-        oneOfGroups.forEach(group => group.forEach(param => rows.push({ param: param, group: group })));
-        rows.forEach(({ param, group }) => {
-            const showBrowse = param === 'src' && tag in ASSET_BROWSABLE_TAGS;
-            const showRouteList = param === 'href' && tag === 'a';
-            const datalistId = showRouteList ? 'add-mandatory-href-routes' : '';
-            const placeholder = group ? PreviewConfig.i18n.oneOfParams.replace('{params}', group.join(', '))
-                : (showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : (PreviewConfig.i18n.required || 'Required'));
-            const row = _renderParamRow(param, {
-                id: 'add-mandatory-' + param,
-                placeholder: placeholder
-            }, showBrowse ? (ASSET_BROWSABLE_TAGS[tag] || '') : null, datalistId);
-            addMandatoryParamsContainer.appendChild(row);
-            
-            if (showBrowse) {
-                row.querySelector('.preview-asset-browse-btn').addEventListener('click', () => {
-                    openAssetPicker(row.querySelector(`#add-mandatory-${param}`), ASSET_BROWSABLE_TAGS[tag]);
-                });
-            }
-            
-            // Populate route datalist for href
-            if (showRouteList) {
-                populateRouteDatalist(datalistId);
-            }
+        // A group the tag needs one param of (a <source>: src or srcset) comes first: a choice, then the chosen one's row
+        oneOfGroups.forEach(group => _renderOneOfGroup(tag, group));
+        mandatoryParams.forEach(param => _appendMandatoryRow(tag, param, false));
+
+        // A tag that may carry a srcset of its own (an <img>) offers its field under its rows
+        if (SRCSET_OPTIONAL_TAGS.includes(tag)) addMandatoryParamsContainer.appendChild(_renderSrcsetOffer(tag));
+    }
+
+    /**
+     * One row of the parameters box, appended: a srcset's field, or a text box (with Media's button for a file, the site's
+     * routes for a link). inGroup: one param of a group the tag needs one of. Returns the row.
+     */
+    function _appendMandatoryRow(tag, param, inGroup) {
+        // A srcset is a field of rows (a picture and its descriptor each), not a text box
+        if (param === 'srcset') return addMandatoryParamsContainer.appendChild(_renderSrcsetFieldRow(tag, false, null));
+        const showBrowse = param === 'src' && tag in ASSET_BROWSABLE_TAGS;
+        const showRouteList = param === 'href' && tag === 'a';
+        const datalistId = showRouteList ? 'add-mandatory-href-routes' : '';
+        const placeholder = (inGroup || !showRouteList) ? (PreviewConfig.i18n.required || 'Required')
+            : (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL');
+        const row = _renderParamRow(param, {
+            id: 'add-mandatory-' + param,
+            placeholder: placeholder
+        }, showBrowse ? (ASSET_BROWSABLE_TAGS[tag] || '') : null, datalistId);
+        addMandatoryParamsContainer.appendChild(row);
+        if (showBrowse) {
+            row.querySelector('.preview-asset-browse-btn').addEventListener('click', () => {
+                openAssetPicker(row.querySelector(`#add-mandatory-${param}`), ASSET_BROWSABLE_TAGS[tag]);
+            });
+        }
+        // Populate route datalist for href (once the row is in the page, where the list is found by its id)
+        if (showRouteList) {
+            populateRouteDatalist(datalistId);
+        }
+        return row;
+    }
+
+    // ---- A group the tag needs one param of ------------------------
+    // A <source> names its file by src (in a <video> or an <audio>) or by srcset (in a <picture>), and HTML lets it hold one,
+    // never both. So the box asks which first: a choice at its top, none made, then the chosen param's row alone. A row not
+    // chosen is no parameter: it carries data-one-of-off, which the box's read and the fields' read leave out.
+
+    /** Words under a group's choice, per tag: which param goes where. */
+    const ONE_OF_HINTS = {
+        source: () => PreviewConfig.i18n.oneOfHintSource
+    };
+
+    /** The groups' choices drawn in the box: { group, rows, radios, row, both, state } (state: a param, 'all' or null). */
+    let oneOfChoices = [];
+
+    /** A group's choice and its params' rows, appended to the box, none chosen. */
+    function _renderOneOfGroup(tag, group) {
+        const name = 'add-oneof-' + oneOfChoices.length;
+        const words = PreviewConfig.i18n.oneOfParams.replace('{params}', group.join(', '));
+        const radios = {};
+        const choices = QSDom.el('div', { class: 'preview-oneof__choices', role: 'radiogroup', 'aria-label': words });
+        group.forEach(param => {
+            const radio = QSDom.el('input', { type: 'radio', name: name, value: param });
+            radios[param] = radio;
+            choices.appendChild(QSDom.el('label', { class: 'preview-oneof__choice' }, [radio, QSDom.el('span', { text: param })]));
         });
+        const hint = ONE_OF_HINTS[tag] ? ONE_OF_HINTS[tag]() : '';
+        const both = QSDom.el('small', { class: 'preview-oneof__both', text: PreviewConfig.i18n.oneOfBoth, hidden: '' });
+        const row = QSDom.el('div', { class: 'preview-contextual-form__param-row preview-oneof', 'data-param-field': 'one-of' }, [
+            QSDom.el('span', { class: 'preview-contextual-form__param-label' }, [
+                words,
+                QSDom.el('span', { class: 'preview-contextual-form__param-required', text: '*' })
+            ]),
+            choices,
+            hint ? QSDom.el('small', { class: 'preview-contextual-form__param-hint', text: hint }) : null,
+            both
+        ]);
+        addMandatoryParamsContainer.appendChild(row);
+        const rows = {};
+        group.forEach(param => { rows[param] = _appendMandatoryRow(tag, param, true); });
+        const choice = { group: group, rows: rows, radios: radios, row: row, both: both, state: null };
+        choices.addEventListener('change', (e) => {
+            if (e.target && group.includes(e.target.value)) _chooseOneOf(choice, e.target.value);
+        });
+        oneOfChoices.push(choice);
+        _chooseOneOf(choice, null);
+    }
+
+    /** The group's state: one param's row shown (its radio checked), none ('' or null), or every row ('all', saying so). */
+    function _chooseOneOf(choice, state) {
+        choice.state = state || null;
+        choice.group.forEach(param => {
+            const on = state === 'all' || state === param;
+            choice.rows[param].hidden = !on;
+            if (on) choice.rows[param].removeAttribute('data-one-of-off');
+            else choice.rows[param].setAttribute('data-one-of-off', '');
+            choice.radios[param].checked = state === param;
+        });
+        choice.both.hidden = state !== 'all';
+        choice.row.classList.remove('preview-oneof--missing');
+    }
+
+    /** Edit Params: each group on what the element holds (one param, or every row when it holds several). */
+    function _openOneOfChoices(params) {
+        oneOfChoices.forEach(choice => {
+            const held = choice.group.filter(param => params[param] != null && String(params[param]) !== '');
+            _chooseOneOf(choice, held.length > 1 ? 'all' : (held[0] || null));
+        });
+    }
+
+    /** A group with nothing chosen, which stops a save (its choice outlined), or null. */
+    function _oneOfProblem() {
+        const open = oneOfChoices.find(choice => choice.state === null);
+        if (!open) return null;
+        open.row.classList.add('preview-oneof--missing');
+        return PreviewConfig.i18n.oneOfChoose.replace('{params}', open.group.join(', '));
+    }
+
+    // ---- A srcset's field ------------------------------------------
+    // A srcset is edited as rows, each a picture and its descriptor (PreviewSrcsetField, preview-srcset-field.js):
+    // on a <source>'s one-of row, and on the row an <img> offers, in Add and in Edit Params. A field's inputs sit in
+    // the parameters box but are no parameters of their own: the box is read through _mandatoryParamInputs(), which
+    // leaves them out, and each field answers its parameters itself (the srcset, and sizes / type where it shows them).
+
+    /** The tags offering an optional srcset of their own; a <source>'s srcset is its one-of row. */
+    const SRCSET_OPTIONAL_TAGS = ['img'];
+
+    /** The fields drawn in the parameters box, by the parameter they write. */
+    let paramFields = {};
+    /** Opens the <img>'s offered field (Edit Params, on an image that has a srcset); null when none is drawn. */
+    let srcsetOfferOpen = null;
+
+    function _destroyParamFields() {
+        Object.keys(paramFields).forEach(k => {
+            try { paramFields[k].destroy(); } catch (e) { /* already gone */ }
+        });
+        paramFields = {};
+        srcsetOfferOpen = null;
+        oneOfChoices = [];
+    }
+
+    /** Whether a field is read: not when it sits in a group's row that is not chosen. */
+    function _paramFieldOn(field) {
+        return !field.root.closest('[data-one-of-off]');
+    }
+
+    /**
+     * The parameters box's own inputs, each a parameter named by its id: a field's inputs (and a group's choice) left out,
+     * and a group's row that is not chosen.
+     */
+    function _mandatoryParamInputs() {
+        return Array.from(addMandatoryParamsContainer?.querySelectorAll('input, select') || [])
+            .filter(field => !field.closest('[data-param-field], [data-one-of-off]'));
+    }
+
+    /** What the fields write, in Add and in Edit Params alike (a field in a row not chosen writes nothing). */
+    function _paramFieldParams() {
+        const out = {};
+        Object.keys(paramFields).forEach(k => { if (_paramFieldOn(paramFields[k])) Object.assign(out, paramFields[k].params()); });
+        return out;
+    }
+
+    /** What stops a save in the box (said there too): a group with nothing chosen, then a field's first problem; or null. */
+    function _paramFieldProblem() {
+        const open = _oneOfProblem();
+        if (open) return open;
+        for (const k of Object.keys(paramFields)) {
+            if (!_paramFieldOn(paramFields[k])) continue;
+            const problem = paramFields[k].problem();
+            if (problem) return problem;
+        }
+        return null;
+    }
+
+    /** Edit Params: each field opened on what the node holds. Answers the names the fields took; the rest go to rows. */
+    function _openParamFields(params, tag) {
+        if (params.srcset != null && !paramFields.srcset && srcsetOfferOpen) srcsetOfferOpen();
+        let taken = [];
+        Object.keys(paramFields).forEach(k => { taken = taken.concat(paramFields[k].open(params)); });
+        return taken;
+    }
+
+    /** Empty and whole again, each field (Save & add another). */
+    function _resetParamFields() {
+        Object.keys(paramFields).forEach(k => paramFields[k].reset());
+    }
+
+    /**
+     * A custom row's value for `name`, taken out of the Advanced list (the row removed), or null: a field that comes to
+     * show `sizes` or `type` holds it from then on, so one place writes each name.
+     */
+    function _adoptCustomParam(name) {
+        const row = Array.from(addCustomParamsList?.querySelectorAll('.preview-contextual-form__param-row--custom') || [])
+            .find(r => (r.querySelector('.preview-contextual-form__param-key')?.value || '').trim() === name);
+        if (!row) return null;
+        const value = row.querySelector('.preview-contextual-form__param-value')?.value ?? '';
+        row.remove();
+        return value;
+    }
+
+    /**
+     * The srcset's row: its label and its field (kept in paramFields). closable: the <img>'s, whose × calls onClose.
+     * Returns ONE Element.
+     */
+    function _renderSrcsetFieldRow(tag, closable, onClose) {
+        const field = PreviewSrcsetField.create({
+            param: 'srcset',
+            withType: tag === 'source',
+            closable: closable,
+            onClose: onClose,
+            pickPicture: (input, onPick) => openAssetPicker(input, 'images', { onPick: onPick }),
+            adopt: _adoptCustomParam
+        });
+        paramFields.srcset = field;
+        return QSDom.el('div', { class: 'preview-contextual-form__param-row preview-contextual-form__param-row--field' }, [
+            QSDom.el('label', { class: 'preview-contextual-form__param-label', text: 'srcset:' }),
+            field.root
+        ]);
+    }
+
+    /** The <img>'s offer: a button opening its srcset's field, whose × gives the button back. Returns ONE Element. */
+    function _renderSrcsetOffer(tag) {
+        const holder = QSDom.el('div', { class: 'preview-srcset-offer' });
+        const openField = () => {
+            holder.replaceChildren(_renderSrcsetFieldRow(tag, true, showOffer));
+        };
+        const showOffer = () => {
+            if (paramFields.srcset) {
+                paramFields.srcset.destroy();
+                delete paramFields.srcset;
+            }
+            const btn = QSDom.el('button', { type: 'button', class: 'preview-contextual-form__add-param-btn' },
+                ['+ ', PreviewConfig.i18n.srcsetOffer]);
+            btn.addEventListener('click', () => {
+                openField();
+                holder.querySelector('.preview-srcset-field__address')?.focus();
+            });
+            holder.replaceChildren(btn);
+        };
+        srcsetOfferOpen = openField;
+        showOffer();
+        return holder;
     }
 
     // ---- Translation-key params ------------------------------------
@@ -6071,6 +6297,9 @@
 
     // Asset picker: opens a dropdown/modal to browse and select an asset.
     // options.upload: an upload row at the top (options.accept: what the file dialog offers).
+    // options.onPick(asset): the picked asset handed back after the input is filled (its path, and the width, height
+    // and mime_type listAssets holds for it), in place of the inline preview, for a caller that shows the picture its
+    // own way (a srcset's row, which takes the width and the format).
     async function openAssetPicker(targetInput, category, options) {
         const opts = options || {};
         // Remove any existing picker
@@ -6086,7 +6315,8 @@
                 targetInput.dispatchEvent(new Event('input'));
                 picker.remove();
                 document.removeEventListener('mousedown', closeHandler);
-                showAssetPreview(targetInput, path, mime);
+                if (typeof opts.onPick === 'function') opts.onPick({ path: path, mime_type: mime });
+                else showAssetPreview(targetInput, path, mime);
             }));
             picker.appendChild(body);
         }
@@ -6183,8 +6413,9 @@
                         transKeyPickers.alt.setValue(asset.alt);
                     }
                     
-                    // Show inline media preview below the input group
-                    showAssetPreview(targetInput, path, asset.mime_type);
+                    // Show inline media preview below the input group, or hand the picture to the caller
+                    if (typeof opts.onPick === 'function') opts.onPick(Object.assign({}, asset, { path: path }));
+                    else showAssetPreview(targetInput, path, asset.mime_type);
                 });
                 
                 list.appendChild(item);
@@ -8161,11 +8392,14 @@
         // Flush any uncommitted text from the class combobox before reading
         if (classCombobox) classCombobox.flush();
         const classes = addClassInput?.value?.trim() || '';
+
+        // A group with nothing chosen, or a field's problem (a duplicate, a width missing…), is never saved: said there and here
+        const fieldProblem = _paramFieldProblem();
+        if (fieldProblem) throw new Error(fieldProblem);
         
-        // Collect mandatory params
+        // Collect mandatory params (a field's own inputs, and a group's row not chosen, left out)
         const params = {};
-        const mandatoryParamFields = addMandatoryParamsContainer?.querySelectorAll('input, select') || [];
-        mandatoryParamFields.forEach(field => {
+        _mandatoryParamInputs().forEach(field => {
             const paramName = field.id.replace('add-mandatory-', '');
             if (field.value) params[paramName] = field.value;
         });
@@ -8200,6 +8434,9 @@
             const value = row.querySelector('.preview-contextual-form__param-value')?.value?.trim();
             if (key && value) params[key] = value;
         });
+
+        // The fields (a srcset's), read last
+        Object.assign(params, _paramFieldParams());
 
         // Optional ID — dedicated convenience field (wins over any Advanced
         // custom `id` row). Validated against CSS-safe HTML id rules.
@@ -8252,7 +8489,9 @@
             // plain reload preserves the target so the next add lands here too.
             const keptOpen = _finalizeAdd(function() {
                 if (addIdInput) { addIdInput.value = ''; addIdInput.classList.remove('admin-input--error'); }
-                (addMandatoryParamsContainer?.querySelectorAll('input, select') || []).forEach(f => { f.value = ''; });
+                _mandatoryParamInputs().forEach(f => { f.value = ''; });
+                // A field empty and whole again, never blanked input by input
+                _resetParamFields();
                 // alt / title are per-instance like the mandatory fields — the
                 // next image is not the same image.
                 Object.keys(transKeyPickers).forEach(k => transKeyPickers[k].setValue(''));

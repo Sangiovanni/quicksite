@@ -183,6 +183,7 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/bubble.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-srcset-field.css') ?>">
     <!-- The three views: every media query of the panel. Stays the last stylesheet. -->
     <link rel="stylesheet" href="<?= $versionedAsset('/css/responsive.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->

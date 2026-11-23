@@ -400,6 +400,48 @@ window.PreviewConfig = {
         functionExample: <?= json_encode(__admin('preview.functionExample', 'Example')) ?>,
         nameRequiredForInput: <?= json_encode(__admin('preview.nameRequiredForInput', 'A name is required so the field is submitted with the form.')) ?>,
         oneOfParams: <?= json_encode(__admin('preview.oneOfParams')) ?>,
+        // A group the tag needs one param of: its choice, which param goes where, and an element holding both
+        oneOfChoose: <?= qs_inline_script_json(__admin('preview.oneOfChoose')) ?>,
+        oneOfBoth: <?= qs_inline_script_json(__admin('preview.oneOfBoth')) ?>,
+        oneOfHintSource: <?= qs_inline_script_json(__admin('preview.oneOfHintSource')) ?>,
+        // A srcset's field (preview-srcset-field.js): the rows, their problems, sizes, type, the written line
+        srcsetKindWidths: <?= qs_inline_script_json(__admin('preview.srcsetKindWidths')) ?>,
+        srcsetKindDensities: <?= qs_inline_script_json(__admin('preview.srcsetKindDensities')) ?>,
+        srcsetAddressLabel: <?= qs_inline_script_json(__admin('preview.srcsetAddressLabel')) ?>,
+        srcsetRemovePicture: <?= qs_inline_script_json(__admin('preview.srcsetRemovePicture')) ?>,
+        srcsetAddPicture: <?= qs_inline_script_json(__admin('preview.srcsetAddPicture')) ?>,
+        srcsetWidthLabel: <?= qs_inline_script_json(__admin('preview.srcsetWidthLabel')) ?>,
+        srcsetWidthFromMedia: <?= qs_inline_script_json(__admin('preview.srcsetWidthFromMedia')) ?>,
+        srcsetWidthUnit: <?= qs_inline_script_json(__admin('preview.srcsetWidthUnit')) ?>,
+        srcsetDensityLabel: <?= qs_inline_script_json(__admin('preview.srcsetDensityLabel')) ?>,
+        srcsetSizesLabel: <?= qs_inline_script_json(__admin('preview.srcsetSizesLabel')) ?>,
+        srcsetSizesFull: <?= qs_inline_script_json(__admin('preview.srcsetSizesFull')) ?>,
+        srcsetSizesHalf: <?= qs_inline_script_json(__admin('preview.srcsetSizesHalf')) ?>,
+        srcsetSizesThird: <?= qs_inline_script_json(__admin('preview.srcsetSizesThird')) ?>,
+        srcsetSizesOther: <?= qs_inline_script_json(__admin('preview.srcsetSizesOther')) ?>,
+        srcsetSizesPlaceholder: <?= qs_inline_script_json(__admin('preview.srcsetSizesPlaceholder')) ?>,
+        srcsetTypeLabel: <?= qs_inline_script_json(__admin('preview.srcsetTypeLabel')) ?>,
+        srcsetTypeNone: <?= qs_inline_script_json(__admin('preview.srcsetTypeNone')) ?>,
+        srcsetTypeFilled: <?= qs_inline_script_json(__admin('preview.srcsetTypeFilled')) ?>,
+        srcsetTypeDiffer: <?= qs_inline_script_json(__admin('preview.srcsetTypeDiffer')) ?>,
+        srcsetTypeUnknown: <?= qs_inline_script_json(__admin('preview.srcsetTypeUnknown')) ?>,
+        srcsetTypeSeen: <?= qs_inline_script_json(__admin('preview.srcsetTypeSeen')) ?>,
+        srcsetWritten: <?= qs_inline_script_json(__admin('preview.srcsetWritten')) ?>,
+        srcsetWrittenEmpty: <?= qs_inline_script_json(__admin('preview.srcsetWrittenEmpty')) ?>,
+        srcsetEditAsText: <?= qs_inline_script_json(__admin('preview.srcsetEditAsText')) ?>,
+        srcsetEditAsRows: <?= qs_inline_script_json(__admin('preview.srcsetEditAsRows')) ?>,
+        srcsetCannotHold: <?= qs_inline_script_json(__admin('preview.srcsetCannotHold')) ?>,
+        srcsetReasonSkipped: <?= qs_inline_script_json(__admin('preview.srcsetReasonSkipped')) ?>,
+        srcsetReasonMixed: <?= qs_inline_script_json(__admin('preview.srcsetReasonMixed')) ?>,
+        srcsetReasonDuplicate: <?= qs_inline_script_json(__admin('preview.srcsetReasonDuplicate')) ?>,
+        srcsetReasonHeight: <?= qs_inline_script_json(__admin('preview.srcsetReasonHeight')) ?>,
+        srcsetReasonDensity: <?= qs_inline_script_json(__admin('preview.srcsetReasonDensity')) ?>,
+        srcsetRowDuplicate: <?= qs_inline_script_json(__admin('preview.srcsetRowDuplicate')) ?>,
+        srcsetRowWidth: <?= qs_inline_script_json(__admin('preview.srcsetRowWidth')) ?>,
+        srcsetRowSpace: <?= qs_inline_script_json(__admin('preview.srcsetRowSpace')) ?>,
+        srcsetRowComma: <?= qs_inline_script_json(__admin('preview.srcsetRowComma')) ?>,
+        srcsetOffer: <?= qs_inline_script_json(__admin('preview.srcsetOffer')) ?>,
+        srcsetOfferClose: <?= qs_inline_script_json(__admin('preview.srcsetOfferClose')) ?>,
         invalidId: <?= json_encode(__admin('preview.invalidId', 'Invalid ID — start with a letter or underscore; letters, digits, hyphens and underscores only (no spaces).')) ?>,
         optional: <?= json_encode(__admin('preview.optional', 'Optional')) ?>,
         eventTooltips: <?= json_encode(AdminTranslation::getInstance()->getRaw('preview.eventTooltips') ?: new stdClass()) ?>,
@@ -990,6 +1032,8 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/connections-store.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/connections-store.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/stream-parsers.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/stream-parsers.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/ai/lib/ai-call.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/ai/lib/ai-call.js') ?>"></script>
+<!-- A srcset read and written (QSSrcset): the Workflows tool's outside pictures and the srcset field split it as the engine does -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/core/srcset.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/core/srcset.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-ai-tools.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-ai-tools.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-transition-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-transition-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-sidebar-resize.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-sidebar-resize.js') ?>"></script>
@@ -1018,6 +1062,9 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => Ad
             . '?v=' . filemtime($_ceJs) . '"></script>' . "\n";
     }
 ?>
+
+<!-- A srcset's field (PreviewSrcsetField): the Add form's and Edit Params' rows of pictures. Before preview.js, which draws it. -->
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-srcset-field.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-srcset-field.js') ?>"></script>
 
 <!-- The simple Add (Select → Add in simple mode): its list's sends. Before preview.js, which hands it the target. -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-simple-add.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-simple-add.js') ?>"></script>

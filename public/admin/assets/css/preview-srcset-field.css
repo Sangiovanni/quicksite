@@ -1,0 +1,232 @@
+/*
+ * The srcset field (preview-srcset-field.js): a srcset edited as rows, each a picture and its descriptor, in the
+ * editor's Add form and Edit Params; and the choice above it, of a group the tag needs one param of (preview.js). Both
+ * wrap at every width: no width of their own beyond what min() bounds, no media query (the panel's three views live in
+ * responsive.css alone).
+ */
+
+/* A group the tag needs one param of (a <source>: src or srcset): the choice at the top of the parameters box, its params'
+   rows under it, a row shown once its param is chosen (a row is display: flex, so its [hidden] needs a rule of its own) */
+.preview-contextual-form__param-row[hidden] {
+    display: none;
+}
+.preview-oneof {
+    align-items: baseline;
+}
+/* Its choices are laid out as the field's kind is (the shared rule below); a param's name in the code's letters */
+.preview-oneof__choices {
+    padding: 2px var(--space-xs);
+    border-radius: var(--radius-sm);
+}
+.preview-oneof__choice {
+    font-family: var(--font-mono);
+}
+.preview-oneof__both {
+    flex-basis: 100%;
+    font-size: var(--font-size-xs);
+    color: var(--admin-warning);
+}
+/* Add or Save with nothing chosen: the choice outlined, as a field in error is */
+.preview-oneof--missing .preview-oneof__choices {
+    outline: 2px solid var(--admin-error);
+    outline-offset: 1px;
+}
+
+/* The srcset's row: its label, then the field across the form's width */
+.preview-contextual-form__param-row--field {
+    align-items: baseline;
+}
+
+/* An <img>'s offer: the button that opens its field, or the field */
+.preview-srcset-offer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.preview-srcset-offer > .preview-contextual-form__param-row {
+    align-self: stretch;
+}
+
+.preview-srcset-field {
+    position: relative;
+    flex: 1 1 100%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    background: var(--admin-bg);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+}
+/* Every part the field shows and hides through `hidden`: an author's display would beat the browser's [hidden] */
+.preview-srcset-field [hidden] {
+    display: none;
+}
+/* An <img>'s field closes with an × at its top right: room kept for it */
+.preview-srcset-field--closable {
+    padding-right: calc(var(--space-sm) + 1.75rem);
+}
+.preview-srcset-field__close {
+    position: absolute;
+    top: var(--space-xs);
+    right: var(--space-xs);
+    display: inline-flex;
+    padding: 4px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--admin-text-muted);
+    cursor: pointer;
+}
+.preview-srcset-field__close:hover {
+    background: var(--admin-surface-hover);
+    color: var(--admin-text);
+}
+
+/* The kind, and a group's choice above the field: plain choices, side by side where they fit */
+.preview-srcset-field__kinds,
+.preview-oneof__choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
+}
+.preview-srcset-field__kind,
+.preview-oneof__choice {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--admin-text);
+    cursor: pointer;
+}
+
+/* + Add a picture, at the start of its line */
+.preview-srcset-field__add {
+    align-self: flex-start;
+}
+
+/* The rows: a picture (its address and Media's button), its descriptor, its ×, and the line saying its problem */
+.preview-srcset-field__rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+.preview-srcset-field__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+}
+.preview-srcset-field__picture {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+.preview-srcset-field__address {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: var(--font-size-xs);
+}
+.preview-srcset-field__descriptor {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex: 0 1 auto;
+    min-width: 0;
+}
+.preview-srcset-field__width {
+    width: min(6rem, 100%);
+    font-size: var(--font-size-xs);
+}
+.preview-srcset-field__density {
+    width: min(8rem, 100%);
+    accent-color: var(--admin-primary);
+}
+.preview-srcset-field__unit,
+.preview-srcset-field__density-value {
+    min-width: 2.5em;
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+.preview-srcset-field__problem {
+    flex-basis: 100%;
+    font-size: var(--font-size-xs);
+    color: var(--admin-error);
+}
+
+/* sizes and type: a label and its control on a line, the free text and the hint under them */
+.preview-srcset-field__line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+}
+.preview-srcset-field__label {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    color: var(--admin-text);
+}
+/* Beside its label where the panel has room for its words, under it on a line of its own where it has not */
+.preview-srcset-field__sizes-select,
+.preview-srcset-field__type-select {
+    flex: 1 1 15rem;
+    width: auto;
+    min-width: 0;
+    font-size: var(--font-size-xs);
+}
+.preview-srcset-field__sizes-text {
+    flex: 1 1 100%;
+    min-width: 0;
+    font-size: var(--font-size-xs);
+}
+.preview-srcset-field__hint {
+    flex-basis: 100%;
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+/* Text mode: the srcset as written, and why the rows cannot hold it */
+.preview-srcset-field__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+.preview-srcset-field__textarea {
+    resize: vertical;
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+}
+.preview-srcset-field__reason {
+    font-size: var(--font-size-xs);
+    color: var(--admin-warning);
+}
+
+/* The written srcset, read only, wrapping anywhere a long address needs */
+.preview-srcset-field__written {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.preview-srcset-field__written-line {
+    min-width: 0;
+    padding: 2px var(--space-xs);
+    background: var(--admin-bg-secondary);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+.preview-srcset-field__written-line--empty {
+    font-family: inherit;
+    font-style: italic;
+    color: var(--admin-text-muted);
+}
+.preview-srcset-field__switch {
+    align-self: flex-start;
+    font-size: var(--font-size-xs);
+}

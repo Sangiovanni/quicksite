@@ -627,14 +627,14 @@ This affects the **deployed/built site only** — the admin panel preview and vi
 
 **Added a `<source>` and the browser ignores it?**
 
-`<source>` means two different things depending on where it sits, and the
-editor's parameter form does not distinguish them. Inside `<picture>` a
-source is selected by `srcset` plus `media` or `type`, and a plain `src` is
-invalid and ignored. Inside `<video>` or `<audio>` it is `src` (with `type`)
-that does the work. The editor asks for `src` in both cases, so a `<source>`
-added inside a `<picture>` needs its `srcset` — and its `media` or `type` —
-added by hand through the **Advanced → custom parameters** section, and the
-`src` removed. Video and audio sources need nothing extra.
+`<source>` means two different things depending on where it sits. Inside
+`<picture>` a source is selected by `srcset` plus `media` or `type`, and a
+plain `src` is invalid and ignored. Inside `<video>` or `<audio>` it is `src`
+(with `type`) that does the work, and a source holds one or the other, never
+both. The editor asks which first: inside a `<picture>`, choose **srcset** and
+fill its field (its rows of pictures; its `type` is filled from their
+format); a `media` that limits the source to some screens is added through
+**Advanced → custom parameters**. Inside a video or an audio, choose **src**.
 
 ## Vision
 
