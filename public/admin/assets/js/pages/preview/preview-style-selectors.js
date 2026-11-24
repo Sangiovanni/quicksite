@@ -3,7 +3,7 @@
  * Handles the Selectors tab in Style mode
  * 
  * Dependencies:
- * - PreviewConfig global (from preview-config.php)
+ * - QSPanelWords (the panel's words)
  * - PreviewState global (from preview-state.js)
  */
 (function() {
@@ -46,7 +46,7 @@
     let selectorSelectedValue = null;
     let selectorSelectedMedia = null;
     let selectorSelectedClear = null;
-    let selectorMatchCount = null;
+    let selectorMatches = null;
     let selectorEditBtn = null;
     let selectorAnimateBtn = null;
     let selectorCopyFromBtn = null;
@@ -100,7 +100,7 @@
         selectorSelectedValue = document.getElementById('selector-selected-value');
         selectorSelectedMedia = document.getElementById('selector-selected-media');
         selectorSelectedClear = document.getElementById('selector-selected-clear');
-        selectorMatchCount = document.getElementById('selector-match-count');
+        selectorMatches = document.getElementById('selector-matches');
         selectorEditBtn = document.getElementById('selector-edit-btn');
         selectorAnimateBtn = document.getElementById('selector-animate-btn');
         selectorCopyFromBtn = document.getElementById('selector-copy-from-btn');
@@ -184,7 +184,7 @@
             selectorsLoading.replaceChildren(
                 _renderLoadErrorIcon(),
                 ' ',
-                QSDom.el('span', { style: 'color: #ef4444;', text: PreviewConfig.i18n?.selectorsLoadError || 'Failed to load selectors' })
+                QSDom.el('span', { style: 'color: #ef4444;', text: QSPanelWords.t('preview.selectorsLoadError') })
             );
         }
     }
@@ -412,7 +412,7 @@
                           categorizedSelectors.ids.length + 
                           categorizedSelectors.attributes.length +
                           Object.values(categorizedSelectors.media).flat().length;
-        if (selectorCount) selectorCount.textContent = totalCount;
+        if (selectorCount) selectorCount.textContent = QSPanelWords.number(totalCount);
         
         // Hide empty groups
         hideEmptyGroups();
@@ -435,7 +435,7 @@
             chip.classList.add('preview-selector-item--dom-only');
         }
         chip.textContent = selector;
-        chip.title = selector + (mediaQuery ? ` (${mediaQuery})` : '') + (hasRules ? '' : ' — ' + PreviewConfig.i18n.selectorNoRulesYet);
+        chip.title = selector + (mediaQuery ? ` (${mediaQuery})` : '') + (hasRules ? '' : ' — ' + QSPanelWords.t('preview.selectorNoRulesYet'));
         chip.dataset.selector = selector;
         chip.dataset.hasRules = hasRules ? '1' : '0';
         if (mediaQuery) chip.dataset.media = mediaQuery;
@@ -465,13 +465,13 @@
      * Update selector counts in group headers
      */
     function updateSelectorCounts() {
-        if (selectorTagsCount) selectorTagsCount.textContent = categorizedSelectors.tags.length;
-        if (selectorClassesCount) selectorClassesCount.textContent = categorizedSelectors.classes.length;
-        if (selectorIdsCount) selectorIdsCount.textContent = categorizedSelectors.ids.length;
-        if (selectorAttributesCount) selectorAttributesCount.textContent = categorizedSelectors.attributes.length;
+        if (selectorTagsCount) selectorTagsCount.textContent = QSPanelWords.number(categorizedSelectors.tags.length);
+        if (selectorClassesCount) selectorClassesCount.textContent = QSPanelWords.number(categorizedSelectors.classes.length);
+        if (selectorIdsCount) selectorIdsCount.textContent = QSPanelWords.number(categorizedSelectors.ids.length);
+        if (selectorAttributesCount) selectorAttributesCount.textContent = QSPanelWords.number(categorizedSelectors.attributes.length);
         if (selectorMediaCount) {
             const mediaCount = Object.values(categorizedSelectors.media).flat().length;
-            selectorMediaCount.textContent = mediaCount;
+            selectorMediaCount.textContent = QSPanelWords.number(mediaCount);
         }
     }
     
@@ -561,14 +561,37 @@
             if (iframeDoc) {
                 const matches = iframeDoc.querySelectorAll(selector);
                 const count = matches.length;
-                if (selectorMatchCount) selectorMatchCount.textContent = count;
+                renderMatchCount(count);
                 editingSelectorCount = count;
             }
         } catch (e) {
             console.warn('Could not count selector matches:', e);
-            if (selectorMatchCount) selectorMatchCount.textContent = '?';
+            renderMatchCount(null);
             editingSelectorCount = 0;
         }
+    }
+
+    /**
+     * "Affects 3 elements": one counted word, its number in bold. A count that could not be read shows "?" in the
+     * word's other form. The word is asked with a mark in place of its number, then split around it, so the number
+     * can be its own element wherever a language puts it.
+     */
+    function renderMatchCount(count) {
+        if (!selectorMatches) return;
+        const MARK = '\u0000';
+        const word = count === null
+            ? QSPanelWords.t('preview.affectsElementsCount.other', { count: MARK })
+            : QSPanelWords.count('preview.affectsElementsCount', count, { count: MARK });
+        const parts = word.split(MARK);
+        selectorMatches.replaceChildren();
+        parts.forEach((part, i) => {
+            if (i > 0) {
+                const strong = document.createElement('strong');
+                strong.textContent = count === null ? '?' : QSPanelWords.number(count);
+                selectorMatches.appendChild(strong);
+            }
+            if (part !== '') selectorMatches.appendChild(document.createTextNode(part));
+        });
     }
 
     // ==================== Filtering ====================
@@ -724,12 +747,12 @@
         labelSpan.title = label;
         
         const prefix = document.createElement('span');
-        prefix.textContent = (PreviewConfig.i18n?.filteringBy || 'Filtering:') + ' ';
+        prefix.textContent = QSPanelWords.t('preview.selectorsFilteringBy') + ' ';
         
         const clearBtn = document.createElement('button');
         clearBtn.type = 'button';
         clearBtn.className = 'preview-selectors-filter-bar__clear';
-        clearBtn.textContent = PreviewConfig.i18n?.showAll || 'Show All';
+        clearBtn.textContent = QSPanelWords.t('preview.selectorsShowAll');
         clearBtn.addEventListener('click', clearElementFilter);
         
         filterBar.appendChild(prefix);
@@ -837,11 +860,11 @@
         icon.appendChild(line2);
         
         const label = document.createElement('span');
-        label.textContent = (PreviewConfig.i18n?.createSelector || 'Create') + ' ' + target.selector;
+        label.textContent = QSPanelWords.t('preview.createSelectorNamed', { selector: target.selector });
         
         chip.appendChild(icon);
         chip.appendChild(label);
-        chip.title = (PreviewConfig.i18n?.createSelector || 'Create') + ' ' + target.selector;
+        chip.title = label.textContent;
         chip.dataset.selector = target.selector;
         
         chip.addEventListener('click', () => {
@@ -868,7 +891,7 @@
             
             if (!response.ok || result.status >= 400) {
                 if (typeof showToast === 'function') {
-                    showToast(PreviewConfig.i18n?.selectorCreateError || 'Failed to create selector', 'error');
+                    showToast(QSPanelWords.t('preview.selectorCreateError'), 'error');
                 }
                 return;
             }
@@ -907,12 +930,12 @@
             filterSelectors('');
             
             if (typeof showToast === 'function') {
-                showToast(PreviewConfig.i18n?.selectorCreated || 'Selector created', 'success');
+                showToast(QSPanelWords.t('preview.selectorCreated'), 'success');
             }
         } catch (error) {
             console.error('[SelectorBrowser] Create selector error:', error);
             if (typeof showToast === 'function') {
-                showToast(PreviewConfig.i18n?.selectorCreateError || 'Failed to create selector', 'error');
+                showToast(QSPanelWords.t('preview.selectorCreateError'), 'error');
             }
         }
     }
@@ -925,14 +948,14 @@
             return listEl?.querySelectorAll('.preview-selector-item:not([style*="display: none"]):not(.preview-selector-item--create)').length || 0;
         };
         
-        if (selectorTagsCount) selectorTagsCount.textContent = countVisibleIn(selectorTagsList);
-        if (selectorClassesCount) selectorClassesCount.textContent = countVisibleIn(selectorClassesList);
-        if (selectorIdsCount) selectorIdsCount.textContent = countVisibleIn(selectorIdsList);
-        if (selectorAttributesCount) selectorAttributesCount.textContent = countVisibleIn(selectorAttributesList);
+        if (selectorTagsCount) selectorTagsCount.textContent = QSPanelWords.number(countVisibleIn(selectorTagsList));
+        if (selectorClassesCount) selectorClassesCount.textContent = QSPanelWords.number(countVisibleIn(selectorClassesList));
+        if (selectorIdsCount) selectorIdsCount.textContent = QSPanelWords.number(countVisibleIn(selectorIdsList));
+        if (selectorAttributesCount) selectorAttributesCount.textContent = QSPanelWords.number(countVisibleIn(selectorAttributesList));
         
         // Media - count all visible in media list
         if (selectorMediaCount) {
-            selectorMediaCount.textContent = countVisibleIn(selectorMediaList);
+            selectorMediaCount.textContent = QSPanelWords.number(countVisibleIn(selectorMediaList));
         }
         
         // Update total
@@ -941,7 +964,7 @@
                      countVisibleIn(selectorIdsList) + 
                      countVisibleIn(selectorAttributesList) +
                      countVisibleIn(selectorMediaList);
-        if (selectorCount) selectorCount.textContent = total;
+        if (selectorCount) selectorCount.textContent = QSPanelWords.number(total);
     }
 
     // ==================== Event Handlers ====================
@@ -1048,7 +1071,7 @@
         if (withRules.length === 0) {
             selectorCopyList.replaceChildren(QSDom.el('div', {
                 class: 'preview-selector-copy-picker__empty',
-                text: PreviewConfig.i18n?.noSelectorsWithRules || 'No other selectors with styles found'
+                text: QSPanelWords.t('preview.noSelectorsWithRules')
             }));
         } else {
             withRules.forEach(item => {
@@ -1125,7 +1148,7 @@
             
             if (!response.ok || !result.data?.styles) {
                 if (typeof showToast === 'function') {
-                    showToast(PreviewConfig.i18n?.noStylesToCopy || 'No styles found on source selector', 'warning');
+                    showToast(QSPanelWords.t('preview.noStylesToCopy'), 'warning');
                 }
                 return;
             }

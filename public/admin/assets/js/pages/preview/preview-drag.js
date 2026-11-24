@@ -11,7 +11,7 @@
  *
  * Dependencies:
  * - window.PreviewState  (sendToIframe, utils.parseStruct)  — loaded before this file
- * - window.PreviewConfig (i18n strings)                     — loaded before this file
+ * - window.QSPanelWords  (the panel's words)                — loaded first on every page
  * - window.QuickSiteAdmin (apiRequest, showToast)           — loaded before this file
  *
  * Public API (window.PreviewDrag):
@@ -66,8 +66,9 @@
         return null;
     }
 
-    function i18n(key) {
-        return (window.PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n[key]) || '';
+    /** An error toast: the word "Error: {message}" around what went wrong. */
+    function showError(message) {
+        showToast(QSPanelWords.t('preview.errorDetail', { error: message }), 'error');
     }
 
     // ==================== Element Move Handler ====================
@@ -87,14 +88,14 @@
 
         if (!source || !target || !source.struct || !source.node || !target.node) {
             console.error('[PreviewDrag] Invalid move data:', { source, target, position });
-            showToast(i18n('error') + ': Invalid move data', 'error');
+            showError(QSPanelWords.t('preview.elementMoveInvalid'));
             sendToIframe('rollbackDrag', {});
             return;
         }
 
         const structInfo = parseStruct(source.struct);
         if (!structInfo || !structInfo.type) {
-            showToast(i18n('error') + ': Invalid structure type', 'error');
+            showError(QSPanelWords.t('preview.invalidStructureType'));
             sendToIframe('rollbackDrag', {});
             return;
         }
@@ -115,7 +116,7 @@
 
             if (!result.ok) {
                 throw new Error(
-                    result.data?.message || result.data?.data?.message || 'Failed to move node'
+                    result.data?.message || result.data?.data?.message || QSPanelWords.t('preview.elementMoveFailed')
                 );
             }
 
@@ -152,15 +153,15 @@
 
             showToast(
                 isUndoRedo
-                    ? (undoRedoAction === 'undo' ? i18n('elementMoveUndone') : i18n('elementMoveRedone'))
-                    : i18n('elementMoved'),
+                    ? (undoRedoAction === 'undo' ? QSPanelWords.t('preview.elementMoveUndone') : QSPanelWords.t('preview.elementMoveRedone'))
+                    : QSPanelWords.t('preview.elementMoved'),
                 'success'
             );
             console.log('[PreviewDrag] Move saved successfully');
 
         } catch (error) {
             console.error('[PreviewDrag] Move error:', error);
-            showToast(i18n('error') + ': ' + error.message, 'error');
+            showError(error.message);
             if (isUndoRedo) {
                 sendToIframe(undoRedoAction === 'undo' ? 'dragRedo' : 'dragUndo', {});
             } else {
@@ -178,7 +179,7 @@
     function onModeEnter() {
         if (dragDefault) dragDefault.style.display = '';
         if (dragInfo)    dragInfo.style.display    = 'none';
-        if (dragHint)    dragHint.textContent       = i18n('dragSelectHint');
+        if (dragHint)    dragHint.textContent       = QSPanelWords.t('preview.dragSelectHint');
         if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
     }
 
@@ -220,13 +221,13 @@
                 if (dragNavNext)   dragNavNext.disabled    = !data.hasNextSibling;
                 if (dragNavChild)  dragNavChild.disabled   = !data.hasChildren;
                 if (dragLockBtn)   dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
-                if (dragHint)      dragHint.textContent    = i18n('dragSelectHint');
+                if (dragHint)      dragHint.textContent    = QSPanelWords.t('preview.dragSelectHint');
                 if (updateGlobalElementInfoFn) updateGlobalElementInfoFn(data);
                 return true;
 
             case 'dragElementLocked':
                 if (dragLockBtn) dragLockBtn.classList.toggle('preview-sidebar-tool-option--active', !!data.persistent);
-                if (dragHint)    dragHint.textContent = i18n('dragLockedHint');
+                if (dragHint)    dragHint.textContent = QSPanelWords.t('preview.dragLockedHint');
                 // Disable nav buttons while element is locked
                 if (dragNavParent) dragNavParent.disabled = true;
                 if (dragNavPrev)   dragNavPrev.disabled   = true;
@@ -236,7 +237,7 @@
 
             case 'dragElementUnlocked':
                 if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
-                if (dragHint)    dragHint.textContent      = i18n('dragSelectHint');
+                if (dragHint)    dragHint.textContent      = QSPanelWords.t('preview.dragSelectHint');
                 if (dragNavParent) dragNavParent.disabled  = !data.hasParent;
                 if (dragNavPrev)   dragNavPrev.disabled    = !data.hasPrevSibling;
                 if (dragNavNext)   dragNavNext.disabled    = !data.hasNextSibling;
@@ -245,7 +246,7 @@
 
             case 'dragElementDeselected':
                 if (dragLockBtn) dragLockBtn.classList.remove('preview-sidebar-tool-option--active');
-                if (dragHint)    dragHint.textContent = i18n('dragSelectHint');
+                if (dragHint)    dragHint.textContent = QSPanelWords.t('preview.dragSelectHint');
                 if (dragDefault) dragDefault.style.display = '';
                 if (dragInfo)    dragInfo.style.display    = 'none';
                 return true;
@@ -258,7 +259,7 @@
             case 'dragModeReady':
                 if (dragUndoBtn) dragUndoBtn.disabled = (data.undoCount === 0);
                 if (dragRedoBtn) dragRedoBtn.disabled = (data.redoCount === 0);
-                if (dragHint)    dragHint.textContent  = i18n('dragSelectHint');
+                if (dragHint)    dragHint.textContent  = QSPanelWords.t('preview.dragSelectHint');
                 return true;
         }
 

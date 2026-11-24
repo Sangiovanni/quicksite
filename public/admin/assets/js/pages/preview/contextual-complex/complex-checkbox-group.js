@@ -11,6 +11,8 @@
 (function () {
     'use strict';
 
+    var t = window.QSComplexWizard.t;
+
     // ---- small render helpers (copied locally — each wizard is an
     // independent module per the framework, so no cross-wizard helper
     // imports to keep the load order simple) ------------------------------
@@ -63,7 +65,7 @@
         r1.value = 'stacked';
         r1.checked = true;
         var s1 = document.createElement('span');
-        s1.textContent = 'Stacked (one per line)';
+        s1.textContent = t('common.layoutStacked');
         l1.appendChild(r1);
         l1.appendChild(s1);
 
@@ -74,7 +76,7 @@
         r2.name = name;
         r2.value = 'inline';
         var s2 = document.createElement('span');
-        s2.textContent = 'Inline (side-by-side)';
+        s2.textContent = t('common.layoutInline');
         l2.appendChild(r2);
         l2.appendChild(s2);
 
@@ -90,7 +92,7 @@
         cb.type = 'checkbox';
         cb.id = id;
         var s = document.createElement('span');
-        s.textContent = 'Submit as array (name="<name>[]") — for PHP-style multi-value submission';
+        s.textContent = t('checkboxGroup.arraySubmit');
         l.appendChild(cb);
         l.appendChild(s);
         return l;
@@ -112,7 +114,7 @@
         var valueInput = document.createElement('input');
         valueInput.type = 'text';
         valueInput.className = 'admin-input qs-cb-option-row__value';
-        valueInput.placeholder = 'value (e.g. newsletter)';
+        valueInput.placeholder = t('checkboxGroup.valuePlaceholder');
         valueInput.autocomplete = 'off';
         valueInput.style.flex = '0 0 33%';
         if (d.value !== undefined) valueInput.value = d.value;
@@ -126,7 +128,7 @@
 
         var picker = window.QSComplexWizard.createTextKeyPicker({
             container: labelMount,
-            placeholder: 'e.g. form.prefs.newsletter',
+            placeholder: t('checkboxGroup.labelPlaceholder'),
             value: d.labelKey || '',
         });
         labelPickers.set(row, picker);
@@ -139,9 +141,9 @@
         var wrap = document.createElement('div');
 
         // -- name --
-        var nameInput = _renderTextInput('ce-cb-name', 'e.g. prefs (letters/digits/_/- only)');
+        var nameInput = _renderTextInput('ce-cb-name', t('checkboxGroup.namePlaceholder'));
         var nameGroup = _renderGroup();
-        nameGroup.appendChild(_renderLabel('Name (shared by every checkbox)', true));
+        nameGroup.appendChild(_renderLabel(t('checkboxGroup.name'), true));
         nameGroup.appendChild(nameInput);
         wrap.appendChild(nameGroup);
 
@@ -152,19 +154,19 @@
 
         // -- legendKey --
         var legendGroup = _renderGroup();
-        legendGroup.appendChild(_renderLabel('Legend (translation key)', true));
+        legendGroup.appendChild(_renderLabel(t('common.legendKey'), true));
         var legendMount = document.createElement('div');
         legendGroup.appendChild(legendMount);
         wrap.appendChild(legendGroup);
         var legendPicker = window.QSComplexWizard.createTextKeyPicker({
             container: legendMount,
-            placeholder: 'e.g. form.prefs.legend',
+            placeholder: t('checkboxGroup.legendPlaceholder'),
             value: '',
         });
 
         // -- layout --
         var layoutGroup = _renderGroup();
-        layoutGroup.appendChild(_renderLabel('Layout'));
+        layoutGroup.appendChild(_renderLabel(t('common.layout')));
         layoutGroup.appendChild(_renderLayoutRadios('ce-cb-layout'));
         wrap.appendChild(layoutGroup);
 
@@ -172,22 +174,22 @@
 
         // -- options list --
         var optsGroup = _renderGroup();
-        optsGroup.appendChild(_renderLabel('Options', true));
-        optsGroup.appendChild(_renderHint('Each option has a value (the literal submitted on form submit) and a label (translation key).'));
+        optsGroup.appendChild(_renderLabel(t('common.options'), true));
+        optsGroup.appendChild(_renderHint(t('common.optionsHint')));
         var optsHost = document.createElement('div');
         optsGroup.appendChild(optsHost);
         wrap.appendChild(optsGroup);
 
         // -- default checked values --
         var defaultGroup = _renderGroup();
-        defaultGroup.appendChild(_renderLabel('Default checked (optional)'));
+        defaultGroup.appendChild(_renderLabel(t('checkboxGroup.defaultChecked')));
         var defaultSelect = document.createElement('select');
         defaultSelect.className = 'admin-input';
         defaultSelect.id = 'ce-cb-defaults';
         defaultSelect.multiple = true;
         defaultSelect.size = 4;
         defaultGroup.appendChild(defaultSelect);
-        defaultGroup.appendChild(_renderHint('Ctrl/Cmd-click to select multiple. Pre-checked checkboxes use these values.'));
+        defaultGroup.appendChild(_renderHint(t('checkboxGroup.defaultCheckedHint')));
         wrap.appendChild(defaultGroup);
 
         container.appendChild(wrap);
@@ -199,7 +201,7 @@
         var labelPickers = new WeakMap();
         var optsEditor = window.QSComplexWizard.createRowEditor({
             container: optsHost,
-            addButtonLabel: '+ Add option',
+            addButtonLabel: t('common.addOption'),
             minRows: 1,
             initialRows: [
                 { value: '', labelKey: '' },
@@ -270,17 +272,18 @@
         function validate() {
             var cfg = getConfig();
             if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(cfg.name)) {
-                return 'Name must start with a letter and use only letters, digits, hyphens, underscores.';
+                return t('common.errors.groupNameFormat');
             }
-            if (!cfg.legendKey) return 'Pick a legend translation key.';
-            if (cfg.options.length === 0) return 'Add at least one option.';
+            if (!cfg.legendKey) return t('common.errors.legendRequired');
+            if (cfg.options.length === 0) return t('common.errors.noOption');
             var seen = {};
             for (var i = 0; i < cfg.options.length; i++) {
                 var o = cfg.options[i];
-                if (o.value === '') return 'Option #' + (i + 1) + ' is missing a value.';
-                if (!o.labelKey) return 'Option #' + (i + 1) + ' is missing a label key.';
+                var nth = { number: QSPanelWords.number(i + 1) };
+                if (o.value === '') return t('common.errors.optionValue', nth);
+                if (!o.labelKey) return t('common.errors.optionLabel', nth);
                 if (Object.prototype.hasOwnProperty.call(seen, o.value)) {
-                    return 'Duplicate option value "' + o.value + '" — values must be unique.';
+                    return t('common.errors.duplicateOption', { value: o.value });
                 }
                 seen[o.value] = true;
             }
@@ -299,8 +302,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['checkbox-group'] = {
-        label: 'Checkbox group',
-        description: window.QSComplexWizard.t('checkboxGroup.description'),
+        label: t('checkboxGroup.label'),
+        description: t('checkboxGroup.description'),
         renderWizard: renderWizard
     };
 })();

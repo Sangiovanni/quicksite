@@ -3,7 +3,7 @@
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content animation-preview__content">
         <div class="preview-keyframe-modal__header">
-            <h3><?= __admin('preview.animationPreview') ?? 'Animation Preview' ?></h3>
+            <h3><?= adminEscape(__admin('preview.animationPreview')) ?></h3>
             <span class="animation-preview__keyframe-name" id="animation-preview-name">@keyframes name</span>
             <button type="button" class="admin-modal__close" id="animation-preview-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
@@ -11,14 +11,14 @@
         <div class="preview-keyframe-modal__body animation-preview__body">
             <!-- Preview Stage -->
             <div class="animation-preview__stage" id="animation-preview-stage">
-                <img src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="Preview" class="animation-preview__logo" id="animation-preview-logo" width="80" height="80">
+                <img src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="<?= adminAttr(__admin('preview.animationPreviewAlt')) ?>" class="animation-preview__logo" id="animation-preview-logo" width="80" height="80">
             </div>
             
             <!-- Animation Controls -->
             <div class="animation-preview__controls">
                 <!-- Duration -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-duration"><?= __admin('preview.animDuration') ?? 'Duration' ?>:</label>
+                    <label for="animation-preview-duration"><?= adminEscape(__admin('preview.animDuration')) ?>:</label>
                     <div class="animation-preview__input-group">
                         <input type="number" id="animation-preview-duration" class="admin-input" value="1000" min="100" max="10000" step="100">
                         <span class="animation-preview__unit">ms</span>
@@ -27,7 +27,7 @@
                 
                 <!-- Timing Function -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-timing"><?= __admin('preview.timingFunction') ?? 'Timing Function' ?>:</label>
+                    <label for="animation-preview-timing"><?= adminEscape(__admin('preview.timingFunction')) ?>:</label>
                     <select id="animation-preview-timing" class="admin-select">
                         <option value="ease" selected>ease</option>
                         <option value="linear">linear</option>
@@ -41,7 +41,7 @@
                     <button type="button"
                             class="admin-btn admin-btn--ghost"
                             id="animation-preview-timing-custom"
-                            title="<?= __admin('preview.easingPickerTitle', 'Easing curve') ?>">
+                            title="<?= adminAttr(__admin('preview.easingPickerTitle')) ?>">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
                             <path d="M3 18 C 9 18, 9 6, 21 6"/>
                             <circle cx="3" cy="18" r="1.5" fill="currentColor"/>
@@ -52,7 +52,7 @@
                 
                 <!-- Delay -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-delay"><?= __admin('preview.animDelay') ?? 'Delay' ?>:</label>
+                    <label for="animation-preview-delay"><?= adminEscape(__admin('preview.animDelay')) ?>:</label>
                     <div class="animation-preview__input-group">
                         <input type="number" id="animation-preview-delay" class="admin-input" value="0" min="0" max="5000" step="100">
                         <span class="animation-preview__unit">ms</span>
@@ -61,12 +61,12 @@
                 
                 <!-- Iteration Count -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-count"><?= __admin('preview.animIterations') ?? 'Iterations' ?>:</label>
+                    <label for="animation-preview-count"><?= adminEscape(__admin('preview.animIterations')) ?>:</label>
                     <div class="animation-preview__input-group">
                         <input type="number" id="animation-preview-count" class="admin-input" value="1" min="1" max="100" step="1">
                         <label class="animation-preview__checkbox">
                             <input type="checkbox" id="animation-preview-infinite">
-                            <span><?= __admin('preview.infinite') ?? 'Infinite' ?></span>
+                            <span><?= adminEscape(__admin('preview.infinite')) ?></span>
                         </label>
                     </div>
                 </div>
@@ -74,7 +74,7 @@
             
             <!-- Generated Animation CSS -->
             <div class="animation-preview__css-preview">
-                <label><?= __admin('preview.generatedCSS') ?? 'Generated CSS' ?>:</label>
+                <label><?= adminEscape(__admin('preview.generatedCSS')) ?>:</label>
                 <code id="animation-preview-css">animation: 1000ms ease 0ms keyframeName; animation-iteration-count: 1;</code>
             </div>
         </div>
@@ -85,7 +85,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
-                    <?= __admin('preview.playAnimation') ?? 'Play Animation' ?>
+                    <?= adminEscape(__admin('preview.playAnimation')) ?>
                 </button>
             </div>
         </div>

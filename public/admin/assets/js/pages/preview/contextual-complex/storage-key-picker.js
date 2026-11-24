@@ -175,7 +175,7 @@
             type: 'button', class: 'admin-btn admin-btn--primary', text: t('create'), onclick: create,
         });
         const cancelBtn = QSDom.el('button', {
-            type: 'button', class: 'admin-btn admin-btn--ghost', text: QuickSiteUtils.tCommon('cancel'),
+            type: 'button', class: 'admin-btn admin-btn--ghost', text: QSPanelWords.t('common.cancel'),
             onclick: function () { createForm.hidden = true; },
         });
         const errorLine = QSDom.el('span', { class: 'qs-storage-key-picker__err' });

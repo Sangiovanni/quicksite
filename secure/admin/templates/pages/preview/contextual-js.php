@@ -7,9 +7,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="preview-contextual-js-page-events__icon">
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
             </svg>
-            <span class="preview-contextual-js-page-events__title"><?= __admin('preview.pageEvents') ?? 'Page Events' ?></span>
-            <span class="preview-contextual-js-page-events__count" id="js-page-events-count" title="<?= __admin('preview.interactionCount') ?? 'Number of page-level interactions' ?>">0</span>
-            <button type="button" class="preview-contextual-js-page-events__toggle" id="js-page-events-toggle" title="<?= __admin('preview.expandCollapse') ?? 'Expand / Collapse' ?>">
+            <span class="preview-contextual-js-page-events__title"><?= adminEscape(__admin('preview.pageEvents')) ?></span>
+            <span class="preview-contextual-js-page-events__count" id="js-page-events-count" title="<?= adminAttr(__admin('preview.interactionCount')) ?>">0</span>
+            <button type="button" class="preview-contextual-js-page-events__toggle" id="js-page-events-toggle" title="<?= adminAttr(__admin('preview.expandCollapse')) ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="preview-contextual-js-page-events__chevron">
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
@@ -17,7 +17,7 @@
         </div>
         <div class="preview-contextual-js-page-events__body" id="js-page-events-body" style="display: none;">
             <div class="preview-contextual-js-page-events__list" id="js-page-events-list">
-                <p class="preview-contextual-js-empty"><?= __admin('preview.noPageEvents') ?? 'No page-level events.' ?></p>
+                <p class="preview-contextual-js-empty"><?= adminEscape(__admin('preview.noPageEvents')) ?></p>
             </div>
             <div class="preview-contextual-js-page-events__actions">
                 <button type="button" class="admin-btn admin-btn--ghost" id="js-page-event-add">
@@ -25,32 +25,32 @@
                         <line x1="12" y1="5" x2="12" y2="19"/>
                         <line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    <?= __admin('preview.addPageEvent') ?? 'Add Page Event' ?>
+                    <?= adminEscape(__admin('preview.addPageEvent')) ?>
                 </button>
             </div>
             <!-- Inline add form for page events -->
             <div class="preview-contextual-js-page-events__form" id="js-page-event-form" style="display: none;">
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.event') ?? 'Event' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.event')) ?></label>
                     <select class="preview-contextual-js-form-select" id="js-page-event-event">
-                        <option value="onload"><?= __admin('preview.eventOnload') ?? 'onload (page ready)' ?></option>
-                        <option value="onscroll"><?= __admin('preview.eventOnscroll') ?? 'onscroll' ?></option>
-                        <option value="onresize"><?= __admin('preview.eventOnresize') ?? 'onresize' ?></option>
+                        <option value="onload"><?= adminEscape(__admin('preview.eventOnload')) ?></option>
+                        <option value="onscroll"><?= adminEscape(__admin('preview.eventOnscroll')) ?></option>
+                        <option value="onresize"><?= adminEscape(__admin('preview.eventOnresize')) ?></option>
                     </select>
                 </div>
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.actionType') ?? 'Action Type' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.actionType')) ?></label>
                     <select class="preview-contextual-js-form-select" id="js-page-event-action-type">
-                        <option value="function"><?= __admin('preview.actionTypeFunction') ?? 'Function' ?></option>
-                        <option value="api"><?= __admin('preview.actionTypeApi') ?? 'API Call' ?></option>
+                        <option value="function"><?= adminEscape(__admin('preview.actionTypeFunction')) ?></option>
+                        <option value="api"><?= adminEscape(__admin('preview.actionTypeApi')) ?></option>
                     </select>
                 </div>
                 <!-- Function section -->
                 <div id="js-page-event-function-section">
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label" for="js-page-event-function"><?= __admin('preview.function') ?? 'Function' ?></label>
+                        <label class="preview-contextual-js-form-label" for="js-page-event-function"><?= adminEscape(__admin('preview.function')) ?></label>
                         <select class="preview-contextual-js-form-select" id="js-page-event-function">
-                            <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
+                            <option value=""><?= adminEscape(__admin('preview.selectFunction')) ?></option>
                         </select>
                     </div>
                     <!-- Show-all toggle for the page-event picker. Same role as
@@ -58,47 +58,47 @@
                     <div class="preview-contextual-js-form-row">
                         <label>
                             <input type="checkbox" id="js-page-event-function-show-all">
-                            <span><?= __admin('preview.showAllFunctions') ?? 'Show all functions' ?></span>
+                            <span><?= adminEscape(__admin('preview.showAllFunctions')) ?></span>
                         </label>
                     </div>
                 </div>
                 <!-- API section (hidden by default) -->
                 <div id="js-page-event-api-section" class="preview-contextual-js-form-api-section">
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.selectApi') ?? 'API' ?></label>
+                        <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.interactionsApiLabel')) ?></label>
                         <select class="preview-contextual-js-form-select" id="js-page-event-api">
-                            <option value=""><?= __admin('preview.selectApiPlaceholder') ?? '-- Select API --' ?></option>
+                            <option value=""><?= adminEscape(__admin('preview.selectApiPlaceholder')) ?></option>
                         </select>
                     </div>
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.selectEndpoint') ?? 'Endpoint' ?></label>
+                        <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.interactionsEndpointLabel')) ?></label>
                         <select class="preview-contextual-js-form-select" id="js-page-event-endpoint" disabled>
-                            <option value=""><?= __admin('preview.selectEndpointPlaceholder') ?? '-- Select endpoint --' ?></option>
+                            <option value=""><?= adminEscape(__admin('preview.selectEndpointPlaceholder')) ?></option>
                         </select>
                     </div>
                 </div>
                 <!-- Response bindings (populated dynamically when endpoint selected) -->
                 <div class="preview-contextual-js-response-bindings" id="js-page-event-bindings" style="display: none;">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.responseMapping') ?? 'Response Mapping' ?></label>
-                    <p class="preview-contextual-js-response-bindings__hint"><?= __admin('preview.responseMappingHint') ?? 'Map API response fields to page elements' ?></p>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.responseMapping')) ?></label>
+                    <p class="preview-contextual-js-response-bindings__hint"><?= adminEscape(__admin('preview.responseMappingHint')) ?></p>
                     <div class="preview-contextual-js-response-bindings__rows" id="js-page-event-bindings-rows"></div>
                     <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost preview-contextual-js-response-bindings__add" id="js-page-event-bindings-add">
-                        + <?= __admin('preview.addMapping') ?? 'Add Mapping' ?>
+                        + <?= adminEscape(__admin('preview.addMapping')) ?>
                     </button>
                 </div>
                 <!-- Dynamic params -->
                 <div class="preview-contextual-js-form-params" id="js-page-event-params"></div>
                 <!-- Preview -->
                 <div class="preview-contextual-js-form-preview">
-                    <span class="preview-contextual-js-form-label"><?= __admin('preview.previewCode') ?? 'Preview' ?>:</span>
+                    <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?>:</span>
                     <code class="preview-contextual-js-form-code" id="js-page-event-preview">-</code>
                 </div>
                 <div class="preview-contextual-js-form-actions">
                     <button type="button" class="admin-btn admin-btn--ghost" id="js-page-event-cancel">
-                        <?= __admin('common.cancel') ?? 'Cancel' ?>
+                        <?= adminEscape(__admin('common.cancel')) ?>
                     </button>
                     <button type="button" class="admin-btn admin-btn--primary" id="js-page-event-save" disabled>
-                        <?= __admin('preview.addPageEvent') ?? 'Add' ?>
+                        <?= adminEscape(__admin('preview.addPageEvent')) ?>
                     </button>
                 </div>
             </div>
@@ -113,9 +113,9 @@
                 <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/>
                 <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>
             </svg>
-            <span class="preview-contextual-js-page-events__title"><?= __admin('preview.stateStores') ?? 'State stores' ?></span>
-            <span class="preview-contextual-js-page-events__count" id="js-state-stores-count" title="<?= __admin('preview.stateStoresCount') ?? 'Number of state stores on this page' ?>">0</span>
-            <button type="button" class="preview-contextual-js-page-events__toggle" id="js-state-stores-toggle" title="<?= __admin('preview.expandCollapse') ?? 'Expand / Collapse' ?>">
+            <span class="preview-contextual-js-page-events__title"><?= adminEscape(__admin('preview.stateStores')) ?></span>
+            <span class="preview-contextual-js-page-events__count" id="js-state-stores-count" title="<?= adminAttr(__admin('preview.stateStoresCount')) ?>">0</span>
+            <button type="button" class="preview-contextual-js-page-events__toggle" id="js-state-stores-toggle" title="<?= adminAttr(__admin('preview.expandCollapse')) ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="preview-contextual-js-page-events__chevron">
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
@@ -123,7 +123,7 @@
         </div>
         <div class="preview-contextual-js-page-events__body" id="js-state-stores-body" style="display: none;">
             <div class="preview-contextual-js-page-events__list" id="js-state-stores-list">
-                <p class="preview-contextual-js-empty"><?= __admin('preview.noStateStores') ?? 'No state stores yet.' ?></p>
+                <p class="preview-contextual-js-empty"><?= adminEscape(__admin('preview.noStateStores')) ?></p>
             </div>
             <div class="preview-contextual-js-page-events__actions">
                 <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-add">
@@ -131,75 +131,75 @@
                         <line x1="12" y1="5" x2="12" y2="19"/>
                         <line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    <?= __admin('preview.addStateStore') ?? 'New store' ?>
+                    <?= adminEscape(__admin('preview.addStateStore')) ?>
                 </button>
-                <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-import" title="<?= __admin('preview.stateStoreImportPick') ?? 'Pick a store from another page' ?>">
+                <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-import" title="<?= adminAttr(__admin('preview.stateStoreImportPick')) ?>">
                     <!-- "download / import" arrow into a tray -->
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                         <path d="M12 3v12"/>
                         <polyline points="6 11 12 17 18 11"/>
                         <line x1="4" y1="21" x2="20" y2="21"/>
                     </svg>
-                    <?= __admin('preview.stateStoreImport') ?? 'Import' ?>
+                    <?= adminEscape(__admin('preview.stateStoreImport')) ?>
                 </button>
             </div>
             <!-- Import picker (populated by getStateStores with no route → all routes) -->
             <div class="preview-contextual-js-page-events__form" id="js-state-store-import-picker" style="display: none;">
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreImportPick') ?? 'Pick a store from another page' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.stateStoreImportPick')) ?></label>
                     <select class="preview-contextual-js-form-select" id="js-state-store-import-select">
                         <option value="">--</option>
                     </select>
                 </div>
                 <div class="preview-contextual-js-form-row" id="js-state-store-import-rename-row" style="display: none;">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreImportRename') ?? 'Rename (store id already exists on this page):' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.stateStoreImportRename')) ?></label>
                     <input type="text" class="preview-contextual-js-form-input" id="js-state-store-import-rename-input" autocomplete="off">
                 </div>
                 <div class="preview-contextual-js-form-actions">
-                    <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-import-cancel"><?= __admin('common.cancel') ?? 'Cancel' ?></button>
-                    <button type="button" class="admin-btn admin-btn--primary" id="js-state-store-import-confirm" disabled><?= __admin('preview.stateStoreImportConfirm') ?? 'Import' ?></button>
+                    <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-import-cancel"><?= adminEscape(__admin('common.cancel')) ?></button>
+                    <button type="button" class="admin-btn admin-btn--primary" id="js-state-store-import-confirm" disabled><?= adminEscape(__admin('preview.stateStoreImportConfirm')) ?></button>
                 </div>
             </div>
             <!-- New / edit store wizard -->
             <div class="preview-contextual-js-page-events__form" id="js-state-store-form" style="display: none;">
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreId') ?? 'Store id' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.stateStoreId')) ?></label>
                     <input type="text" class="preview-contextual-js-form-input" id="js-state-store-id" placeholder="commandsList" autocomplete="off">
                 </div>
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.selectApi') ?? 'API' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.interactionsApiLabel')) ?></label>
                     <select class="preview-contextual-js-form-select" id="js-state-store-api">
-                        <option value=""><?= __admin('preview.selectApiPlaceholder') ?? '-- Select API --' ?></option>
+                        <option value=""><?= adminEscape(__admin('preview.selectApiPlaceholder')) ?></option>
                     </select>
                 </div>
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.selectEndpoint') ?? 'Endpoint' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.interactionsEndpointLabel')) ?></label>
                     <select class="preview-contextual-js-form-select" id="js-state-store-endpoint" disabled>
-                        <option value=""><?= __admin('preview.selectEndpointPlaceholder') ?? '-- Select endpoint --' ?></option>
+                        <option value=""><?= adminEscape(__admin('preview.selectEndpointPlaceholder')) ?></option>
                     </select>
                 </div>
                 <label class="preview-contextual-js-form-checkbox">
                     <input type="checkbox" id="js-state-store-fetch-on-load">
-                    <span><?= __admin('preview.stateStoreFetchOnLoad') ?? 'Fetch on page load' ?></span>
+                    <span><?= adminEscape(__admin('preview.stateStoreFetchOnLoad')) ?></span>
                 </label>
                 <div class="preview-contextual-js-state-stores__fields">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.stateStoreFields') ?? 'Fields' ?></label>
-                    <p class="preview-contextual-js-response-bindings__hint"><?= __admin('preview.stateStoreFieldsHint') ?? 'The field name is the request key. init = initial value (pick a source kind + key). from = response path, e.g. data.items.' ?></p>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.stateStoreFields')) ?></label>
+                    <p class="preview-contextual-js-response-bindings__hint"><?= adminEscape(__admin('preview.stateStoreFieldsHint')) ?></p>
                     <div class="preview-contextual-js-state-stores__fields-rows" id="js-state-store-fields-rows"></div>
                     <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost" id="js-state-store-field-add">
-                        + <?= __admin('preview.stateStoreAddField') ?? 'Add field' ?>
+                        + <?= adminEscape(__admin('preview.stateStoreAddField')) ?>
                     </button>
                 </div>
                 <div class="preview-contextual-js-form-preview">
-                    <span class="preview-contextual-js-form-label"><?= __admin('preview.previewCode') ?? 'Preview' ?>:</span>
+                    <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?>:</span>
                     <code class="preview-contextual-js-form-code" id="js-state-store-preview">-</code>
                 </div>
                 <div class="preview-contextual-js-form-actions">
                     <button type="button" class="admin-btn admin-btn--ghost" id="js-state-store-cancel">
-                        <?= __admin('common.cancel') ?? 'Cancel' ?>
+                        <?= adminEscape(__admin('common.cancel')) ?>
                     </button>
                     <button type="button" class="admin-btn admin-btn--primary" id="js-state-store-save" disabled>
-                        <?= __admin('preview.saveStateStore') ?? 'Save store' ?>
+                        <?= adminEscape(__admin('preview.saveStateStore')) ?>
                     </button>
                 </div>
             </div>
@@ -210,33 +210,33 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
         </svg>
-        <span><?= __admin('preview.jsModeHint') ?? 'Click an element to manage its JavaScript interactions' ?></span>
+        <span><?= adminEscape(__admin('preview.jsModeHint')) ?></span>
     </div>
     
     <!-- JS Info (shown when element selected) -->
     <div id="contextual-js-info" style="display: none;">
         <div class="preview-contextual-js-element">
-            <span class="preview-contextual-js-label"><?= __admin('preview.element') ?? 'Element' ?>:</span>
+            <span class="preview-contextual-js-label"><?= adminEscape(__admin('preview.element')) ?>:</span>
             <code class="preview-contextual-js-value" id="js-element-info">-</code>
         </div>
         <!-- Navigation Buttons (mirror of select-mode nav, scoped to JS panel) -->
         <div class="preview-contextual-info__nav" id="js-node-nav">
-            <button type="button" class="preview-nav-btn" id="js-nav-parent" title="<?= __admin('preview.goToParent') ?? 'Go to Parent (↑)' ?>" disabled>
+            <button type="button" class="preview-nav-btn" id="js-nav-parent" title="<?= adminAttr(__admin('preview.goToParent')) ?>" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="18 15 12 9 6 15"/>
                 </svg>
             </button>
-            <button type="button" class="preview-nav-btn" id="js-nav-prev" title="<?= __admin('preview.goToPrevSibling') ?? 'Previous Sibling (←)' ?>" disabled>
+            <button type="button" class="preview-nav-btn" id="js-nav-prev" title="<?= adminAttr(__admin('preview.goToPrevSibling')) ?>" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="15 18 9 12 15 6"/>
                 </svg>
             </button>
-            <button type="button" class="preview-nav-btn" id="js-nav-next" title="<?= __admin('preview.goToNextSibling') ?? 'Next Sibling (→)' ?>" disabled>
+            <button type="button" class="preview-nav-btn" id="js-nav-next" title="<?= adminAttr(__admin('preview.goToNextSibling')) ?>" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="9 18 15 12 9 6"/>
                 </svg>
             </button>
-            <button type="button" class="preview-nav-btn" id="js-nav-child" title="<?= __admin('preview.goToFirstChild') ?? 'First Child (↓)' ?>" disabled>
+            <button type="button" class="preview-nav-btn" id="js-nav-child" title="<?= adminAttr(__admin('preview.goToFirstChild')) ?>" disabled>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
@@ -247,37 +247,37 @@
     <!-- Interactions List -->
     <div class="preview-contextual-js-content" id="contextual-js-content" style="display: none;">
         <div class="preview-contextual-js-list" id="js-interactions-list">
-            <p class="preview-contextual-js-empty"><?= __admin('preview.noInteractions') ?? 'No interactions yet.' ?></p>
+            <p class="preview-contextual-js-empty"><?= adminEscape(__admin('preview.noInteractions')) ?></p>
         </div>
         
         <!-- Add Interaction Form (hidden by default) -->
         <div class="preview-contextual-js-form" id="js-add-form" style="display: none;">
             <div class="preview-contextual-js-form-header">
-                <strong><?= __admin('preview.newInteraction') ?? 'New Interaction' ?></strong>
+                <strong><?= adminEscape(__admin('preview.newInteraction')) ?></strong>
                 <button type="button" class="admin-modal__close" id="js-form-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
             </div>
             
             <div class="preview-contextual-js-form-row">
-                <label class="preview-contextual-js-form-label" for="js-form-event"><?= __admin('preview.event') ?? 'Event' ?></label>
+                <label class="preview-contextual-js-form-label" for="js-form-event"><?= adminEscape(__admin('preview.event')) ?></label>
                 <select class="preview-contextual-js-form-select" id="js-form-event">
-                    <option value=""><?= __admin('preview.selectEvent') ?? '-- Select event --' ?></option>
+                    <option value=""><?= adminEscape(__admin('preview.selectEvent')) ?></option>
                 </select>
             </div>
             
             <div class="preview-contextual-js-form-row">
-                <label class="preview-contextual-js-form-label"><?= __admin('preview.actionType') ?? 'Action Type' ?></label>
+                <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.actionType')) ?></label>
                 <select class="preview-contextual-js-form-select" id="js-form-action-type">
-                    <option value="function"><?= __admin('preview.actionTypeFunction') ?? 'Function' ?></option>
-                    <option value="api"><?= __admin('preview.actionTypeApi') ?? 'API Call' ?></option>
+                    <option value="function"><?= adminEscape(__admin('preview.actionTypeFunction')) ?></option>
+                    <option value="api"><?= adminEscape(__admin('preview.actionTypeApi')) ?></option>
                 </select>
             </div>
             
             <!-- Function section (shown when action type = function) -->
             <div id="js-form-function-section">
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label" for="js-form-function"><?= __admin('preview.function') ?? 'Function' ?></label>
+                    <label class="preview-contextual-js-form-label" for="js-form-function"><?= adminEscape(__admin('preview.function')) ?></label>
                     <select class="preview-contextual-js-form-select" id="js-form-function">
-                        <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
+                        <option value=""><?= adminEscape(__admin('preview.selectFunction')) ?></option>
                     </select>
                 </div>
                 <!-- Show-all toggle: by default the function list is filtered to verbs
@@ -286,7 +286,7 @@
                 <div class="preview-contextual-js-form-row">
                     <label>
                         <input type="checkbox" id="js-form-function-show-all">
-                        <span><?= __admin('preview.showAllFunctions') ?? 'Show all functions' ?></span>
+                        <span><?= adminEscape(__admin('preview.showAllFunctions')) ?></span>
                     </label>
                 </div>
                 <!-- Function details panel: full description + example.
@@ -302,15 +302,15 @@
                      the user type any METHOD + URL (with {{lang}} and
                      :placeholders supported). -->
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.apiMode') ?? 'Mode' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.apiMode')) ?></label>
                     <div class="preview-contextual-js-form-mode">
                         <label class="preview-contextual-js-form-mode-option">
                             <input type="radio" name="js-form-api-mode" value="registry" checked>
-                            <span><?= __admin('preview.apiModeRegistry') ?? 'From registry' ?></span>
+                            <span><?= adminEscape(__admin('preview.apiModeRegistry')) ?></span>
                         </label>
                         <label class="preview-contextual-js-form-mode-option">
                             <input type="radio" name="js-form-api-mode" value="direct">
-                            <span><?= __admin('preview.apiModeDirect') ?? 'Direct URL' ?></span>
+                            <span><?= adminEscape(__admin('preview.apiModeDirect')) ?></span>
                         </label>
                     </div>
                 </div>
@@ -318,15 +318,15 @@
                 <!-- Registry-mode fields -->
                 <div id="js-form-api-registry-fields">
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.selectApi') ?? 'API' ?></label>
+                        <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.interactionsApiLabel')) ?></label>
                         <select class="preview-contextual-js-form-select" id="js-form-api">
-                            <option value=""><?= __admin('preview.selectApiPlaceholder') ?? '-- Select API --' ?></option>
+                            <option value=""><?= adminEscape(__admin('preview.selectApiPlaceholder')) ?></option>
                         </select>
                     </div>
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.selectEndpoint') ?? 'Endpoint' ?></label>
+                        <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.interactionsEndpointLabel')) ?></label>
                         <select class="preview-contextual-js-form-select" id="js-form-endpoint" disabled>
-                            <option value=""><?= __admin('preview.selectEndpointPlaceholder') ?? '-- Select endpoint --' ?></option>
+                            <option value=""><?= adminEscape(__admin('preview.selectEndpointPlaceholder')) ?></option>
                         </select>
                     </div>
                     <!-- Read-only "target" chip showing the resolved
@@ -334,7 +334,7 @@
                          compiled call without scrolling to the Preview
                          section. Hidden until both dropdowns are filled. -->
                     <div class="preview-contextual-js-form-row preview-contextual-js-form-target-row" id="js-form-target-row" style="display: none;">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.target') ?? 'Target' ?></label>
+                        <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.target')) ?></label>
                         <code class="preview-contextual-js-form-target" id="js-form-target-label">—</code>
                     </div>
                 </div>
@@ -342,7 +342,7 @@
                 <!-- Direct-URL-mode fields -->
                 <div id="js-form-api-direct-fields" style="display: none;">
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.method') ?? 'Method' ?></label>
+                        <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.method')) ?></label>
                         <select class="preview-contextual-js-form-select" id="js-form-api-method">
                             <option value="GET">GET</option>
                             <option value="POST">POST</option>
@@ -352,9 +352,9 @@
                         </select>
                     </div>
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.url') ?? 'URL' ?></label>
+                        <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.url')) ?></label>
                         <input type="text" class="preview-contextual-js-form-input" id="js-form-api-url" placeholder="https://api.example.com/users/:id" autocomplete="off">
-                        <small class="preview-contextual-js-form-hint"><?= __admin('preview.urlHint') ?? 'Supports {{lang}} and :placeholders. e.g. /users/:id/posts becomes /users/42/posts at runtime.' ?></small>
+                        <small class="preview-contextual-js-form-hint"><?= adminEscape(__admin('preview.urlHint')) ?></small>
                     </div>
                 </div>
 
@@ -363,7 +363,7 @@
                      row (param name + value or selector). Compiled into
                      `paramName=value` kwargs on the call. -->
                 <div class="preview-contextual-js-form-row" id="js-form-path-params-row" style="display: none;">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.pathParams') ?? 'Path params' ?></label>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.pathParams')) ?></label>
                     <div class="preview-contextual-js-form-path-params-rows" id="js-form-path-params-rows"></div>
                 </div>
 
@@ -378,9 +378,9 @@
                      modes. Hidden when method is GET/DELETE (the browser
                      forbids a body on those, see qs.js GET/HEAD handling). -->
                 <div class="preview-contextual-js-form-row" id="js-form-api-body-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.requestBody') ?? 'Body source' ?></label>
-                    <input type="text" class="preview-contextual-js-form-input" id="js-form-api-body" placeholder="<?= __admin('preview.bodySourcePlaceholder') ?? '#form or CSS selector' ?>">
-                    <small class="preview-contextual-js-form-hint"><?= __admin('preview.bodySourceHint') ?? 'Use #form to collect from a form, or a CSS selector. Ignored on GET/DELETE.' ?></small>
+                    <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.requestBody')) ?></label>
+                    <input type="text" class="preview-contextual-js-form-input" id="js-form-api-body" placeholder="<?= adminAttr(__admin('preview.bodySourcePlaceholder')) ?>">
+                    <small class="preview-contextual-js-form-hint"><?= adminEscape(__admin('preview.bodySourceHint')) ?></small>
                 </div>
 
                 <!-- Advanced collapsible — hosts toast labels, silent
@@ -389,7 +389,7 @@
                      common-case picker compact. -->
                 <details class="preview-contextual-js-form-advanced" id="js-form-api-advanced">
                     <summary class="preview-contextual-js-form-advanced-summary">
-                        <?= __admin('preview.advanced') ?? 'Advanced' ?>
+                        <?= adminEscape(__admin('preview.advanced')) ?>
                     </summary>
                     <div class="preview-contextual-js-form-advanced-body">
 
@@ -398,22 +398,22 @@
                              *-mount slots. Silent checkboxes opt out of
                              the toast entirely for that side. -->
                         <div class="preview-contextual-js-form-row">
-                            <label class="preview-contextual-js-form-label"><?= __admin('preview.toastOnSuccess') ?? 'On success' ?></label>
+                            <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.toastOnSuccess')) ?></label>
                             <div class="preview-contextual-js-form-toast-row">
                                 <div class="preview-contextual-js-form-toast-mount" id="js-form-toast-success-mount"></div>
                                 <label class="preview-contextual-js-form-toast-silent">
                                     <input type="checkbox" id="js-form-toast-success-silent">
-                                    <span><?= __admin('preview.silent') ?? 'silent' ?></span>
+                                    <span><?= adminEscape(__admin('preview.silent')) ?></span>
                                 </label>
                             </div>
                         </div>
                         <div class="preview-contextual-js-form-row">
-                            <label class="preview-contextual-js-form-label"><?= __admin('preview.toastOnError') ?? 'On error' ?></label>
+                            <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.toastOnError')) ?></label>
                             <div class="preview-contextual-js-form-toast-row">
                                 <div class="preview-contextual-js-form-toast-mount" id="js-form-toast-error-mount"></div>
                                 <label class="preview-contextual-js-form-toast-silent">
                                     <input type="checkbox" id="js-form-toast-error-silent">
-                                    <span><?= __admin('preview.silent') ?? 'silent' ?></span>
+                                    <span><?= adminEscape(__admin('preview.silent')) ?></span>
                                 </label>
                             </div>
                         </div>
@@ -424,10 +424,10 @@
                              fetch step. The async wrap in
                              transformCallSyntax makes them await fetch. -->
                         <div class="preview-contextual-js-form-row preview-contextual-js-form-actions-row">
-                            <label class="preview-contextual-js-form-label"><?= __admin('preview.postFetchActions') ?? 'Post-fetch actions' ?></label>
+                            <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.postFetchActions')) ?></label>
                             <div class="preview-contextual-js-form-actions-list" id="js-form-actions-list"></div>
                             <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost preview-contextual-js-form-actions-add" id="js-form-actions-add">
-                                + <?= __admin('preview.addAction') ?? 'Add action' ?>
+                                + <?= adminEscape(__admin('preview.addAction')) ?>
                             </button>
                         </div>
 
@@ -436,11 +436,11 @@
             </div>
             <!-- Response bindings for element interactions -->
             <div class="preview-contextual-js-response-bindings" id="js-form-bindings" style="display: none;">
-                <label class="preview-contextual-js-form-label"><?= __admin('preview.responseMapping') ?? 'Response Mapping' ?></label>
-                <p class="preview-contextual-js-response-bindings__hint"><?= __admin('preview.responseMappingHint') ?? 'Map API response fields to page elements' ?></p>
+                <label class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.responseMapping')) ?></label>
+                <p class="preview-contextual-js-response-bindings__hint"><?= adminEscape(__admin('preview.responseMappingHint')) ?></p>
                 <div class="preview-contextual-js-response-bindings__rows" id="js-form-bindings-rows"></div>
                 <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost preview-contextual-js-response-bindings__add" id="js-form-bindings-add">
-                    + <?= __admin('preview.addMapping') ?? 'Add Mapping' ?>
+                    + <?= adminEscape(__admin('preview.addMapping')) ?>
                 </button>
             </div>
             
@@ -449,16 +449,16 @@
             </div>
             
             <div class="preview-contextual-js-form-preview">
-                <span class="preview-contextual-js-form-label"><?= __admin('preview.previewCode') ?? 'Preview' ?>:</span>
+                <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?>:</span>
                 <code class="preview-contextual-js-form-code" id="js-preview-code">-</code>
             </div>
             
             <div class="preview-contextual-js-form-actions">
                 <button type="button" class="admin-btn admin-btn--ghost" id="js-form-cancel">
-                    <?= __admin('common.cancel') ?? 'Cancel' ?>
+                    <?= adminEscape(__admin('common.cancel')) ?>
                 </button>
                 <button type="button" class="admin-btn admin-btn--primary" id="js-form-save" disabled>
-                    <?= __admin('preview.addInteraction') ?? 'Add' ?>
+                    <?= adminEscape(__admin('preview.addInteraction')) ?>
                 </button>
             </div>
         </div>
@@ -470,7 +470,7 @@
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <?= __admin('preview.addInteraction') ?? 'Add Interaction' ?>
+                <?= adminEscape(__admin('preview.addInteraction')) ?>
             </button>
         </div>
     </div>

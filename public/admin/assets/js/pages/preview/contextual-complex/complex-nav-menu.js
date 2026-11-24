@@ -10,6 +10,8 @@
 (function () {
     'use strict';
 
+    var t = window.QSComplexWizard.t;
+
     function _renderLabel(text, required) {
         var l = document.createElement('label');
         l.className = 'admin-label';
@@ -53,7 +55,7 @@
         var hrefInput = document.createElement('input');
         hrefInput.type = 'text';
         hrefInput.className = 'admin-input qs-nav-row__href';
-        hrefInput.placeholder = 'href (e.g. /about, https://...)';
+        hrefInput.placeholder = t('navMenu.hrefPlaceholder');
         hrefInput.autocomplete = 'off';
         hrefInput.style.flex = '1';
         hrefInput.style.minWidth = '0';
@@ -74,7 +76,7 @@
         extCb.className = 'qs-nav-row__external';
         if (d.external) extCb.checked = true;
         var extSpan = document.createElement('span');
-        extSpan.textContent = 'External (new tab)';
+        extSpan.textContent = t('navMenu.external');
         extLabel.appendChild(extCb);
         extLabel.appendChild(extSpan);
 
@@ -86,7 +88,7 @@
 
         var labelPicker = window.QSComplexWizard.createTextKeyPicker({
             container: labelMount,
-            placeholder: 'label key (e.g. menu.home)',
+            placeholder: t('navMenu.labelPlaceholder'),
             value: d.labelKey || '',
         });
         pickerMap.set(row, { label: labelPicker });
@@ -97,8 +99,8 @@
         var wrap = document.createElement('div');
 
         var itemsGroup = _renderGroup();
-        itemsGroup.appendChild(_renderLabel('Menu items', true));
-        itemsGroup.appendChild(_renderHint('Each item = one <li> with a single <a>. Tick "External" for outbound links (adds target="_blank" rel="noopener").'));
+        itemsGroup.appendChild(_renderLabel(t('navMenu.items'), true));
+        itemsGroup.appendChild(_renderHint(t('navMenu.itemsHint')));
         var itemsHost = document.createElement('div');
         itemsGroup.appendChild(itemsHost);
         wrap.appendChild(itemsGroup);
@@ -108,7 +110,7 @@
         var pickerMap = new WeakMap();
         var editor = window.QSComplexWizard.createRowEditor({
             container: itemsHost,
-            addButtonLabel: '+ Add menu item',
+            addButtonLabel: t('navMenu.addItem'),
             minRows: 1,
             initialRows: [
                 { labelKey: '', href: '/', external: false },
@@ -135,11 +137,12 @@
 
         function validate() {
             var cfg = getConfig();
-            if (cfg.items.length === 0) return 'Add at least one menu item.';
+            if (cfg.items.length === 0) return t('navMenu.errors.noItem');
             for (var i = 0; i < cfg.items.length; i++) {
                 var it = cfg.items[i];
-                if (!it.labelKey) return 'Item #' + (i + 1) + ' is missing a label key.';
-                if (!it.href) return 'Item #' + (i + 1) + ' is missing an href.';
+                var nth = { number: QSPanelWords.number(i + 1) };
+                if (!it.labelKey) return t('navMenu.errors.labelKey', nth);
+                if (!it.href) return t('navMenu.errors.href', nth);
             }
             return null;
         }
@@ -155,8 +158,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['nav-menu'] = {
-        label: 'Nav menu',
-        description: window.QSComplexWizard.t('navMenu.description'),
+        label: t('navMenu.label'),
+        description: t('navMenu.description'),
         renderWizard: renderWizard
     };
 })();

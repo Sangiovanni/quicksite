@@ -5,7 +5,7 @@
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
-        <span><?= __admin('preview.addModeHint') ?? 'Select an element first to add siblings or children' ?></span>
+        <span><?= adminEscape(__admin('preview.addModeHint')) ?></span>
     </div>
     
     <div class="preview-contextual-form" id="contextual-add-form" style="display: none;">
@@ -18,13 +18,13 @@
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <span id="add-form-title-text"><?= __admin('preview.addElement') ?? 'Add Element' ?></span>
+                <span id="add-form-title-text"><?= adminEscape(__admin('preview.addElement')) ?></span>
             </span>
-            <button type="button" class="preview-contextual-form__back-btn" id="add-back-to-select" title="<?= __admin('preview.backToSelect') ?? 'Back to Select' ?>">
+            <button type="button" class="preview-contextual-form__back-btn" id="add-back-to-select" title="<?= adminAttr(__admin('preview.backToSelect')) ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="15 18 9 12 15 6"/>
                 </svg>
-                <span><?= __admin('common.back') ?? 'Back' ?></span>
+                <span><?= adminEscape(__admin('common.back')) ?></span>
             </button>
         </div>
         
@@ -36,20 +36,20 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
                     </svg>
-                    <span><?= __admin('preview.htmlTag') ?? 'HTML Tag' ?></span>
+                    <span><?= adminEscape(__admin('preview.htmlTag')) ?></span>
                 </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="component">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                         <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
                     </svg>
-                    <span><?= __admin('preview.component') ?? 'Component' ?></span>
+                    <span><?= adminEscape(__admin('preview.component')) ?></span>
                 </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="snippet">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/>
                     </svg>
-                    <span><?= __admin('preview.snippet') ?? 'Snippet' ?></span>
+                    <span><?= adminEscape(__admin('preview.snippet')) ?></span>
                 </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="complex">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -58,7 +58,7 @@
                         <rect x="3" y="10" width="18" height="3" rx="1"/>
                         <rect x="3" y="16" width="11" height="3" rx="1"/>
                     </svg>
-                    <span><?= __admin('preview.complex', 'Complex') ?></span>
+                    <span><?= adminEscape(__admin('preview.complex')) ?></span>
                 </button>
                 <button type="button" class="preview-contextual-form__tab" data-type="text">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -66,7 +66,7 @@
                         <line x1="9" y1="20" x2="15" y2="20"/>
                         <line x1="12" y1="4" x2="12" y2="20"/>
                     </svg>
-                    <span><?= __admin('preview.textTab') ?? 'Text' ?></span>
+                    <span><?= adminEscape(__admin('preview.textTab')) ?></span>
                 </button>
             </div>
             <input type="hidden" id="add-type-input" value="tag">
@@ -77,9 +77,9 @@
 
         <!-- Complex Element selection (for Complex type) -->
         <div class="preview-contextual-form__field" id="add-complex-field" style="display: none;">
-            <label for="add-complex-kind"><?= __admin('preview.complexKind', 'Kind') ?>:</label>
+            <label for="add-complex-kind"><?= adminEscape(__admin('preview.complexKind')) ?>:</label>
             <select id="add-complex-kind" class="admin-input">
-                <option value=""><?= __admin('preview.complexPickKind', '— pick a kind —') ?></option>
+                <option value=""><?= adminEscape(__admin('preview.complexPickKind')) ?></option>
                 <!-- Populated by JS from window.QSComplexWizard.registry -->
             </select>
         </div>
@@ -97,16 +97,16 @@
              its translation in the current language. -->
         <div class="preview-contextual-form__section" id="add-text-field" style="display: none;">
             <label class="preview-contextual-form__section-label">
-                <?= __admin('preview.textTypeLabel') ?? 'Text type' ?>:
+                <?= adminEscape(__admin('preview.textTypeLabel')) ?>:
             </label>
             <div class="preview-contextual-form__field">
                 <label>
                     <input type="radio" name="add-text-type" value="key" checked>
-                    <span><?= __admin('preview.textTypeKey') ?? 'Translation key' ?></span>
+                    <span><?= adminEscape(__admin('preview.textTypeKey')) ?></span>
                 </label>
                 <label>
                     <input type="radio" name="add-text-type" value="raw">
-                    <span><?= __admin('preview.textTypeRaw') ?? 'RAW (literal)' ?></span>
+                    <span><?= adminEscape(__admin('preview.textTypeRaw')) ?></span>
                 </label>
             </div>
             <!-- Translation-key picker (shown when type=key): reuses the variables
@@ -114,25 +114,25 @@
                  translation; typing a new query reveals an inline create form
                  (the picker writes the value via setTranslationKeys itself). -->
             <div class="preview-contextual-form__field" id="add-text-key-field">
-                <label><?= __admin('preview.textKey') ?? 'Text key' ?>:</label>
+                <label><?= adminEscape(__admin('preview.textKey')) ?>:</label>
                 <div id="add-text-key-picker"></div>
             </div>
             <!-- RAW literal value (shown when type=raw). -->
             <div class="preview-contextual-form__field" id="add-text-value-field" style="display: none;">
-                <label for="add-text-value"><?= __admin('preview.textValueLabel') ?? 'Text' ?>:</label>
-                <input type="text" id="add-text-value" class="admin-input" placeholder="<?= __admin('preview.textValuePlaceholder') ?? 'Type the text…' ?>" autocomplete="off">
+                <label for="add-text-value"><?= adminEscape(__admin('preview.textValueLabel')) ?>:</label>
+                <input type="text" id="add-text-value" class="admin-input" placeholder="<?= adminAttr(__admin('preview.textValuePlaceholder')) ?>" autocomplete="off">
             </div>
         </div>
 
         <!-- Tag Selection (for HTML Tag type) -->
         <div class="preview-contextual-form__field" id="add-tag-field" style="display: none;">
-            <label><?= __admin('preview.selectTag') ?? 'Tag' ?>:</label>
+            <label><?= adminEscape(__admin('preview.selectTag')) ?>:</label>
             <?php $selectorId = 'add'; include '_tag-selector.php'; ?>
         </div>
         
         <!-- Component Selection (for Component type) -->
         <div class="preview-contextual-form__field" id="add-component-field" style="display: none;">
-            <label><?= __admin('preview.selectComponent') ?? 'Select Component' ?>:</label>
+            <label><?= adminEscape(__admin('preview.selectComponent')) ?>:</label>
             <?php $selectorId = 'add'; include '_component-selector.php'; ?>
         </div>
         
@@ -147,20 +147,20 @@
                     <line x1="12" y1="16" x2="12" y2="12"/>
                     <line x1="12" y1="8" x2="12.01" y2="8"/>
                 </svg>
-                <span><?= __admin('preview.componentNoVars') ?? 'This component has no configurable variables' ?></span>
+                <span><?= adminEscape(__admin('preview.componentNoVars')) ?></span>
             </div>
         </div>
 
         <!-- Snippet Selection (for Snippet type) -->
         <div class="preview-contextual-form__field" id="add-snippet-field">
-            <label><?= __admin('preview.selectSnippet') ?? 'Select Snippet' ?>:</label>
+            <label><?= adminEscape(__admin('preview.selectSnippet')) ?>:</label>
             <?php $selectorId = 'add'; include '_snippet-selector.php'; ?>
         </div>
 
         <!-- COLLAPSIBLE: Preview (for HTML Tag type) -->
         <div class="preview-contextual-form__collapsible" id="add-preview-section" style="display: none;">
             <button type="button" class="preview-contextual-form__collapsible-header" data-storage-key="qs-add-preview-expanded">
-                <span class="preview-contextual-form__collapsible-title"><?= __admin('preview.tagPreview') ?? 'Tag Preview' ?></span>
+                <span class="preview-contextual-form__collapsible-title"><?= adminEscape(__admin('preview.tagPreview')) ?></span>
                 <svg class="preview-contextual-form__collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
@@ -173,7 +173,7 @@
         <!-- COLLAPSIBLE: Position Selection -->
         <div class="preview-contextual-form__collapsible" id="add-position-section">
             <button type="button" class="preview-contextual-form__collapsible-header" data-storage-key="qs-add-position-expanded">
-                <span class="preview-contextual-form__collapsible-title"><?= __admin('preview.position') ?? 'Position' ?></span>
+                <span class="preview-contextual-form__collapsible-title"><?= adminEscape(__admin('preview.position')) ?></span>
                 <svg class="preview-contextual-form__collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
@@ -188,7 +188,7 @@
                                 <rect x="5" y="5" width="50" height="16" rx="2" class="position-picker__new"/>
                                 <rect x="5" y="29" width="50" height="16" rx="2" class="position-picker__selected"/>
                             </svg>
-                            <span class="position-picker__label"><?= __admin('preview.positionBefore') ?? 'Before' ?></span>
+                            <span class="position-picker__label"><?= adminEscape(__admin('preview.positionBefore')) ?></span>
                         </div>
                     </label>
                     
@@ -200,7 +200,7 @@
                                 <rect x="5" y="5" width="50" height="16" rx="2" class="position-picker__selected"/>
                                 <rect x="5" y="29" width="50" height="16" rx="2" class="position-picker__new"/>
                             </svg>
-                            <span class="position-picker__label"><?= __admin('preview.positionAfter') ?? 'After' ?></span>
+                            <span class="position-picker__label"><?= adminEscape(__admin('preview.positionAfter')) ?></span>
                         </div>
                     </label>
                     
@@ -212,18 +212,18 @@
                                 <rect x="3" y="3" width="54" height="44" rx="3" class="position-picker__selected"/>
                                 <rect x="10" y="10" width="40" height="14" rx="2" class="position-picker__new"/>
                             </svg>
-                            <span class="position-picker__label"><?= __admin('preview.positionInside') ?? 'Inside' ?></span>
+                            <span class="position-picker__label"><?= adminEscape(__admin('preview.positionInside')) ?></span>
                         </div>
                     </label>
                 </div>
-                <p class="preview-contextual-form__hint" id="add-position-none" style="display: none;"><?= __admin('preview.textPositionNone') ?></p>
+                <p class="preview-contextual-form__hint" id="add-position-none" style="display: none;"><?= adminEscape(__admin('preview.textPositionNone')) ?></p>
             </div>
         </div>
         
         <!-- Mandatory Parameters Section (dynamic based on tag) -->
         <div class="preview-contextual-form__section" id="add-mandatory-params" style="display: none;">
             <label class="preview-contextual-form__section-label">
-                <?= __admin('preview.requiredParams') ?? 'Required Parameters' ?>:
+                <?= adminEscape(__admin('preview.requiredParams')) ?>:
             </label>
             <div class="preview-contextual-form__mandatory-fields" id="add-mandatory-params-container">
                 <!-- Dynamically populated -->
@@ -232,12 +232,12 @@
         
         <!-- CSS Class Combobox -->
         <div class="preview-contextual-form__field" id="add-class-field" style="display: none;">
-            <label><?= __admin('preview.cssClass') ?? 'CSS Class' ?> <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:</label>
+            <label><?= adminEscape(__admin('preview.cssClass')) ?> <small>(<?= adminEscape(__admin('common.optional')) ?>)</small>:</label>
             <div class="class-combobox" id="add-class-combobox">
                 <div class="class-combobox__input-area">
                     <div class="class-combobox__chips" id="add-class-chips"></div>
                     <input type="text" class="class-combobox__input" id="add-class-input"
-                           placeholder="<?= __admin('preview.typeClassName') ?? 'Type a class name…' ?>"
+                           placeholder="<?= adminAttr(__admin('preview.typeClassName')) ?>"
                            autocomplete="off" spellcheck="false">
                 </div>
                 <div class="class-combobox__dropdown" id="add-class-dropdown" style="display: none;">
@@ -251,16 +251,16 @@
              combobox. Dedicated convenience field mirroring CSS Class;
              id stays settable via Advanced custom params in edit flows. -->
         <div class="preview-contextual-form__field" id="add-id-field" style="display: none;">
-            <label for="add-id-input"><?= __admin('preview.elementId', 'ID') ?> <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:</label>
+            <label for="add-id-input"><?= adminEscape(__admin('preview.elementId')) ?> <small>(<?= adminEscape(__admin('common.optional')) ?>)</small>:</label>
             <input type="text" class="admin-input" id="add-id-input"
-                   placeholder="<?= __admin('preview.elementIdPlaceholder', 'unique-id') ?>"
+                   placeholder="<?= adminAttr(__admin('preview.elementIdPlaceholder')) ?>"
                    autocomplete="off" spellcheck="false">
         </div>
 
         <!-- COLLAPSIBLE: Advanced / Custom Parameters (for tags only) -->
         <div class="preview-contextual-form__collapsible" id="add-advanced-section" style="display: none;">
             <button type="button" class="preview-contextual-form__collapsible-header" data-storage-key="qs-add-advanced-expanded">
-                <span class="preview-contextual-form__collapsible-title"><?= __admin('preview.advanced') ?? 'Advanced' ?></span>
+                <span class="preview-contextual-form__collapsible-title"><?= adminEscape(__admin('preview.advanced')) ?></span>
                 <svg class="preview-contextual-form__collapsible-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
@@ -271,7 +271,7 @@
                         <!-- Dynamically added param rows -->
                     </div>
                     <button type="button" class="preview-contextual-form__add-param-btn" id="add-another-param">
-                        + <?= __admin('preview.addAnother') ?? 'Add another' ?>
+                        + <?= adminEscape(__admin('preview.addAnother')) ?>
                     </button>
                 </div>
             </div>
@@ -284,8 +284,8 @@
              notice, which promised a key no command generates any more. -->
         <div class="preview-contextual-form__section" id="add-transkey-params" style="display: none;">
             <label class="preview-contextual-form__section-label">
-                <?= __admin('preview.translationKeyParams', 'Translated attributes') ?>
-                <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:
+                <?= adminEscape(__admin('preview.translationKeyParams')) ?>
+                <small>(<?= adminEscape(__admin('common.optional')) ?>)</small>:
             </label>
             <div id="add-transkey-params-container">
                 <!-- Dynamically populated -->
@@ -294,22 +294,22 @@
 
         <!-- BOTTOM Action Buttons -->
         <div class="preview-contextual-form__actions preview-contextual-form__actions--bottom">
-            <button type="button" class="admin-btn admin-btn--ghost" id="add-cancel"><?= __admin('common.cancel') ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" id="add-cancel"><?= adminEscape(__admin('common.cancel')) ?></button>
             <!-- Save & add another — keeps the form open for the next add.
                  Shown for HTML Tag / Component / Complex only (JS-managed). -->
-            <button type="button" class="admin-btn admin-btn--outline" id="add-confirm-another" style="display: none;" title="<?= __admin('preview.saveAndAddAnother', 'Save & add another') ?>">
+            <button type="button" class="admin-btn admin-btn--outline" id="add-confirm-another" style="display: none;" title="<?= adminAttr(__admin('preview.saveAndAddAnother')) ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <span><?= __admin('preview.saveAndAddAnother', 'Save & add another') ?></span>
+                <span><?= adminEscape(__admin('preview.saveAndAddAnother')) ?></span>
             </button>
             <button type="button" class="admin-btn admin-btn--success" id="add-confirm">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <span id="add-confirm-label"><?= __admin('preview.addElement') ?? 'Add Element' ?></span>
+                <span id="add-confirm-label"><?= adminEscape(__admin('preview.addElement')) ?></span>
             </button>
         </div>
     </div>

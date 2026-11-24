@@ -156,15 +156,11 @@
 
     // ── Internals ──
 
-    // A panel string by its PreviewConfig.i18n name. A missing one shows its name, so it is seen and
-    // keyed rather than hidden.
-    function t(name) {
-        var value = PreviewConfig.i18n[name];
-        return (typeof value === 'string') ? value : name;
-    }
+    // An editor word by the rest of its key's path after "preview." (a word nothing hands shows its path).
+    function t(name, params) { return QSPanelWords.t('preview.' + name, params); }
 
     function errorText(err) {
-        return (err && err.message) || t('styleSourceUnknownError');
+        return (err && err.message) || QSPanelWords.t('common.unknownError');
     }
 
     function fetchStyles() {
@@ -218,7 +214,7 @@
             if (seq === _readSeq) reconcile(content);
         }, function (err) {
             // Source could not check the file: it keeps what it shows, and says so.
-            if (seq === _readSeq) QuickSiteUtils.showToast(t('styleSourceLoadError') + ': ' + errorText(err), 'error');
+            if (seq === _readSeq) QuickSiteUtils.showToast(t('styleSourceLoadErrorDetail', { error: errorText(err) }), 'error');
         });
     }
 
@@ -342,7 +338,7 @@
     // @import … blocked") from the response envelope's errors[], not just the generic top-line message.
     function saveErrorMessage(data) {
         data = data || {};
-        var base = data.message || data.error || t('styleSourceUnknownError');
+        var base = data.message || data.error || QSPanelWords.t('common.unknownError');
         var e = data.errors && data.errors[0];
         var detail = e && (e.pattern || e.hint || e.reason);
         return detail ? base + ' — ' + detail : base;
@@ -386,7 +382,7 @@
             }
             return QuickSiteAPI.request('editStyles', 'POST', { content: content });
         }, function (err) {
-            QuickSiteUtils.showToast(t('styleSourceCheckFailed').replace('{error}', errorText(err)), 'error');
+            QuickSiteUtils.showToast(t('styleSourceCheckFailed', { error: errorText(err) }), 'error');
             return null;
         }).then(function (result) {
             if (!result) return;
@@ -395,7 +391,7 @@
             }
             onSaved(content, base, result.data);
         }).catch(function (err) {
-            QuickSiteUtils.showToast(t('styleSourceSaveError').replace('{error}', errorText(err)), 'error');
+            QuickSiteUtils.showToast(t('styleSourceSaveError', { error: errorText(err) }), 'error');
         }).then(function () {
             _isSaving = false;
             setSaveLabel(false);
@@ -477,7 +473,7 @@
             PreviewState.hotReloadCss();
             invalidateStructuredTabs();
         }).catch(function (err) {
-            QuickSiteUtils.showToast(t('styleSourceLoadError') + ': ' + errorText(err), 'error');
+            QuickSiteUtils.showToast(t('styleSourceLoadErrorDetail', { error: errorText(err) }), 'error');
         });
     }
 
@@ -567,9 +563,11 @@
             _restoreBanner.style.display = 'none';
             return;
         }
-        var when = new Date(_offeredDraft.savedAt || Date.now()).toLocaleString();
-        var tpl = (_offeredDraft.base === _serverContent) ? t('styleSourceRestoreDetail') : t('styleSourceRestoreDetailChanged');
-        if (_restoreDetail) _restoreDetail.textContent = tpl.replace('{time}', when);
+        var when = QSPanelWords.date(_offeredDraft.savedAt || Date.now());
+        var detail = (_offeredDraft.base === _serverContent)
+            ? t('styleSourceRestoreDetail', { time: when })
+            : t('styleSourceRestoreDetailChanged', { time: when });
+        if (_restoreDetail) _restoreDetail.textContent = detail;
         _restoreBanner.style.display = '';
     }
 
@@ -900,9 +898,10 @@
             _search.countEl.classList.add('preview-source-canvas__search-count--no-match');
             return;
         }
-        _search.countEl.textContent = t('styleSourceFindCount')
-            .replace('{current}', String(current))
-            .replace('{total}', String(total));
+        _search.countEl.textContent = t('styleSourceFindCount', {
+            current: QSPanelWords.number(current),
+            total: QSPanelWords.number(total)
+        });
         _search.countEl.classList.remove('preview-source-canvas__search-count--no-match');
     }
 

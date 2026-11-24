@@ -1,15 +1,15 @@
 /**
- * Preview Style Motion Module (renamed from Animations — A3-companion)
+ * Preview Style Motion Module
  *
  * Hosts the Motion tab in CSS mode. Section ordering: "Selectors with motion"
  * (transitions + animations + hover-state-only) primary; "Keyframes library"
  * secondary. The internal DOM ids (#animations-panel, #keyframes-*, etc.) and
  * the tab routing key (data-tab="animations") are intentionally kept on the
  * old "animations" name to avoid touching every CSS selector + JS lookup;
- * the user-facing label "Motion" comes through i18n.
+ * the user-facing label "Motion" is the panel's word preview.animations.
  *
  * Dependencies:
- * - PreviewConfig global (from preview-config.php)
+ * - QSPanelWords (the panel's words)
  * - PreviewState global (from preview-state.js)
  */
 (function() {
@@ -228,7 +228,7 @@
         } catch (error) {
             console.error('Failed to load animations:', error);
             const message = document.createElement('span');
-            message.textContent = PreviewConfig.i18n.loadAnimationsFailed;
+            message.textContent = QSPanelWords.t('preview.loadAnimationsFailed');
             const icon = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.alertCircle, 24);
             animationsLoading.replaceChildren(...(icon ? [icon, message] : [message]));
         }
@@ -240,7 +240,7 @@
         if (!keyframesList || !keyframesCount || !keyframesEmpty) return;
 
         const count = keyframesData.length;
-        keyframesCount.textContent = count;
+        keyframesCount.textContent = QSPanelWords.number(count);
 
         if (count === 0) {
             keyframesList.replaceChildren();
@@ -261,23 +261,21 @@
      * its bin), the selectors using it.
      */
     function _renderKeyframeItem(kf, users) {
-        const i18n = PreviewConfig.i18n;
         const name = kf.name || '';
-        const named = (word, fallback) => (i18n[word] || fallback).replace('{name}', () => name);
         const info = QSDom.el('div', { class: 'preview-keyframe-item__info' }, [
             QSDom.el('span', { class: 'preview-keyframe-item__name', text: '@keyframes ' + name }),
-            QSDom.el('span', { class: 'preview-keyframe-item__frames', text: kf.frameCount + ' ' + (kf.frameCount === 1 ? i18n.frame : i18n.frames) })
+            QSDom.el('span', { class: 'preview-keyframe-item__frames', text: QSPanelWords.count('preview.keyframeFrameCount', kf.frameCount) })
         ]);
         const item = QSDom.el('div', { class: 'preview-keyframe-item', dataset: { keyframe: name } }, [
             info,
             QSDom.el('div', { class: 'preview-keyframe-item__actions' }, [
-                _renderKeyframeAction(kf.name, 'preview', i18n.previewAnimation, _icon(QuickSiteUtils.ICON_PATHS.play, 14)),
-                _renderKeyframeAction(kf.name, 'apply', i18n.applyKeyframeToSelector || 'Apply to selector…', _icon(ICON_APPLY, 14, 'round-join')),
-                QSControls.edit(named('editNamed', 'Edit “{name}”'), (e) => {
+                _renderKeyframeAction(kf.name, 'preview', QSPanelWords.t('preview.previewAnimation'), _icon(QuickSiteUtils.ICON_PATHS.play, 14)),
+                _renderKeyframeAction(kf.name, 'apply', QSPanelWords.t('preview.applyKeyframeToSelector'), _icon(ICON_APPLY, 14, 'round-join')),
+                QSControls.edit(QSPanelWords.t('preview.editNamed', { name: name }), (e) => {
                     e.stopPropagation();
                     if (name) editKeyframe(name);
                 }, { className: 'preview-keyframe-item__btn--edit', focusKey: 'keyframe-edit:' + name, attrs: { 'data-action': 'edit' } }),
-                QSControls.bin(named('deleteNamed', 'Delete “{name}”'), (e) => {
+                QSControls.bin(QSPanelWords.t('preview.deleteNamed', { name: name }), (e) => {
                     e.stopPropagation();
                     if (name) deleteKeyframe(name);
                 }, { focusKey: 'keyframe-delete:' + name, attrs: { 'data-action': 'delete' } })
@@ -287,13 +285,12 @@
             // "used by N" badge toggles the inline user list
             const usersDiv = QSDom.el('div', { class: 'preview-keyframe-item__users', 'data-users': '', hidden: '' },
                 users.map(sel => _renderKeyframeUser(kf.name, sel)));
-            const tplCount = i18n.keyframeUsedByCount || 'used by {n}';
             const badge = QSDom.el('button', {
                 type: 'button',
                 class: 'preview-keyframe-item__used-by',
                 'data-action': 'toggle-users',
-                title: i18n.keyframeUsedByTitle || 'Show selectors using this keyframe',
-                text: tplCount.replace('{n}', String(users.length)),
+                title: QSPanelWords.t('preview.keyframeUsedByTitle'),
+                text: QSPanelWords.t('preview.keyframeUsedByCount', { n: QSPanelWords.number(users.length) }),
                 onclick: (e) => {
                     e.stopPropagation();
                     usersDiv.hidden = !usersDiv.hidden;
@@ -329,7 +326,7 @@
     function _renderKeyframeUser(keyframeName, selector) {
         return QSDom.el('div', { class: 'preview-keyframe-item__user' }, [
             QSDom.el('code', { text: selector }),
-            QSControls.bin(PreviewConfig.i18n.keyframeRemoveFromSelector || 'Remove animation from this selector', (e) => {
+            QSControls.bin(QSPanelWords.t('preview.keyframeRemoveFromSelector'), (e) => {
                 e.stopPropagation();
                 if (!keyframeName || !selector) return;
                 removeKeyframeFromSelector(keyframeName, selector);
@@ -385,7 +382,7 @@
         // Transitions
         if (transitionsList && transitionsCount) {
             const transitions = animatedSelectorsData.transitions || [];
-            transitionsCount.textContent = transitions.length;
+            transitionsCount.textContent = QSPanelWords.number(transitions.length);
 
             // "+ Add transition" button first in the list, so it shows whether the group has
             // transitions or not, and folds away with the group (same parent).
@@ -399,19 +396,19 @@
                 }
             }, [
                 _icon(QuickSiteUtils.ICON_PATHS.plus, 14, 'round'),
-                QSDom.el('span', { text: PreviewConfig.i18n.addTransition || 'Add transition' })
+                QSDom.el('span', { text: QSPanelWords.t('preview.addTransition') })
             ]);
             transitionsList.replaceChildren(addBtn, ...(transitions.length === 0
-                ? [QSDom.el('p', { text: PreviewConfig.i18n.noTransitions })]
+                ? [QSDom.el('p', { text: QSPanelWords.t('preview.noTransitions') })]
                 : transitions.map(item => _renderAnimatedSelectorGroup(item, 'transition'))));
         }
 
         // Animations
         if (animationsList && animationsCount) {
             const animations = animatedSelectorsData.animations || [];
-            animationsCount.textContent = animations.length;
+            animationsCount.textContent = QSPanelWords.number(animations.length);
             animationsList.replaceChildren(...(animations.length === 0
-                ? [QSDom.el('p', { text: PreviewConfig.i18n.noAnimations })]
+                ? [QSDom.el('p', { text: QSPanelWords.t('preview.noAnimationSelectors') })]
                 : animations.map(item => _renderAnimatedSelectorGroup(item, 'animation'))));
         }
 
@@ -476,7 +473,7 @@
         const toggle = QSDom.el('button', {
             type: 'button',
             class: 'preview-animated-selector-group__toggle',
-            title: PreviewConfig.i18n.toggleStates,
+            title: QSPanelWords.t('preview.toggleStates'),
             onclick: (e) => {
                 e.stopPropagation();
                 toggle.closest('.preview-animated-selector-group')?.classList.toggle('preview-animated-selector-group--collapsed');
@@ -490,7 +487,7 @@
                 toggle,
                 name(),
                 detailsEl(),
-                QSDom.el('span', { class: 'preview-animated-selector__state-count', text: item.states.length + ' ' + PreviewConfig.i18n.states }),
+                QSDom.el('span', { class: 'preview-animated-selector__state-count', text: QSPanelWords.count('preview.animatedSelectorStateCount', item.states.length) }),
                 arrow()
             ])),
             QSDom.el('div', { class: 'preview-animated-selector-group__states' }, item.states.map(_renderAnimatedState))
@@ -527,13 +524,13 @@
             });
             return QSDom.el('div', { class: 'preview-animated-selector__orphan-hint' }, [
                 _icon(QuickSiteUtils.ICON_PATHS.info, 12),
-                QSDom.el('span', null, [PreviewConfig.i18n.mayBeTriggeredVia + ': ', ...related])
+                QSDom.el('span', null, [QSPanelWords.t('preview.mayBeTriggeredVia') + ': ', ...related])
             ]);
         }
         if (item.isOrphan) {
             return QSDom.el('div', { class: 'preview-animated-selector__orphan-hint preview-animated-selector__orphan-hint--warning' }, [
                 _icon(QuickSiteUtils.ICON_PATHS.warning, 12),
-                QSDom.el('span', { text: PreviewConfig.i18n.noDirectTrigger })
+                QSDom.el('span', { text: QSPanelWords.t('preview.noDirectTrigger') })
             ]);
         }
         return null;
@@ -766,7 +763,7 @@
             }
         } catch (error) {
             console.error('Failed to load keyframe:', error);
-            showToast(PreviewConfig.i18n.loadKeyframeFailed, 'error');
+            showToast(QSPanelWords.t('preview.loadKeyframeFailed'), 'error');
         }
     }
     
@@ -912,8 +909,8 @@
         selectedFramePercent = frames.length > 0 ? frames[0].percent : 0;
         
         keyframeModalTitle.textContent = mode === 'edit' 
-            ? (PreviewConfig.i18n.editKeyframe)
-            : (PreviewConfig.i18n.createKeyframe);
+            ? QSPanelWords.t('preview.editKeyframe')
+            : QSPanelWords.t('preview.createKeyframe');
         
         keyframeNameInput.value = name;
         keyframeNameInput.readOnly = (mode === 'edit');
@@ -1001,7 +998,7 @@
                         const existingFrame = keyframeFrames.find(f => f.percent === clampedPercent && f !== frame);
                         if (existingFrame) {
                             marker.style.left = originalPercent + '%';
-                            showNotification(PreviewConfig.i18n.frameExists, 'error');
+                            showNotification(QSPanelWords.t('preview.frameExists'), 'error');
                         } else {
                             frame.percent = clampedPercent;
                             if (selectedFramePercent === originalPercent) {
@@ -1066,7 +1063,7 @@
                 type: 'button',
                 class: 'preview-keyframe-modal__add-property',
                 onclick: () => addKeyframeProperty(frameIndex)
-            }, [_icon(QuickSiteUtils.ICON_PATHS.plus, 12), PreviewConfig.i18n.addKeyframeProperty]));
+            }, [_icon(QuickSiteUtils.ICON_PATHS.plus, 12), QSPanelWords.t('preview.addKeyframeProperty')]));
             frameEl.appendChild(propsContainer);
             return frameEl;
         });
@@ -1076,7 +1073,7 @@
             type: 'button',
             class: 'preview-keyframe-modal__add-frame',
             onclick: () => promptAddFrame()
-        }, [_icon(QuickSiteUtils.ICON_PATHS.plus, 14), PreviewConfig.i18n.addFrame]);
+        }, [_icon(QuickSiteUtils.ICON_PATHS.plus, 14), QSPanelWords.t('preview.addFrame')]);
         keyframeFramesContainer.replaceChildren(...frameEls, addFrameBtn);
     }
 
@@ -1097,7 +1094,7 @@
             value: String(frame.percent),
             max: '100',
             step: 'any',
-            title: PreviewConfig.i18n.enterFramePercent,
+            title: QSPanelWords.t('preview.enterFramePercent'),
             onchange: (e) => {
                 const newPercent = parseFloat(e.target.value);
                 if (isNaN(newPercent) || newPercent < 0 || newPercent > 100) {
@@ -1107,7 +1104,7 @@
                 const existingFrame = keyframeFrames.find(f => f.percent === newPercent && f !== frame);
                 if (existingFrame) {
                     e.target.value = frame.percent;
-                    showNotification(PreviewConfig.i18n.frameExists, 'error');
+                    showNotification(QSPanelWords.t('preview.frameExists'), 'error');
                     return;
                 }
                 const oldPercent = frame.percent;
@@ -1126,7 +1123,7 @@
         const actions = QSDom.el('div', { class: 'preview-keyframe-modal__frame-actions' });
         if (keyframeFrames.length > 1) {
             // The frame leaves the form: nothing is written until Save
-            actions.appendChild(QSControls.removeRow(PreviewConfig.i18n.deleteFrame, (e) => {
+            actions.appendChild(QSControls.removeRow(QSPanelWords.t('preview.deleteFrame'), (e) => {
                 e.stopPropagation();
                 deleteKeyframeFrame(frame.percent);
             }));
@@ -1155,19 +1152,19 @@
         const propSelect = QSDom.el('select', Object.assign({ class: 'preview-keyframe-modal__property-select' }, index),
             commonProperties.map(p => {
                 const selected = p === '' ? !isCommonProp : prop.property === p;
-                return QSDom.el('option', Object.assign({ value: p, text: p === '' ? PreviewConfig.i18n.customProperty : p }, selected ? { selected: '' } : {}));
+                return QSDom.el('option', Object.assign({ value: p, text: p === '' ? QSPanelWords.t('preview.customProperty') : p }, selected ? { selected: '' } : {}));
             }));
         const nameInput = QSDom.el('input', Object.assign({
             type: 'text',
             class: 'preview-keyframe-modal__property-name' + (isCommonProp ? ' preview-keyframe-modal__property-name--hidden' : ''),
             value: prop.property || '',
-            placeholder: PreviewConfig.i18n.keyframePropertyName
+            placeholder: QSPanelWords.t('preview.keyframePropertyName')
         }, index, { 'data-field': 'property' }));
         const valueInput = QSDom.el('input', Object.assign({
             type: 'text',
             class: 'preview-keyframe-modal__property-value',
             value: prop.value || '',
-            placeholder: PreviewConfig.i18n.keyframePropertyValue
+            placeholder: QSPanelWords.t('preview.keyframePropertyValue')
         }, index, { 'data-field': 'value' }));
 
         propSelect.addEventListener('change', (e) => {
@@ -1193,23 +1190,23 @@
             QSDom.el('div', { class: 'preview-keyframe-modal__property-name-group' }, [propSelect, nameInput]),
             QSDom.el('span', { class: 'preview-keyframe-modal__property-colon', text: ':' }),
             valueInput,
-            QSControls.removeRow(PreviewConfig.i18n.deleteKeyframeProperty, () => deleteKeyframeProperty(frameIndex, propIndex),
+            QSControls.removeRow(QSPanelWords.t('preview.deleteKeyframeProperty'), () => deleteKeyframeProperty(frameIndex, propIndex),
                 { className: 'preview-keyframe-modal__delete-property' })
         ]);
     }
 
     async function promptAddFrame() {
-        const percent = await QuickSiteUtils.prompt(PreviewConfig.i18n.enterFramePercent, { defaultValue: '50' });
+        const percent = await QuickSiteUtils.prompt(QSPanelWords.t('preview.enterFramePercent'), { defaultValue: '50' });
         if (percent !== null) {
             const percentNum = parseFloat(percent);
             if (!isNaN(percentNum) && percentNum >= 0 && percentNum <= 100) {
                 if (keyframeFrames.find(f => f.percent === percentNum)) {
-                    showToast(PreviewConfig.i18n.frameExists, 'warning');
+                    showToast(QSPanelWords.t('preview.frameExists'), 'warning');
                 } else {
                     addKeyframeFrame(percentNum);
                 }
             } else {
-                showToast(PreviewConfig.i18n.invalidPercent, 'error');
+                showToast(QSPanelWords.t('preview.invalidPercent'), 'error');
             }
         }
     }
@@ -1248,7 +1245,7 @@
     
     function deleteKeyframeFrame(percent) {
         if (keyframeFrames.length <= 1) {
-            showToast(PreviewConfig.i18n.cannotDeleteLastFrame, 'warning');
+            showToast(QSPanelWords.t('preview.cannotDeleteLastFrame'), 'warning');
             return;
         }
         
@@ -1278,7 +1275,7 @@
     
     function deleteKeyframeProperty(frameIndex, propIndex) {
         if (keyframeFrames[frameIndex].properties.length <= 1) {
-            showToast(PreviewConfig.i18n.cannotDeleteLastProperty, 'warning');
+            showToast(QSPanelWords.t('preview.cannotDeleteLastProperty'), 'warning');
             return;
         }
         
@@ -1312,7 +1309,7 @@
         const name = keyframeNameInput.value.trim() || 'preview-temp-animation';
         
         if (keyframeFrames.length === 0) {
-            showToast(PreviewConfig.i18n.noFramesToPreview, 'warning');
+            showToast(QSPanelWords.t('preview.noFramesToPreview'), 'warning');
             return;
         }
         
@@ -1342,11 +1339,11 @@
                 targetElement.dataset.previewOriginalAnimation = originalAnimation;
                 targetElement.dataset.previewAnimating = 'true';
                 
-                showToast(PreviewConfig.i18n.previewingAnimation, 'info');
+                showToast(QSPanelWords.t('preview.previewingAnimation'), 'info');
             }
         } catch (error) {
             console.error('Failed to preview animation:', error);
-            showToast(PreviewConfig.i18n.previewFailed, 'error');
+            showToast(QSPanelWords.t('preview.previewFailed'), 'error');
         }
     }
     
@@ -1377,11 +1374,10 @@
      * its red button says Replace.
      */
     function _askReplaceKeyframe(name) {
-        const i18n = PreviewConfig.i18n;
-        return QuickSiteUtils.confirm(i18n.keyframeExistsConfirm, {
-            title: (i18n.keyframeReplaceTitle || 'Replace the keyframe “{name}”?').replace('{name}', () => name),
+        return QuickSiteUtils.confirm(QSPanelWords.t('preview.keyframeExistsConfirm'), {
+            title: QSPanelWords.t('preview.keyframeReplaceTitle', { name: name }),
             type: 'danger',
-            confirmText: i18n.keyframeReplace || 'Replace'
+            confirmText: QSPanelWords.t('preview.keyframeReplace')
         });
     }
 
@@ -1389,13 +1385,13 @@
         const name = keyframeNameInput.value.trim();
         
         if (!name) {
-            showToast(PreviewConfig.i18n.keyframeNameRequired, 'error');
+            showToast(QSPanelWords.t('preview.keyframeNameRequired'), 'error');
             keyframeNameInput.focus();
             return;
         }
         
         if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(name)) {
-            showToast(PreviewConfig.i18n.invalidKeyframeName, 'error');
+            showToast(QSPanelWords.t('preview.invalidKeyframeName'), 'error');
             keyframeNameInput.focus();
             return;
         }
@@ -1420,7 +1416,7 @@
         );
         
         if (validFrames.length === 0) {
-            showToast(PreviewConfig.i18n.atLeastOneFrame, 'error');
+            showToast(QSPanelWords.t('preview.atLeastOneFrame'), 'error');
             return;
         }
         
@@ -1468,8 +1464,8 @@
             
             showToast(
                 keyframeEditorMode === 'create' 
-                    ? (PreviewConfig.i18n.keyframeCreated)
-                    : (PreviewConfig.i18n.keyframeSaved),
+                    ? QSPanelWords.t('preview.keyframeCreated')
+                    : QSPanelWords.t('preview.keyframeSaved'),
                 'success'
             );
             
@@ -1487,15 +1483,15 @@
             
         } catch (error) {
             console.error('Failed to save keyframe:', error);
-            showToast(PreviewConfig.i18n.saveKeyframeFailed, 'error');
+            showToast(QSPanelWords.t('preview.saveKeyframeFailed'), 'error');
         }
     }
     
     async function deleteKeyframe(keyframeName) {
         if (!(await QuickSiteUtils.confirm('', {
-            title: (PreviewConfig.i18n.keyframeDeleteTitle || 'Delete the keyframe “{name}”?').replace('{name}', () => keyframeName),
+            title: QSPanelWords.t('preview.keyframeDeleteTitle', { name: keyframeName }),
             type: 'danger',
-            confirmText: PreviewConfig.i18n.delete || 'Delete'
+            confirmText: QSPanelWords.t('common.delete')
         }))) {
             return;
         }
@@ -1506,7 +1502,7 @@
             const data = response.data || {};
             
             if (data.status === 200) {
-                showToast(PreviewConfig.i18n.keyframeDeleted, 'success');
+                showToast(QSPanelWords.t('preview.keyframeDeleted'), 'success');
                 animationsLoaded = false;
                 loadAnimationsTab();
                 
@@ -1521,7 +1517,7 @@
             }
         } catch (error) {
             console.error('Failed to delete keyframe:', error);
-            showToast(PreviewConfig.i18n.deleteKeyframeFailed, 'error');
+            showToast(QSPanelWords.t('preview.deleteKeyframeFailed'), 'error');
         }
     }
 
@@ -1594,7 +1590,7 @@
             _apply.list.replaceChildren();
             const loading = document.createElement('div');
             loading.className = 'apply-keyframe-modal__empty';
-            loading.textContent = (PreviewConfig.i18n && PreviewConfig.i18n.loading) || 'Loading…';
+            loading.textContent = QSPanelWords.t('common.loading');
             _apply.list.appendChild(loading);
         }
         await ensureSelectorsLoaded();
@@ -1621,7 +1617,6 @@
 
     function renderApplyKeyframeList(filter) {
         if (!_apply.list) return;
-        const i18n = PreviewConfig.i18n || {};
         // Source the selector list from PreviewSelectorBrowser if available.
         // It exposes getAllSelectors() returning the unified list the
         // Selectors tab uses — which matches the user's mental model
@@ -1635,7 +1630,7 @@
             _apply.list.replaceChildren();
             const empty = document.createElement('div');
             empty.className = 'apply-keyframe-modal__empty';
-            empty.textContent = i18n.applyKeyframeNoSelectors || 'No selectors yet — add one via the Selectors tab.';
+            empty.textContent = QSPanelWords.t('preview.applyKeyframeNoSelectors');
             _apply.list.appendChild(empty);
             return;
         }
@@ -1648,7 +1643,7 @@
         if (!matched.length) {
             const empty = document.createElement('div');
             empty.className = 'apply-keyframe-modal__empty';
-            empty.textContent = i18n.applyKeyframeNoMatch || 'No selector matches.';
+            empty.textContent = QSPanelWords.t('preview.applyKeyframeNoMatch');
             _apply.list.appendChild(empty);
             return;
         }
@@ -1689,7 +1684,6 @@
 
     async function submitApplyKeyframe() {
         if (!_apply.keyframe || !_apply.selected) return;
-        const i18n = PreviewConfig.i18n || {};
         const keyframe = _apply.keyframe;
         const selector = _apply.selected;
         if (_apply.applyBtn) _apply.applyBtn.disabled = true;
@@ -1706,10 +1700,9 @@
             const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', body);
             ok = !!result.ok;
             errMsg = (result.data && (result.data.message || result.data.error)) || '';
-            if (!ok) throw new Error(errMsg || 'setStyleRule failed');
+            if (!ok) throw new Error(errMsg || QSPanelWords.t('common.unknownError'));
 
-            const tpl = i18n.applyKeyframeAdded || '{name} applied to {selector}';
-            showToast(tpl.replace('{name}', keyframe).replace('{selector}', selector), 'success');
+            showToast(QSPanelWords.t('preview.applyKeyframeAdded', { name: keyframe, selector: selector }), 'success');
             closeApplyKeyframeModal();
 
             // Refresh the Selectors / Motion caches so the new animation
@@ -1727,8 +1720,7 @@
                 PreviewState.hotReloadCss();
             }
         } catch (err) {
-            const tpl = i18n.applyKeyframeError || 'Failed to apply: {error}';
-            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+            showToast(QSPanelWords.t('preview.applyKeyframeError', { error: (err && err.message) || '' }), 'error');
             if (_apply.applyBtn) _apply.applyBtn.disabled = false;
         }
     }
@@ -1758,12 +1750,10 @@
     }
 
     async function removeKeyframeFromSelector(keyframeName, selector) {
-        const i18n = PreviewConfig.i18n || {};
-        const confirmTpl = i18n.keyframeRemoveConfirm || 'Remove animation from {selector}?';
         if (!(await QuickSiteUtils.confirm('', {
-            title: confirmTpl.replace('{selector}', () => selector),
+            title: QSPanelWords.t('preview.keyframeRemoveConfirm', { selector: selector }),
             type: 'danger',
-            confirmText: i18n.remove || 'Remove'
+            confirmText: QSPanelWords.t('common.remove')
         }))) return;
 
         try {
@@ -1781,10 +1771,9 @@
             const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', body);
             ok = !!result.ok;
             errMsg = (result.data && (result.data.message || result.data.error)) || '';
-            if (!ok) throw new Error(errMsg || 'setStyleRule failed');
+            if (!ok) throw new Error(errMsg || QSPanelWords.t('common.unknownError'));
 
-            const tpl = i18n.keyframeRemoved || 'Animation removed from {selector}';
-            showToast(tpl.replace('{selector}', selector), 'success');
+            showToast(QSPanelWords.t('preview.keyframeRemoved', { selector: selector }), 'success');
 
             // Refresh: animatedSelectorsData feeds the users map; reload it
             // so the badge count drops + the row disappears.
@@ -1799,8 +1788,7 @@
                 PreviewState.hotReloadCss();
             }
         } catch (err) {
-            const tpl = i18n.keyframeRemoveError || 'Failed to remove: {error}';
-            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+            showToast(QSPanelWords.t('preview.keyframeRemoveError', { error: (err && err.message) || '' }), 'error');
         }
     }
 
@@ -1934,7 +1922,7 @@
             _wizard.selectorList.replaceChildren();
             const loading = document.createElement('div');
             loading.className = 'add-transition-modal__empty';
-            loading.textContent = (PreviewConfig.i18n && PreviewConfig.i18n.loading) || 'Loading…';
+            loading.textContent = QSPanelWords.t('common.loading');
             _wizard.selectorList.appendChild(loading);
         }
         await ensureSelectorsLoaded();
@@ -1948,7 +1936,6 @@
 
     function renderWizardSelectorList(filter) {
         if (!_wizard.selectorList) return;
-        const i18n = PreviewConfig.i18n || {};
         let selectors = [];
         if (window.PreviewSelectorBrowser && PreviewSelectorBrowser.getAllSelectors) {
             try { selectors = PreviewSelectorBrowser.getAllSelectors() || []; }
@@ -1958,7 +1945,7 @@
             _wizard.selectorList.replaceChildren();
             const empty = document.createElement('div');
             empty.className = 'add-transition-modal__empty';
-            empty.textContent = i18n.applyKeyframeNoSelectors || 'No selectors yet — add one via the Selectors tab.';
+            empty.textContent = QSPanelWords.t('preview.applyKeyframeNoSelectors');
             _wizard.selectorList.appendChild(empty);
             return;
         }
@@ -1971,7 +1958,7 @@
         if (!matched.length) {
             const empty = document.createElement('div');
             empty.className = 'add-transition-modal__empty';
-            empty.textContent = i18n.applyKeyframeNoMatch || 'No selector matches.';
+            empty.textContent = QSPanelWords.t('preview.applyKeyframeNoMatch');
             _wizard.selectorList.appendChild(empty);
             return;
         }
@@ -2101,14 +2088,13 @@
     }
 
     async function submitTransitionWizard() {
-        const i18n = PreviewConfig.i18n || {};
         if (!_wizard.selectedSelector) {
-            showToast(i18n.addTransitionSelectorRequired || 'Pick a selector first', 'warning');
+            showToast(QSPanelWords.t('preview.addTransitionSelectorRequired'), 'warning');
             return;
         }
         const prop = effectivePropertyName();
         if (!prop) {
-            showToast(i18n.addTransitionPropertyRequired || 'Property is required', 'warning');
+            showToast(QSPanelWords.t('preview.addTransitionPropertyRequired'), 'warning');
             return;
         }
         const value = buildTransitionValue(prop);
@@ -2124,10 +2110,9 @@
             const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', body);
             ok = !!result.ok;
             errMsg = (result.data && (result.data.message || result.data.error)) || '';
-            if (!ok) throw new Error(errMsg || 'setStyleRule failed');
+            if (!ok) throw new Error(errMsg || QSPanelWords.t('common.unknownError'));
 
-            const tpl = i18n.addTransitionAdded || 'Transition added to {selector}';
-            showToast(tpl.replace('{selector}', selector), 'success');
+            showToast(QSPanelWords.t('preview.addTransitionAdded', { selector: selector }), 'success');
             closeTransitionWizard();
 
             // Refresh the data + iframe so the new transition surfaces in
@@ -2141,8 +2126,7 @@
                 PreviewState.hotReloadCss();
             }
         } catch (err) {
-            const tpl = i18n.addTransitionError || 'Failed to add transition: {error}';
-            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+            showToast(QSPanelWords.t('preview.addTransitionError', { error: (err && err.message) || '' }), 'error');
             if (_wizard.submitBtn) _wizard.submitBtn.disabled = false;
         }
     }

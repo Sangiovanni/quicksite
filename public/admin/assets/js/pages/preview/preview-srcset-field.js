@@ -28,9 +28,9 @@ window.PreviewSrcsetField = (function () {
 
     /** The plain choices of `sizes` in widths mode; Other… takes free text. The first is the default. */
     const SIZES_CHOICES = [
-        { value: '100vw', text: () => PreviewConfig.i18n.srcsetSizesFull },
-        { value: '50vw', text: () => PreviewConfig.i18n.srcsetSizesHalf },
-        { value: '33vw', text: () => PreviewConfig.i18n.srcsetSizesThird }
+        { value: '100vw', text: () => QSPanelWords.t('preview.srcsetSizesFull') },
+        { value: '50vw', text: () => QSPanelWords.t('preview.srcsetSizesHalf') },
+        { value: '33vw', text: () => QSPanelWords.t('preview.srcsetSizesThird') }
     ];
     const SIZES_OTHER = 'other';
     /** The kind a new field starts on (Sangio, 2026-11-23: a convention, not a setting). */
@@ -48,29 +48,22 @@ window.PreviewSrcsetField = (function () {
         return /^[ \t\n\f\r,]*$/.test(text);
     }
 
-    /** A word with its {name} placeholders filled. */
-    function fill(word, values) {
-        let out = String(word == null ? '' : word);
-        Object.keys(values || {}).forEach((k) => { out = out.split('{' + k + '}').join(values[k]); });
-        return out;
-    }
-
     /** The words of a row's problem (QSSrcset.check()'s codes). */
     function rowProblemText(code, descriptor) {
-        if (code === 'duplicate') return fill(PreviewConfig.i18n.srcsetRowDuplicate, { descriptor: descriptor });
-        if (code === 'width') return PreviewConfig.i18n.srcsetRowWidth;
-        if (code === 'space') return PreviewConfig.i18n.srcsetRowSpace;
-        if (code === 'comma') return PreviewConfig.i18n.srcsetRowComma;
+        if (code === 'duplicate') return QSPanelWords.t('preview.srcsetRowDuplicate', { descriptor: descriptor });
+        if (code === 'width') return QSPanelWords.t('preview.srcsetRowWidth');
+        if (code === 'space') return QSPanelWords.t('preview.srcsetRowSpace');
+        if (code === 'comma') return QSPanelWords.t('preview.srcsetRowComma');
         return '';
     }
 
     /** The words of why rows cannot hold a value (QSSrcset.read()'s codes). */
     function reasonText(r) {
-        if (r.code === 'skipped') return fill(PreviewConfig.i18n.srcsetReasonSkipped, { candidate: r.candidate });
-        if (r.code === 'mixed') return PreviewConfig.i18n.srcsetReasonMixed;
-        if (r.code === 'duplicate') return fill(PreviewConfig.i18n.srcsetReasonDuplicate, { descriptor: r.descriptor });
-        if (r.code === 'height') return fill(PreviewConfig.i18n.srcsetReasonHeight, { candidate: r.candidate });
-        if (r.code === 'density') return fill(PreviewConfig.i18n.srcsetReasonDensity, { descriptor: r.descriptor });
+        if (r.code === 'skipped') return QSPanelWords.t('preview.srcsetReasonSkipped', { candidate: r.candidate });
+        if (r.code === 'mixed') return QSPanelWords.t('preview.srcsetReasonMixed');
+        if (r.code === 'duplicate') return QSPanelWords.t('preview.srcsetReasonDuplicate', { descriptor: r.descriptor });
+        if (r.code === 'height') return QSPanelWords.t('preview.srcsetReasonHeight', { candidate: r.candidate });
+        if (r.code === 'density') return QSPanelWords.t('preview.srcsetReasonDensity', { descriptor: r.descriptor });
         return '';
     }
 
@@ -115,33 +108,33 @@ window.PreviewSrcsetField = (function () {
         const root = QSDom.el('div', { class: 'preview-srcset-field' + (o.closable ? ' preview-srcset-field--closable' : ''), 'data-param-field': param });
         if (o.closable) {
             // The field's × at its top right: the panel's close, placed by the field's own class
-            root.appendChild(QSControls.close(PreviewConfig.i18n.srcsetOfferClose,
+            root.appendChild(QSControls.close(QSPanelWords.t('preview.srcsetOfferClose'),
                 () => { if (typeof o.onClose === 'function') o.onClose(); }, { className: 'preview-srcset-field__close' }));
         }
 
         const kinds = QSDom.el('div', { class: 'preview-srcset-field__kinds', role: 'radiogroup' }, [
-            _renderKindChoice(id + '-kind', 'width', PreviewConfig.i18n.srcsetKindWidths, kind === 'width'),
-            _renderKindChoice(id + '-kind', 'density', PreviewConfig.i18n.srcsetKindDensities, kind === 'density')
+            _renderKindChoice(id + '-kind', 'width', QSPanelWords.t('preview.srcsetKindWidths'), kind === 'width'),
+            _renderKindChoice(id + '-kind', 'density', QSPanelWords.t('preview.srcsetKindDensities'), kind === 'density')
         ]);
         const list = QSDom.el('div', { class: 'preview-srcset-field__rows' });
         const addBtn = QSDom.el('button', { type: 'button', class: 'preview-contextual-form__add-param-btn preview-srcset-field__add' },
-            ['+ ', PreviewConfig.i18n.srcsetAddPicture]);
+            ['+ ', QSPanelWords.t('preview.srcsetAddPicture')]);
 
         const sizesSelect = QSDom.el('select', { class: 'admin-input admin-input--sm preview-srcset-field__sizes-select', id: id + '-sizes' },
-            SIZES_CHOICES.map((c) => _renderOption(c.value, c.text())).concat([_renderOption(SIZES_OTHER, PreviewConfig.i18n.srcsetSizesOther)]));
+            SIZES_CHOICES.map((c) => _renderOption(c.value, c.text())).concat([_renderOption(SIZES_OTHER, QSPanelWords.t('preview.srcsetSizesOther'))]));
         const sizesText = QSDom.el('input', { type: 'text', class: 'admin-input admin-input--sm preview-srcset-field__sizes-text',
-            placeholder: PreviewConfig.i18n.srcsetSizesPlaceholder, 'aria-label': PreviewConfig.i18n.srcsetSizesPlaceholder, hidden: '' });
+            placeholder: QSPanelWords.t('preview.srcsetSizesPlaceholder'), 'aria-label': QSPanelWords.t('preview.srcsetSizesPlaceholder'), hidden: '' });
         const sizesBox = QSDom.el('div', { class: 'preview-srcset-field__line', hidden: '' }, [
-            QSDom.el('label', { class: 'preview-srcset-field__label', for: id + '-sizes', text: PreviewConfig.i18n.srcsetSizesLabel }),
+            QSDom.el('label', { class: 'preview-srcset-field__label', for: id + '-sizes', text: QSPanelWords.t('preview.srcsetSizesLabel') }),
             sizesSelect,
             sizesText
         ]);
 
         const typeSelect = QSDom.el('select', { class: 'admin-input admin-input--sm preview-srcset-field__type-select', id: id + '-type' },
-            [_renderOption('', PreviewConfig.i18n.srcsetTypeNone)].concat(QSSrcset.formats().map((f) => _renderOption(f, f))));
+            [_renderOption('', QSPanelWords.t('preview.srcsetTypeNone'))].concat(QSSrcset.formats().map((f) => _renderOption(f, f))));
         const typeHint = QSDom.el('small', { class: 'preview-srcset-field__hint', hidden: '' });
         const typeBox = QSDom.el('div', { class: 'preview-srcset-field__line', hidden: '' }, [
-            QSDom.el('label', { class: 'preview-srcset-field__label', for: id + '-type', text: PreviewConfig.i18n.srcsetTypeLabel }),
+            QSDom.el('label', { class: 'preview-srcset-field__label', for: id + '-type', text: QSPanelWords.t('preview.srcsetTypeLabel') }),
             typeSelect,
             typeHint
         ]);
@@ -153,11 +146,11 @@ window.PreviewSrcsetField = (function () {
 
         const written = QSDom.el('code', { class: 'preview-srcset-field__written-line' });
         const writtenBox = QSDom.el('div', { class: 'preview-srcset-field__written' }, [
-            QSDom.el('span', { class: 'preview-srcset-field__label', text: PreviewConfig.i18n.srcsetWritten }),
+            QSDom.el('span', { class: 'preview-srcset-field__label', text: QSPanelWords.t('preview.srcsetWritten') }),
             written
         ]);
         const switchBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--outline preview-srcset-field__switch',
-            text: PreviewConfig.i18n.srcsetEditAsText });
+            text: QSPanelWords.t('preview.srcsetEditAsText') });
 
         root.append(kinds, list, addBtn, textBox, sizesBox, typeBox, writtenBox, switchBtn);
 
@@ -179,13 +172,13 @@ window.PreviewSrcsetField = (function () {
         /** One row: its picture, its descriptor, its ×, and the line saying its problem. Returns ONE Element. */
         function _renderRow(row) {
             const address = QSDom.el('input', { type: 'text', class: 'admin-input admin-input--sm preview-srcset-field__address',
-                placeholder: PreviewConfig.i18n.srcsetAddressLabel, 'aria-label': PreviewConfig.i18n.srcsetAddressLabel,
+                placeholder: QSPanelWords.t('preview.srcsetAddressLabel'), 'aria-label': QSPanelWords.t('preview.srcsetAddressLabel'),
                 spellcheck: 'false', autocomplete: 'off' });
             address.value = row.address;
             const browse = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--outline preview-asset-browse-btn',
-                title: PreviewConfig.i18n.browseAssets }, ['📁']);
+                title: QSPanelWords.t('preview.browseAssets') }, ['📁']);
             // The row's small ×: the field writes nothing until the form is saved
-            const remove = QSControls.removeRow(PreviewConfig.i18n.srcsetRemovePicture, null);
+            const remove = QSControls.removeRow(QSPanelWords.t('preview.srcsetRemovePicture'), null);
             const descriptor = QSDom.el('div', { class: 'preview-srcset-field__descriptor' });
             const problem = QSDom.el('small', { class: 'preview-srcset-field__problem', hidden: '' });
             const el = QSDom.el('div', { class: 'preview-srcset-field__row' }, [
@@ -237,8 +230,8 @@ window.PreviewSrcsetField = (function () {
                 const fromMedia = !!(row.media && row.media.width !== null);
                 const input = QSDom.el('input', { type: 'number', min: '1', step: '1', inputmode: 'numeric',
                     class: 'admin-input admin-input--sm preview-srcset-field__width',
-                    'aria-label': PreviewConfig.i18n.srcsetWidthLabel,
-                    title: fromMedia ? PreviewConfig.i18n.srcsetWidthFromMedia : PreviewConfig.i18n.srcsetWidthLabel });
+                    'aria-label': QSPanelWords.t('preview.srcsetWidthLabel'),
+                    title: fromMedia ? QSPanelWords.t('preview.srcsetWidthFromMedia') : QSPanelWords.t('preview.srcsetWidthLabel') });
                 if (fromMedia) input.readOnly = true;
                 input.value = row.width === null ? '' : String(row.width);
                 input.addEventListener('input', () => {
@@ -247,11 +240,11 @@ window.PreviewSrcsetField = (function () {
                     update();
                 });
                 input.addEventListener('change', () => { sortRows(); update(); });
-                row.descriptorBox.append(input, QSDom.el('span', { class: 'preview-srcset-field__unit', text: PreviewConfig.i18n.srcsetWidthUnit }));
+                row.descriptorBox.append(input, QSDom.el('span', { class: 'preview-srcset-field__unit', text: QSPanelWords.t('preview.srcsetWidthUnit') }));
             } else {
                 const slider = QSDom.el('input', { type: 'range', min: String(QSSrcset.DENSITY_MIN), max: String(QSSrcset.DENSITY_MAX),
                     step: String(QSSrcset.DENSITY_STEP), class: 'preview-srcset-field__density',
-                    'aria-label': PreviewConfig.i18n.srcsetDensityLabel, title: PreviewConfig.i18n.srcsetDensityLabel });
+                    'aria-label': QSPanelWords.t('preview.srcsetDensityLabel'), title: QSPanelWords.t('preview.srcsetDensityLabel') });
                 slider.value = String(row.density);
                 const shown = QSDom.el('output', { class: 'preview-srcset-field__density-value', text: QSSrcset.descriptorText('density', row) });
                 slider.addEventListener('input', () => {
@@ -351,7 +344,7 @@ window.PreviewSrcsetField = (function () {
             kinds.hidden = !rowsMode;
             textBox.hidden = rowsMode;
             writtenBox.hidden = !rowsMode;
-            switchBtn.textContent = rowsMode ? PreviewConfig.i18n.srcsetEditAsText : PreviewConfig.i18n.srcsetEditAsRows;
+            switchBtn.textContent = rowsMode ? QSPanelWords.t('preview.srcsetEditAsText') : QSPanelWords.t('preview.srcsetEditAsRows');
 
             // Each row's problem, said in the row.
             const check = QSSrcset.check(kind, rowData());
@@ -363,13 +356,13 @@ window.PreviewSrcsetField = (function () {
                 const descriptorInput = r.descriptorBox.querySelector('input');
                 if (descriptorInput) descriptorInput.classList.toggle('admin-input--error', code === 'width' || code === 'duplicate');
             });
-            written.textContent = value === '' ? PreviewConfig.i18n.srcsetWrittenEmpty : value;
+            written.textContent = value === '' ? QSPanelWords.t('preview.srcsetWrittenEmpty') : value;
             written.classList.toggle('preview-srcset-field__written-line--empty', value === '');
 
             // Text mode: why rows cannot hold the text, when they cannot.
             const reading = rowsMode ? null : QSSrcset.read(textarea.value);
             reasonLine.replaceChildren();
-            if (reading && !reading.ok) reasonLine.append(PreviewConfig.i18n.srcsetCannotHold, ' ', reasonText(reading));
+            if (reading && !reading.ok) reasonLine.append(QSPanelWords.t('preview.srcsetCannotHold'), ' ', reasonText(reading));
             reasonLine.hidden = !(reading && !reading.ok);
 
             // sizes: in widths mode, once the srcset holds a file. First shown: take a value another row of the form holds.
@@ -394,10 +387,10 @@ window.PreviewSrcsetField = (function () {
                 // While the pictures fill it, it follows them: their format, or none once they differ or one is unknown.
                 if (type.auto && rowsMode) setType(shared.format);
                 let hint = '';
-                if (!rowsMode || (!shared.format && !shared.differ)) hint = typeSelect.value ? '' : PreviewConfig.i18n.srcsetTypeUnknown;
-                else if (shared.differ) hint = PreviewConfig.i18n.srcsetTypeDiffer;
-                else if (type.auto || typeSelect.value === shared.format) hint = PreviewConfig.i18n.srcsetTypeFilled;
-                else hint = fill(PreviewConfig.i18n.srcsetTypeSeen, { format: shared.format });
+                if (!rowsMode || (!shared.format && !shared.differ)) hint = typeSelect.value ? '' : QSPanelWords.t('preview.srcsetTypeUnknown');
+                else if (shared.differ) hint = QSPanelWords.t('preview.srcsetTypeDiffer');
+                else if (type.auto || typeSelect.value === shared.format) hint = QSPanelWords.t('preview.srcsetTypeFilled');
+                else hint = QSPanelWords.t('preview.srcsetTypeSeen', { format: shared.format });
                 typeHint.textContent = hint;
                 typeHint.hidden = hint === '';
             }
@@ -513,7 +506,10 @@ window.PreviewSrcsetField = (function () {
             return out;
         }
 
-        /** What stops a Save: a row's problem, or a changed text a browser would read wrongly; null when nothing does. */
+        /**
+         * What stops a Save: a row's problem, or a changed text a browser would read wrongly, said with the parameter's
+         * name; null when nothing does.
+         */
         function problem() {
             update();
             if (mode === 'rows') {
@@ -521,13 +517,13 @@ window.PreviewSrcsetField = (function () {
                 if (!check.first) return null;
                 const row = rows[check.first.index];
                 if (row && row.addressInput) row.addressInput.focus();
-                return param + ': ' + rowProblemText(check.first.code, check.first.descriptor);
+                return QSPanelWords.t('preview.srcsetProblem', { param: param, problem: rowProblemText(check.first.code, check.first.descriptor) });
             }
             if (asTextarea(textarea.value) === asTextarea(original.value)) return null;
             const reading = QSSrcset.read(textarea.value);
             if (reading.ok || !reading.fault) return null;
             textarea.focus();
-            return param + ': ' + reasonText(reading);
+            return QSPanelWords.t('preview.srcsetProblem', { param: param, problem: reasonText(reading) });
         }
 
         /** Empty and whole again (Save & add another): one empty row, the kind kept, `sizes` at its default. */

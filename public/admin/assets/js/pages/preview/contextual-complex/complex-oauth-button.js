@@ -26,6 +26,8 @@
 (function () {
     'use strict';
 
+    const t = window.QSComplexWizard.t;
+
     let _providersCache = null;
     let _providersPromise = null;
     let _routesCache = null;
@@ -144,11 +146,6 @@
     // inline <code> / <a> fragments. Keeping them as named _render*
     // helpers per the CLAUDE.md HTML-in-JS hygiene rule (createElement +
     // textContent over innerHTML strings).
-    function _renderCode(text) {
-        const c = document.createElement('code');
-        c.textContent = text;
-        return c;
-    }
     function _renderAnchor(href, text) {
         const a = document.createElement('a');
         a.href = href;
@@ -168,40 +165,36 @@
         });
         return p;
     }
+    /**
+     * One paragraph of the cookie note: the word's {name} markers are code (`codes`, through
+     * QSComplexWizard.codeText()), and `link` ({ name, href, text }), when given, is the one marker
+     * that is a link.
+     */
+    function _renderNoteParagraph(word, codes, link) {
+        const pieces = link ? String(word).split('{' + link.name + '}') : [word];
+        const parts = [];
+        pieces.forEach(function (piece, i) {
+            if (i > 0) parts.push(_renderAnchor(link.href, link.text));
+            window.QSComplexWizard.codeText(piece, codes).forEach(function (part) { parts.push(part); });
+        });
+        return _renderParagraph(parts);
+    }
     function _renderCookieNoteBody() {
         const body = document.createElement('div');
         body.className = 'qs-oauth-cookie-note__body';
 
-        body.appendChild(_renderParagraph([
-            'In the standard flow (user clicks this button on your site, ',
-            'gets redirected to the provider, comes back to ',
-            _renderCode('/auth/oauth/<provider>/callback'),
-            ') the OAuth cookies are FIRST-PARTY and work everywhere.',
-        ]));
+        body.appendChild(_renderNoteParagraph(t('oauthButton.cookieNoteFlow'),
+            { callback: '/auth/oauth/<provider>/callback' }));
 
-        body.appendChild(_renderParagraph([
-            'If you EMBED this site in an ',
-            _renderCode('<iframe>'),
-            ' on a different origin (e.g. a partner portal) then Safari ',
-            'Intelligent Tracking Prevention and Firefox Enhanced Tracking ',
-            'Protection may treat the OAuth cookies as third-party and ',
-            'BLOCK them — the user appears to log in but the callback ',
-            'drops their session.',
-        ]));
+        body.appendChild(_renderNoteParagraph(t('oauthButton.cookieNoteEmbed'), { iframe: '<iframe>' }));
 
-        body.appendChild(_renderParagraph([
-            'Workarounds when embedding: open the sign-in flow in a new ',
-            'tab/popup (',
-            _renderCode('target="_blank"'),
-            ') so the cookies are set in a first-party context, or use ',
-            _renderAnchor(
-                'https://developer.mozilla.org/docs/Web/API/Storage_Access_API',
-                'the Storage Access API'
-            ),
-            ' to request cookie access. Full guidance lives in ',
-            _renderCode('ADMIN_PANEL.md §9.5'),
-            ' under the OAuth tier.',
-        ]));
+        body.appendChild(_renderNoteParagraph(t('oauthButton.cookieNoteWorkarounds'),
+            { target: 'target="_blank"', doc: 'ADMIN_PANEL.md §9.5' },
+            {
+                name: 'api',
+                href: 'https://developer.mozilla.org/docs/Web/API/Storage_Access_API',
+                text: t('oauthButton.cookieNoteApi'),
+            }));
 
         return body;
     }
@@ -211,78 +204,65 @@
 
         // ---- provider picker ------------------------------------------
         const providerGroup = _renderGroup();
-        providerGroup.appendChild(_renderLabel('Provider', true));
+        providerGroup.appendChild(_renderLabel(t('oauthButton.provider'), true));
         const providerSelect = document.createElement('select');
         providerSelect.className = 'admin-input';
         providerSelect.disabled = true;
         const loadingOption = document.createElement('option');
-        loadingOption.textContent = 'Loading providers…';
+        loadingOption.textContent = t('oauthButton.providersLoading');
         loadingOption.value = '';
         providerSelect.appendChild(loadingOption);
         providerGroup.appendChild(providerSelect);
-        providerGroup.appendChild(_renderHint(
-            'The providers this installation offers. Its operator adds one by editing '
-            + 'management/config/oauth-providers.json in the secure folder.'
-        ));
+        providerGroup.appendChild(_renderHint(t('oauthButton.providerHint')));
         wrap.appendChild(providerGroup);
 
         // ---- setup-status panel ---------------------------------------
         const statusGroup = _renderGroup();
-        statusGroup.appendChild(_renderLabel('Setup status'));
+        statusGroup.appendChild(_renderLabel(t('oauthButton.setupStatus')));
         const statusPanel = document.createElement('div');
         statusPanel.className = 'qs-oauth-status-panel';
-        statusPanel.textContent = 'Pick a provider to see what the wizard will create.';
+        statusPanel.textContent = t('oauthButton.statusIdle');
         statusGroup.appendChild(statusPanel);
         wrap.appendChild(statusGroup);
 
         // ---- label textKey --------------------------------------------
         const labelGroup = _renderGroup();
-        labelGroup.appendChild(_renderLabel('Button label key', true));
+        labelGroup.appendChild(_renderLabel(t('oauthButton.labelKey'), true));
         const labelMount = document.createElement('div');
         labelGroup.appendChild(labelMount);
         labelGroup.appendChild(QSDom.el('p', { class: 'admin-hint' },
-            window.QSComplexWizard.codeText(window.QSComplexWizard.t('oauthButton.labelKeyHint'),
+            window.QSComplexWizard.codeText(t('oauthButton.labelKeyHint'),
                 { key: 'form.signin.<provider>' })));
         wrap.appendChild(labelGroup);
 
         // ---- optional icon class --------------------------------------
         const iconGroup = _renderGroup();
-        iconGroup.appendChild(_renderLabel('Icon CSS class (optional)'));
+        iconGroup.appendChild(_renderLabel(t('oauthButton.iconClass')));
         const iconInput = document.createElement('input');
         iconInput.type = 'text';
         iconInput.className = 'admin-input';
-        iconInput.placeholder = 'e.g. icon-google';
+        iconInput.placeholder = t('oauthButton.iconPlaceholder');
         iconInput.autocomplete = 'off';
         iconGroup.appendChild(iconInput);
-        iconGroup.appendChild(_renderHint(
-            'Adds <span class="qs-oauth-button__icon <yourClass>" '
-            + 'aria-hidden="true"></span> inside the link. Leave empty '
-            + 'for a label-only button.'
-        ));
+        iconGroup.appendChild(_renderHint(t('oauthButton.iconHint')));
         wrap.appendChild(iconGroup);
 
         // ---- optional "redirect after login" --------------------------
         const returnGroup = _renderGroup();
-        returnGroup.appendChild(_renderLabel('Redirect after login (optional)'));
+        returnGroup.appendChild(_renderLabel(t('oauthButton.redirect')));
         const returnSelect = document.createElement('select');
         returnSelect.className = 'admin-input';
         const homeOpt = document.createElement('option');
         homeOpt.value = '';
-        homeOpt.textContent = '(homepage — / by default)';
+        homeOpt.textContent = t('oauthButton.redirectHome');
         returnSelect.appendChild(homeOpt);
         returnSelect.disabled = true;
         const loadingOpt = document.createElement('option');
         loadingOpt.value = '';
-        loadingOpt.textContent = 'Loading routes…';
+        loadingOpt.textContent = t('oauthButton.routesLoading');
         returnSelect.appendChild(loadingOpt);
         returnGroup.appendChild(returnSelect);
-        returnGroup.appendChild(_renderHint(
-            'Path on this site users land on after sign-in. Restricted to '
-            + 'existing routes (server rejects unknown / off-site paths to '
-            + 'prevent open-redirect abuse). To land on a :param route, '
-            + 'leave this empty and set ?return=/path/manually via the '
-            + 'element params editor after insertion.'
-        ));
+        returnGroup.appendChild(_renderHint(t('oauthButton.redirectHint')));
         wrap.appendChild(returnGroup);
 
         loadRoutesOnce().then(function (routes) {
@@ -313,7 +293,7 @@
         cookieNote.className = 'qs-oauth-cookie-note';
         const cookieSummary = document.createElement('summary');
         cookieSummary.className = 'qs-oauth-cookie-note__summary';
-        cookieSummary.textContent = 'Third-party cookies note — relevant if you embed this site in iframes';
+        cookieSummary.textContent = t('oauthButton.cookieNote');
         cookieNote.appendChild(cookieSummary);
         cookieNote.appendChild(_renderCookieNoteBody());
         wrap.appendChild(cookieNote);
@@ -323,7 +303,7 @@
         // ---- labelKey picker init -------------------------------------
         const labelPicker = window.QSComplexWizard.createTextKeyPicker({
             container: labelMount,
-            placeholder: 'e.g. form.signin.google',
+            placeholder: t('oauthButton.labelPlaceholder'),
             value: '',
         });
 
@@ -338,14 +318,14 @@
             if (providersData.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = '';
-                opt.textContent = '(no providers configured)';
+                opt.textContent = t('oauthButton.noProviders');
                 providerSelect.appendChild(opt);
-                statusPanel.textContent = 'This installation offers no OAuth provider.';
+                statusPanel.textContent = t('oauthButton.noProvidersStatus');
                 return;
             }
             const placeholder = document.createElement('option');
             placeholder.value = '';
-            placeholder.textContent = 'Pick a provider…';
+            placeholder.textContent = t('oauthButton.pickProvider');
             providerSelect.appendChild(placeholder);
             providersData.forEach(function (p) {
                 const o = document.createElement('option');
@@ -383,7 +363,7 @@
         function renderStatus(provider) {
             statusPanel.textContent = '';
             if (!provider) {
-                statusPanel.textContent = 'Pick a provider to see what the wizard will create.';
+                statusPanel.textContent = t('oauthButton.statusIdle');
                 return;
             }
             const setup = provider.setup || {};
@@ -395,15 +375,17 @@
                 r.textContent = (isDone ? '✓ ' : '○ ') + text;
                 return r;
             }
-            lines.appendChild(row('Start route ' + setup.start_route_path, setup.start_route_exists));
-            lines.appendChild(row('Callback route ' + setup.callback_route_path, setup.callback_route_exists));
+            lines.appendChild(row(t('oauthButton.startRoute', { path: setup.start_route_path }), setup.start_route_exists));
+            lines.appendChild(row(t('oauthButton.callbackRoute', { path: setup.callback_route_path }), setup.callback_route_exists));
             statusPanel.appendChild(lines);
 
+            // Not fully set up means one route or both are missing: the summary counts them.
+            const missingRoutes = (setup.start_route_exists ? 0 : 1) + (setup.callback_route_exists ? 0 : 1);
             const summary = document.createElement('div');
             summary.className = 'qs-oauth-status-panel__summary' + (setup.fully_set_up ? ' qs-oauth-status-panel__summary--warn' : '');
             summary.textContent = setup.fully_set_up
-                ? 'Routes already exist — wizard will reuse them and add a button on this page.'
-                : 'Wizard will create the missing route(s) + attach oauth-start / oauth-callback resolvers, then insert the button.';
+                ? t('oauthButton.statusReuse')
+                : QSPanelWords.count('complexWizard.oauthButton.statusCreate', missingRoutes);
             statusPanel.appendChild(summary);
 
             if (provider.credentials_status !== 'set') {
@@ -412,8 +394,7 @@
                 reminder.setAttribute('role', 'alert');
                 reminder.appendChild(QSDom.svgIcon('M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', 16));
                 const reminderText = document.createElement('span');
-                reminderText.textContent = 'This project has no preview keys for ' + provider.name
-                    + ' yet: enter them on the OAuth providers page before testing the button.';
+                reminderText.textContent = t('oauthButton.noPreviewKeys', { provider: provider.name });
                 reminder.appendChild(reminderText);
                 statusPanel.appendChild(reminder);
             }
@@ -448,19 +429,19 @@
 
         function validate() {
             const cfg = getConfig();
-            if (!cfg.provider) return 'Pick an OAuth provider.';
-            if (!cfg.labelKey) return 'Provide a label translation key (e.g. form.signin.google).';
+            if (!cfg.provider) return t('oauthButton.errors.provider');
+            if (!cfg.labelKey) return t('oauthButton.errors.labelKey');
             return null;
         }
 
         async function preSubmit() {
             const cfg = getConfig();
             const provider = cfg.provider;
-            if (!provider) throw new Error('No provider selected.');
+            if (!provider) throw new Error(t('oauthButton.errors.noProvider'));
 
             const adminApi = window.QuickSiteAdmin;
             if (!adminApi || typeof adminApi.apiRequest !== 'function') {
-                throw new Error('QuickSiteAdmin not available — cannot run setup.');
+                throw new Error(t('oauthButton.errors.noAdminApi'));
             }
 
             const startPath    = 'auth/oauth/' + provider + '/start';
@@ -474,8 +455,8 @@
                 if (!r || !r.ok) {
                     const code = (r && r.data && r.data.code) || '';
                     if (code !== 'route.already_exists') {
-                        const msg = (r && r.data && r.data.message) || 'Route creation failed';
-                        throw new Error('addRoute ' + path + ': ' + msg);
+                        const msg = (r && r.data && r.data.message) || t('oauthButton.errors.routeFailed');
+                        throw new Error(t('oauthButton.errors.setupStep', { command: 'addRoute', route: path, message: msg }));
                     }
                 }
             }
@@ -497,8 +478,8 @@
             for (const body of [startResolverBody, callbackResolverBody]) {
                 const r = await adminApi.apiRequest('setRouteResolver', 'POST', body);
                 if (!r || !r.ok) {
-                    const msg = (r && r.data && r.data.message) || 'setRouteResolver failed';
-                    throw new Error('setRouteResolver ' + body.route + ': ' + msg);
+                    const msg = (r && r.data && r.data.message) || t('oauthButton.errors.resolverFailed');
+                    throw new Error(t('oauthButton.errors.setupStep', { command: 'setRouteResolver', route: body.route, message: msg }));
                 }
             }
             // After preSubmit, succeeded or not, the host reads the Edit list again and
@@ -516,8 +497,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['oauth-button'] = {
-        label: 'Sign in with OAuth',
-        description: window.QSComplexWizard.t('oauthButton.description'),
+        label: t('oauthButton.label'),
+        description: t('oauthButton.description'),
         renderWizard: renderWizard
     };
 })();

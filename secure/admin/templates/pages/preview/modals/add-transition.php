@@ -9,18 +9,18 @@
     <div class="add-transition-modal__dialog" role="dialog" aria-labelledby="add-transition-modal-title">
         <div class="add-transition-modal__header">
             <h3 class="add-transition-modal__title" id="add-transition-modal-title">
-                <?= __admin('preview.addTransitionTitle', 'Add transition') ?>
+                <?= adminEscape(__admin('preview.addTransitionTitle')) ?>
             </h3>
             <button type="button" class="admin-modal__close" id="add-transition-modal-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="add-transition-modal__body">
             <!-- Selector picker -->
             <div class="add-transition-modal__field">
-                <label class="add-transition-modal__label"><?= __admin('preview.addTransitionSelector', 'Selector') ?></label>
+                <label class="add-transition-modal__label"><?= adminEscape(__admin('preview.addTransitionSelector')) ?></label>
                 <input type="text"
                        class="admin-input add-transition-modal__search"
                        id="add-transition-selector-search"
-                       placeholder="<?= __admin('preview.addTransitionSelectorSearchPlaceholder', 'Search selectors…') ?>"
+                       placeholder="<?= adminAttr(__admin('preview.addTransitionSelectorSearchPlaceholder')) ?>"
                        autocomplete="off"
                        spellcheck="false">
                 <div class="add-transition-modal__selector-list" id="add-transition-selector-list" role="listbox">
@@ -31,13 +31,13 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                     </svg>
-                    <span><?= __admin('preview.addTransitionExistingHint', 'This selector already has a transition. Submitting will overwrite it.') ?></span>
+                    <span><?= adminEscape(__admin('preview.addTransitionExistingHint')) ?></span>
                 </div>
             </div>
 
             <!-- Property picker -->
             <div class="add-transition-modal__field">
-                <label class="add-transition-modal__label"><?= __admin('preview.addTransitionProperty', 'Property') ?></label>
+                <label class="add-transition-modal__label"><?= adminEscape(__admin('preview.addTransitionProperty')) ?></label>
                 <div class="add-transition-modal__chips" id="add-transition-property-chips">
                     <!-- Preset property chips. The set is opinionated: the most-
                          transitioned properties on the web. Custom value lands
@@ -53,7 +53,7 @@
                 <input type="text"
                        class="admin-input add-transition-modal__property-input"
                        id="add-transition-property-input"
-                       placeholder="<?= __admin('preview.addTransitionPropertyPlaceholder', 'or type a custom property') ?>"
+                       placeholder="<?= adminAttr(__admin('preview.addTransitionPropertyPlaceholder')) ?>"
                        autocomplete="off"
                        spellcheck="false">
             </div>
@@ -61,7 +61,7 @@
             <!-- Duration + Delay (number inputs) -->
             <div class="add-transition-modal__row">
                 <div class="add-transition-modal__field add-transition-modal__field--inline">
-                    <label class="add-transition-modal__label" for="add-transition-duration"><?= __admin('preview.addTransitionDuration', 'Duration') ?></label>
+                    <label class="add-transition-modal__label" for="add-transition-duration"><?= adminEscape(__admin('preview.addTransitionDuration')) ?></label>
                     <div class="add-transition-modal__number-group">
                         <input type="number"
                                id="add-transition-duration"
@@ -69,11 +69,11 @@
                                min="0"
                                step="50"
                                value="300">
-                        <span class="add-transition-modal__unit"><?= __admin('preview.addTransitionMs', 'ms') ?></span>
+                        <span class="add-transition-modal__unit"><?= adminEscape(__admin('preview.addTransitionMs')) ?></span>
                     </div>
                 </div>
                 <div class="add-transition-modal__field add-transition-modal__field--inline">
-                    <label class="add-transition-modal__label" for="add-transition-delay"><?= __admin('preview.addTransitionDelay', 'Delay') ?></label>
+                    <label class="add-transition-modal__label" for="add-transition-delay"><?= adminEscape(__admin('preview.addTransitionDelay')) ?></label>
                     <div class="add-transition-modal__number-group">
                         <input type="number"
                                id="add-transition-delay"
@@ -81,14 +81,14 @@
                                min="0"
                                step="50"
                                value="0">
-                        <span class="add-transition-modal__unit"><?= __admin('preview.addTransitionMs', 'ms') ?></span>
+                        <span class="add-transition-modal__unit"><?= adminEscape(__admin('preview.addTransitionMs')) ?></span>
                     </div>
                 </div>
             </div>
 
             <!-- Easing (button opens QSEasingPicker) -->
             <div class="add-transition-modal__field">
-                <label class="add-transition-modal__label"><?= __admin('preview.addTransitionEasing', 'Easing') ?></label>
+                <label class="add-transition-modal__label"><?= adminEscape(__admin('preview.addTransitionEasing')) ?></label>
                 <button type="button"
                         class="add-transition-modal__easing-btn"
                         id="add-transition-easing-btn"
@@ -97,22 +97,22 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
                         <path d="M3 18 C 9 18, 9 6, 21 6"/>
                     </svg>
-                    <span class="add-transition-modal__easing-edit"><?= __admin('preview.addTransitionEasingEditBtn', 'Edit curve…') ?></span>
+                    <span class="add-transition-modal__easing-edit"><?= adminEscape(__admin('preview.addTransitionEasingEditBtn')) ?></span>
                 </button>
             </div>
 
             <!-- Generated declaration preview -->
             <div class="add-transition-modal__preview">
-                <span class="add-transition-modal__preview-label"><?= __admin('preview.addTransitionPreviewLabel', 'Preview') ?>:</span>
+                <span class="add-transition-modal__preview-label"><?= adminEscape(__admin('preview.addTransitionPreviewLabel')) ?>:</span>
                 <code class="admin-table-wrapper add-transition-modal__preview-value" tabindex="0" id="add-transition-preview-value">transition: opacity 300ms ease;</code>
             </div>
         </div>
         <div class="add-transition-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" id="add-transition-modal-cancel">
-                <?= __admin('common.cancel') ?? 'Cancel' ?>
+                <?= adminEscape(__admin('common.cancel')) ?>
             </button>
             <button type="button" class="admin-btn admin-btn--primary" id="add-transition-modal-submit" disabled>
-                <?= __admin('preview.addTransitionSubmit', 'Add transition') ?>
+                <?= adminEscape(__admin('preview.addTransitionSubmit')) ?>
             </button>
         </div>
     </div>

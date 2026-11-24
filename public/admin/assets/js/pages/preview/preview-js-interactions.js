@@ -3,7 +3,8 @@
  * Handles the JS mode interactions panel for managing element event handlers
  * 
  * Dependencies:
- * - PreviewConfig global (from preview-config.php)
+ * - QSPanelWords (core/panel-words.js): its words, the `preview` and `common` sections
+ *   preview-config.php and layout.php hand it
  */
 (function() {
     'use strict';
@@ -179,9 +180,9 @@
         // bubble reaches.
         if (jsFormEvent && window.QSSearchableSelect && !jsEventPicker) {
             jsEventPicker = new window.QSSearchableSelect(jsFormEvent, {
-                placeholder: PreviewConfig.i18n.selectEvent,
-                searchPlaceholder: PreviewConfig.i18n.searchEvents,
-                emptyText: PreviewConfig.i18n.noEventsMatch
+                placeholder: QSPanelWords.t('preview.selectEvent'),
+                searchPlaceholder: QSPanelWords.t('preview.searchEvents'),
+                emptyText: QSPanelWords.t('preview.noEventsMatch')
             });
         }
 
@@ -190,9 +191,9 @@
         if (jsFormFunction && window.QSSearchableSelect && !jsFnPicker) {
             try {
                 jsFnPicker = new window.QSSearchableSelect(jsFormFunction, {
-                    placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- Select function --',
-                    searchPlaceholder: PreviewConfig.i18n?.searchFunctions || 'Search functions… (matches name + description)',
-                    emptyText: PreviewConfig.i18n?.noFunctionsMatch || 'No functions match',
+                    placeholder: QSPanelWords.t('preview.selectFunction'),
+                    searchPlaceholder: QSPanelWords.t('preview.searchFunctions'),
+                    emptyText: QSPanelWords.t('preview.noFunctionsMatch'),
                 });
             } catch (e) {
                 console.warn('[PreviewJsInteractions] Failed to mount QSSearchableSelect on jsFormFunction:', e);
@@ -245,9 +246,9 @@
         if (peFormFunction && window.QSSearchableSelect && !peFnPicker) {
             try {
                 peFnPicker = new window.QSSearchableSelect(peFormFunction, {
-                    placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- Select function --',
-                    searchPlaceholder: PreviewConfig.i18n?.searchFunctions || 'Search functions… (matches name + description)',
-                    emptyText: PreviewConfig.i18n?.noFunctionsMatch || 'No functions match',
+                    placeholder: QSPanelWords.t('preview.selectFunction'),
+                    searchPlaceholder: QSPanelWords.t('preview.searchFunctions'),
+                    emptyText: QSPanelWords.t('preview.noFunctionsMatch'),
                 });
             } catch (e) {
                 console.warn('[PreviewJsInteractions] Failed to mount QSSearchableSelect on peFormFunction:', e);
@@ -636,7 +637,7 @@
             console.error('[PreviewJsInteractions] Failed to load interactions:', error);
             const listEl = document.getElementById('js-interactions-list');
             if (listEl) {
-                listEl.replaceChildren(_renderEmptyNote('Failed to load interactions', true));
+                listEl.replaceChildren(_renderEmptyNote(QSPanelWords.t('preview.interactionsLoadError'), true));
             }
         }
     }
@@ -671,9 +672,9 @@
                 QSDom.el('div', { class: 'preview-js-interaction__function', text: _callText(interaction) })
             ]),
             QSDom.el('div', { class: 'preview-js-interaction__actions' }, [
-                QSControls.edit(PreviewConfig.i18n?.edit || 'Edit', () => editInteraction(event, indexInEvent),
+                QSControls.edit(QSPanelWords.t('common.edit'), () => editInteraction(event, indexInEvent),
                     { focusKey: 'interaction-edit:' + key, attrs: where }),
-                QSControls.bin(PreviewConfig.i18n?.delete || 'Delete', () => deleteInteraction(event, indexInEvent, _callText(interaction)),
+                QSControls.bin(QSPanelWords.t('common.delete'), () => deleteInteraction(event, indexInEvent, _callText(interaction)),
                     { className: 'js-delete-btn', focusKey: 'interaction-delete:' + key, attrs: where })
             ])
         ]);
@@ -686,11 +687,11 @@
         return QSDom.el('div', { class: 'preview-contextual-js-page-events__item' }, [
             QSDom.el('span', { class: 'preview-contextual-js-page-events__event-badge', text: interaction.event }),
             QSDom.el('code', { class: 'preview-contextual-js-page-events__code', text: _callText(interaction) }),
-            QSControls.edit(PreviewConfig.i18n?.edit || 'Edit', (e) => {
+            QSControls.edit(QSPanelWords.t('common.edit'), (e) => {
                 e.stopPropagation();
                 editPageEventEntry(interaction.event, interaction.index);
             }, { className: 'preview-contextual-js-page-events__edit', focusKey: 'page-event-edit:' + key, attrs: where }),
-            QSControls.bin(PreviewConfig.i18n?.delete || 'Delete', (e) => {
+            QSControls.bin(QSPanelWords.t('common.delete'), (e) => {
                 e.stopPropagation();
                 deletePageEvent(interaction.event, interaction.index, _callText(interaction));
             }, { focusKey: 'page-event-delete:' + key, attrs: where })
@@ -711,7 +712,7 @@
         if (!listEl) return;
         
         if (!data.interactions || data.interactions.length === 0) {
-            listEl.replaceChildren(_renderEmptyNote(PreviewConfig.i18n?.noInteractions || 'No interactions'));
+            listEl.replaceChildren(_renderEmptyNote(QSPanelWords.t('preview.noInteractions')));
             return;
         }
         
@@ -757,22 +758,22 @@
         }
 
         await QuickSiteUtils.confirm(call || '', {
-            title: PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?',
+            title: QSPanelWords.t('preview.confirmDeleteInteraction'),
             type: 'danger',
-            confirmText: PreviewConfig.i18n?.delete || 'Delete',
+            confirmText: QSPanelWords.t('common.delete'),
             action: async () => {
                 try {
                     const response = await QuickSiteAdmin.apiRequest('deleteInteraction', 'DELETE', body);
                     const result = response.data || {};
                     if (!response.ok) {
-                        return { ok: false, message: result.message || 'Failed to delete interaction' };
+                        return { ok: false, message: result.message || QSPanelWords.t('preview.interactionDeleteFailed') };
                     }
                 } catch (error) {
                     console.error('[PreviewJsInteractions] Delete error:', error);
                     return { ok: false, message: error.message };
                 }
                 if (showToastFn) {
-                    showToastFn(PreviewConfig.i18n?.interactionDeleted || 'Interaction deleted', 'success');
+                    showToastFn(QSPanelWords.t('preview.interactionDeleted'), 'success');
                 }
                 await loadInteractions();
                 if (reloadPreviewFn) {
@@ -809,7 +810,7 @@
         
         if (!currentInteractionsData || !currentJsContext) {
             if (showToastFn) {
-                showToastFn(PreviewConfig.i18n?.noInteractionData || 'No interaction data available', 'error');
+                showToastFn(QSPanelWords.t('preview.noInteractionData'), 'error');
             }
             return;
         }
@@ -820,7 +821,7 @@
         
         if (index >= interactionsForEvent.length) {
             if (showToastFn) {
-                showToastFn(PreviewConfig.i18n?.interactionNotFound || 'Interaction not found', 'error');
+                showToastFn(QSPanelWords.t('preview.interactionNotFound'), 'error');
             }
             return;
         }
@@ -842,8 +843,8 @@
         if (jsPanelActions) jsPanelActions.style.display = 'none';
         
         // Change header and button text to "Edit"
-        if (formHeader) formHeader.textContent = PreviewConfig.i18n?.editInteraction || 'Edit Interaction';
-        if (jsFormSave) jsFormSave.textContent = PreviewConfig.i18n?.save || 'Save';
+        if (formHeader) formHeader.textContent = QSPanelWords.t('preview.editInteraction');
+        if (jsFormSave) jsFormSave.textContent = QSPanelWords.t('common.save');
         
         // Populate dropdowns
         populateEventDropdown();
@@ -1020,7 +1021,7 @@
                             if (!has) {
                                 const opt = document.createElement('option');
                                 opt.value = v;
-                                opt.textContent = v + ' (legacy)';
+                                opt.textContent = QSPanelWords.t('preview.legacyOption', { value: v });
                                 input.appendChild(opt);
                             }
                         }
@@ -1061,8 +1062,8 @@
         
         // Reset header and button text
         const formHeader = jsAddForm?.querySelector('.preview-contextual-js-form-header strong');
-        if (formHeader) formHeader.textContent = PreviewConfig.i18n?.newInteraction || 'New Interaction';
-        if (jsFormSave) jsFormSave.textContent = PreviewConfig.i18n?.addInteraction || 'Add Interaction';
+        if (formHeader) formHeader.textContent = QSPanelWords.t('preview.newInteraction');
+        if (jsFormSave) jsFormSave.textContent = QSPanelWords.t('preview.addInteraction');
         
         // Populate dropdowns
         populateEventDropdown();
@@ -1341,7 +1342,7 @@
             input.type = 'text';
             input.className = 'preview-contextual-js-form-input preview-contextual-js-form-path-param-value';
             input.dataset.pathParam = name;
-            input.placeholder = 'value or #selector.value';
+            input.placeholder = QSPanelWords.t('preview.pathParamValuePlaceholder');
             input.value = (existingKwargs[name] !== undefined ? existingKwargs[name]
                 : prior[name] !== undefined ? prior[name] : '');
             input.addEventListener('input', updatePreview);
@@ -1380,7 +1381,7 @@
         if (!jsFormToastSuccessPicker && jsFormToastSuccessMount) {
             jsFormToastSuccessPicker = factory({
                 container:   jsFormToastSuccessMount,
-                placeholder: 'e.g. form.contact.success',
+                placeholder: QSPanelWords.t('preview.toastSuccessKeyPlaceholder'),
                 value:       '',
                 onChange:    updatePreview,
             });
@@ -1388,7 +1389,7 @@
         if (!jsFormToastErrorPicker && jsFormToastErrorMount) {
             jsFormToastErrorPicker = factory({
                 container:   jsFormToastErrorMount,
-                placeholder: 'e.g. form.contact.error',
+                placeholder: QSPanelWords.t('preview.toastErrorKeyPlaceholder'),
                 value:       '',
                 onChange:    updatePreview,
             });
@@ -1444,9 +1445,7 @@
 
         var msg = document.createElement('span');
         msg.className = 'preview-contextual-js-form-auth-hint__msg';
-        msg.appendChild(document.createTextNode(
-            (detected.length > 1 ? 'Token fields detected: ' : 'Token field detected: ')
-        ));
+        msg.appendChild(document.createTextNode(QSPanelWords.count('preview.tokenFieldsDetected', detected.length) + ' '));
         detected.forEach(function(path, i) {
             if (i > 0) msg.appendChild(document.createTextNode(', '));
             var code = document.createElement('code');
@@ -1465,8 +1464,7 @@
             btn.type = 'button';
             btn.className = 'admin-btn admin-btn--xs admin-btn--ghost preview-contextual-js-form-auth-hint__btn';
             btn.textContent = '+ saveToken("' + leaf + '")';
-            btn.title = 'Add a saveToken action that stores response.' + path
-                + ' into localStorage as "' + leaf + '".';
+            btn.title = QSPanelWords.t('preview.authHintAddTitle', { path: path, name: leaf });
             btn.addEventListener('click', function() {
                 postFetchActionsState.push({
                     verb: 'saveToken',
@@ -1505,12 +1503,21 @@
     }
 
     /**
+     * A verb category's name in the picker: its word, preview.functionCategories.<id>. A category
+     * the catalog names and no word file knows shows its own id.
+     */
+    function _functionCategoryLabel(cat) {
+        var path = 'preview.functionCategories.' + cat;
+        return QSPanelWords.has(path) ? QSPanelWords.t(path) : cat;
+    }
+
+    /**
      * Populate a verb <select> with the QS catalog, grouped into category
      * optgroups (name + data-args/description/example per option, so the
      * searchable combobox shows + matches descriptions). Shared by the main
-     * Function picker and the post-fetch action verb pickers so they are
-     * identical. `fns` is the pre-filtered verb list; `placeholderText` is the
-     * blank first option.
+     * Function picker, the page-event Function picker and the post-fetch
+     * action verb pickers so they are identical. `fns` is the pre-filtered
+     * verb list; `placeholderText` is the blank first option.
      */
     function _populateVerbSelect(selectEl, fns, placeholderText) {
         selectEl.replaceChildren();
@@ -1519,6 +1526,9 @@
         placeholderOpt.textContent = placeholderText;
         selectEl.appendChild(placeholderOpt);
 
+        // A verb's category is optional: one without falls into Uncategorized (a
+        // defensive bucket), last; 'general' is the intentional cross-cutting bucket.
+        // See DESIGN_DECISIONS.md "Picker categorisation".
         var grouped = {};
         (fns || []).forEach(function (fn) {
             if (!fn || !fn.name) return;
@@ -1528,12 +1538,6 @@
         });
 
         var KNOWN_CATEGORY_ORDER = ['dom-toggle', 'form', 'fetch', 'auth', 'nav', 'state-store', 'focus', 'display', 'general'];
-        var CATEGORY_LABELS = {
-            'dom-toggle': 'DOM toggles', 'form': 'Forms', 'fetch': 'Fetch / network',
-            'auth': 'Auth', 'nav': 'Navigation', 'state-store': 'State stores',
-            'focus': 'DOM focus', 'display': 'Rendering / display', 'general': 'General',
-            'uncategorized': 'Uncategorized'
-        };
         var renderOrder = KNOWN_CATEGORY_ORDER.slice();
         Object.keys(grouped)
             .filter(function (c) { return c !== 'uncategorized' && KNOWN_CATEGORY_ORDER.indexOf(c) === -1; })
@@ -1544,7 +1548,7 @@
         renderOrder.forEach(function (cat) {
             if (!grouped[cat] || grouped[cat].length === 0) return;
             var optgroup = document.createElement('optgroup');
-            optgroup.label = CATEGORY_LABELS[cat] || cat;
+            optgroup.label = _functionCategoryLabel(cat);
             grouped[cat].forEach(function (fn) {
                 var option = document.createElement('option');
                 option.value = fn.name;
@@ -1575,7 +1579,7 @@
         var actionFns = (availableFunctions || []).filter(function (fn) {
             return fn && fn.name && fn.name !== 'fetch';
         });
-        _populateVerbSelect(verbSelect, actionFns, '-- pick verb --');
+        _populateVerbSelect(verbSelect, actionFns, QSPanelWords.t('preview.selectFunction'));
         verbSelect.value = action.verb || '';
 
         // Args container — re-rendered when verb changes.
@@ -1618,7 +1622,7 @@
         });
 
         // The row's ×: the action leaves the list (nothing is written until Save)
-        var del = QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove', function() {
+        var del = QSControls.removeRow(QSPanelWords.t('common.remove'), function() {
             postFetchActionsState.splice(idx, 1);
             renderActionsList();
             updatePreview();
@@ -1631,9 +1635,9 @@
         if (window.QSSearchableSelect) {
             try {
                 new window.QSSearchableSelect(verbSelect, {
-                    placeholder: (PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.selectFunction) || '-- pick verb --',
-                    searchPlaceholder: (PreviewConfig.i18n && PreviewConfig.i18n.searchFunctions) || 'Search functions… (matches name + description)',
-                    emptyText: (PreviewConfig.i18n && PreviewConfig.i18n.noFunctionsMatch) || 'No functions match',
+                    placeholder: QSPanelWords.t('preview.selectFunction'),
+                    searchPlaceholder: QSPanelWords.t('preview.searchFunctions'),
+                    emptyText: QSPanelWords.t('preview.noFunctionsMatch'),
                 });
             } catch (e) {
                 console.warn('[PreviewJsInteractions] Failed to wrap action verb select:', e);
@@ -1879,7 +1883,7 @@
 
         var label = document.createElement('label');
         label.className = 'preview-contextual-js-form-label';
-        label.textContent = arg.name || ('Param ' + (paramIndex + 1));
+        label.textContent = arg.name || QSPanelWords.t('preview.argUnnamed', { number: QSPanelWords.number(paramIndex + 1) });
         if (arg.required !== false) label.append(' ', QSDom.el('span', { class: 'required', text: '*' }));
         row.appendChild(label);
 
@@ -1972,7 +1976,7 @@
         if (ids.length === 0) {
             var none = document.createElement('option');
             none.value = '';
-            none.textContent = PreviewConfig.i18n?.stateStoreNonePage || 'No stores on this page';
+            none.textContent = QSPanelWords.t('preview.stateStoreNonePage');
             sel.appendChild(none);
             sel.disabled = true;
         } else {
@@ -2001,7 +2005,7 @@
         sel.textContent = '';
         var placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = PreviewConfig.i18n?.selectApiEndpoint || '— Select an API endpoint —';
+        placeholder.textContent = QSPanelWords.t('preview.apiEndpointPickerPlaceholder');
         sel.appendChild(placeholder);
         availableApiEndpoints.forEach(function(ep) {
             var opt = document.createElement('option');
@@ -2036,7 +2040,7 @@
         sel.textContent = '';
         var placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = PreviewConfig.i18n?.selectApi || '— Select an API —';
+        placeholder.textContent = QSPanelWords.t('preview.selectApi');
         sel.appendChild(placeholder);
         var seen = {};
         availableApiEndpoints.forEach(function(ep) {
@@ -2044,7 +2048,7 @@
             seen[ep.api] = true;
             var endpointsForApi = availableApiEndpoints.filter(function(e) { return e.api === ep.api; });
             var sampleNames = endpointsForApi.slice(0, 3).map(function(e) { return e.endpoint; }).join(', ');
-            var subtitle = endpointsForApi.length + ' endpoint' + (endpointsForApi.length === 1 ? '' : 's');
+            var subtitle = QSPanelWords.count('preview.apiEndpointCount', endpointsForApi.length);
             if (sampleNames) subtitle += ' — ' + sampleNames + (endpointsForApi.length > 3 ? ', …' : '');
             var opt = document.createElement('option');
             opt.value = '@' + ep.api;
@@ -2080,14 +2084,14 @@
         if (!window.QSSearchableSelect) return null;
         var labels = inputType === 'apiEndpoint'
             ? {
-                placeholder: PreviewConfig.i18n?.selectApiEndpoint || 'Select an API endpoint…',
-                searchPlaceholder: PreviewConfig.i18n?.searchEndpoints || 'Search endpoints… (matches name, path, description)',
-                emptyText: PreviewConfig.i18n?.noEndpointsMatch || 'No endpoints match',
+                placeholder: QSPanelWords.t('preview.apiEndpointPickerPlaceholder'),
+                searchPlaceholder: QSPanelWords.t('preview.searchEndpoints'),
+                emptyText: QSPanelWords.t('preview.noEndpointsMatch'),
             }
             : {
-                placeholder: PreviewConfig.i18n?.selectApi || 'Select an API…',
-                searchPlaceholder: PreviewConfig.i18n?.searchApis || 'Search APIs…',
-                emptyText: PreviewConfig.i18n?.noApisMatch || 'No APIs match',
+                placeholder: QSPanelWords.t('preview.selectApi'),
+                searchPlaceholder: QSPanelWords.t('preview.searchApis'),
+                emptyText: QSPanelWords.t('preview.noApisMatch'),
             };
         var picker;
         try {
@@ -2132,7 +2136,7 @@
         sel.textContent = '';
         var placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = PreviewConfig.i18n?.selectRoute || '— Select a route —';
+        placeholder.textContent = QSPanelWords.t('preview.selectRoute');
         sel.appendChild(placeholder);
 
         if (allowExternal) {
@@ -2142,8 +2146,8 @@
             // when this gets picked.
             var custom = document.createElement('option');
             custom.value = '__custom__';
-            custom.textContent = PreviewConfig.i18n?.routeCustomUrl || 'Custom URL…';
-            custom.dataset.description = PreviewConfig.i18n?.routeCustomUrlHint || 'Type any URL (external or internal)';
+            custom.textContent = QSPanelWords.t('preview.routeCustomUrl');
+            custom.dataset.description = QSPanelWords.t('preview.routeCustomUrlHint');
             sel.appendChild(custom);
         }
 
@@ -2151,7 +2155,7 @@
         var home = document.createElement('option');
         home.value = '/';
         home.textContent = '/';
-        home.dataset.description = 'Project home';
+        home.dataset.description = QSPanelWords.t('preview.routeHomeHint');
         sel.appendChild(home);
 
         availableRoutes.forEach(function(r) {
@@ -2201,13 +2205,13 @@
         input.className = 'qs-route-picker__custom-input';
         input.dataset.paramIndex = paramIndex;
         input.dataset.paramName = arg.name || '';
-        input.placeholder = 'https://example.com or /custom-path';
+        input.placeholder = QSPanelWords.t('preview.routeCustomUrlPlaceholder');
         input.style.display = 'none';
 
         var backBtn = document.createElement('button');
         backBtn.type = 'button';
         backBtn.className = 'qs-route-picker__back';
-        backBtn.title = PreviewConfig.i18n?.backToRoutePicker || 'Back to route picker';
+        backBtn.title = QSPanelWords.t('preview.backToRoutePicker');
         backBtn.textContent = '←';
         backBtn.style.display = 'none';
 
@@ -2253,7 +2257,7 @@
             if (!has && v !== '' && v !== '__custom__') {
                 var opt = document.createElement('option');
                 opt.value = v;
-                opt.textContent = v + ' (legacy)';
+                opt.textContent = QSPanelWords.t('preview.legacyOption', { value: v });
                 sel.appendChild(opt);
             }
             sel.value = v;
@@ -2296,11 +2300,11 @@
         var picker;
         try {
             picker = new window.QSSearchableSelect(sel, {
-                placeholder: PreviewConfig.i18n?.selectRoute || 'Select a route…',
+                placeholder: QSPanelWords.t('preview.selectRoute'),
                 searchPlaceholder: allowExternal
-                    ? (PreviewConfig.i18n?.searchRoutesOrCustom || 'Search routes… (or pick Custom URL)')
-                    : (PreviewConfig.i18n?.searchRoutes || 'Search routes…'),
-                emptyText: PreviewConfig.i18n?.noRoutesMatch || 'No routes match',
+                    ? QSPanelWords.t('preview.searchRoutesOrCustom')
+                    : QSPanelWords.t('preview.searchRoutes'),
+                emptyText: QSPanelWords.t('preview.noRoutesMatch'),
             });
         } catch (e) {
             console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for inputType=route:', e);
@@ -2360,20 +2364,19 @@
         var placeholder = document.createElement('option');
         placeholder.value = '';
         if (params.length === 0) {
-            placeholder.textContent = PreviewConfig.i18n?.noRouteParams
-                || '— No :params on this route — add one at /admin/sitemap —';
+            placeholder.textContent = QSPanelWords.t('preview.noRouteParams');
             sel.appendChild(placeholder);
             sel.disabled = true;
             return;
         }
-        placeholder.textContent = PreviewConfig.i18n?.selectRouteParam || '— Select a :param —';
+        placeholder.textContent = QSPanelWords.t('preview.selectRouteParam');
         sel.appendChild(placeholder);
         sel.disabled = false;
         params.forEach(function(p) {
             var opt = document.createElement('option');
             opt.value = p;
             opt.textContent = p;
-            opt.dataset.description = (PreviewConfig.i18n?.routeParamCapturedFrom || 'Captured from :{name} in the route URL').replace('{name}', p);
+            opt.dataset.description = QSPanelWords.t('preview.routeParamCapturedFrom', { name: p });
             sel.appendChild(opt);
         });
     }
@@ -2393,9 +2396,9 @@
         if (!window.QSSearchableSelect) return null;
         try {
             return new window.QSSearchableSelect(sel, {
-                placeholder: PreviewConfig.i18n?.selectRouteParam || 'Select a :param',
-                searchPlaceholder: PreviewConfig.i18n?.searchRouteParams || 'Search :params…',
-                emptyText: PreviewConfig.i18n?.noRouteParamsMatch || 'No :params on this route',
+                placeholder: QSPanelWords.t('preview.selectRouteParam'),
+                searchPlaceholder: QSPanelWords.t('preview.searchRouteParams'),
+                emptyText: QSPanelWords.t('preview.noRouteParamsMatch'),
             });
         } catch (e) {
             console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for inputType=routeParam:', e);
@@ -2428,8 +2431,7 @@
         if (arg.required !== false && (arg.default === undefined || arg.default === null || arg.default === '')) {
             var placeholder = document.createElement('option');
             placeholder.value = '';
-            placeholder.textContent = PreviewConfig.i18n?.selectEnumValue
-                || ('— Select ' + (arg.name || 'value') + ' —');
+            placeholder.textContent = QSPanelWords.t('preview.selectEnumValue');
             sel.appendChild(placeholder);
         }
 
@@ -2495,22 +2497,20 @@
         var sentinelBtn = document.createElement('button');
         sentinelBtn.type = 'button';
         sentinelBtn.className = 'qs-translation-key-picker__sentinel';
-        sentinelBtn.textContent = PreviewConfig.i18n?.customTextSentinel || 'Custom text…';
-        sentinelBtn.title = PreviewConfig.i18n?.customTextHint
-            || 'Use a raw string instead of a translation key (one-off / debug)';
+        sentinelBtn.textContent = QSPanelWords.t('preview.customTextSentinel');
+        sentinelBtn.title = QSPanelWords.t('preview.customTextHint');
 
         // Custom mode: free-text input + back button.
         var customInput = document.createElement('input');
         customInput.type = 'text';
         customInput.className = 'qs-translation-key-picker__custom-input';
-        customInput.placeholder = PreviewConfig.i18n?.customTextPlaceholder
-            || 'Any text (not translation-aware)';
+        customInput.placeholder = QSPanelWords.t('preview.customTextPlaceholder');
         customInput.style.display = 'none';
 
         var backBtn = document.createElement('button');
         backBtn.type = 'button';
         backBtn.className = 'qs-translation-key-picker__back';
-        backBtn.title = PreviewConfig.i18n?.backToKeyPicker || 'Back to translation key picker';
+        backBtn.title = QSPanelWords.t('preview.backToKeyPicker');
         backBtn.textContent = '←';
         backBtn.style.display = 'none';
 
@@ -2587,7 +2587,7 @@
                 tkPicker = window.QSComplexWizard.createTextKeyPicker({
                     container: pickerHost,
                     value: '',
-                    placeholder: PreviewConfig.i18n?.searchTranslationKey || 'Search translation keys…',
+                    placeholder: QSPanelWords.t('preview.searchTranslationKey'),
                     onChange: function(key) {
                         hidden.value = key || '';
                         updateFn();
@@ -2660,7 +2660,7 @@
         toggle.type = 'button';
         toggle.className = 'preview-contextual-js-form-advanced-toggle';
         toggle.append(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 14, 'preview-contextual-js-form-advanced-chevron'),
-            PreviewConfig.i18n?.advanced || 'Advanced');
+            QSPanelWords.t('preview.advanced'));
         
         var content = document.createElement('div');
         content.className = 'preview-contextual-js-form-advanced-content';
@@ -2693,8 +2693,7 @@
             jsFormFunctionDetails.replaceChildren();
             return;
         }
-        const i18n = PreviewConfig.i18n || {};
-        const exampleLabel = i18n.functionExample || 'Example';
+        const exampleLabel = QSPanelWords.t('preview.functionExample');
         const parts = [];
         if (desc) {
             const p = document.createElement('p');
@@ -2733,7 +2732,7 @@
         jsFormParams.replaceChildren();
         
         if (args.length === 0) {
-            jsFormParams.replaceChildren(QSDom.el('p', { class: 'preview-contextual-js-form-hint', text: PreviewConfig.i18n?.noParams || 'No parameters' }));
+            jsFormParams.replaceChildren(QSDom.el('p', { class: 'preview-contextual-js-form-hint', text: QSPanelWords.t('preview.noParams') }));
         } else {
             var requiredArgs = [];
             var optionalArgs = [];
@@ -2945,7 +2944,7 @@
         var customInput = document.createElement('input');
         customInput.type = 'text';
         customInput.className = 'admin-input qs-response-path-picker__custom';
-        customInput.placeholder = arg.description || 'e.g. data.access_token';
+        customInput.placeholder = arg.description || QSPanelWords.t('preview.responsePathPlaceholder');
         customInput.style.display = 'none';
         wrap.appendChild(customInput);
 
@@ -2980,7 +2979,7 @@
             customInput.style.display = 'none';
             select.textContent = '';
             var ph = document.createElement('option');
-            ph.value = ''; ph.textContent = '— pick a response field —';
+            ph.value = ''; ph.textContent = QSPanelWords.t('preview.responsePathSelectField');
             select.appendChild(ph);
             paths.forEach(function (p) {
                 var o = document.createElement('option');
@@ -2990,11 +2989,11 @@
             // Keep a current value that isn't in the schema selectable.
             if (cur && paths.indexOf(cur) === -1) {
                 var co = document.createElement('option');
-                co.value = cur; co.textContent = cur + '  (custom)';
+                co.value = cur; co.textContent = QSPanelWords.t('preview.customValueOption', { value: cur });
                 select.appendChild(co);
             }
             var cs = document.createElement('option');
-            cs.value = CUSTOM_SENTINEL; cs.textContent = '✎ Custom path…';
+            cs.value = CUSTOM_SENTINEL; cs.textContent = QSPanelWords.t('preview.responsePathCustom');
             select.appendChild(cs);
             select.value = cur || '';
         }
@@ -3028,66 +3027,25 @@
     // ==================== Dropdown Population ====================
 
     /**
-     * Plain-English tooltips per event name. Sourced from the admin
-     * translation file (preview.eventTooltips), with the inline map below
-     * as a hard-coded EN fallback when the i18n bundle is missing the key.
-     */
-    const EVENT_TOOLTIPS_FALLBACK = {
-        // Common
-        onclick:        'When the user clicks the element',
-        ondblclick:     'When the user double-clicks the element',
-        onmouseenter:   'When the cursor enters the element',
-        onmouseleave:   'When the cursor leaves the element',
-        onfocus:        'When the element receives keyboard focus',
-        onblur:         'When the element loses keyboard focus',
-        onkeydown:      'When a key is pressed down while the element is focused',
-        onkeyup:        'When a key is released while the element is focused',
-        // Tag-specific (Common bucket per tag)
-        onsubmit:       'When the form is submitted',
-        onreset:        'When the form is reset',
-        oninput:        'Every time the value changes (every keystroke)',
-        onchange:       'When the value changes and the field loses focus',
-        ontoggle:       'When a <details> element is opened or closed',
-        onplay:         'When media starts playing',
-        onpause:        'When media is paused',
-        onended:        'When media playback ends',
-        onvolumechange: 'When the media volume changes',
-        ontimeupdate:   'While media is playing (fires repeatedly)',
-        onload:         'When the element finishes loading',
-        onerror:        'When the element fails to load',
-        onresize:       'When the window is resized',
-        onscroll:       'When the user scrolls',
-        // Less common
-        onmousemove:    'When the cursor moves over the element',
-        onmousedown:    'When a mouse button is pressed over the element',
-        onmouseup:      'When a mouse button is released over the element'
-    };
-
-    function eventTooltip(ev) {
-        const i18nMap = (PreviewConfig.i18n && PreviewConfig.i18n.eventTooltips) || {};
-        return i18nMap[ev] || EVENT_TOOLTIPS_FALLBACK[ev] || ev;
-    }
-
-    /**
      * Populate event dropdown as two <optgroup>s: Common / Less common — the
      * events the interaction commands accept. listInteractions also returns an
      * "advanced" bucket; it is not offered, because the commands refuse every
-     * event in it. Each <option> carries its event's tooltip as
+     * event in it. Each <option> carries its event's tooltip,
+     * preview.eventTooltips.<event> (every event offered has one), as
      * data-description, which the event picker shows under the event (and
      * whole in the bubble).
      */
     function populateEventDropdown() {
         if (!jsFormEvent) return;
 
-        const i18n = PreviewConfig.i18n || {};
         const tag = currentJsContext?.tag || 'element';
         const buckets = currentAvailableEventsGrouped || {};
 
-        QSDom.setSelectPlaceholder(jsFormEvent, i18n.selectEvent || 'Select event...');
+        QSDom.setSelectPlaceholder(jsFormEvent, QSPanelWords.t('preview.selectEvent'));
 
         const groups = [
-            { key: 'common',     label: (i18n.eventsCommonFor || 'Common for') + ' <' + tag + '>' },
-            { key: 'lessCommon', label: i18n.eventsLessCommon || 'Less common' }
+            { key: 'common',     label: QSPanelWords.t('preview.eventsCommonForTag', { tag: tag }) },
+            { key: 'lessCommon', label: QSPanelWords.t('preview.eventsLessCommon') }
         ];
 
         groups.forEach(g => {
@@ -3099,8 +3057,7 @@
                 const option = document.createElement('option');
                 option.value = ev;
                 option.textContent = ev;
-                const tooltip = eventTooltip(ev);
-                if (tooltip !== ev) option.dataset.description = tooltip;
+                option.dataset.description = QSPanelWords.t('preview.eventTooltips.' + ev);
                 optgroup.appendChild(option);
             });
             jsFormEvent.appendChild(optgroup);
@@ -3139,9 +3096,9 @@
         // override sitting right below the dropdown.
         var placeholderText;
         if (fnsToShow.length === 0 && eventName && !showAll) {
-            placeholderText = '— No function presets for "' + eventName + '" — flip "Show all" or use API Call —';
+            placeholderText = QSPanelWords.t('preview.noFunctionPresetsForEvent', { event: eventName });
         } else {
-            placeholderText = PreviewConfig.i18n?.selectFunction || '-- Select function --';
+            placeholderText = QSPanelWords.t('preview.selectFunction');
         }
         _populateVerbSelect(jsFormFunction, fnsToShow, placeholderText);
 
@@ -3156,8 +3113,8 @@
     function populateApiDropdown() {
         if (!jsFormApi || !jsFormEndpoint) return;
         
-        QSDom.setSelectPlaceholder(jsFormApi, PreviewConfig.i18n?.selectApi || 'Select API...');
-        QSDom.setSelectPlaceholder(jsFormEndpoint, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
+        QSDom.setSelectPlaceholder(jsFormApi, QSPanelWords.t('preview.selectApi'));
+        QSDom.setSelectPlaceholder(jsFormEndpoint, QSPanelWords.t('preview.selectEndpoint'));
         jsFormEndpoint.disabled = true;
         
         const uniqueApis = [...new Set(availableApiEndpoints.map(ep => ep.api))];
@@ -3176,7 +3133,7 @@
     function populateEndpointDropdown(apiName) {
         if (!jsFormEndpoint) return;
         
-        QSDom.setSelectPlaceholder(jsFormEndpoint, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
+        QSDom.setSelectPlaceholder(jsFormEndpoint, QSPanelWords.t('preview.selectEndpoint'));
         
         if (!apiName) {
             jsFormEndpoint.disabled = true;
@@ -3296,20 +3253,18 @@
             typingInput.type = 'text';
             typingInput.className = 'preview-js-picker-typing';
             typingInput.autocomplete = 'off';
-            typingInput.placeholder = PreviewConfig.i18n?.matchTargetHint || 'textContent, .child-class, or data-attr';
+            typingInput.placeholder = QSPanelWords.t('preview.matchTargetPlaceholder');
         } else if (inputType === 'selector') {
             // Selector vs class hint: the two look alike
             // in a chain (`QS.hide('.foo', 'foo')`) but the picker treats
             // them differently — selectors keep their `.`/`#`/`[` prefix
             // (handed to querySelector); class names lose it (handed to
             // classList.add). Make the distinction visible up front.
-            input.placeholder = PreviewConfig.i18n?.selectorOrThis || 'CSS selector (.class, #id, [data-x]) — or "this"';
-            input.title = PreviewConfig.i18n?.selectorHint
-                || 'Keep the CSS prefix — e.g. .my-class, #header, [data-foo]. Use "this" to target the element firing the event.';
+            input.placeholder = QSPanelWords.t('preview.selectorOrThis');
+            input.title = QSPanelWords.t('preview.selectorHint');
         } else if (inputType === 'class') {
-            input.placeholder = PreviewConfig.i18n?.searchClass || 'class name only (no leading .)';
-            input.title = PreviewConfig.i18n?.classHint
-                || 'Bare class name without the dot — e.g. hidden, active. Passed to classList.add().';
+            input.placeholder = QSPanelWords.t('preview.searchClass');
+            input.title = QSPanelWords.t('preview.classHint');
         }
 
         // Initial value
@@ -3332,7 +3287,7 @@
             if (inputType === 'selector') {
                 const seenValues = new Set();
                 
-                items.push({ value: 'this', label: PreviewConfig.i18n?.thisElement || '(this element)', type: 'special' });
+                items.push({ value: 'this', label: QSPanelWords.t('preview.thisElement'), type: 'special' });
                 seenValues.add('this');
                 
                 (categorizedSelectors.ids || []).forEach(s => {
@@ -3371,7 +3326,7 @@
                 
                 const commonClasses = ['hidden', 'active', 'open', 'visible', 'disabled', 'selected'];
                 commonClasses.forEach(cls => {
-                    items.push({ value: cls, label: cls + ' (common)', type: 'common' });
+                    items.push({ value: cls, label: QSPanelWords.t('preview.classCommonOption', { name: cls }), type: 'common' });
                     seenClasses.add(cls);
                 });
                 
@@ -3396,13 +3351,13 @@
                 // 2) Child CSS selectors (.class / #id) — match a child's text.
                 // 3) data-* attributes discovered in the iframe DOM.
                 const seenValues = new Set();
-                items.push({ value: 'textContent', label: 'textContent (full text)', type: 'special' });
+                items.push({ value: 'textContent', label: QSPanelWords.t('preview.matchTargetFullText'), type: 'special' });
                 seenValues.add('textContent');
                 
                 pageStructureClasses.forEach(cls => {
                     const sel = '.' + cls;
                     if (!seenValues.has(sel)) {
-                        items.push({ value: sel, label: sel + ' (child text)', type: 'dom' });
+                        items.push({ value: sel, label: QSPanelWords.t('preview.matchTargetChildText', { selector: sel }), type: 'dom' });
                         seenValues.add(sel);
                     }
                 });
@@ -3410,7 +3365,7 @@
                 (categorizedSelectors.ids || []).forEach(s => {
                     var clean = stripPseudoFromSelector(s.selector);
                     if (clean && !seenValues.has(clean)) {
-                        items.push({ value: clean, label: clean + ' (child text)', type: 'id' });
+                        items.push({ value: clean, label: QSPanelWords.t('preview.matchTargetChildText', { selector: clean }), type: 'id' });
                         seenValues.add(clean);
                     }
                 });
@@ -3418,7 +3373,7 @@
                 (categorizedSelectors.classes || []).forEach(s => {
                     var clean = stripPseudoFromSelector(s.selector);
                     if (clean && !seenValues.has(clean)) {
-                        items.push({ value: clean, label: clean + ' (child text)', type: 'class' });
+                        items.push({ value: clean, label: QSPanelWords.t('preview.matchTargetChildText', { selector: clean }), type: 'class' });
                         seenValues.add(clean);
                     }
                 });
@@ -3438,7 +3393,7 @@
                         });
                         Array.from(dataAttrs).sort().forEach(name => {
                             if (!seenValues.has(name)) {
-                                items.push({ value: name, label: name + ' (attribute)', type: 'attr' });
+                                items.push({ value: name, label: QSPanelWords.t('preview.matchTargetAttribute', { name: name }), type: 'attr' });
                                 seenValues.add(name);
                             }
                         });
@@ -3523,7 +3478,7 @@
                 const label = document.createElement('span');
                 label.className = 'preview-js-picker-chip-label';
                 label.textContent = part;
-                const removeLabel = (PreviewConfig.i18n?.removeNamed || 'Remove “{name}”').replace('{name}', () => part);
+                const removeLabel = QSPanelWords.t('preview.removeNamed', { name: part });
                 const close = QSControls.removeRow(removeLabel, (e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -3850,7 +3805,7 @@
             const msg = document.createElement('div');
             msg.className = 'preview-contextual-js-form-error';
             msg.dataset.errFor = err.argName;
-            msg.textContent = (PreviewConfig.i18n?.argRequiredLabel || '⚠ {name} is required').replace('{name}', err.argName);
+            msg.textContent = QSPanelWords.t('preview.argRequiredLabel', { name: err.argName });
             row.appendChild(msg);
             row.classList.add('preview-contextual-js-form-row--error');
             // One-shot live-clear when the user starts editing the field.
@@ -3900,7 +3855,7 @@
                 const url = (jsFormApiUrl?.value || '').trim();
                 if (!eventName || !url) {
                     if (showToastFn) {
-                        showToastFn(PreviewConfig.i18n?.selectEventApiUrl || 'Please select event and enter a URL', 'error');
+                        showToastFn(QSPanelWords.t('preview.selectEventApiUrl'), 'error');
                     }
                     return;
                 }
@@ -3911,7 +3866,7 @@
                 endpointName = jsFormEndpoint?.value || '';
                 if (!eventName || !apiName || !endpointName) {
                     if (showToastFn) {
-                        showToastFn(PreviewConfig.i18n?.selectEventApiEndpoint || 'Please select event, API, and endpoint', 'error');
+                        showToastFn(QSPanelWords.t('preview.selectEventApiEndpoint'), 'error');
                     }
                     return;
                 }
@@ -3951,7 +3906,7 @@
 
             if (!eventName || !fnName || !currentJsContext) {
                 if (showToastFn) {
-                    showToastFn(PreviewConfig.i18n?.selectEventAndFunction || 'Please select event and function', 'error');
+                    showToastFn(QSPanelWords.t('preview.selectEventAndFunction'), 'error');
                 }
                 return;
             }
@@ -3967,10 +3922,7 @@
                 _applyArgErrors(validation.errors, jsFormParams);
                 if (showToastFn) {
                     const names = validation.errors.map(e => e.argName).join(', ');
-                    const msgTpl = validation.errors.length > 1
-                        ? (PreviewConfig.i18n?.missingRequiredParams || 'Missing required parameters: {names}')
-                        : (PreviewConfig.i18n?.missingRequiredParam || 'Missing required parameter: {name}');
-                    showToastFn(msgTpl.replace('{names}', names).replace('{name}', names), 'error');
+                    showToastFn(QSPanelWords.count('preview.requiredParamsMissing', validation.errors.length, { names: names }), 'error');
                 }
                 return;
             }
@@ -3980,7 +3932,7 @@
         
         if (!currentJsContext) {
             if (showToastFn) {
-                showToastFn(PreviewConfig.i18n?.noElementSelected || 'No element selected', 'error');
+                showToastFn(QSPanelWords.t('preview.noElementSelected'), 'error');
             }
             return;
         }
@@ -4011,7 +3963,7 @@
         try {
             if (jsFormSave) {
                 jsFormSave.disabled = true;
-                jsFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...';
+                jsFormSave.textContent = QSPanelWords.t('common.saving');
             }
             
             const command = isEdit ? 'editInteraction' : 'addInteraction';
@@ -4022,7 +3974,7 @@
             const result = response.data || {};
             
             if (!response.ok) {
-                throw new Error(result.message || (isEdit ? 'Failed to edit' : 'Failed to add'));
+                throw new Error(result.message || QSPanelWords.t(isEdit ? 'preview.interactionEditFailed' : 'preview.interactionAddFailed'));
             }
             
             // Post-fetch actions: only relevant when the main interaction
@@ -4043,7 +3995,7 @@
 
             if (showToastFn) {
                 showToastFn(
-                    isEdit ? (PreviewConfig.i18n?.interactionUpdated || 'Updated') : (PreviewConfig.i18n?.interactionAdded || 'Added'),
+                    isEdit ? QSPanelWords.t('preview.interactionUpdated') : QSPanelWords.t('preview.interactionAdded'),
                     'success'
                 );
             }
@@ -4058,14 +4010,14 @@
         } catch (error) {
             console.error('[PreviewJsInteractions] Save error:', error);
             if (showToastFn) {
-                showToastFn('Error: ' + error.message, 'error');
+                showToastFn(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
             }
         } finally {
             if (jsFormSave) {
                 jsFormSave.disabled = false;
                 jsFormSave.textContent = isEdit 
-                    ? (PreviewConfig.i18n?.save || 'Save')
-                    : (PreviewConfig.i18n?.addInteraction || 'Add Interaction');
+                    ? QSPanelWords.t('common.save')
+                    : QSPanelWords.t('preview.addInteraction');
             }
         }
     }
@@ -4121,8 +4073,8 @@
 
         } catch (error) {
             console.error('[PreviewJsInteractions] Failed to load page events:', error);
-            if (peList) peList.replaceChildren(_renderEmptyNote('Failed to load page events', false));
-            if (peCount) peCount.textContent = '0';
+            if (peList) peList.replaceChildren(_renderEmptyNote(QSPanelWords.t('preview.pageEventsLoadError'), false));
+            if (peCount) peCount.textContent = QSPanelWords.number(0);
         }
     }
     
@@ -4133,10 +4085,10 @@
         if (!peList) return;
         
         var interactions = data?.interactions || [];
-        if (peCount) peCount.textContent = String(interactions.length);
+        if (peCount) peCount.textContent = QSPanelWords.number(interactions.length);
         
         if (interactions.length === 0) {
-            peList.replaceChildren(_renderEmptyNote(PreviewConfig.i18n?.noInteractions || 'No page events'));
+            peList.replaceChildren(_renderEmptyNote(QSPanelWords.t('preview.noPageEvents')));
             return;
         }
         
@@ -4150,19 +4102,19 @@
     async function deletePageEvent(eventName, index, call) {
         if (!currentPageName) return;
         await QuickSiteUtils.confirm(call || '', {
-            title: PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?',
+            title: QSPanelWords.t('preview.confirmDeleteInteraction'),
             type: 'danger',
-            confirmText: PreviewConfig.i18n?.delete || 'Delete',
+            confirmText: QSPanelWords.t('common.delete'),
             action: async function() {
                 try {
                     var response = await QuickSiteAdmin.apiRequest('deletePageEvent', 'DELETE', { pageName: currentPageName, event: eventName, index: index });
                     var result = response.data || {};
-                    if (!response.ok) return { ok: false, message: result.message || 'Failed to delete' };
+                    if (!response.ok) return { ok: false, message: result.message || QSPanelWords.t('preview.deleteFailed') };
                 } catch (error) {
                     console.error('[PreviewJsInteractions] Delete page event error:', error);
                     return { ok: false, message: error.message };
                 }
-                if (showToastFn) showToastFn(PreviewConfig.i18n?.interactionDeleted || 'Deleted', 'success');
+                if (showToastFn) showToastFn(QSPanelWords.t('preview.interactionDeleted'), 'success');
                 await loadPageEvents();
                 if (reloadPreviewFn) reloadPreviewFn();
                 return true;
@@ -4192,7 +4144,7 @@
             }
         }
         if (!entry) {
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.interactionNotFound || 'Interaction not found', 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.interactionNotFound'), 'error');
             return;
         }
 
@@ -4213,7 +4165,7 @@
 
         // Switch the Save button label so the action is unambiguous.
         if (peFormSave) {
-            peFormSave.textContent = PreviewConfig.i18n?.save || 'Save';
+            peFormSave.textContent = QSPanelWords.t('common.save');
             peFormSave.disabled = false;
         }
 
@@ -4292,7 +4244,7 @@
                         if (!has) {
                             var opt = document.createElement('option');
                             opt.value = v;
-                            opt.textContent = v + ' (legacy)';
+                            opt.textContent = QSPanelWords.t('preview.legacyOption', { value: v });
                             input.appendChild(opt);
                         }
                     }
@@ -4339,7 +4291,7 @@
         if (peFormPreview) peFormPreview.textContent = '-';
         if (peFormSave) {
             peFormSave.disabled = true;
-            peFormSave.textContent = PreviewConfig.i18n?.addPageEvent || 'Add';
+            peFormSave.textContent = QSPanelWords.t('preview.addPageEvent');
         }
     }
     
@@ -4355,7 +4307,7 @@
         // handlePageEventSave routes to POST /addPageEvent (the default).
         editingPageEvent = null;
         if (peFormSave) {
-            peFormSave.textContent = PreviewConfig.i18n?.addPageEvent || 'Add';
+            peFormSave.textContent = QSPanelWords.t('preview.addPageEvent');
         }
     }
     
@@ -4388,7 +4340,7 @@
         peFormParams.replaceChildren();
         
         if (args.length === 0) {
-            peFormParams.replaceChildren(QSDom.el('p', { class: 'preview-contextual-js-form-hint', text: PreviewConfig.i18n?.noParams || 'No parameters' }));
+            peFormParams.replaceChildren(QSDom.el('p', { class: 'preview-contextual-js-form-hint', text: QSPanelWords.t('preview.noParams') }));
         } else {
             var requiredArgs = [];
             var optionalArgs = [];
@@ -4420,7 +4372,7 @@
         var apiName = peFormApi?.value || '';
         if (!peFormEndpoint) return;
         
-        QSDom.setSelectPlaceholder(peFormEndpoint, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
+        QSDom.setSelectPlaceholder(peFormEndpoint, QSPanelWords.t('preview.selectEndpoint'));
         
         if (!apiName) {
             peFormEndpoint.disabled = true;
@@ -4524,7 +4476,7 @@
             var apiName = peFormApi?.value || '';
             var endpointName = peFormEndpoint?.value || '';
             if (!apiName || !endpointName) {
-                if (showToastFn) showToastFn('Select API and endpoint', 'error');
+                if (showToastFn) showToastFn(QSPanelWords.t('preview.selectApiEndpoint'), 'error');
                 return;
             }
             fnName = 'fetch';
@@ -4539,7 +4491,7 @@
         } else {
             fnName = peFormFunction?.value || '';
             if (!fnName) {
-                if (showToastFn) showToastFn('Select a function', 'error');
+                if (showToastFn) showToastFn(QSPanelWords.t('preview.selectFunctionFirst'), 'error');
                 return;
             }
             // Same required-arg validation as handleSave.
@@ -4549,10 +4501,7 @@
                 _applyArgErrors(peValidation.errors, peFormParams);
                 if (showToastFn) {
                     var peNames = peValidation.errors.map(function(e) { return e.argName; }).join(', ');
-                    var peMsgTpl = peValidation.errors.length > 1
-                        ? (PreviewConfig.i18n?.missingRequiredParams || 'Missing required parameters: {names}')
-                        : (PreviewConfig.i18n?.missingRequiredParam || 'Missing required parameter: {name}');
-                    showToastFn(peMsgTpl.replace('{names}', peNames).replace('{name}', peNames), 'error');
+                    showToastFn(QSPanelWords.count('preview.requiredParamsMissing', peValidation.errors.length, { names: peNames }), 'error');
                 }
                 return;
             }
@@ -4565,7 +4514,7 @@
         try {
             if (peFormSave) {
                 peFormSave.disabled = true;
-                peFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...';
+                peFormSave.textContent = QSPanelWords.t('common.saving');
             }
 
             var command = isEdit ? 'editPageEvent' : 'addPageEvent';
@@ -4589,12 +4538,12 @@
             var response = await QuickSiteAdmin.apiRequest(command, method, body);
 
             var result = response.data || {};
-            if (!response.ok) throw new Error(result.message || (isEdit ? 'Failed to edit' : 'Failed to add'));
+            if (!response.ok) throw new Error(result.message || QSPanelWords.t(isEdit ? 'preview.interactionEditFailed' : 'preview.interactionAddFailed'));
 
             if (showToastFn) {
                 showToastFn(
-                    isEdit ? (PreviewConfig.i18n?.interactionUpdated || 'Updated')
-                           : (PreviewConfig.i18n?.interactionAdded   || 'Added'),
+                    isEdit ? QSPanelWords.t('preview.interactionUpdated')
+                           : QSPanelWords.t('preview.interactionAdded'),
                     'success'
                 );
             }
@@ -4604,7 +4553,7 @@
 
         } catch (error) {
             console.error('[PreviewJsInteractions] Save page event error:', error);
-            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
         } finally {
             if (peFormSave) {
                 peFormSave.disabled = false;
@@ -4613,8 +4562,8 @@
                 // the button after a failed save we keep the original label
                 // the user saw (Add vs Save).
                 peFormSave.textContent = editingPageEvent
-                    ? (PreviewConfig.i18n?.save || 'Save')
-                    : (PreviewConfig.i18n?.addPageEvent || 'Add');
+                    ? QSPanelWords.t('common.save')
+                    : QSPanelWords.t('preview.addPageEvent');
             }
         }
     }
@@ -4622,11 +4571,11 @@
     // ==================== State Stores ====================
 
     // Direction options for a store field (the glyphs are fixed; the
-    // words are translatable via PreviewConfig.i18n).
+    // words are the panel's).
     var SS_DIRECTIONS = [
-        { value: 'request',  label: '→ ' + (PreviewConfig.i18n?.stateStoreDirRequest  || 'request (sent)') },
-        { value: 'response', label: '← ' + (PreviewConfig.i18n?.stateStoreDirResponse || 'response (received)') },
-        { value: 'both',     label: '⇄ ' + (PreviewConfig.i18n?.stateStoreDirBoth     || 'both (sent + received)') }
+        { value: 'request',  label: '→ ' + QSPanelWords.t('preview.stateStoreDirRequest') },
+        { value: 'response', label: '← ' + QSPanelWords.t('preview.stateStoreDirResponse') },
+        { value: 'both',     label: '⇄ ' + QSPanelWords.t('preview.stateStoreDirBoth') }
     ];
 
     // Init source kinds for a store field. The wizard now exposes a kind
@@ -4636,11 +4585,11 @@
     // _parseSsInit — list the longer prefix names FIRST so e.g.
     // "localStorage" doesn't get eaten by a (hypothetical) "local" prefix.
     var SS_INIT_KINDS = [
-        { value: 'literal',        label: PreviewConfig.i18n?.stateStoreInitKindLiteral        || 'literal',        prefix: null },
-        { value: 'query',          label: PreviewConfig.i18n?.stateStoreInitKindQuery          || 'URL query',      prefix: 'query:' },
-        { value: 'param',          label: PreviewConfig.i18n?.stateStoreInitKindPathParam      || 'URL path param', prefix: 'param:' },
-        { value: 'localStorage',   label: PreviewConfig.i18n?.stateStoreInitKindLocalStorage   || 'localStorage',   prefix: 'localStorage:',   storage: true },
-        { value: 'sessionStorage', label: PreviewConfig.i18n?.stateStoreInitKindSessionStorage || 'sessionStorage', prefix: 'sessionStorage:', storage: true }
+        { value: 'literal',        label: QSPanelWords.t('preview.stateStoreInitKindLiteral'),        prefix: null },
+        { value: 'query',          label: QSPanelWords.t('preview.stateStoreInitKindQuery'),          prefix: 'query:' },
+        { value: 'param',          label: QSPanelWords.t('preview.stateStoreInitKindPathParam'),      prefix: 'param:' },
+        { value: 'localStorage',   label: QSPanelWords.t('preview.stateStoreInitKindLocalStorage'),   prefix: 'localStorage:',   storage: true },
+        { value: 'sessionStorage', label: QSPanelWords.t('preview.stateStoreInitKindSessionStorage'), prefix: 'sessionStorage:', storage: true }
     ];
 
     /** Whether a start value's kind names a storage key: the shared picker's, never typed. */
@@ -4716,8 +4665,8 @@
             displayStateStores(ssCurrentStores);
         } catch (error) {
             console.error('[PreviewJsInteractions] Failed to load state stores:', error);
-            if (ssList) { ssList.textContent = ''; ssList.appendChild(_ssEmpty('Failed to load state stores')); }
-            if (ssCount) ssCount.textContent = '0';
+            if (ssList) { ssList.textContent = ''; ssList.appendChild(_ssEmpty(QSPanelWords.t('preview.stateStoresLoadError'))); }
+            if (ssCount) ssCount.textContent = QSPanelWords.number(0);
         }
     }
 
@@ -4727,10 +4676,10 @@
     function displayStateStores(stores) {
         if (!ssList) return;
         var ids = Object.keys(stores || {});
-        if (ssCount) ssCount.textContent = String(ids.length);
+        if (ssCount) ssCount.textContent = QSPanelWords.number(ids.length);
         ssList.textContent = '';
         if (ids.length === 0) {
-            ssList.appendChild(_ssEmpty(PreviewConfig.i18n?.noStateStores || 'No state stores yet.'));
+            ssList.appendChild(_ssEmpty(QSPanelWords.t('preview.noStateStores')));
             return;
         }
         ids.forEach(function(id) {
@@ -4753,17 +4702,16 @@
         var code = document.createElement('code');
         code.className = 'preview-contextual-js-page-events__code';
         var fieldCount = (def && def.fields) ? Object.keys(def.fields).length : 0;
-        var summary = (def && def.endpoint ? def.endpoint : '?') + ' · ' + fieldCount + 'f';
+        var summary = (def && def.endpoint ? def.endpoint : '?') + ' · ' + QSPanelWords.count('preview.stateStoreFieldCountShort', fieldCount);
         if (def && def.fetchOnLoad) summary += ' · onload';
         code.textContent = summary;
         card.appendChild(code);
 
-        var named = function(word, fallback) { return (PreviewConfig.i18n?.[word] || fallback).replace('{name}', function() { return id; }); };
-        card.appendChild(QSControls.edit(named('editNamed', 'Edit “{name}”'), function(e) {
+        card.appendChild(QSControls.edit(QSPanelWords.t('preview.editNamed', { name: id }), function(e) {
             e.stopPropagation();
             handleStateStoreEdit(id);
         }, { focusKey: 'store-edit:' + id }));
-        card.appendChild(QSControls.bin(named('deleteNamed', 'Delete “{name}”'), function(e) {
+        card.appendChild(QSControls.bin(QSPanelWords.t('preview.deleteNamed', { name: id }), function(e) {
             e.stopPropagation();
             deleteStore(id);
         }, { focusKey: 'store-delete:' + id }));
@@ -4781,19 +4729,19 @@
         var stores = Object.assign({}, ssCurrentStores);
         delete stores[id];
         await QuickSiteUtils.confirm('', {
-            title: (PreviewConfig.i18n?.confirmDeleteStateStore || 'Delete state store "%s"?').replace('%s', function() { return id; }),
+            title: QSPanelWords.t('preview.confirmDeleteStateStore', { name: id }),
             type: 'danger',
-            confirmText: PreviewConfig.i18n?.delete || 'Delete',
+            confirmText: QSPanelWords.t('common.delete'),
             action: async function() {
                 try {
                     var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
                     var result = response.data || {};
-                    if (!response.ok) return { ok: false, message: result.message || 'Failed to delete' };
+                    if (!response.ok) return { ok: false, message: result.message || QSPanelWords.t('preview.deleteFailed') };
                 } catch (error) {
                     console.error('[PreviewJsInteractions] Delete state store error:', error);
                     return { ok: false, message: error.message };
                 }
-                if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreDeleted || 'State store deleted', 'success');
+                if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreDeleted'), 'success');
                 await loadStateStores();
                 // Tell the data-attribute picker its cached store list is
                 // stale — next pick of a store-field attribute (data-state-*)
@@ -4817,7 +4765,7 @@
         ssFormApi.textContent = '';
         var ph = document.createElement('option');
         ph.value = '';
-        ph.textContent = PreviewConfig.i18n?.selectApiPlaceholder || '-- Select API --';
+        ph.textContent = QSPanelWords.t('preview.selectApiPlaceholder');
         ssFormApi.appendChild(ph);
         var uniqueApis = [...new Set(availableApiEndpoints.map(function(ep) { return ep.api; }))];
         uniqueApis.forEach(function(apiName) {
@@ -4837,7 +4785,7 @@
         ssFormEndpoint.textContent = '';
         var ph = document.createElement('option');
         ph.value = '';
-        ph.textContent = PreviewConfig.i18n?.selectEndpointPlaceholder || '-- Select endpoint --';
+        ph.textContent = QSPanelWords.t('preview.selectEndpointPlaceholder');
         ssFormEndpoint.appendChild(ph);
         if (!apiName) {
             ssFormEndpoint.disabled = true;
@@ -4942,12 +4890,12 @@
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'preview-contextual-js-form-input ss-field-name';
-        nameInput.placeholder = PreviewConfig.i18n?.stateStoreFieldName || 'field name';
+        nameInput.placeholder = QSPanelWords.t('preview.stateStoreFieldName');
         if (name) nameInput.value = name;
         nameInput.addEventListener('input', updateStateStorePreview);
         head.appendChild(nameInput);
         // The field's ×: it leaves the store's form (nothing is written until Save store)
-        head.appendChild(QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove',
+        head.appendChild(QSControls.removeRow(QSPanelWords.t('common.remove'),
             function() { row.remove(); updateStateStorePreview(); }, { className: 'ss-field-remove' }));
         row.appendChild(head);
 
@@ -5020,9 +4968,9 @@
             initKeyPickerHolder.style.display = namesKey ? '' : 'none';
             if (!namesKey) {
                 var p;
-                if (kind === 'literal')      p = PreviewConfig.i18n?.stateStoreInitKeyLiteralPlaceholder || 'value (e.g. Hello)';
-                else if (kind === 'query')   p = PreviewConfig.i18n?.stateStoreInitKeyQueryPlaceholder   || 'URL param name (e.g. page)';
-                else                         p = PreviewConfig.i18n?.stateStoreInitKeyParamPlaceholder   || 'param name (e.g. slug)';
+                if (kind === 'literal')      p = QSPanelWords.t('preview.stateStoreInitKeyLiteralPlaceholder');
+                else if (kind === 'query')   p = QSPanelWords.t('preview.stateStoreInitKeyQueryPlaceholder');
+                else                         p = QSPanelWords.t('preview.stateStoreInitKeyParamPlaceholder');
                 initKeyInput.placeholder = p;
             } else if (initKeyPicker) {
                 initKeyPicker.refresh();
@@ -5054,7 +5002,7 @@
         var defaultInput = document.createElement('input');
         defaultInput.type = 'text';
         defaultInput.className = 'preview-contextual-js-form-input ss-field-default';
-        defaultInput.placeholder = PreviewConfig.i18n?.stateStoreDefaultPlaceholder || 'default';
+        defaultInput.placeholder = QSPanelWords.t('preview.stateStoreDefaultPlaceholder');
         if (def.default !== undefined && def.default !== null) defaultInput.value = String(def.default);
         defaultInput.addEventListener('input', updateStateStorePreview);
 
@@ -5081,7 +5029,7 @@
         var fromInput = document.createElement('input');
         fromInput.type = 'text';
         fromInput.className = 'preview-contextual-js-form-input ss-field-from';
-        fromInput.placeholder = PreviewConfig.i18n?.stateStoreFromPlaceholder || 'from: response path e.g. data.items';
+        fromInput.placeholder = QSPanelWords.t('preview.stateStoreFromPlaceholder');
         if (def.from) fromInput.value = String(def.from);
         fromInput.addEventListener('input', updateStateStorePreview);
         var appendLabel = document.createElement('label');
@@ -5092,7 +5040,7 @@
         if (def.append) appendCb.checked = true;
         appendCb.addEventListener('change', updateStateStorePreview);
         var appendSpan = document.createElement('span');
-        appendSpan.textContent = PreviewConfig.i18n?.stateStoreAppend || 'append (grow list)';
+        appendSpan.textContent = QSPanelWords.t('preview.stateStoreAppend');
         appendLabel.appendChild(appendCb);
         appendLabel.appendChild(appendSpan);
         fromRow.appendChild(fromInput);
@@ -5169,7 +5117,7 @@
         var valid = idValid && !!api && !!ep && fieldCount > 0;
         if (ssFormPreview) {
             ssFormPreview.textContent = valid
-                ? (id + ': @' + api + '/' + ep + ' · ' + fieldCount + ' field' + (fieldCount === 1 ? '' : 's'))
+                ? (id + ': @' + api + '/' + ep + ' · ' + QSPanelWords.count('preview.stateStoreFieldCount', fieldCount))
                 : '-';
         }
         if (ssFormSave) ssFormSave.disabled = !valid;
@@ -5265,12 +5213,12 @@
         try {
             // No `route` → backend returns the full map: {<route>: {<storeId>: def}, ...}.
             var response = await QuickSiteAdmin.apiRequest('getStateStores', 'POST', {});
-            if (!response.ok) throw new Error('Failed to fetch state stores');
+            if (!response.ok) throw new Error(QSPanelWords.t('preview.stateStoresFetchFailed'));
             var result = response.data || {};
             allStores = (result.data && result.data.stores) || {};
         } catch (error) {
             console.error('[PreviewJsInteractions] Import: fetch failed:', error);
-            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
             return;
         }
 
@@ -5292,14 +5240,14 @@
             if (options.length === 0) {
                 var noneOpt = document.createElement('option');
                 noneOpt.value = '';
-                noneOpt.textContent = PreviewConfig.i18n?.stateStoreImportNone || 'No stores on other pages to import';
+                noneOpt.textContent = QSPanelWords.t('preview.stateStoreImportNone');
                 noneOpt.disabled = true;
                 noneOpt.selected = true;
                 ssImportSelect.appendChild(noneOpt);
             } else {
                 var placeholder = document.createElement('option');
                 placeholder.value = '';
-                placeholder.textContent = '-- ' + (PreviewConfig.i18n?.stateStoreImportPick || 'Pick a store') + ' --';
+                placeholder.textContent = QSPanelWords.t('preview.stateStoreImportPlaceholder');
                 ssImportSelect.appendChild(placeholder);
                 options.forEach(function (opt) {
                     var o = document.createElement('option');
@@ -5371,7 +5319,7 @@
             if (options[i].route + '|' + options[i].storeId === raw) { match = options[i]; break; }
         }
         if (!match) {
-            if (showToastFn) showToastFn('Import: option not found', 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreImportOptionNotFound'), 'error');
             return;
         }
 
@@ -5380,11 +5328,11 @@
         if (collision) {
             targetId = (ssImportRenameInput?.value || '').trim();
             if (!/^[a-zA-Z][\w-]*$/.test(targetId)) {
-                if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreInvalidId || 'Invalid store id', 'error');
+                if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreInvalidId'), 'error');
                 return;
             }
             if (ssCurrentStores[targetId]) {
-                if (showToastFn) showToastFn((PreviewConfig.i18n?.stateStoreIdExists || 'A store named "%s" already exists').replace('%s', targetId), 'error');
+                if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreIdExists', { name: targetId }), 'error');
                 return;
             }
         }
@@ -5397,7 +5345,7 @@
             clonedDef = JSON.parse(JSON.stringify(match.def));
         } catch (e) {
             console.error('[PreviewJsInteractions] Import: clone failed:', e);
-            if (showToastFn) showToastFn('Import: malformed source def', 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreImportMalformed'), 'error');
             return;
         }
 
@@ -5408,8 +5356,8 @@
             if (ssImportConfirm) ssImportConfirm.disabled = true;
             var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
             var result = response.data || {};
-            if (!response.ok) throw new Error(result.message || 'Failed to save');
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreImported || 'Store imported', 'success');
+            if (!response.ok) throw new Error(result.message || QSPanelWords.t('preview.stateStoreSaveFailed'));
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreImported'), 'success');
             hideStateStoreImportPicker();
             await loadStateStores();
             // Tell the data-attribute picker its cached store list is
@@ -5423,7 +5371,7 @@
             if (reloadPreviewFn) reloadPreviewFn();
         } catch (error) {
             console.error('[PreviewJsInteractions] Import: save failed:', error);
-            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
             if (ssImportConfirm) ssImportConfirm.disabled = false;
         }
     }
@@ -5446,24 +5394,24 @@
         if (!currentPageName) return;
         var id = (ssFormId?.value || '').trim();
         if (!/^[a-zA-Z][\w-]*$/.test(id)) {
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreInvalidId || 'Invalid store id (letters, digits, _ or -)', 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreInvalidId'), 'error');
             return;
         }
         var api = ssFormApi?.value || '';
         var ep = ssFormEndpoint?.value || '';
         if (!api || !ep) {
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.selectApiEndpoint || 'Select an API and endpoint', 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.selectApiEndpoint'), 'error');
             return;
         }
         var fields = collectSsFields();
         if (Object.keys(fields).length === 0) {
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreNoFields || 'Add at least one field', 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreNoFields'), 'error');
             return;
         }
 
         var stores = Object.assign({}, ssCurrentStores);
         if (!ssEditingId && stores[id]) {
-            if (showToastFn) showToastFn((PreviewConfig.i18n?.stateStoreIdExists || 'A store named "%s" already exists').replace('%s', id), 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreIdExists', { name: id }), 'error');
             return;
         }
         if (ssEditingId && ssEditingId !== id) delete stores[ssEditingId];   // rename
@@ -5474,11 +5422,11 @@
         };
 
         try {
-            if (ssFormSave) { ssFormSave.disabled = true; ssFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...'; }
+            if (ssFormSave) { ssFormSave.disabled = true; ssFormSave.textContent = QSPanelWords.t('common.saving'); }
             var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
             var result = response.data || {};
-            if (!response.ok) throw new Error(result.message || 'Failed to save');
-            if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreSaved || 'State store saved', 'success');
+            if (!response.ok) throw new Error(result.message || QSPanelWords.t('preview.stateStoreSaveFailed'));
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.stateStoreSaved'), 'success');
             hideStateStoreForm();
             await loadStateStores();
             // Tell the data-attribute picker its cached store list is
@@ -5492,9 +5440,9 @@
             if (reloadPreviewFn) reloadPreviewFn();
         } catch (error) {
             console.error('[PreviewJsInteractions] Save state store error:', error);
-            if (showToastFn) showToastFn('Error: ' + error.message, 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
         } finally {
-            if (ssFormSave) { ssFormSave.disabled = false; ssFormSave.textContent = PreviewConfig.i18n?.saveStateStore || 'Save store'; }
+            if (ssFormSave) { ssFormSave.disabled = false; ssFormSave.textContent = QSPanelWords.t('preview.saveStateStore'); }
         }
     }
 
@@ -5526,10 +5474,10 @@
         var note = document.createElement('p');
         note.className = 'preview-contextual-js-response-bindings__notice';
         var strong = document.createElement('strong');
-        strong.textContent = PreviewConfig.i18n?.noResponseSchema;
+        strong.textContent = QSPanelWords.t('preview.noResponseSchema');
         note.appendChild(strong);
         note.appendChild(document.createTextNode(' '));
-        note.appendChild(document.createTextNode(PreviewConfig.i18n?.noResponseSchemaHint));
+        note.appendChild(document.createTextNode(QSPanelWords.t('preview.noResponseSchemaHint')));
         return note;
     }
 
@@ -5540,7 +5488,7 @@
     function _renderNoFieldsNotice() {
         var note = document.createElement('p');
         note.className = 'preview-contextual-js-response-bindings__notice';
-        note.textContent = PreviewConfig.i18n?.responseSchemaNoFields;
+        note.textContent = QSPanelWords.t('preview.responseSchemaNoFields');
         return note;
     }
 
@@ -5771,7 +5719,7 @@
 
         var blank = document.createElement('option');
         blank.value = '';
-        blank.textContent = '-- skip --';
+        blank.textContent = QSPanelWords.t('preview.fieldMapSkip');
         sel.appendChild(blank);
 
         itemFields.forEach(function(f) {
@@ -5791,7 +5739,7 @@
         if (defaultFrom && itemFields.indexOf(defaultFrom) === -1) {
             var custom = document.createElement('option');
             custom.value = defaultFrom;
-            custom.textContent = defaultFrom + ' (custom)';
+            custom.textContent = QSPanelWords.t('preview.customValueOption', { value: defaultFrom });
             sel.appendChild(custom);
         }
         sel.value = defaultFrom;
@@ -5857,9 +5805,9 @@
 
         var thead = document.createElement('thead');
         var trh = document.createElement('tr');
-        ['Component var', 'From API field', 'Enum'].forEach(function(t) {
+        ['preview.fieldMapComponentVar', 'preview.fieldMapFromApiField', 'preview.fieldMapEnum'].forEach(function(path) {
             var th = document.createElement('th');
-            th.textContent = t;
+            th.textContent = QSPanelWords.t(path);
             trh.appendChild(th);
         });
         thead.appendChild(trh);
@@ -5876,42 +5824,29 @@
 
     /**
      * Yellow banner shown when the selected component's template lacks
-     * a data-bind attribute for one or more fieldMap target vars. Built
-     * with createElement + textNodes — no innerHTML, no string-glued
-     * HTML.
+     * a data-bind attribute for one or more fieldMap target vars: one word,
+     * preview.componentListMissingDataBind, whose {attribute} and {file} are
+     * code and whose {keys} is the list of those vars, each as code. Built
+     * with createElement + textNodes — no innerHTML, no string-glued HTML.
      */
     function _renderWarningBanner(missingKeys, componentName) {
         var div = document.createElement('div');
         div.className = 'preview-contextual-js-response-bindings__cl-warn';
+        div.append(QSDom.el('strong', { text: QSPanelWords.t('preview.componentListWarning') }), ' ');
 
-        var strong = document.createElement('strong');
-        strong.textContent = 'Warning: ';
-        div.appendChild(strong);
-
-        div.appendChild(document.createTextNode(
-            'the component template has no data-bind attribute for: '
-        ));
-        missingKeys.forEach(function(k, i) {
-            if (i > 0) div.appendChild(document.createTextNode(', '));
-            var code = document.createElement('code');
-            code.textContent = k;
-            div.appendChild(code);
+        // codeText() makes {attribute} and {file} code; {keys}, which it is not handed,
+        // comes back as a piece of its own, and becomes the list of vars.
+        var parts = window.QSComplexWizard.codeText(QSPanelWords.t('preview.componentListMissingDataBind'), {
+            attribute: 'data-bind="<var>"',
+            file: componentName + '.json'
         });
-        div.appendChild(document.createTextNode('. Add '));
-
-        var dbCode = document.createElement('code');
-        dbCode.textContent = 'data-bind="<var>"';
-        div.appendChild(dbCode);
-
-        div.appendChild(document.createTextNode(' to the matching element in '));
-
-        var fileCode = document.createElement('code');
-        fileCode.textContent = componentName + '.json';
-        div.appendChild(fileCode);
-
-        div.appendChild(document.createTextNode(
-            ' for the runtime binding to apply.'
-        ));
+        parts.forEach(function(part) {
+            if (part !== '{keys}') { div.append(part); return; }
+            missingKeys.forEach(function(k, i) {
+                if (i > 0) div.append(', ');
+                div.append(QSDom.el('code', { text: k }));
+            });
+        });
         return div;
     }
 
@@ -5922,7 +5857,7 @@
     function _renderEmptyComponentMessage() {
         var div = document.createElement('div');
         div.className = 'preview-contextual-js-response-bindings__cl-empty';
-        div.textContent = 'Component has no {{placeholders}} or __enums__ to bind.';
+        div.textContent = QSPanelWords.t('preview.componentListNothingToBind');
         return div;
     }
 
@@ -5963,17 +5898,11 @@
         var note = document.createElement('p');
         note.className = 'preview-contextual-js-response-bindings__notice';
         if (fieldType) {
-            note.appendChild(document.createTextNode(
-                (PreviewConfig.i18n?.modeNeedsArray
-                 || 'List / Component / Count need a field the response schema declares as an array. This one is declared') + ' '
-            ));
-            var code = document.createElement('code');
-            code.textContent = fieldType;
-            note.appendChild(code);
-            note.appendChild(document.createTextNode('.'));
+            // The declared type sits in the sentence as code, where its language puts it.
+            note.append(...window.QSComplexWizard.codeText(
+                QSPanelWords.t('preview.modeNeedsArrayDeclared'), { type: fieldType }));
         } else {
-            note.textContent = PreviewConfig.i18n?.modeNeedsArrayUntyped
-                || 'List / Component / Count need a field the response schema declares as an array. This one declares no type.';
+            note.textContent = QSPanelWords.t('preview.modeNeedsArrayUntyped');
         }
         return note;
     }
@@ -6016,12 +5945,12 @@
 
         var formatLabel = document.createElement('span');
         formatLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
-        formatLabel.textContent = 'Format:';
+        formatLabel.textContent = QSPanelWords.t('preview.countFormat');
         formatRow.appendChild(formatLabel);
 
         var formatName = 'count-format-' + Math.random().toString(36).slice(2, 9);
-        var numberLbl   = _renderCountFormatLabel(formatName, 'number',   'Just the number');
-        var sentenceLbl = _renderCountFormatLabel(formatName, 'sentence', 'Translated sentence');
+        var numberLbl   = _renderCountFormatLabel(formatName, 'number',   QSPanelWords.t('preview.countFormatNumber'));
+        var sentenceLbl = _renderCountFormatLabel(formatName, 'sentence', QSPanelWords.t('preview.countFormatSentence'));
         formatRow.appendChild(numberLbl);
         formatRow.appendChild(sentenceLbl);
         root.appendChild(formatRow);
@@ -6029,9 +5958,9 @@
         // ── Sentence sub-block (3 textKey pickers) ──
         var sentenceBlock = document.createElement('div');
         sentenceBlock.className = 'preview-contextual-js-response-bindings__count-sentence';
-        var zeroSlot = _renderSentencePickerSlot('Zero:');
-        var oneSlot  = _renderSentencePickerSlot('One:');
-        var manySlot = _renderSentencePickerSlot('Many:');
+        var zeroSlot = _renderSentencePickerSlot(QSPanelWords.t('preview.countSentenceZero'));
+        var oneSlot  = _renderSentencePickerSlot(QSPanelWords.t('preview.countSentenceOne'));
+        var manySlot = _renderSentencePickerSlot(QSPanelWords.t('preview.countSentenceMany'));
         sentenceBlock.appendChild(zeroSlot.row);
         sentenceBlock.appendChild(oneSlot.row);
         sentenceBlock.appendChild(manySlot.row);
@@ -6043,14 +5972,14 @@
 
         var fbLabel = document.createElement('span');
         fbLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
-        fbLabel.textContent = 'Fallback:';
+        fbLabel.textContent = QSPanelWords.t('preview.countFallback');
         fallbackRow.appendChild(fbLabel);
 
         var fbInput = document.createElement('input');
         fbInput.type = 'number';
         fbInput.className = 'preview-contextual-js-response-bindings__count-fallback';
         fbInput.placeholder = '0';
-        fbInput.title = 'Number to show when the field is missing or falsy.';
+        fbInput.title = QSPanelWords.t('preview.countFallbackHint');
         if (existing && existing.fallback !== undefined && existing.fallback !== null) {
             fbInput.value = existing.fallback;
         }
@@ -6070,9 +5999,9 @@
         var pickerFactory = window.QSComplexWizard && window.QSComplexWizard.createTextKeyPicker;
         var pickers = { zero: null, one: null, many: null };
         var slots = [
-            ['zero', zeroSlot, 'e.g. shop.productsZero'],
-            ['one',  oneSlot,  'e.g. shop.productsOne'],
-            ['many', manySlot, 'e.g. shop.productsMany']
+            ['zero', zeroSlot, QSPanelWords.t('preview.countSentenceZeroPlaceholder')],
+            ['one',  oneSlot,  QSPanelWords.t('preview.countSentenceOnePlaceholder')],
+            ['many', manySlot, QSPanelWords.t('preview.countSentenceManyPlaceholder')]
         ];
         slots.forEach(function(slot) {
             var name = slot[0];
@@ -6131,7 +6060,7 @@
         sel.className = 'preview-contextual-js-response-bindings__cl-component';
         var placeholder = document.createElement('option');
         placeholder.value = '';
-        placeholder.textContent = '-- select component --';
+        placeholder.textContent = QSPanelWords.t('preview.componentListSelectComponent');
         sel.appendChild(placeholder);
         return sel;
     }
@@ -6158,7 +6087,7 @@
         compRow.className = 'preview-contextual-js-response-bindings__cl-comp-row';
         var compLabel = document.createElement('span');
         compLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
-        compLabel.textContent = 'Component:';
+        compLabel.textContent = QSPanelWords.t('preview.componentListComponent');
         var compSelect = _renderComponentSelect();
         compRow.appendChild(compLabel);
         compRow.appendChild(compSelect);
@@ -6313,10 +6242,10 @@
         // Field dropdown
         var fieldSelect = document.createElement('select');
         fieldSelect.className = 'preview-contextual-js-response-bindings__row-field';
-        fieldSelect.title = PreviewConfig.i18n?.responseField || 'Response field';
+        fieldSelect.title = QSPanelWords.t('preview.responseField');
         var emptyOpt = document.createElement('option');
         emptyOpt.value = '';
-        emptyOpt.textContent = '-- field --';
+        emptyOpt.textContent = QSPanelWords.t('preview.responseFieldPlaceholder');
         fieldSelect.appendChild(emptyOpt);
         fieldNames.forEach(function(f) {
             var schema = fieldsMap[f] || {};
@@ -6471,12 +6400,12 @@
             lbl.appendChild(span);
             return lbl;
         }
-        var modeListLbl = modeLabel('list', 'data-bind template',
-            'Each item maps to a [data-bind="key"] element inside the container\'s first child.');
-        var modeCompLbl = modeLabel('componentList', 'Component per item',
-            'Each item clones a hidden component instance. fieldMap controls how API fields map to component vars; enums resolve via QS.enum.');
-        var modeCountLbl = modeLabel('count', 'Count',
-            'Write the count of the array (or 1 for non-empty values, fallback for missing/falsy) to a target selector. Optional translated-sentence format with zero / one / many strings.');
+        var modeListLbl = modeLabel('list', QSPanelWords.t('preview.bindingModeList'),
+            QSPanelWords.t('preview.bindingModeListHint'));
+        var modeCompLbl = modeLabel('componentList', QSPanelWords.t('preview.bindingModeComponent'),
+            QSPanelWords.t('preview.bindingModeComponentHint'));
+        var modeCountLbl = modeLabel('count', QSPanelWords.t('preview.bindingModeCount'),
+            QSPanelWords.t('preview.bindingModeCountHint'));
         modeRow.appendChild(modeListLbl);
         modeRow.appendChild(modeCompLbl);
         modeRow.appendChild(modeCountLbl);
@@ -6488,31 +6417,31 @@
         // Scalar mode elements
         var attrLabel = document.createElement('span');
         attrLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
-        attrLabel.textContent = PreviewConfig.i18n?.targetAttribute || 'Attribute:';
+        attrLabel.textContent = QSPanelWords.t('preview.targetAttribute');
 
         var attrInput = document.createElement('input');
         attrInput.type = 'text';
         attrInput.className = 'preview-contextual-js-response-bindings__row-attr';
-        attrInput.placeholder = 'e.g. src, href  (blank = textContent)';
-        attrInput.title = PreviewConfig.i18n?.targetAttribute || 'Attribute to set (e.g. src, href). Leave blank to set text content.';
+        attrInput.placeholder = QSPanelWords.t('preview.targetAttributePlaceholder');
+        attrInput.title = QSPanelWords.t('preview.targetAttributeHint');
         if (existing && existing.attribute) attrInput.value = existing.attribute;
 
         // Array/list mode shared elements
         var emptyLabel = document.createElement('span');
         emptyLabel.className = 'preview-contextual-js-response-bindings__row-attr-label';
-        emptyLabel.textContent = PreviewConfig.i18n?.emptyText || 'Empty text:';
+        emptyLabel.textContent = QSPanelWords.t('preview.emptyText');
 
         var emptyInput = document.createElement('input');
         emptyInput.type = 'text';
         emptyInput.className = 'preview-contextual-js-response-bindings__row-empty-text';
-        emptyInput.placeholder = PreviewConfig.i18n?.emptyTextPlaceholder || 'e.g. No items found  (optional)';
-        emptyInput.title = PreviewConfig.i18n?.emptyTextHint || 'Text shown when the array is empty';
+        emptyInput.placeholder = QSPanelWords.t('preview.emptyTextPlaceholder');
+        emptyInput.title = QSPanelWords.t('preview.emptyTextHint');
         if (existing && existing.emptyText) emptyInput.value = existing.emptyText;
 
         // List mode hint
         var listHint = document.createElement('span');
         listHint.className = 'preview-contextual-js-response-bindings__row-list-hint';
-        listHint.textContent = PreviewConfig.i18n?.listModeHint || 'Uses data-bind attributes inside the container\'s first child as item template.';
+        listHint.textContent = QSPanelWords.t('preview.listModeHint');
 
         // ─ Mode-specific blocks (built lazily on first pick) ─
         var compListBlock = null;
@@ -6557,11 +6486,11 @@
                 if (resolved === 'count') {
                     // For count, the selector input is the TARGET element
                     // (textContent recipient), not a container with template.
-                    selectorInput.placeholder = PreviewConfig.i18n?.targetSelector || 'Target selector';
-                    selectorInput.title = 'CSS selector for the element whose textContent gets the count (or the translated sentence).';
+                    selectorInput.placeholder = QSPanelWords.t('preview.targetSelector');
+                    selectorInput.title = QSPanelWords.t('preview.countTargetSelectorHint');
                 } else {
-                    selectorInput.placeholder = PreviewConfig.i18n?.containerSelector || 'Container selector';
-                    selectorInput.title = PreviewConfig.i18n?.containerSelectorHint || 'Container element whose first child is the template. Each array item clones it.';
+                    selectorInput.placeholder = QSPanelWords.t('preview.containerSelector');
+                    selectorInput.title = QSPanelWords.t('preview.containerSelectorHint');
                 }
 
                 if (resolved === 'componentList') {
@@ -6585,8 +6514,8 @@
             } else {
                 modeRow.style.display = 'none';
                 delete row.dataset.renderMode;
-                selectorInput.placeholder = PreviewConfig.i18n?.targetSelector || 'Target selector';
-                selectorInput.title = PreviewConfig.i18n?.targetSelector || 'CSS selector to inject data into';
+                selectorInput.placeholder = QSPanelWords.t('preview.targetSelector');
+                selectorInput.title = QSPanelWords.t('preview.targetSelectorHint');
                 bottomRow.appendChild(attrLabel);
                 bottomRow.appendChild(attrInput);
                 // Only once a field is actually chosen — an empty dropdown is
@@ -6639,7 +6568,7 @@
         row.appendChild(bottomRow);
 
         // ── The row's × (nothing is written until Save), at the end of its top line ──
-        topRow.appendChild(QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove', function() { row.remove(); },
+        topRow.appendChild(QSControls.removeRow(QSPanelWords.t('common.remove'), function() { row.remove(); },
             { className: 'preview-contextual-js-response-bindings__row-delete' }));
 
         rowsEl.appendChild(row);
@@ -6743,7 +6672,7 @@
                     }
                 });
             var result = response.data || {};
-            if (!response.ok) throw new Error(result.message || 'Failed to save bindings');
+            if (!response.ok) throw new Error(result.message || QSPanelWords.t('preview.bindingsSaveFailed'));
 
             // Sangio's rule — nothing happens silently. A count-sentence
             // binding names three translation keys; a key that resolves in no
@@ -6769,9 +6698,7 @@
                     var keys = byLang[lang].filter(function(k, i, a) { return a.indexOf(k) === i; });
                     return lang + ': ' + keys.join(', ');
                 }).join(' — ');
-                var heading = PreviewConfig.i18n?.countKeysUnresolved
-                    || 'Saved. Some count sentences have no text yet';
-                showToastFn(heading + ' — ' + detail, 'warning');
+                showToastFn(QSPanelWords.t('preview.countKeysUnresolved') + ' — ' + detail, 'warning');
             }
             
             // Update local cache
@@ -6783,7 +6710,7 @@
             return true;
         } catch (error) {
             console.error('[PreviewJsInteractions] Failed to save response bindings:', error);
-            if (showToastFn) showToastFn('Error saving bindings: ' + error.message, 'error');
+            if (showToastFn) showToastFn(QSPanelWords.t('preview.bindingsSaveError', { error: error.message }), 'error');
             return false;
         }
     }
@@ -6803,66 +6730,12 @@
 
         var placeholderText;
         if (fnsToShow.length === 0 && ev && !showAll) {
-            placeholderText = '— No function presets for "' + ev + '" — flip "Show all" or use API Call —';
+            placeholderText = QSPanelWords.t('preview.noFunctionPresetsForEvent', { event: ev });
         } else {
-            placeholderText = PreviewConfig.i18n?.selectFunction || '-- Select function --';
+            placeholderText = QSPanelWords.t('preview.selectFunction');
         }
-        selectEl.replaceChildren();
-        var placeholderOpt = document.createElement('option');
-        placeholderOpt.value = '';
-        placeholderOpt.textContent = placeholderText;
-        selectEl.appendChild(placeholderOpt);
-
-        // Category-based grouping (mirrors the same
-        // change in populateFunctionDropdown — kept in sync). category is
-        // OPTIONAL; missing falls into "Uncategorized" (defensive
-        // bucket); 'general' is the intentional cross-cutting bucket.
-        // See DESIGN_DECISIONS.md "Picker categorisation".
-        var grouped = {};
-        fnsToShow.forEach(function(fn) {
-            var cat = fn.category || 'uncategorized';
-            if (!grouped[cat]) grouped[cat] = [];
-            grouped[cat].push(fn);
-        });
-
-        var KNOWN_CATEGORY_ORDER = [
-            'dom-toggle', 'form', 'fetch', 'auth', 'nav',
-            'state-store', 'focus', 'display', 'general'
-        ];
-        var CATEGORY_LABELS = {
-            'dom-toggle':  'DOM toggles',
-            'form':        'Forms',
-            'fetch':       'Fetch / network',
-            'auth':        'Auth',
-            'nav':         'Navigation',
-            'state-store': 'State stores',
-            'focus':       'DOM focus',
-            'display':     'Rendering / display',
-            'general':     'General',
-            'uncategorized': 'Uncategorized'
-        };
-        var renderOrder = KNOWN_CATEGORY_ORDER.slice();
-        Object.keys(grouped)
-            .filter(function(c) { return c !== 'uncategorized' && KNOWN_CATEGORY_ORDER.indexOf(c) === -1; })
-            .sort()
-            .forEach(function(c) { renderOrder.push(c); });
-        if (grouped.uncategorized) renderOrder.push('uncategorized');
-
-        renderOrder.forEach(function(cat) {
-            if (!grouped[cat] || grouped[cat].length === 0) return;
-            var optgroup = document.createElement('optgroup');
-            optgroup.label = CATEGORY_LABELS[cat] || cat;
-            grouped[cat].forEach(function(fn) {
-                var option = document.createElement('option');
-                option.value = fn.name;
-                option.textContent = fn.name;
-                option.dataset.args = JSON.stringify(fn.args || []);
-                option.dataset.description = fn.description || '';
-                option.dataset.example = fn.example || '';
-                optgroup.appendChild(option);
-            });
-            selectEl.appendChild(optgroup);
-        });
+        // The same category optgroups as the element's Function picker.
+        _populateVerbSelect(selectEl, fnsToShow, placeholderText);
 
         // Combobox: sync whichever picker wraps this selectEl.
         // Today only peFnPicker wraps a select handled by this routine;
@@ -6875,7 +6748,7 @@
      */
     function _populateApiSelects(apiSelect, endpointSelect) {
         if (apiSelect) {
-            QSDom.setSelectPlaceholder(apiSelect, PreviewConfig.i18n?.selectApi || 'Select API...');
+            QSDom.setSelectPlaceholder(apiSelect, QSPanelWords.t('preview.selectApi'));
             var seen = {};
             availableApiEndpoints.forEach(function(ep) {
                 if (!seen[ep.api]) {
@@ -6888,7 +6761,7 @@
             });
         }
         if (endpointSelect) {
-            QSDom.setSelectPlaceholder(endpointSelect, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
+            QSDom.setSelectPlaceholder(endpointSelect, QSPanelWords.t('preview.selectEndpoint'));
             endpointSelect.disabled = true;
         }
     }

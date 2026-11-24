@@ -34,6 +34,11 @@
     var MAX_COLS = 20;
     var DEFAULT_COLS = 3;
     var DEFAULT_BODY_ROWS = 2;
+    // A table id: a letter, then letters, digits, hyphens or underscores (the emitted HTML id, and
+    // the namespace of the keys a Translatable paste generates).
+    var TABLE_ID_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
+
+    var t = window.QSComplexWizard.t;
 
     // ---- small render helpers --------------------------------------------
 
@@ -105,37 +110,43 @@
         // -- table id (required when paste mode = Translatable; used to
         //    namespace auto-generated translation keys) --
         var idGroup = _renderGroup();
-        idGroup.appendChild(_renderLabel('Table id (HTML id of the <table>; required when using Translatable paste mode)'));
+        idGroup.appendChild(_renderLabel(t('table.id')));
         var tableIdInput = document.createElement('input');
         tableIdInput.type = 'text';
         tableIdInput.className = 'admin-input';
         tableIdInput.id = 'ce-table-id';
-        tableIdInput.placeholder = 'e.g. q1Sales';
+        tableIdInput.placeholder = t('table.idPlaceholder');
         tableIdInput.autocomplete = 'off';
         idGroup.appendChild(tableIdInput);
-        idGroup.appendChild(_renderHint('Used to namespace auto-generated keys when pasting in Translatable mode (e.g. "table.q1Sales.head.0"). Letters/digits/hyphens/underscores; must start with a letter. Optional when pasting in RAW mode or when typing each cell key manually.'));
+        // The Translatable paste mode's requirement, in the warning colour right under the field:
+        // shown only while that mode is chosen and the id is empty or not valid (_syncIdRequirement).
+        var idRequirement = _renderHint(t('table.idRequired'));
+        idRequirement.classList.add('admin-hint--warning');
+        idRequirement.hidden = true;
+        idGroup.appendChild(idRequirement);
+        idGroup.appendChild(_renderHint(t('table.idHint')));
         wrap.appendChild(idGroup);
 
         // -- caption picker --
         var capGroup = _renderGroup();
-        capGroup.appendChild(_renderLabel('Caption (optional)'));
+        capGroup.appendChild(_renderLabel(t('table.caption')));
         var capMount = document.createElement('div');
         capGroup.appendChild(capMount);
         wrap.appendChild(capGroup);
         var captionPicker = window.QSComplexWizard.createTextKeyPicker({
             container: capMount,
-            placeholder: 'e.g. tables.q1Sales.caption (leave blank for no caption)',
+            placeholder: t('table.captionPlaceholder'),
             value: '',
         });
 
         // -- hasHead toggle --
-        var headLabel = _renderCheckbox('ce-table-has-head', 'Include header row (<thead>)', true);
+        var headLabel = _renderCheckbox('ce-table-has-head', t('table.hasHead'), true);
         wrap.appendChild(_renderGroup(headLabel));
         var hasHeadInput = headLabel.querySelector('input');
 
         // -- column count --
         var colCountGroup = _renderGroup();
-        colCountGroup.appendChild(_renderLabel('Columns', true));
+        colCountGroup.appendChild(_renderLabel(t('table.columns'), true));
         var colCountInput = document.createElement('input');
         colCountInput.type = 'number';
         colCountInput.className = 'admin-input';
@@ -145,13 +156,16 @@
         colCountInput.value = String(DEFAULT_COLS);
         colCountInput.style.maxWidth = '120px';
         colCountGroup.appendChild(colCountInput);
-        colCountGroup.appendChild(_renderHint('Resizing preserves overlapping cells. Limits: ' + MIN_COLS + '–' + MAX_COLS + '.'));
+        colCountGroup.appendChild(_renderHint(t('table.columnsHint', {
+            min: QSPanelWords.number(MIN_COLS),
+            max: QSPanelWords.number(MAX_COLS),
+        })));
         wrap.appendChild(colCountGroup);
 
         wrap.appendChild(_renderHr());
 
         // -- paste from spreadsheet (with mode radio) --
-        // Two-mode design (per Option C, the user's preferred hybrid):
+        // Two-mode design:
         //   RAW         : prefixes each cell with __RAW__ → renders verbatim
         //                 in every language; zero key creation, zero
         //                 translation-file pollution.
@@ -162,8 +176,8 @@
         //                 empty for others — same convention the textKey
         //                 picker uses when creating new keys).
         var pasteGroup = _renderGroup();
-        pasteGroup.appendChild(_renderLabel('Paste from spreadsheet (optional)'));
-        pasteGroup.appendChild(_renderHint('Paste TSV (copy-paste from Excel / Sheets) or CSV. First row becomes the header when "Include header row" is on.'));
+        pasteGroup.appendChild(_renderLabel(t('table.paste')));
+        pasteGroup.appendChild(_renderHint(t('table.pasteHint')));
 
         // Paste mode radio.
         var modeRow = document.createElement('div');
@@ -198,12 +212,12 @@
             return l;
         }
         modeRow.appendChild(_renderModeRadio('raw',
-            'RAW (literal — same in all languages)',
-            'Each cell becomes __RAW__<value> — rendered verbatim. No keys created. Fastest.',
+            t('table.modeRaw'),
+            t('table.modeRawHint'),
             true));
         modeRow.appendChild(_renderModeRadio('translatable',
-            'Translatable (auto-generate keys + write values to one language)',
-            'Requires a table id (above). Keys become "table.<id>.head.<col>" / "table.<id>.body.<r>.<c>". Values are written via setTranslationKeys for the language you pick below. EMPTY cells are skipped (no orphan keys).',
+            t('table.modeTranslatable'),
+            t('table.modeTranslatableHint'),
             false));
         pasteGroup.appendChild(modeRow);
 
@@ -220,7 +234,7 @@
         var langLabel = document.createElement('span');
         langLabel.className = 'admin-hint';
         langLabel.style.margin = '0';
-        langLabel.textContent = 'Write values to language:';
+        langLabel.textContent = t('table.writeTo');
         var langSelect = document.createElement('select');
         langSelect.className = 'admin-input';
         langSelect.id = 'ce-table-paste-lang';
@@ -230,7 +244,7 @@
         (function () {
             var opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = '(loading…)';
+            opt.textContent = t('table.langLoading');
             langSelect.appendChild(opt);
         })();
         langRow.appendChild(langLabel);
@@ -241,7 +255,7 @@
         pasteArea.className = 'admin-input';
         pasteArea.id = 'ce-table-paste';
         pasteArea.rows = 4;
-        pasteArea.placeholder = 'Paste your TSV / CSV here…';
+        pasteArea.placeholder = t('table.pastePlaceholder');
         pasteGroup.appendChild(pasteArea);
 
         var pasteActions = document.createElement('div');
@@ -251,12 +265,12 @@
         var pasteApply = document.createElement('button');
         pasteApply.type = 'button';
         pasteApply.className = 'admin-btn';
-        pasteApply.textContent = 'Apply pasted grid';
+        pasteApply.textContent = t('table.pasteApply');
         pasteActions.appendChild(pasteApply);
         var pasteStatus = document.createElement('span');
         pasteStatus.className = 'admin-hint';
         pasteStatus.style.alignSelf = 'center';
-        pasteStatus.textContent = 'Replaces ALL current cells.';
+        pasteStatus.textContent = t('table.pasteReplaces');
         pasteActions.appendChild(pasteStatus);
         pasteGroup.appendChild(pasteActions);
         wrap.appendChild(pasteGroup);
@@ -265,7 +279,7 @@
 
         // -- header row (hidden when !hasHead) --
         var headerGroup = _renderGroup();
-        headerGroup.appendChild(_renderLabel('Header row'));
+        headerGroup.appendChild(_renderLabel(t('table.headerRow')));
         var headerRow = document.createElement('div');
         headerRow.style.display = 'flex';
         headerRow.style.gap = '4px';
@@ -274,8 +288,8 @@
 
         // -- body rows --
         var bodyGroup = _renderGroup();
-        bodyGroup.appendChild(_renderLabel('Body rows', true));
-        bodyGroup.appendChild(_renderHint('Reorder / delete rows with the side toolbar (Alt+↑/↓ also works).'));
+        bodyGroup.appendChild(_renderLabel(t('table.bodyRows'), true));
+        bodyGroup.appendChild(_renderHint(t('table.bodyRowsHint')));
         var bodyHost = document.createElement('div');
         bodyGroup.appendChild(bodyHost);
         wrap.appendChild(bodyGroup);
@@ -310,7 +324,7 @@
                 row.appendChild(mount);
                 var picker = window.QSComplexWizard.createTextKeyPicker({
                     container: mount,
-                    placeholder: isHeader ? 'header key' : 'cell key',
+                    placeholder: isHeader ? t('table.headerKeyPlaceholder') : t('table.cellKeyPlaceholder'),
                     value: (d.cells && d.cells[c]) || '',
                 });
                 pickers.push(picker);
@@ -330,7 +344,7 @@
                 headerRow.appendChild(mount);
                 var picker = window.QSComplexWizard.createTextKeyPicker({
                     container: mount,
-                    placeholder: 'header key',
+                    placeholder: t('table.headerKeyPlaceholder'),
                     value: (values && values[c]) || '',
                 });
                 headerPickers.push(picker);
@@ -342,7 +356,7 @@
         // ---- body row editor ----------------------------------------------
         var bodyEditor = window.QSComplexWizard.createRowEditor({
             container: bodyHost,
-            addButtonLabel: '+ Add body row',
+            addButtonLabel: t('table.addBodyRow'),
             minRows: 1,
             initialRows: (function () {
                 var rows = [];
@@ -395,7 +409,7 @@
                         rowEl.appendChild(mount);
                         var picker = window.QSComplexWizard.createTextKeyPicker({
                             container: mount,
-                            placeholder: 'cell key',
+                            placeholder: t('table.cellKeyPlaceholder'),
                             value: '',
                         });
                         pickers.push(picker);
@@ -417,14 +431,25 @@
             headerGroup.style.display = hasHeadInput.checked ? '' : 'none';
         });
 
-        // Toggle the language picker visibility on mode change.
+        // A mode change toggles the language picker and keeps the id's requirement in step. A radio
+        // announces 'change' only when it becomes the checked one, so each radio listens.
         wrap.querySelectorAll('input[name="ce-table-paste-mode"]').forEach(function (r) {
             r.addEventListener('change', function () {
                 langRow.style.display = (r.checked && r.value === 'translatable') ? 'flex' : 'none';
+                _syncIdRequirement();
             });
         });
+        // Every edit of the id (typed, pasted, cut) announces 'input'; no script sets its value.
+        tableIdInput.addEventListener('input', _syncIdRequirement);
 
         // ---- paste helpers ------------------------------------------------
+
+        // The id's requirement shows while the paste mode is Translatable and the id is empty or
+        // not valid, and is hidden otherwise.
+        function _syncIdRequirement() {
+            var tableId = (tableIdInput.value || '').trim();
+            idRequirement.hidden = !(_currentPasteMode() === 'translatable' && !TABLE_ID_PATTERN.test(tableId));
+        }
 
         // getCurrentLang() mirrors text-key-picker.js's getCurrentLang.
         function _getCurrentLang() {
@@ -494,7 +519,7 @@
         pasteApply.addEventListener('click', function () {
             var grid = _parseTabularBlob(pasteArea.value);
             if (grid.length === 0) {
-                pasteStatus.textContent = 'Nothing pasted.';
+                pasteStatus.textContent = t('table.nothingPasted');
                 return;
             }
             var maxCols = 0;
@@ -522,14 +547,17 @@
                     return row.map(function (v) { return v === '' ? '' : '__RAW__' + v; });
                 });
                 _applyGridToPickers(headerKeysRaw, bodyKeysRaw, maxCols);
-                pasteStatus.textContent = 'Applied as RAW (literal text).';
+                pasteStatus.textContent = t('table.appliedRaw');
                 return;
             }
 
-            // Translatable mode — needs an id + writes translations.
+            // Translatable mode — needs an id + writes translations. Without a valid id the
+            // requirement shows under the id field, which takes the focus; the status line goes
+            // back to what a paste does rather than repeat the requirement.
             var tableId = (tableIdInput.value || '').trim();
-            if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(tableId)) {
-                pasteStatus.textContent = 'Translatable mode needs a valid table id above.';
+            if (!TABLE_ID_PATTERN.test(tableId)) {
+                _syncIdRequirement();
+                pasteStatus.textContent = t('table.pasteReplaces');
                 tableIdInput.focus();
                 return;
             }
@@ -575,14 +603,14 @@
                 // payload (which the backend likely accepts as a no-op,
                 // but skipping the call is cleaner).
                 _applyGridToPickers(headerKeysT, bodyKeysT, maxCols);
-                pasteStatus.textContent = 'Nothing to translate (all cells empty).';
+                pasteStatus.textContent = t('table.nothingToTranslate');
                 return;
             }
 
             // Disable the button during the network round-trip + show
             // status. Re-enable in finally.
             pasteApply.disabled = true;
-            pasteStatus.textContent = 'Writing translations to "' + targetLang + '"…';
+            pasteStatus.textContent = t('table.writing', { language: targetLang });
 
             // Single request to the target language only, through the one list of the site's words
             // (QSSiteWords.write(): its answer checked). We deliberately do NOT write empty stubs to
@@ -591,14 +619,15 @@
             // A refusal writes nothing and leaves the pickers as they were.
             window.QSSiteWords.write(targetLang, flat).then(function (done) {
                 if (!done.ok) {
-                    pasteStatus.textContent = 'Not written: ' + done.message;
+                    pasteStatus.textContent = t('table.notWritten', { reason: done.message });
                     return;
                 }
                 _applyGridToPickers(headerKeysT, bodyKeysT, maxCols);
-                pasteStatus.textContent = 'Wrote ' + Object.keys(flat).length + ' translation key(s) for "' + tableId + '" (' + targetLang + ').';
+                pasteStatus.textContent = QSPanelWords.count('complexWizard.table.wrote', Object.keys(flat).length,
+                    { id: tableId, language: targetLang });
             }).catch(function (err) {
                 console.error('[Table wizard] Translatable paste failed:', err);
-                pasteStatus.textContent = 'Translation write failed — see console.';
+                pasteStatus.textContent = t('table.writeFailed');
             }).then(function () {
                 pasteApply.disabled = false;
             });
@@ -633,20 +662,20 @@
             // provided — the cross-language translation workflow + the
             // emitted HTML id both need it to match the standard format.
             var tableId = (tableIdInput.value || '').trim();
-            if (tableId !== '' && !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(tableId)) {
-                return 'Table id must start with a letter; use only letters, digits, hyphens, underscores.';
+            if (tableId !== '' && !TABLE_ID_PATTERN.test(tableId)) {
+                return t('table.errors.idFormat');
             }
-            if (currentColCount < MIN_COLS) return 'Add at least one column.';
-            if (currentColCount > MAX_COLS) return 'Column count exceeds the limit (' + MAX_COLS + ').';
+            if (currentColCount < MIN_COLS) return t('table.errors.noColumn');
+            if (currentColCount > MAX_COLS) return t('table.errors.tooManyColumns', { max: QSPanelWords.number(MAX_COLS) });
             if (hasHeadInput.checked) {
                 // Per-cell empty header is allowed (renders as an empty <th>)
                 // — but a header with EVERY cell empty is almost certainly
                 // a misclick, so warn.
                 var allEmpty = headerPickers.every(function (p) { return !(p.getValue() || '').trim(); });
-                if (allEmpty) return 'Header row is all empty. Turn off "Include header row" if you don\'t want a <thead>.';
+                if (allEmpty) return t('table.errors.headerEmpty');
             }
             var rows = bodyEditor.getRows();
-            if (rows.length === 0) return 'Add at least one body row.';
+            if (rows.length === 0) return t('table.errors.noBodyRow');
             // Body cells CAN be empty (renders as empty <td>) — no per-cell
             // validation. The user may want sparse cells.
             return null;
@@ -665,8 +694,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['table'] = {
-        label: 'Table',
-        description: window.QSComplexWizard.t('table.description'),
+        label: t('table.label'),
+        description: t('table.description'),
         renderWizard: renderWizard
     };
 })();

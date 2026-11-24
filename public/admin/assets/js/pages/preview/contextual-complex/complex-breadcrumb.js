@@ -7,13 +7,16 @@
  *
  * Wizard mirrors the Nav-menu shape (labelKey picker + href input per
  * row) with one twist: the LAST row's href field is greyed out + its
- * label says "(current page — href ignored)". This is purely UX hint;
- * the builder ignores the last item's href regardless.
+ * placeholder says the href is ignored (the last item is the current
+ * page). This is purely UX hint; the builder ignores the last item's
+ * href regardless.
  *
  * Server-side builder: secure/src/classes/complexElements/Breadcrumb.php
  */
 (function () {
     'use strict';
+
+    var t = window.QSComplexWizard.t;
 
     function _renderLabel(text, required) {
         var l = document.createElement('label');
@@ -51,7 +54,7 @@
         var hrefInput = document.createElement('input');
         hrefInput.type = 'text';
         hrefInput.className = 'admin-input qs-bc-row__href';
-        hrefInput.placeholder = 'href (e.g. /docs)';
+        hrefInput.placeholder = t('breadcrumb.hrefPlaceholder');
         hrefInput.autocomplete = 'off';
         if (d.href !== undefined) hrefInput.value = d.href;
         // Attach the shared routes datalist (autocomplete only — external
@@ -68,7 +71,7 @@
 
         var picker = window.QSComplexWizard.createTextKeyPicker({
             container: labelMount,
-            placeholder: 'label key (e.g. nav.docs)',
+            placeholder: t('breadcrumb.labelPlaceholder'),
             value: d.labelKey || '',
         });
         pickerMap.set(row, { label: picker });
@@ -85,8 +88,8 @@
             var isLast = (idx === contents.length - 1);
             hrefEl.disabled = isLast;
             hrefEl.placeholder = isLast
-                ? '(ignored — last item is the current page)'
-                : 'href (e.g. /docs)';
+                ? t('breadcrumb.lastHrefPlaceholder')
+                : t('breadcrumb.hrefPlaceholder');
             if (isLast) {
                 hrefEl.style.opacity = '0.5';
             } else {
@@ -99,8 +102,8 @@
         var wrap = document.createElement('div');
 
         var itemsGroup = _renderGroup();
-        itemsGroup.appendChild(_renderLabel('Crumbs', true));
-        itemsGroup.appendChild(_renderHint('Top-to-bottom = left-to-right in the rendered breadcrumb. Last item = current page; its href is ignored.'));
+        itemsGroup.appendChild(_renderLabel(t('breadcrumb.crumbs'), true));
+        itemsGroup.appendChild(_renderHint(t('breadcrumb.crumbsHint')));
         var itemsHost = document.createElement('div');
         itemsGroup.appendChild(itemsHost);
         wrap.appendChild(itemsGroup);
@@ -110,7 +113,7 @@
         var pickerMap = new WeakMap();
         var editor = window.QSComplexWizard.createRowEditor({
             container: itemsHost,
-            addButtonLabel: '+ Add crumb',
+            addButtonLabel: t('breadcrumb.addCrumb'),
             minRows: 1,
             initialRows: [
                 { labelKey: '', href: '/' },
@@ -137,15 +140,16 @@
 
         function validate() {
             var cfg = getConfig();
-            if (cfg.items.length === 0) return 'Add at least one crumb.';
+            if (cfg.items.length === 0) return t('breadcrumb.errors.noCrumb');
             var lastIdx = cfg.items.length - 1;
             for (var i = 0; i < cfg.items.length; i++) {
                 var it = cfg.items[i];
-                if (!it.labelKey) return 'Crumb #' + (i + 1) + ' is missing a label key.';
+                var nth = { number: QSPanelWords.number(i + 1) };
+                if (!it.labelKey) return t('breadcrumb.errors.labelKey', nth);
                 // The LAST crumb may have an empty href (it's the current page);
                 // every earlier crumb must have one.
                 if (i !== lastIdx && !it.href) {
-                    return 'Crumb #' + (i + 1) + ' is missing an href.';
+                    return t('breadcrumb.errors.href', nth);
                 }
             }
             return null;
@@ -162,8 +166,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['breadcrumb'] = {
-        label: 'Breadcrumb',
-        description: window.QSComplexWizard.t('breadcrumb.description'),
+        label: t('breadcrumb.label'),
+        description: t('breadcrumb.description'),
         renderWizard: renderWizard
     };
 })();

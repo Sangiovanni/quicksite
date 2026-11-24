@@ -14,6 +14,8 @@
 (function () {
     'use strict';
 
+    var t = window.QSComplexWizard.t;
+
     function _renderLabel(text, required) {
         var l = document.createElement('label');
         l.className = 'admin-label';
@@ -51,11 +53,11 @@
 
         var labelHint = document.createElement('div');
         labelHint.className = 'admin-hint';
-        labelHint.textContent = 'Tab label';
+        labelHint.textContent = t('tabSet.tabLabel');
 
         var contentHint = document.createElement('div');
         contentHint.className = 'admin-hint';
-        contentHint.textContent = 'Panel content (wrapped in <p>)';
+        contentHint.textContent = t('tabSet.panelContent');
 
         row.appendChild(labelHint);
         row.appendChild(labelMount);
@@ -64,12 +66,12 @@
 
         var labelPicker = window.QSComplexWizard.createTextKeyPicker({
             container: labelMount,
-            placeholder: 'e.g. settings.tabs.account',
+            placeholder: t('tabSet.labelPlaceholder'),
             value: d.labelKey || '',
         });
         var contentPicker = window.QSComplexWizard.createTextKeyPicker({
             container: contentMount,
-            placeholder: 'e.g. settings.account.body',
+            placeholder: t('tabSet.contentPlaceholder'),
             value: d.contentKey || '',
         });
         pickerMap.set(row, { label: labelPicker, content: contentPicker });
@@ -81,21 +83,21 @@
 
         // -- setId --
         var setIdGroup = _renderGroup();
-        setIdGroup.appendChild(_renderLabel('Tab set id (HTML id of the wrapper)', true));
+        setIdGroup.appendChild(_renderLabel(t('tabSet.setId'), true));
         var setIdInput = document.createElement('input');
         setIdInput.type = 'text';
         setIdInput.className = 'admin-input';
         setIdInput.id = 'ce-ts-set-id';
-        setIdInput.placeholder = 'e.g. settings-tabs';
+        setIdInput.placeholder = t('tabSet.setIdPlaceholder');
         setIdInput.autocomplete = 'off';
         setIdGroup.appendChild(setIdInput);
-        setIdGroup.appendChild(_renderHint('Used to scope each tab\'s click chain so multiple tab sets on the same page don\'t interfere. Letters/digits/hyphens/underscores; must start with a letter.'));
+        setIdGroup.appendChild(_renderHint(t('tabSet.setIdHint')));
         wrap.appendChild(setIdGroup);
 
         // -- items --
         var itemsGroup = _renderGroup();
-        itemsGroup.appendChild(_renderLabel('Tabs', true));
-        itemsGroup.appendChild(_renderHint('Each tab = one label + one panel content. The first tab is the initial active one. Each panel can be edited as a normal node after save (e.g. to add lists, images, or other complex elements).'));
+        itemsGroup.appendChild(_renderLabel(t('tabSet.tabs'), true));
+        itemsGroup.appendChild(_renderHint(t('tabSet.tabsHint')));
         var itemsHost = document.createElement('div');
         itemsGroup.appendChild(itemsHost);
         wrap.appendChild(itemsGroup);
@@ -105,7 +107,7 @@
         var pickerMap = new WeakMap();
         var editor = window.QSComplexWizard.createRowEditor({
             container: itemsHost,
-            addButtonLabel: '+ Add tab',
+            addButtonLabel: t('tabSet.addTab'),
             minRows: 1,
             initialRows: [
                 { labelKey: '', contentKey: '' },
@@ -133,13 +135,14 @@
         function validate() {
             var cfg = getConfig();
             if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(cfg.setId)) {
-                return 'Tab set id must start with a letter and use only letters, digits, hyphens, underscores.';
+                return t('tabSet.errors.setId');
             }
-            if (cfg.items.length === 0) return 'Add at least one tab.';
+            if (cfg.items.length === 0) return t('tabSet.errors.noTab');
             for (var i = 0; i < cfg.items.length; i++) {
                 var it = cfg.items[i];
-                if (!it.labelKey)   return 'Tab #' + (i + 1) + ' is missing a label key.';
-                if (!it.contentKey) return 'Tab #' + (i + 1) + ' is missing a content key.';
+                var nth = { number: QSPanelWords.number(i + 1) };
+                if (!it.labelKey)   return t('tabSet.errors.labelKey', nth);
+                if (!it.contentKey) return t('tabSet.errors.contentKey', nth);
             }
             return null;
         }
@@ -155,8 +158,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['tab-set'] = {
-        label: 'Tab set',
-        description: window.QSComplexWizard.t('tabSet.description'),
+        label: t('tabSet.label'),
+        description: t('tabSet.description'),
         renderWizard: renderWizard
     };
 })();

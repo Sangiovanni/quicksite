@@ -3,22 +3,22 @@
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content">
         <div class="preview-keyframe-modal__header">
-            <h3 id="keyframe-modal-title"><?= __admin('preview.editKeyframe') ?? 'Edit Keyframe' ?></h3>
+            <h3 id="keyframe-modal-title"><?= adminEscape(__admin('preview.editKeyframe')) ?></h3>
             <button type="button" class="admin-modal__close" id="keyframe-modal-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="preview-keyframe-modal__body">
             <!-- Keyframe Name -->
             <div class="preview-keyframe-modal__field">
-                <label for="keyframe-name"><?= __admin('preview.keyframeName') ?? 'Name' ?> <span>*</span>:</label>
+                <label for="keyframe-name"><?= adminEscape(__admin('preview.keyframeName')) ?> <span>*</span>:</label>
                 <input type="text" id="keyframe-name" class="admin-input" placeholder="fadeIn" required>
-                <small class="preview-keyframe-modal__hint"><?= __admin('preview.keyframeNameHint') ?? 'Letters, numbers, hyphens. Start with letter.' ?></small>
+                <small class="preview-keyframe-modal__hint"><?= adminEscape(__admin('preview.keyframeNameHint')) ?></small>
             </div>
             
             <!-- Timeline -->
             <div class="preview-keyframe-modal__timeline-section">
                 <div class="preview-keyframe-modal__timeline-header">
-                    <label><?= __admin('preview.keyframeTimeline') ?? 'Timeline' ?>:</label>
-                    <small><?= __admin('preview.clickToAddFrame') ?? 'Click on timeline to add frames' ?></small>
+                    <label><?= adminEscape(__admin('preview.keyframeTimeline')) ?>:</label>
+                    <small><?= adminEscape(__admin('preview.clickToAddFrame')) ?></small>
                 </div>
                 <div class="preview-keyframe-modal__timeline" id="keyframe-timeline">
                     <!-- Timeline markers populated by JS -->
@@ -35,11 +35,11 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <polygon points="5 3 19 12 5 21 5 3"/>
                 </svg>
-                <?= __admin('preview.previewAnimation') ?? 'Preview' ?>
+                <?= adminEscape(__admin('preview.previewAnimation')) ?>
             </button>
             <div class="preview-keyframe-modal__footer-right">
-                <button type="button" class="admin-btn admin-btn--ghost" id="keyframe-cancel"><?= __admin('common.cancel') ?></button>
-                <button type="button" class="admin-btn admin-btn--primary" id="keyframe-save"><?= __admin('common.save') ?></button>
+                <button type="button" class="admin-btn admin-btn--ghost" id="keyframe-cancel"><?= adminEscape(__admin('common.cancel')) ?></button>
+                <button type="button" class="admin-btn admin-btn--primary" id="keyframe-save"><?= adminEscape(__admin('common.save')) ?></button>
             </div>
         </div>
     </div>

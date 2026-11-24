@@ -27,9 +27,9 @@
     if (targetSelect && window.QSSearchableSelect) {
         try {
             targetPicker = new window.QSSearchableSelect(targetSelect, {
-                placeholder: '— Select page or component —',
-                searchPlaceholder: 'Search pages, components, layout…',
-                emptyText: 'No matches',
+                placeholder: QSPanelWords.t('preview.editListPlaceholder'),
+                searchPlaceholder: QSPanelWords.t('preview.editListSearchPlaceholder'),
+                emptyText: QSPanelWords.t('preview.editListNoMatches'),
                 fitOptions: true,
             });
         } catch (e) {
@@ -224,7 +224,6 @@
     const selectorSelected = document.getElementById('selector-selected');
     const selectorSelectedValue = document.getElementById('selector-selected-value');
     const selectorSelectedClear = document.getElementById('selector-selected-clear');
-    const selectorMatchCount = document.getElementById('selector-match-count');
     const selectorEditBtn = document.getElementById('selector-edit-btn');
     const selectorAnimateBtn = document.getElementById('selector-animate-btn');
     
@@ -382,8 +381,8 @@
     const addComplexKindPicker = addComplexKindSelect && window.QSSearchableSelect
         ? new window.QSSearchableSelect(addComplexKindSelect, {
             placeholder: addComplexKindSelect.options[0] ? addComplexKindSelect.options[0].textContent : '',
-            searchPlaceholder: PreviewConfig.i18n.complexKindSearch,
-            emptyText: PreviewConfig.i18n.complexKindNoMatch
+            searchPlaceholder: QSPanelWords.t('preview.complexKindSearch'),
+            emptyText: QSPanelWords.t('preview.complexKindNoMatch')
         })
         : null;
     const addComplexBody = document.getElementById('add-complex-body');
@@ -552,7 +551,7 @@
     
     /**
      * CSS Properties organized by category for property selector dropdowns
-     * Used by QSPropertySelector class
+     * Used by QSPropertySelector class. A category's id names its label's word: preview.propertyCategory<id>.
      */
     const CSS_PROPERTY_CATEGORIES = {
         'Layout': [
@@ -625,8 +624,8 @@
             this.container = options.container;
             this.onSelect = options.onSelect || (() => {});
             this.excludeProperties = new Set(options.excludeProperties || []);
-            this.placeholder = options.placeholder || PreviewConfig.i18n.selectProperty;
-            this.searchPlaceholder = options.searchPlaceholder || PreviewConfig.i18n.searchProperties;
+            this.placeholder = options.placeholder || QSPanelWords.t('preview.selectProperty');
+            this.searchPlaceholder = options.searchPlaceholder || QSPanelWords.t('preview.searchProperties');
             this.currentValue = options.currentValue || '';
             this.showCategoryLabels = options.showCategoryLabels !== false;
             
@@ -723,7 +722,7 @@
                         if (!this.excludeProperties.has(customVal)) {
                             this.select(customVal);
                         } else {
-                            showToast(PreviewConfig.i18n.propertyAlreadyExists, 'warning');
+                            showToast(QSPanelWords.t('preview.propertyAlreadyExists'), 'warning');
                         }
                     }
                 } else if (e.key === 'Escape') {
@@ -813,7 +812,7 @@
                 if (this.showCategoryLabels) {
                     const label = document.createElement('div');
                     label.className = 'qs-property-selector__group-label';
-                    label.textContent = category;
+                    label.textContent = QSPanelWords.t('preview.propertyCategory' + category);
                     group.appendChild(label);
                 }
                 
@@ -850,13 +849,13 @@
                     const warningItem = document.createElement('div');
                     warningItem.className = 'qs-property-selector__warning';
                     warningItem.append(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.alertCircle, 14), ' ',
-                        QSDom.el('span', { text: PreviewConfig.i18n.propertyAlreadyExists }));
+                        QSDom.el('span', { text: QSPanelWords.t('preview.propertyAlreadyExists') }));
                     listEl.appendChild(warningItem);
                 } else {
                     const customItem = document.createElement('button');
                     customItem.type = 'button';
                     customItem.className = 'qs-property-selector__item qs-property-selector__item--custom';
-                    customItem.appendChild(QSDom.el('span', {}, [PreviewConfig.i18n.useCustomProperty + ' ', QSDom.el('strong', { text: filter })]));
+                    customItem.appendChild(QSDom.el('span', {}, [QSPanelWords.t('preview.useCustomProperty') + ' ', QSDom.el('strong', { text: filter })]));
                     customItem.addEventListener('click', () => this.select(filter));
                     listEl.appendChild(customItem);
                     this.allItems.push(customItem);
@@ -865,7 +864,7 @@
             
             // Show empty state
             if (this.allItems.length === 0 && !filterLower) {
-                listEl.replaceChildren(QSDom.el('div', { class: 'qs-property-selector__empty', text: PreviewConfig.i18n.noPropertiesFound }));
+                listEl.replaceChildren(QSDom.el('div', { class: 'qs-property-selector__empty', text: QSPanelWords.t('preview.noPropertiesFound') }));
             }
             
             this.focusedIndex = -1;
@@ -1221,7 +1220,7 @@
             swatch.type = 'button';
             swatch.className = this._getClass('color-swatch');
             swatch.style.background = this.currentValue || '#ffffff';
-            swatch.title = PreviewConfig.i18n.clickToPickColor;
+            swatch.title = QSPanelWords.t('preview.clickToPickColor');
             
             swatch.addEventListener('click', () => {
                 if (this.onColorPick) {
@@ -1677,7 +1676,7 @@
     }
 
     function _renderComponentsGroup() {
-        return QSDom.el('optgroup', { label: '🧩 ' + (PreviewConfig.i18n.components || 'Components') });
+        return QSDom.el('optgroup', { label: '🧩 ' + QSPanelWords.t('preview.components') });
     }
 
     /** A new component's option, in its group, which is made for the first one. */
@@ -1734,7 +1733,7 @@
         }
         navigateToFirstPage({ keepMode: currentMode === 'ai-tools' });
         const shown = targetSelect.options[targetSelect.selectedIndex];
-        showToast(PreviewConfig.i18n.editTargetGone.replace('{name}', gone).replace('{now}', shown ? shown.textContent : ''), 'info');
+        showToast(QSPanelWords.t('preview.editTargetGone', { name: gone, now: shown ? shown.textContent : '' }), 'info');
     }
 
     /** What getLangList answers, or null: the languages then stay as they were. */
@@ -1840,8 +1839,8 @@
         // Show/hide the toolbar's bin of the component being edited, named for it
         if (deleteComponentBtn) {
             deleteComponentBtn.style.display = editType === 'component' ? 'inline-flex' : 'none';
-            if (editType === 'component' && PreviewConfig.i18n.deleteComponentNamed) {
-                const label = PreviewConfig.i18n.deleteComponentNamed.split('{name}').join(editName);
+            if (editType === 'component') {
+                const label = QSPanelWords.t('preview.deleteComponentNamed', { name: editName });
                 deleteComponentBtn.title = label;
                 deleteComponentBtn.setAttribute('aria-label', label);
             }
@@ -1892,7 +1891,7 @@
         
         // Show banner immediately with loading state
         componentWarning.style.display = 'flex';
-        componentWarningText.textContent = PreviewConfig.i18n.componentWarning?.replace(':count', '...') || 'Editing component template...';
+        componentWarningText.textContent = QSPanelWords.t('preview.componentWarningLoading');
         
         try {
             // Fetch usage count via findComponentUsages API (GET with name as URL param)
@@ -1900,9 +1899,7 @@
             
             if (result.ok && result.data?.data) {
                 const totalUsages = result.data.data.totalUsages || 0;
-                const warningText = PreviewConfig.i18n.componentWarning?.replace(':count', totalUsages.toString()) 
-                    || `Editing component template - changes affect all ${totalUsages} usage(s)`;
-                componentWarningText.textContent = warningText;
+                componentWarningText.textContent = QSPanelWords.count('preview.componentWarningUsages', totalUsages);
             }
         } catch (error) {
             console.warn('[Preview] Failed to fetch component usages:', error);
@@ -2045,10 +2042,10 @@
             if (currentEditType !== 'component' || !currentEditName) return;
             
             const name = currentEditName;
-            const asked = await QuickSiteUtils.confirm(PreviewConfig.i18n.deleteCannotBeUndone || 'This action cannot be undone.', {
-                title: (PreviewConfig.i18n.deleteComponentTitle || 'Delete the component “{name}”?').split('{name}').join(name),
+            const asked = await QuickSiteUtils.confirm(QSPanelWords.t('preview.deleteCannotBeUndone'), {
+                title: QSPanelWords.t('preview.deleteComponentTitle', { name: name }),
                 type: 'danger',
-                confirmText: PreviewConfig.i18n.delete || 'Delete'
+                confirmText: QSPanelWords.t('common.delete')
             });
             if (!asked) return;
             
@@ -2077,17 +2074,17 @@
                     // Show warnings if any
                     const warnings = result.data?.data?.warnings;
                     if (warnings && warnings.length > 0) {
-                        showToast((PreviewConfig.i18n.componentDeleted || 'Component deleted') + ' ⚠️ ' + warnings.join(', '), 'warning');
+                        showToast(QSPanelWords.t('preview.componentDeleted') + ' ⚠️ ' + warnings.join(', '), 'warning');
                     } else {
-                        showToast(PreviewConfig.i18n.componentDeleted || 'Component deleted', 'success');
+                        showToast(QSPanelWords.t('preview.componentDeleted'), 'success');
                     }
                 } else {
-                    const msg = result.data?.message || PreviewConfig.i18n.componentDeleteFailed || 'Failed to delete component';
+                    const msg = result.data?.message || QSPanelWords.t('preview.componentDeleteFailed');
                     showToast(msg, 'error');
                 }
             } catch (error) {
                 console.error('[Preview] Delete component failed:', error);
-                showToast(PreviewConfig.i18n.componentDeleteFailed || 'Failed to delete component', 'error');
+                showToast(QSPanelWords.t('preview.componentDeleteFailed'), 'error');
             }
         });
     }
@@ -2160,10 +2157,10 @@
         });
         if (result.ok) {
             if (route === currentEditName) pageTitleSaved = value;
-            showToast(PreviewConfig.i18n.pageTitleSaved, 'success');
+            showToast(QSPanelWords.t('preview.pageTitleSaved'), 'success');
         } else {
             const error = (result.data && result.data.message) || String(result.status);
-            showToast(PreviewConfig.i18n.pageTitleSaveFailed.replace('{error}', error), 'error');
+            showToast(QSPanelWords.t('preview.pageTitleSaveFailed', { error: error }), 'error');
         }
     }
 
@@ -2219,7 +2216,7 @@
         if (!pageDescriptionCut || !pageDescriptionInput) return;
         const warnings = descriptionWarnings(pageDescriptionInput.value.trim());
         pageDescriptionCut.hidden = warnings.length === 0;
-        pageDescriptionCut.textContent = warnings.length ? '⚠ ' + warnings.length : '';
+        pageDescriptionCut.textContent = warnings.length ? '⚠ ' + QSPanelWords.number(warnings.length) : '';
         if (!warnings.length) {
             pageDescriptionCut.removeAttribute('title');
             return;
@@ -2243,19 +2240,24 @@
 
     /** Those platforms in one sentence, each with where it cuts (the Social previews page's words). */
     function descriptionCutSentence(warnings) {
-        const i18n = PreviewConfig.i18n;
-        const names = i18n.socialPlatformNames || {};
-        const items = warnings.map((w) => i18n.socialCutItem
-            .replace('{platform}', names[w.platform] || w.name)
-            .replace('{limit}', String(w.limit))
-            .replace('{unit}', w.unit === 'bytes' ? i18n.socialUnitBytes : i18n.socialUnitCharacters));
+        const items = warnings.map((w) => QSPanelWords.t('socialPreviews.cutItem', {
+            platform: socialPlatformName(w),
+            limit: QSPanelWords.number(w.limit),
+            unit: QSPanelWords.t(w.unit === 'bytes' ? 'socialPreviews.unitBytes' : 'socialPreviews.unitCharacters')
+        }));
         let list;
         try {
-            list = new Intl.ListFormat(document.documentElement.lang || 'en', { style: 'long', type: 'conjunction' }).format(items);
+            list = new Intl.ListFormat(QSPanelWords.lang, { style: 'long', type: 'conjunction' }).format(items);
         } catch (e) {
             list = items.join(', ');
         }
-        return i18n.socialCutBy.replace('{list}', list);
+        return QSPanelWords.t('socialPreviews.cutBy', { list: list });
+    }
+
+    /** A platform's name: the panel's word where the Social previews page has one (X's two cards), else the table's own. */
+    function socialPlatformName(w) {
+        const key = 'socialPreviews.platformName.' + w.platform;
+        return QSPanelWords.has(key) ? QSPanelWords.t(key) : w.name;
     }
 
     /**
@@ -2267,7 +2269,6 @@
      */
     function openPageDescriptionDialog() {
         if (!pageDescriptionInput || currentEditType !== 'page' || !currentEditName || !controlOffered(pageDescriptionGroup)) return;
-        const i18n = PreviewConfig.i18n;
         const modal = _renderDescriptionDialog(pageDescriptionInput.value);
         const area = modal.querySelector('.preview-description-dialog__text');
         const count = modal.querySelector('.preview-description-dialog__count');
@@ -2279,7 +2280,7 @@
             const warnings = descriptionWarnings(area.value.trim());
             cut.hidden = warnings.length === 0;
             cut.textContent = warnings.length ? '⚠ ' + descriptionCutSentence(warnings) : '';
-            count.textContent = i18n.pageDescriptionCount.replace('{count}', String(area.value.length)).replace('{max}', String(area.maxLength));
+            count.textContent = QSPanelWords.t('preview.pageDescriptionCount', { count: QSPanelWords.number(area.value.length), max: QSPanelWords.number(area.maxLength) });
         };
         let shown = null;
         const close = () => {
@@ -2317,11 +2318,12 @@
 
     /** The description's dialog: its title (the page, and the language when there are several) with ×, its text, its line, its buttons. */
     function _renderDescriptionDialog(text) {
-        const i18n = PreviewConfig.i18n;
         const id = 'preview-description-dialog';
         const langGroup = langSelect ? langSelect.closest('.preview-toolbar__group') : null;
         const several = !!langGroup && langGroup.style.display !== 'none';
-        const title = i18n.pageDescriptionDialog.replace('{page}', currentEditName) + (several ? ' (' + getCurrentLang().toUpperCase() + ')' : '');
+        const title = several
+            ? QSPanelWords.t('preview.pageDescriptionDialogLang', { page: currentEditName, lang: getCurrentLang().toUpperCase() })
+            : QSPanelWords.t('preview.pageDescriptionDialog', { page: currentEditName });
         const area = QSDom.el('textarea', {
             id: id + '-text', class: 'admin-input preview-description-dialog__text', rows: '6',
             'aria-labelledby': id + '-title', 'aria-describedby': id + '-hint'
@@ -2336,14 +2338,14 @@
                 QSControls.close(null, null, { attrs: { 'data-dialog': 'close' } })
             ]),
             QSDom.el('div', { class: 'preview-description-dialog__body' }, [
-                QSDom.el('p', { class: 'admin-hint', id: id + '-hint', text: i18n.pageDescriptionDialogHint }),
+                QSDom.el('p', { class: 'admin-hint', id: id + '-hint', text: QSPanelWords.t('preview.pageDescriptionDialogHint') }),
                 area,
                 QSDom.el('p', { class: 'preview-description-dialog__count' }),
                 QSDom.el('p', { class: 'preview-description-dialog__cut', hidden: '' })
             ]),
             QSDom.el('div', { class: 'admin-modal-dialog__actions preview-description-dialog__actions' }, [
-                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', 'data-dialog': 'cancel', text: i18n.cancel }),
-                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary', 'data-dialog': 'save', text: i18n.save })
+                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', 'data-dialog': 'cancel', text: QSPanelWords.t('common.cancel') }),
+                QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary', 'data-dialog': 'save', text: QSPanelWords.t('common.save') })
             ])
         ]);
     }
@@ -2370,10 +2372,10 @@
         });
         if (result.ok) {
             if (route === currentEditName && lang === getCurrentLang()) pageDescriptionSaved = value;
-            showToast(value === '' ? PreviewConfig.i18n.pageDescriptionRemoved : PreviewConfig.i18n.pageDescriptionSaved, 'success');
+            showToast(value === '' ? QSPanelWords.t('preview.pageDescriptionRemoved') : QSPanelWords.t('preview.pageDescriptionSaved'), 'success');
         } else {
             const error = (result.data && result.data.message) || String(result.status);
-            showToast(PreviewConfig.i18n.pageDescriptionSaveFailed.replace('{error}', error), 'error');
+            showToast(QSPanelWords.t('preview.pageDescriptionSaveFailed', { error: error }), 'error');
         }
     }
 
@@ -2483,14 +2485,16 @@
                     sendToIframe('hideStruct', { struct: struct });
                 }
                 
-                const msg = section.charAt(0).toUpperCase() + section.slice(1) + (show ? ' shown' : ' hidden');
+                const msg = section === 'menu'
+                    ? QSPanelWords.t(show ? 'preview.layoutMenuShown' : 'preview.layoutMenuHidden')
+                    : QSPanelWords.t(show ? 'preview.layoutFooterShown' : 'preview.layoutFooterHidden');
                 showToast(msg, 'success');
             } else {
-                throw new Error(result.data?.message || 'Failed to update layout');
+                throw new Error(result.data?.message || QSPanelWords.t('preview.layoutToggleFailed'));
             }
         } catch (error) {
             console.error('[Preview] Layout toggle error:', error);
-            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
             // Revert toggle
             if (section === 'menu' && toggleMenuCheckbox) {
                 toggleMenuCheckbox.checked = !toggleMenuCheckbox.checked;
@@ -2518,21 +2522,21 @@
     
     if (createComponentBtn) {
         createComponentBtn.addEventListener('click', async function() {
-            const namePrompt = PreviewConfig.i18n.componentNamePrompt || 'Component name (letters, numbers, hyphens):';
+            const namePrompt = QSPanelWords.t('preview.componentNamePrompt');
             const name = await QuickSiteUtils.prompt(namePrompt);
             if (!name) return;
             
             // Validate name: alphanumeric, hyphens, underscores only
             const trimmed = name.trim();
             if (!trimmed || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(trimmed)) {
-                showToast(PreviewConfig.i18n.componentNameInvalid || 'Invalid name. Use only letters, numbers, hyphens, and underscores.', 'error');
+                showToast(QSPanelWords.t('preview.componentNameInvalid'), 'error');
                 return;
             }
             
             // Check if component already exists in the dropdown
             const existingOption = targetSelect.querySelector('option[value="component:' + trimmed + '"]');
             if (existingOption) {
-                showToast(PreviewConfig.i18n.componentNameExists || 'A component with this name already exists.', 'error');
+                showToast(QSPanelWords.t('preview.componentNameExists'), 'error');
                 return;
             }
             
@@ -2551,14 +2555,14 @@
                     showEditTarget(addEditListComponent(trimmed).value);
                     navigateTo('component', trimmed);
                     
-                    showToast(PreviewConfig.i18n.componentCreated || 'Component created', 'success');
+                    showToast(QSPanelWords.t('preview.componentCreated'), 'success');
                 } else {
-                    const msg = result.data?.message || PreviewConfig.i18n.componentCreateFailed || 'Failed to create component';
+                    const msg = result.data?.message || QSPanelWords.t('preview.componentCreateFailed');
                     showToast(msg, 'error');
                 }
             } catch (error) {
                 console.error('[Preview] Create component failed:', error);
-                showToast(PreviewConfig.i18n.componentCreateFailed || 'Failed to create component', 'error');
+                showToast(QSPanelWords.t('preview.componentCreateFailed'), 'error');
             }
         });
     }
@@ -2887,15 +2891,12 @@
         // first entry triggers data load, subsequent entries are no-op
         // unless a refresh is requested. leave() keeps the cache.
         if (mode === 'translation' && window.PreviewTranslation) {
-            // Merge panel-specific i18n keys before the module renders.
-            ensureI18nPanel('translation');
             PreviewTranslation.enter();
         } else if (mode !== 'translation' && window.PreviewTranslation) {
             PreviewTranslation.leave();
         }
 
         if (mode === 'ai-tools' && window.PreviewAiTools) {
-            ensureI18nPanel('aiTools');
             PreviewAiTools.enter();
         } else if (mode !== 'ai-tools' && window.PreviewAiTools) {
             PreviewAiTools.leave();
@@ -2982,8 +2983,6 @@
             // tabs. admin.js filterByPermissions has already hidden it if
             // the role lacks editStyles.
             if (sourceAdvancedRow) sourceAdvancedRow.style.display = '';
-            // Merge theme panel i18n (default tab) before the module renders
-            ensureI18nPanel('theme');
             // Load theme variables via module if not already loaded
             if (window.PreviewStyleTheme && !PreviewStyleTheme.isLoaded()) {
                 PreviewStyleTheme.load();
@@ -3001,42 +3000,23 @@
         }
     }
 
-    // ==================== i18n Panel Merging ====================
-
-    /**
-     * Merge panel-specific i18n keys into PreviewConfig.i18n on first activation.
-     * Keys for theme, selectors, and animations tabs live in PreviewConfig.i18nPanels
-     * and are merged here so the initial page-load script block stays lean.
-     *
-     * @param {string} panelName - Panel key matching a PreviewConfig.i18nPanels entry
-     */
-    const _i18nPanelsMerged = new Set();
-    function ensureI18nPanel(panelName) {
-        if (_i18nPanelsMerged.has(panelName)) return;
-        const partial = window.PreviewConfig?.i18nPanels?.[panelName];
-        if (partial) {
-            Object.assign(PreviewConfig.i18n, partial);
-        }
-        _i18nPanelsMerged.add(panelName);
-    }
-
     function showContextualInfo(data) {
         // Format structure name for display
         let structDisplay = data.struct || '-';
         if (structDisplay.startsWith('page-')) {
-            structDisplay = 'Page: ' + structDisplay.substring(5);
+            structDisplay = QSPanelWords.t('preview.selectionPage', { name: structDisplay.substring(5) });
         } else if (structDisplay === 'menu') {
-            structDisplay = 'Menu';
+            structDisplay = QSPanelWords.t('preview.selectionMenu');
         } else if (structDisplay === 'footer') {
-            structDisplay = 'Footer';
+            structDisplay = QSPanelWords.t('preview.selectionFooter');
         }
         
         // Update contextual info fields (with null checks)
         if (ctxNodeStruct) ctxNodeStruct.textContent = structDisplay;
-        if (ctxNodeId) ctxNodeId.textContent = data.isComponent ? data.componentNode : (data.node === '' ? '(root)' : data.node || '-');
+        if (ctxNodeId) ctxNodeId.textContent = data.isComponent ? data.componentNode : (data.node === '' ? QSPanelWords.t('preview.nodeIdRoot') : data.node || '-');
         if (ctxNodeTag) ctxNodeTag.textContent = data.tag || '-';
         if (ctxNodeClasses) ctxNodeClasses.textContent = data.classes || '-';
-        if (ctxNodeChildren) ctxNodeChildren.textContent = data.childCount !== undefined ? data.childCount : '-';
+        if (ctxNodeChildren) ctxNodeChildren.textContent = data.childCount !== undefined ? QSPanelWords.number(data.childCount) : '-';
         if (ctxNodeText) ctxNodeText.textContent = data.textContent || '-';
         
         // Show/hide component row
@@ -3073,13 +3053,13 @@
         // (the renderer wraps text in <span data-qs-textonly>) from real
         // elements — used to read as just "span" and led to misdiagnosis.
         if (globalElementInfoSummary) {
-            const nodeDisplay = data.isComponent ? data.componentNode : (data.node === '' ? '(root)' : data.node || '-');
+            const nodeDisplay = data.isComponent ? data.componentNode : (data.node === '' ? QSPanelWords.t('preview.nodeIdRoot') : data.node || '-');
             let summary;
             if (data.kind === 'text') {
                 const preview = (data.textContent || '').replace(/\s+/g, ' ').substring(0, 30);
-                summary = `[text "${preview}"] [${nodeDisplay}]`;
+                summary = QSPanelWords.t('preview.elementSummaryText', { text: preview, node: nodeDisplay });
             } else if (data.kind === 'component') {
-                summary = `[component ${data.component || data.tag || '?'}] [${nodeDisplay}]`;
+                summary = QSPanelWords.t('preview.elementSummaryComponent', { name: data.component || data.tag || '?', node: nodeDisplay });
             } else {
                 summary = `${data.tag || '-'}${data.classes ? '.' + data.classes.split(' ')[0] : ''} [${nodeDisplay}]`;
             }
@@ -3087,10 +3067,10 @@
         }
 
         // Update details
-        if (globalInfoNodeId) globalInfoNodeId.textContent = data.isComponent ? data.componentNode : (data.node === '' ? '(root)' : data.node || '-');
+        if (globalInfoNodeId) globalInfoNodeId.textContent = data.isComponent ? data.componentNode : (data.node === '' ? QSPanelWords.t('preview.nodeIdRoot') : data.node || '-');
         if (globalInfoNodeTag) globalInfoNodeTag.textContent = data.tag || '-';
         if (globalInfoNodeClasses) globalInfoNodeClasses.textContent = data.classes || '-';
-        if (globalInfoNodeChildren) globalInfoNodeChildren.textContent = data.childCount !== undefined ? data.childCount : '-';
+        if (globalInfoNodeChildren) globalInfoNodeChildren.textContent = data.childCount !== undefined ? QSPanelWords.number(data.childCount) : '-';
 
         // Params row: stacked key="value" lines, hidden when no user-authored
         // attrs survive the editor-chrome filter (data-qs-*, contenteditable).
@@ -3199,7 +3179,6 @@
         if (selectorsPanel) selectorsPanel.style.display = 'none';
         if (animationsPanel) animationsPanel.style.display = 'none';
         sourcePanel.style.display = '';
-        ensureI18nPanel('source');
         // Swap the main canvas — hide the iframe container,
         // show the source canvas where the code editor mounts.
         if (previewContainer) previewContainer.style.display = 'none';
@@ -3295,9 +3274,6 @@
         /** Show a tab's panel (after Source, if it was open, has closed). */
         function openStyleTab(tab) {
             const tabName = tab.dataset.tab;
-
-            // Merge panel-specific i18n keys (cheap + idempotent).
-            ensureI18nPanel(tabName);
 
             // Reload-on-stale check must run
             // BEFORE the `tabName === activeStyleTab` early return.
@@ -3396,13 +3372,13 @@
         if (struct === 'menu' || struct === 'footer') {
             if (currentEditType === 'layout' && currentEditName === struct) return null;
             const message = struct === 'menu'
-                ? PreviewConfig.i18n.switchToMenuConfirm
-                : PreviewConfig.i18n.switchToFooterConfirm;
+                ? QSPanelWords.t('preview.switchToMenuConfirm')
+                : QSPanelWords.t('preview.switchToFooterConfirm');
             return { message: message, type: 'layout', name: struct };
         }
         if (struct && currentEditType === 'layout' && struct.startsWith('page-')) {
             const page = struct.substring(5);
-            return { message: PreviewConfig.i18n.switchToPageConfirm.replace('{page}', page), type: 'page', name: page };
+            return { message: QSPanelWords.t('preview.switchToPageConfirm', { page: page }), type: 'page', name: page };
         }
         return null;
     }
@@ -3487,16 +3463,6 @@
         // Update navigation buttons
         if (window.PreviewNavigation) {
             PreviewNavigation.updateButtons();
-        }
-        
-        // Format structure name for display
-        let structDisplay = data.struct || '-';
-        if (structDisplay.startsWith('page-')) {
-            structDisplay = 'Page: ' + structDisplay.substring(5);
-        } else if (structDisplay === 'menu') {
-            structDisplay = 'Menu';
-        } else if (structDisplay === 'footer') {
-            structDisplay = 'Footer';
         }
         
         // Update contextual area info
@@ -3631,6 +3597,19 @@
         }).catch(function () { /* leave (loading…) — user picks at submit time */ });
     }
 
+    /** The table's dimensions in words: its header's cells when it has a header, then its body's rows × columns. */
+    function _translateCsvDims(dims) {
+        const parts = [];
+        if (dims.hasHead) parts.push(QSPanelWords.t('preview.translateCsvDimsHeader', { cells: QSPanelWords.number(dims.headerCols) }));
+        parts.push(QSPanelWords.t('preview.translateCsvDimsBody', { rows: QSPanelWords.number(dims.bodyRows), cols: QSPanelWords.number(dims.cols) }));
+        return parts.join(' + ');
+    }
+
+    /** Row numbers in a list, as a status line names them. */
+    function _translateCsvRowList(rows) {
+        return rows.map((n) => QSPanelWords.number(n, { useGrouping: false })).join(', ');
+    }
+
     // Live-validate the pasted grid against the expected dimensions.
     //
     // Severity model:
@@ -3675,19 +3654,19 @@
         // ---- HARD errors ------------------------------------------------
         const hardErrs = [];
         if (pastedHeader !== expectedHeader) {
-            hardErrs.push('header cells: expected ' + expectedHeader + ', got ' + pastedHeader
-                + (!ctx.dims.hasHead && hasHead ? ' (table has no <thead> — untick "Include header row")' : '')
-                + (ctx.dims.hasHead && !hasHead ? ' (table has a <thead> — tick "Include header row")' : ''));
+            const headerWord = !ctx.dims.hasHead && hasHead ? 'preview.translateCsvHeaderMismatchUntick'
+                : (ctx.dims.hasHead && !hasHead ? 'preview.translateCsvHeaderMismatchTick' : 'preview.translateCsvHeaderMismatch');
+            hardErrs.push(QSPanelWords.t(headerWord, { expected: QSPanelWords.number(expectedHeader), got: QSPanelWords.number(pastedHeader) }));
         }
         if (pastedBody !== expectedBody) {
-            hardErrs.push('body rows: expected ' + expectedBody + ', got ' + pastedBody);
+            hardErrs.push(QSPanelWords.t('preview.translateCsvBodyMismatch', { expected: QSPanelWords.number(expectedBody), got: QSPanelWords.number(pastedBody) }));
         }
         if (hardErrs.length > 0) {
             return {
                 ok: false,
                 severity: 'error',
                 hasContent: true,
-                message: '✕ ' + hardErrs.join('; ') + '.',
+                message: QSPanelWords.t('preview.translateCsvErrors', { errors: hardErrs.join('; ') }),
             };
         }
 
@@ -3708,14 +3687,11 @@
         // by the header check, no extra logic here.
 
         if (tooFew.length === 0 && tooMany.length === 0) {
-            const summary = [];
-            if (ctx.dims.hasHead) summary.push('header ' + expectedHeader);
-            summary.push('body ' + expectedBody + '×' + expectedCols);
             return {
                 ok: true,
                 severity: 'ok',
                 hasContent: true,
-                message: '✓ Matches existing table (' + summary.join(' + ') + '). Ready to apply.',
+                message: QSPanelWords.t('preview.translateCsvMatches', { dims: _translateCsvDims(ctx.dims) }),
             };
         }
 
@@ -3723,18 +3699,17 @@
         // category is in play.
         const warnParts = [];
         if (tooFew.length > 0) {
-            warnParts.push('row' + (tooFew.length === 1 ? '' : 's') + ' ' + tooFew.join(', ')
-                + ' too short (missing cells will be written as empty)');
+            warnParts.push(QSPanelWords.count('preview.translateCsvRowsTooShort', tooFew.length, { rows: _translateCsvRowList(tooFew) }));
         }
         if (tooMany.length > 0) {
-            warnParts.push('row' + (tooMany.length === 1 ? '' : 's') + ' ' + tooMany.join(', ')
-                + ' too long (extra cells beyond column ' + expectedCols + ' will be dropped)');
+            warnParts.push(QSPanelWords.count('preview.translateCsvRowsTooLong', tooMany.length,
+                { rows: _translateCsvRowList(tooMany), column: QSPanelWords.number(expectedCols) }));
         }
         return {
             ok: true,   // allow Apply — backend handles jagged grids safely
             severity: 'warning',
             hasContent: true,
-            message: '⚠ ' + warnParts.join('; ') + '. You can still apply, or fix the paste first.',
+            message: QSPanelWords.t('preview.translateCsvWarnings', { warnings: warnParts.join('; ') }),
         };
     }
 
@@ -3764,10 +3739,7 @@
 
         if (translateCsvStructIdEl) translateCsvStructIdEl.textContent = '"' + ctx.structureId + '"';
         if (translateCsvExpectedDims) {
-            const parts = [];
-            if (ctx.dims.hasHead) parts.push('header ' + ctx.dims.headerCols);
-            parts.push('body ' + ctx.dims.bodyRows + '×' + ctx.dims.cols);
-            translateCsvExpectedDims.textContent = 'Expected: ' + parts.join(' + ') + '.';
+            translateCsvExpectedDims.textContent = QSPanelWords.t('preview.translateCsvExpected', { dims: _translateCsvDims(ctx.dims) });
         }
         if (translateCsvHasHead) translateCsvHasHead.checked = !!ctx.dims.hasHead;
         if (translateCsvPasteArea) translateCsvPasteArea.value = '';
@@ -3795,7 +3767,7 @@
 
         const grid = _parseTabularBlob(translateCsvPasteArea ? translateCsvPasteArea.value : '');
         if (grid.length === 0) {
-            translateCsvStatus.textContent = 'Nothing pasted.';
+            translateCsvStatus.textContent = QSPanelWords.t('preview.translateCsvNothingPasted');
             return;
         }
         const hasHead = translateCsvHasHead ? translateCsvHasHead.checked : false;
@@ -3805,23 +3777,23 @@
             header = grid[0] || [];
             rows = grid.slice(1);
             if (rows.length === 0) {
-                translateCsvStatus.textContent = 'You ticked "Include header row" but pasted only one line.';
+                translateCsvStatus.textContent = QSPanelWords.t('preview.translateCsvHeaderOnly');
                 return;
             }
         }
         const lang = translateCsvLang ? translateCsvLang.value : '';
         if (!lang) {
-            translateCsvStatus.textContent = 'Pick a target language.';
+            translateCsvStatus.textContent = QSPanelWords.t('preview.translateCsvPickLanguage');
             return;
         }
 
         const api = window.QuickSiteAdmin;
         if (!api) {
-            translateCsvStatus.textContent = 'Admin API unavailable.';
+            translateCsvStatus.textContent = QSPanelWords.t('preview.translateCsvNoApi');
             return;
         }
         if (translateCsvApply) translateCsvApply.disabled = true;
-        translateCsvStatus.textContent = 'Writing translations to "' + lang + '"…';
+        translateCsvStatus.textContent = QSPanelWords.t('preview.translateCsvWriting', { lang: lang });
 
         try {
             const res = await api.apiRequest('importStructureTranslations', 'POST', {
@@ -3839,9 +3811,9 @@
             if (!ok) {
                 // 422 dimension mismatch — show the diff if present.
                 const code = envelope && envelope.code;
-                const msg = (envelope && envelope.message) || ('Request failed (HTTP ' + (res && res.status) + ')');
+                const msg = (envelope && envelope.message) || QSPanelWords.t('preview.translateCsvRequestFailed', { status: res && res.status });
                 if (code === 'validation.dimension_mismatch' && payload.diffs) {
-                    translateCsvStatus.textContent = msg + ' — Adjust your CSV and try again.';
+                    translateCsvStatus.textContent = QSPanelWords.t('preview.translateCsvAdjust', { message: msg });
                 } else {
                     translateCsvStatus.textContent = msg;
                 }
@@ -3850,7 +3822,7 @@
             }
 
             const written = payload.keysWritten || 0;
-            translateCsvStatus.textContent = 'Wrote ' + written + ' translation key(s) for "' + ctx.structureId + '" (' + lang + ').';
+            translateCsvStatus.textContent = QSPanelWords.count('preview.translateCsvWrote', written, { id: ctx.structureId, lang: lang });
             // Close after a short pause so the user sees the success.
             setTimeout(function () {
                 closeTranslateCsvModal();
@@ -3864,7 +3836,7 @@
 
         } catch (err) {
             console.error('[translate-csv] submit failed:', err);
-            translateCsvStatus.textContent = 'Request failed — see console.';
+            translateCsvStatus.textContent = QSPanelWords.t('preview.translateCsvRequestFailedConsole');
             if (translateCsvApply) translateCsvApply.disabled = false;
         }
     }
@@ -4227,14 +4199,14 @@
         
         if (!textKey || newValue === undefined) {
             console.error('[Preview] Invalid text edit data:', data);
-            showToast(PreviewConfig.i18n.error + ': Invalid text data', 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: QSPanelWords.t('preview.textEditInvalidData') }), 'error');
             return;
         }
         
         // Reject unresolved component variable placeholders (e.g., {{$icon}})
         if (textKey.includes('{{')) {
             console.warn('[Preview] Ignoring edit on unresolved variable placeholder:', textKey);
-            showToast('Cannot edit unresolved component variable', 'warning');
+            showToast(QSPanelWords.t('preview.textEditUnresolvedVariable'), 'warning');
             return;
         }
 
@@ -4257,7 +4229,7 @@
                 throw new Error(done.message);
             }
 
-            showToast(PreviewConfig.i18n.textSaved, 'success');
+            showToast(QSPanelWords.t('preview.textSaved'), 'success');
             // A word holding a placeholder ({{__lang}}, a parameter) shows filled once the page draws it again.
             if (newValue.indexOf('{{') !== -1) {
                 reloadPreview();
@@ -4295,7 +4267,7 @@
             
         } catch (error) {
             console.error('[Preview] Text save error:', error);
-            showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
             
             // Restore original text in iframe on error
             try {
@@ -4320,12 +4292,12 @@
         const node = data.node;
         if (!struct || !node) {
             console.error('[Preview] Raw text edit missing struct/node:', data);
-            showToast(PreviewConfig.i18n.error + ': missing node info', 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: QSPanelWords.t('preview.textEditMissingNode') }), 'error');
             return;
         }
         const info = parseStruct(struct);
         if (!info || !info.type) {
-            showToast(PreviewConfig.i18n.error + ': invalid structure', 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: QSPanelWords.t('preview.textEditInvalidStructure') }), 'error');
             return;
         }
 
@@ -4340,14 +4312,14 @@
         try {
             const result = await QuickSiteAdmin.apiRequest('editStructure', 'PATCH', params);
             if (!result.ok) {
-                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to save text');
+                throw new Error(result.data?.message || result.data?.data?.message || QSPanelWords.t('preview.textSaveFailed'));
             }
-            showToast(PreviewConfig.i18n.textSaved, 'success');
+            showToast(QSPanelWords.t('preview.textSaved'), 'success');
             // The inline contenteditable already shows the new text; the stale
             // data-qs-textkey on the span refreshes on the next reload.
         } catch (error) {
             console.error('[Preview] Raw text save error:', error);
-            showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
             try {
                 const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
                 const textEl = iframeDoc.querySelector(`[data-qs-textkey="${data.textKey}"]`);
@@ -4393,7 +4365,7 @@
     function _renderPanelError(error) {
         return QSDom.el('div', {
             style: 'color:var(--admin-error);font-size:var(--font-size-sm);padding:var(--space-sm);',
-            text: (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message
+            text: QSPanelWords.t('preview.errorDetail', { error: error.message })
         });
     }
 
@@ -4410,7 +4382,7 @@
     function _renderSelectorLoading() {
         return QSDom.el('div', { class: 'snippet-selector__loading' }, [
             QSDom.el('div', {}),
-            PreviewConfig.i18n.loading || 'Loading...'
+            QSPanelWords.t('common.loading')
         ]);
     }
 
@@ -4441,7 +4413,7 @@
         if (browseCategory !== null) {
             group.append(' ', QSDom.el('button', {
                 type: 'button', class: 'admin-btn admin-btn--outline preview-asset-browse-btn',
-                'data-category': browseCategory, title: PreviewConfig.i18n.browseAssets
+                'data-category': browseCategory, title: QSPanelWords.t('preview.browseAssets')
             }, ['📁']));
         }
         return QSDom.el('div', { class: 'preview-contextual-form__param-row' }, [
@@ -4451,9 +4423,9 @@
         ]);
     }
 
-    /** "N variable(s)" for a component in the Add form's list. */
+    /** The count of a component's variables, in the Add form's list. */
     function componentVariablesLabel(count) {
-        return (count === 1 ? PreviewConfig.i18n.componentVariableCountOne : PreviewConfig.i18n.componentVariableCount).replace('{n}', count);
+        return QSPanelWords.count('preview.componentVariablesCount', count);
     }
     
     /**
@@ -4644,7 +4616,7 @@
                 const hidden = previewPage.classList.toggle('preview-page--rows-hidden');
                 if (!hidden) previewPage.scrollTop = rowsScrollTop;
                 this.setAttribute('aria-pressed', String(hidden));
-                this.title = hidden ? this.dataset.titleShow : this.dataset.titleHide;
+                this.title = QSPanelWords.t(hidden ? 'preview.rowsShow' : 'preview.rowsHide');
             });
         }
 
@@ -4767,21 +4739,21 @@
         if (!struct || node == null) return;
         
         const asked = await QuickSiteUtils.confirm('', {
-            title: PreviewConfig.i18n.confirmDeleteTextNode || 'Delete this text node?',
+            title: QSPanelWords.t('preview.confirmDeleteTextNode'),
             type: 'danger',
-            confirmText: PreviewConfig.i18n.delete || 'Delete'
+            confirmText: QSPanelWords.t('common.delete')
         });
         if (!asked) return;
         
         const structInfo = parseStruct(struct);
         if (!structInfo || !structInfo.type) {
-            showToast(PreviewConfig.i18n.error + ': Invalid structure type', 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: QSPanelWords.t('preview.invalidStructureType') }), 'error');
             return;
         }
         
         const keepKeys = ctxTextKeepKeys ? ctxTextKeepKeys.checked : false;
         
-        showToast(PreviewConfig.i18n.loading + '...', 'info');
+        showToast(QSPanelWords.t('common.loading'), 'info');
         
         try {
             const params = {
@@ -4795,10 +4767,10 @@
             const result = await QuickSiteAdmin.apiRequest('deleteNode', 'DELETE', params);
             
             if (!result.ok) {
-                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to delete text node');
+                throw new Error(result.data?.message || result.data?.data?.message || QSPanelWords.t('preview.textNodeDeleteFailed'));
             }
             
-            showToast(PreviewConfig.i18n.textNodeDeleted || 'Text node deleted', 'success');
+            showToast(QSPanelWords.t('preview.textNodeDeleted'), 'success');
 
             // Live DOM update — remove the node from iframe
             sendToIframe('removeNode', { struct, nodeId: node });
@@ -4807,7 +4779,7 @@
             broadcastStructureChanged();
         } catch (error) {
             console.error('[Preview] Text delete error:', error);
-            showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
         }
     }
     
@@ -4819,7 +4791,7 @@
     async function deleteSelectedNode() {
         if (selectedStruct == null || selectedNode == null) return;
         if (selectedNode === '') {
-            showToast(PreviewConfig.i18n?.cannotModifyRoot || 'Cannot delete the root element. Select a child element.', 'warning');
+            showToast(QSPanelWords.t('preview.cannotDeleteRoot'), 'warning');
             return;
         }
         
@@ -4853,8 +4825,7 @@
                         const deletingNode = children[deletingIndex];
                         
                         if (deletingNode && hasTextKey(deletingNode) && childrenWithText.length <= 1) {
-                            lastTextWarning = PreviewConfig.i18n?.deleteLastTextWarning
-                                || 'This is the last element containing text content. Deleting it will create a text-less component (styling shape only). The resulting element must have dimensions set via CSS to remain visible.\n\nContinue?';
+                            lastTextWarning = QSPanelWords.t('preview.deleteLastTextWarning');
                         }
                     }
                 }
@@ -4865,16 +4836,16 @@
         
         // Confirm deletion
         const asked = await QuickSiteUtils.confirm(lastTextWarning, {
-            title: PreviewConfig.i18n.confirmDeleteNode,
+            title: QSPanelWords.t('preview.confirmDeleteNode'),
             type: 'danger',
-            confirmText: PreviewConfig.i18n.delete || 'Delete'
+            confirmText: QSPanelWords.t('common.delete')
         });
         if (!asked) return;
         
         // Parse struct to get type and name
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
-            showToast(PreviewConfig.i18n.error + ': Invalid structure type', 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: QSPanelWords.t('preview.invalidStructureType') }), 'error');
             return;
         }
         
@@ -4882,7 +4853,7 @@
         const structToDelete = selectedStruct;
         const nodeToDelete = selectedNode;
         
-        showToast(PreviewConfig.i18n.loading + '...', 'info');
+        showToast(QSPanelWords.t('common.loading'), 'info');
         
         try {
             const params = {
@@ -4897,13 +4868,13 @@
             const result = await QuickSiteAdmin.apiRequest('deleteNode', 'DELETE', params);
             
             if (!result.ok) {
-                throw new Error(result.data?.message || result.data?.data?.message || 'Failed to delete node');
+                throw new Error(result.data?.message || result.data?.data?.message || QSPanelWords.t('preview.nodeDeleteFailed'));
             }
             
             // Hide the node panel
             hideNodePanel();
             
-            showToast(PreviewConfig.i18n.nodeDeleted, 'success');
+            showToast(QSPanelWords.t('preview.nodeDeleted'), 'success');
             console.log('[Preview] Node deleted successfully');
 
             // Live DOM update - remove node and reindex siblings
@@ -4915,7 +4886,7 @@
 
         } catch (error) {
             console.error('[Preview] Delete error:', error);
-            showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
         }
     }
     
@@ -4923,11 +4894,11 @@
     
     async function duplicateSelectedNode() {
         if (selectedStruct == null || selectedNode == null) {
-            showToast(PreviewConfig.i18n?.selectElementFirst || 'Select an element first', 'warning');
+            showToast(QSPanelWords.t('preview.selectNodeFirst'), 'warning');
             return;
         }
         if (selectedNode === '' && currentEditType !== 'component') {
-            showToast(PreviewConfig.i18n?.cannotModifyRoot || 'Cannot duplicate the root element. Select a child element.', 'warning');
+            showToast(QSPanelWords.t('preview.cannotDuplicateRoot'), 'warning');
             return;
         }
         
@@ -4935,10 +4906,10 @@
             // Get the structure type and name
             const structInfo = parseStruct(selectedStruct);
             if (!structInfo || !structInfo.type) {
-                throw new Error('Invalid structure type');
+                throw new Error(QSPanelWords.t('preview.invalidStructureType'));
             }
             
-            showToast(PreviewConfig.i18n.loading + '...', 'info');
+            showToast(QSPanelWords.t('common.loading'), 'info');
             
             // Use the duplicateNode API which handles:
             // - Deep clones the node
@@ -4955,14 +4926,14 @@
             const result = await QuickSiteAdmin.apiRequest('duplicateNode', 'POST', params);
             
             if (!result.ok) {
-                throw new Error(result.data?.message || 'Failed to duplicate node');
+                throw new Error(result.data?.message || QSPanelWords.t('preview.nodeDuplicateFailed'));
             }
             
             const keysCreated = result.data?.data?.translationKeysMapped || 0;
             const newNodeId = result.data?.data?.newNodeId;
-            const msg = keysCreated > 0 
-                ? (PreviewConfig.i18n?.nodeDuplicated || 'Element duplicated') + ` (${keysCreated} translation keys)`
-                : (PreviewConfig.i18n?.nodeDuplicated || 'Element duplicated');
+            const msg = keysCreated > 0
+                ? QSPanelWords.count('preview.nodeDuplicatedKeys', keysCreated)
+                : QSPanelWords.t('preview.nodeDuplicated');
             
             showToast(msg, 'success');
             
@@ -4983,7 +4954,7 @@
 
         } catch (error) {
             console.error('[Preview] Duplicate error:', error);
-            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
         }
     }
     
@@ -4998,7 +4969,7 @@
         if (ctxNodeAdd) {
             ctxNodeAdd.addEventListener('click', function() {
                 if (selectedStruct == null || selectedNode == null) {
-                    showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+                    showToast(QSPanelWords.t('preview.selectNodeFirst'), 'warning');
                     return;
                 }
                 setMode('add');
@@ -5021,9 +4992,8 @@
         if (addBackToSelect) {
             addBackToSelect.addEventListener('click', async function() {
                 if (_isEditModeDirty()) {
-                    const msg = PreviewConfig.i18n.discardUnsavedParams
-                        || 'You have unsaved param changes. Discard?';
-                    if (!(await QuickSiteUtils.confirm(msg, { type: 'danger', confirmText: PreviewConfig.i18n.discard || 'Discard' }))) return;
+                    const msg = QSPanelWords.t('preview.discardUnsavedParams');
+                    if (!(await QuickSiteUtils.confirm(msg, { type: 'danger', confirmText: QSPanelWords.t('preview.discard') }))) return;
                 }
                 setMode('select');
             });
@@ -5247,7 +5217,7 @@
                 wrapper.style.display = insideOffered ? '' : 'none';
                 // The Text tab's Inside is the element's end: its label and its diagram say so
                 const label = wrapper.querySelector('.position-picker__label');
-                if (label) label.textContent = isText ? PreviewConfig.i18n.positionInsideEnd : PreviewConfig.i18n.positionInside;
+                if (label) label.textContent = isText ? QSPanelWords.t('preview.positionInsideEnd') : QSPanelWords.t('preview.positionInside');
                 const box = wrapper.querySelector('.position-picker__new');
                 if (box) box.setAttribute('y', isText ? '26' : '10');
             }
@@ -5390,7 +5360,7 @@
             addConfirmBtn.classList.remove('admin-btn--primary');
             addConfirmBtn.classList.add('admin-btn--success');
         }
-        const defaultTitle = PreviewConfig.i18n.addElement || 'Add Element';
+        const defaultTitle = QSPanelWords.t('preview.addElement');
         if (addFormTitleText) addFormTitleText.textContent = defaultTitle;
         if (addConfirmLabel) addConfirmLabel.textContent = defaultTitle;
     }
@@ -5409,7 +5379,7 @@
     async function showSidebarEditParamsForm() {
         if (!contextualAddForm || !contextualAddDefault) return;
         if (selectedStruct == null || selectedNode == null) {
-            showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+            showToast(QSPanelWords.t('preview.selectNodeFirst'), 'warning');
             return;
         }
 
@@ -5421,24 +5391,24 @@
             const result = await extractSelectedNodeStructure({ allowRoot: true });
             nodeData = result.nodeData;
         } catch (err) {
-            showToast(err.message || 'Failed to load element', 'error');
+            showToast(err.message || QSPanelWords.t('preview.elementLoadFailed'), 'error');
             return;
         }
 
         // List-shape page root (the whole structure is an array) cannot
         // be edited as a single node — the user should pick a child.
         if (Array.isArray(nodeData)) {
-            showToast('Select a child element — the page root is a list and has no editable params on its own', 'warning');
+            showToast(QSPanelWords.t('preview.editParamsRootList'), 'warning');
             return;
         }
         // Component reference + text nodes: no editable params here.
         if (!nodeData.tag) {
             if (nodeData.component) {
-                showToast('Editing component-call params is not available yet', 'info');
+                showToast(QSPanelWords.t('preview.editParamsComponentCall'), 'info');
             } else if (nodeData.textKey !== undefined) {
-                showToast('Text nodes have no editable params', 'info');
+                showToast(QSPanelWords.t('preview.editParamsTextNode'), 'info');
             } else {
-                showToast('This element has no editable params', 'warning');
+                showToast(QSPanelWords.t('preview.editParamsNone'), 'warning');
             }
             return;
         }
@@ -5515,9 +5485,8 @@
         updateSidebarAddTransKeyParams();
 
         // Swap header + bottom-button text.
-        const headerLabel = PreviewConfig.i18n.editParamsHeader || PreviewConfig.i18n.editParams || 'Edit Params';
-        if (addFormTitleText) addFormTitleText.textContent = headerLabel + ': <' + tag + '>';
-        if (addConfirmLabel) addConfirmLabel.textContent = PreviewConfig.i18n.save || 'Save';
+        if (addFormTitleText) addFormTitleText.textContent = QSPanelWords.t('preview.editParamsHeaderTag', { tag: tag });
+        if (addConfirmLabel) addConfirmLabel.textContent = QSPanelWords.t('common.save');
 
         // Edit-mode visual cues: form gets a class for the header accent
         // strip (admin.css), and the Save button switches from
@@ -5713,16 +5682,15 @@
         if (contextualAddOriginalParams == null
             || contextualAddOriginalStruct == null
             || contextualAddOriginalNode == null) {
-            throw new Error('Edit-mode state lost — reopen Edit Params');
+            throw new Error(QSPanelWords.t('preview.editParamsStateLost'));
         }
         if (contextualAddOriginalNode === '') {
-            throw new Error(PreviewConfig.i18n.cannotEditRoot
-                || 'Cannot edit the page root — select a child element');
+            throw new Error(QSPanelWords.t('preview.cannotEditRoot'));
         }
 
         const structInfo = parseStruct(contextualAddOriginalStruct);
         if (!structInfo || !structInfo.type) {
-            throw new Error('Invalid structure type');
+            throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         }
 
         // A group with nothing chosen, or a field's problem (a duplicate, a width missing…), is never saved: said there and here
@@ -5734,7 +5702,7 @@
 
         // No-op short-circuit: just close without hitting the server.
         if (Object.keys(addParams).length === 0 && removeParams.length === 0) {
-            showToast(PreviewConfig.i18n.noParamChanges || 'No changes to save', 'info');
+            showToast(QSPanelWords.t('preview.noParamChanges'), 'info');
             hideSidebarAddForm();
             return;
         }
@@ -5750,7 +5718,7 @@
         const response = await QuickSiteAdmin.apiRequest('editNode', 'POST', body);
         if (!response.ok) {
             const msg = (response.data && response.data.message)
-                || (PreviewConfig.i18n.editParamsError || 'Failed to save params');
+                || QSPanelWords.t('preview.editParamsError');
             throw new Error(msg);
         }
 
@@ -5761,7 +5729,7 @@
         const targetStruct = contextualAddOriginalStruct;
         const targetNode = contextualAddOriginalNode;
 
-        showToast(PreviewConfig.i18n.paramsSaved || 'Params saved', 'success');
+        showToast(QSPanelWords.t('preview.paramsSaved'), 'success');
         hideSidebarAddForm();
 
         // Live DOM update if the server returned the re-rendered HTML;
@@ -5899,8 +5867,8 @@
         const showBrowse = param === 'src' && tag in ASSET_BROWSABLE_TAGS;
         const showRouteList = param === 'href' && tag === 'a';
         const datalistId = showRouteList ? 'add-mandatory-href-routes' : '';
-        const placeholder = (inGroup || !showRouteList) ? (PreviewConfig.i18n.required || 'Required')
-            : (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL');
+        const placeholder = (inGroup || !showRouteList) ? QSPanelWords.t('common.required')
+            : QSPanelWords.t('preview.hrefPlaceholder');
         const row = _renderParamRow(param, {
             id: 'add-mandatory-' + param,
             placeholder: placeholder
@@ -5925,7 +5893,7 @@
 
     /** Words under a group's choice, per tag: which param goes where. */
     const ONE_OF_HINTS = {
-        source: () => PreviewConfig.i18n.oneOfHintSource
+        source: () => QSPanelWords.t('preview.oneOfHintSource')
     };
 
     /** The groups' choices drawn in the box: { group, rows, radios, row, both, state } (state: a param, 'all' or null). */
@@ -5934,7 +5902,7 @@
     /** A group's choice and its params' rows, appended to the box, none chosen. */
     function _renderOneOfGroup(tag, group) {
         const name = 'add-oneof-' + oneOfChoices.length;
-        const words = PreviewConfig.i18n.oneOfParams.replace('{params}', group.join(', '));
+        const words = QSPanelWords.t('preview.oneOfParams', { params: group.join(', ') });
         const radios = {};
         const choices = QSDom.el('div', { class: 'preview-oneof__choices', role: 'radiogroup', 'aria-label': words });
         group.forEach(param => {
@@ -5943,7 +5911,7 @@
             choices.appendChild(QSDom.el('label', { class: 'preview-oneof__choice' }, [radio, QSDom.el('span', { text: param })]));
         });
         const hint = ONE_OF_HINTS[tag] ? ONE_OF_HINTS[tag]() : '';
-        const both = QSDom.el('small', { class: 'preview-oneof__both', text: PreviewConfig.i18n.oneOfBoth, hidden: '' });
+        const both = QSDom.el('small', { class: 'preview-oneof__both', text: QSPanelWords.t('preview.oneOfBoth'), hidden: '' });
         const row = QSDom.el('div', { class: 'preview-contextual-form__param-row preview-oneof', 'data-param-field': 'one-of' }, [
             QSDom.el('span', { class: 'preview-contextual-form__param-label' }, [
                 words,
@@ -5991,7 +5959,7 @@
         const open = oneOfChoices.find(choice => choice.state === null);
         if (!open) return null;
         open.row.classList.add('preview-oneof--missing');
-        return PreviewConfig.i18n.oneOfChoose.replace('{params}', open.group.join(', '));
+        return QSPanelWords.t('preview.oneOfChoose', { params: open.group.join(', ') });
     }
 
     // ---- A srcset's field ------------------------------------------
@@ -6108,7 +6076,7 @@
                 delete paramFields.srcset;
             }
             const btn = QSDom.el('button', { type: 'button', class: 'preview-contextual-form__add-param-btn' },
-                ['+ ', PreviewConfig.i18n.srcsetOffer]);
+                ['+ ', QSPanelWords.t('preview.srcsetOffer')]);
             btn.addEventListener('click', () => {
                 openField();
                 holder.querySelector('.preview-srcset-field__address')?.focus();
@@ -6149,8 +6117,7 @@
         // the controller (getValue / setValue / destroy).
         transKeyPickers[param] = window.QSComplexWizard.createTextKeyPicker({
             container: host,
-            placeholder: PreviewConfig.i18n.searchOrTypeKey
-                || 'Search or type a translation key'
+            placeholder: QSPanelWords.t('preview.searchOrTypeKey')
         });
 
         return row;
@@ -6234,10 +6201,10 @@
             ]),
             QSDom.el('div', { class: 'preview-contextual-form__param-input-group' }, [
                 QSDom.el('input', { type: 'text', id: 'add-mandatory-name', class: 'admin-input admin-input--sm preview-contextual-form__param-input',
-                    placeholder: PreviewConfig.i18n.required || 'Required' })
+                    placeholder: QSPanelWords.t('common.required') })
             ]),
             QSDom.el('small', { class: 'preview-contextual-form__param-hint', id: 'add-mandatory-name-hint',
-                text: PreviewConfig.i18n.nameRequiredForInput || 'Required so the field is submitted with the form.' })
+                text: QSPanelWords.t('preview.nameRequiredForInput') })
         );
         addMandatoryParamsContainer.appendChild(nameRow);
 
@@ -6252,12 +6219,12 @@
             if (isExempt) {
                 nameStar.style.display = 'none';
                 nameHint.style.display = 'none';
-                nameInput.placeholder = PreviewConfig.i18n.optional || 'Optional';
+                nameInput.placeholder = QSPanelWords.t('preview.optional');
                 nameInput.classList.remove('admin-input--error');
             } else {
                 nameStar.style.display = '';
                 nameHint.style.display = '';
-                nameInput.placeholder = PreviewConfig.i18n.required || 'Required';
+                nameInput.placeholder = QSPanelWords.t('common.required');
             }
         };
         typeSelect.addEventListener('change', refreshNameRequired);
@@ -6291,26 +6258,25 @@
      * role that may upload. Returns ONE Element.
      */
     function _renderAssetUpload(targetInput, accept, onPicked) {
-        const words = PreviewConfig.i18n.simpleAdd || {};
         const file = QSDom.el('input', { type: 'file', accept: accept || '', hidden: '' });
-        const btn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--outline', text: words.upload || 'Upload a file…' });
+        const btn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--outline', text: QSPanelWords.t('preview.simpleAdd.upload') });
         btn.addEventListener('click', () => file.click());
         file.addEventListener('change', async () => {
             const picked = file.files && file.files[0];
             if (!picked) return;
             btn.disabled = true;
-            btn.textContent = words.uploading || 'Uploading…';
+            btn.textContent = QSPanelWords.t('preview.simpleAdd.uploading');
             try {
                 const form = new FormData();
                 form.append('file', picked);
                 const res = await QuickSiteAdmin.apiUpload('uploadAsset', form);
                 const path = res && res.ok && res.data && res.data.data ? res.data.data.path : '';
-                if (!path) throw new Error((res && res.data && res.data.message) || (words.uploadFailed || 'The upload failed.'));
+                if (!path) throw new Error((res && res.data && res.data.message) || QSPanelWords.t('preview.simpleAdd.uploadFailed'));
                 onPicked(path, picked.type || '');
             } catch (err) {
-                showToast(err.message || (words.uploadFailed || 'The upload failed.'), 'error');
+                showToast(err.message || QSPanelWords.t('preview.simpleAdd.uploadFailed'), 'error');
                 btn.disabled = false;
-                btn.textContent = words.upload || 'Upload a file…';
+                btn.textContent = QSPanelWords.t('preview.simpleAdd.upload');
                 file.value = '';
             }
         });
@@ -6342,7 +6308,7 @@
             }));
             picker.appendChild(body);
         }
-        body.appendChild(QSDom.el('div', { class: 'preview-asset-picker__loading', text: PreviewConfig.i18n.loading || 'Loading...' }));
+        body.appendChild(QSDom.el('div', { class: 'preview-asset-picker__loading', text: QSPanelWords.t('common.loading') }));
         
         // Position near the input, clamped to viewport
         const rect = targetInput.getBoundingClientRect();
@@ -6382,7 +6348,7 @@
             const response = await QuickSiteAdmin.apiRequest('listAssets', 'GET', null, urlParams);
             
             if (!response.ok || !response.data?.data) {
-                body.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadFailed));
+                body.replaceChildren(_renderAssetPickerNote(QSPanelWords.t('preview.assetsLoadFailed')));
                 return;
             }
             
@@ -6396,7 +6362,7 @@
                 }
             }
             if (assets.length === 0) {
-                body.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsNone));
+                body.replaceChildren(_renderAssetPickerNote(QSPanelWords.t('preview.assetsNone')));
                 return;
             }
 
@@ -6445,7 +6411,7 @@
             
             body.appendChild(list);
         } catch (err) {
-            body.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadError));
+            body.replaceChildren(_renderAssetPickerNote(QSPanelWords.t('preview.assetsLoadError')));
             console.error('[Preview] Asset picker error:', err);
         }
     }
@@ -6475,7 +6441,7 @@
         const mime = (mimeType || '').split('/')[0];
         
         if (mime === 'image' || imageExts.includes(ext)) {
-            container.appendChild(QSDom.el('img', { src: displayPath, alt: PreviewConfig.i18n.assetPreviewAlt, class: 'preview-asset-inline__media' }));
+            container.appendChild(QSDom.el('img', { src: displayPath, alt: QSPanelWords.t('preview.assetPreviewAlt'), class: 'preview-asset-inline__media' }));
         } else if (mime === 'video' || videoExts.includes(ext)) {
             container.appendChild(QSDom.el('video', { src: displayPath, controls: '', class: 'preview-asset-inline__media' }));
         } else if (mime === 'audio' || audioExts.includes(ext)) {
@@ -6524,7 +6490,7 @@
         addTextKeyPickerInst = window.QSComplexWizard.createTextKeyPicker({
             container: addTextKeyPickerHost,
             value: '',
-            placeholder: PreviewConfig.i18n?.variablesPlaceholderTranslation || 'Search or type a translation key'
+            placeholder: QSPanelWords.t('preview.variablesPlaceholderTranslation')
         });
     }
     function updateAddTextFieldsForType() {
@@ -6595,7 +6561,7 @@
         const registry = (window.QSComplexWizard && window.QSComplexWizard.registry) || {};
         const entry = registry[kind];
         if (!entry || typeof entry.renderWizard !== 'function') {
-            addComplexBody.replaceChildren(_renderComplexError(PreviewConfig.i18n.complexKindNoWizard.replace('{kind}', kind)));
+            addComplexBody.replaceChildren(_renderComplexError(QSPanelWords.t('preview.complexKindNoWizard', { kind: kind })));
             addComplexBody.style.display = '';
             return;
         }
@@ -6603,7 +6569,7 @@
             addComplexController = entry.renderWizard(addComplexBody) || null;
         } catch (e) {
             console.error('[CE] renderWizard for "' + kind + '" threw:', e);
-            addComplexBody.replaceChildren(_renderComplexError(PreviewConfig.i18n.complexWizardFailed));
+            addComplexBody.replaceChildren(_renderComplexError(QSPanelWords.t('preview.complexWizardFailed')));
         }
         addComplexBody.style.display = '';
     }
@@ -6692,7 +6658,7 @@
             
             const validComponents = componentsData.filter(c => c.valid);
             if (validComponents.length === 0) {
-                optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.noComponentsFound || 'No components found'));
+                optionsContainer.replaceChildren(_renderSelectorNote(QSPanelWords.t('preview.noComponentsFound')));
                 return;
             }
             
@@ -6754,7 +6720,7 @@
             if (enumVars.length > 0) {
                 const enumSection = document.createElement('div');
                 enumSection.className = 'preview-variables-section';
-                enumSection.appendChild(_renderVariablesSectionTitle(PreviewConfig.i18n.variablesSectionEnums || 'Enums'));
+                enumSection.appendChild(_renderVariablesSectionTitle(QSPanelWords.t('preview.variablesSectionEnums')));
                 
                 enumVars.forEach(v => {
                     const options = v.options || [];
@@ -6775,7 +6741,7 @@
             if (paramVars.length > 0) {
                 const paramSection = document.createElement('div');
                 paramSection.className = 'preview-variables-section';
-                paramSection.appendChild(_renderVariablesSectionTitle(PreviewConfig.i18n.variablesSectionParams || 'Parameters'));
+                paramSection.appendChild(_renderVariablesSectionTitle(QSPanelWords.t('preview.variablesSectionParams')));
                 
                 paramVars.forEach(v => {
                     // Check if this param variable should show an asset browse button
@@ -6784,7 +6750,7 @@
                     const datalistId = showRouteList ? `add-comp-${v.name}-routes` : '';
                     const row = _renderParamRow(v.name, {
                         'data-var-name': v.name,
-                        placeholder: showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : '{{' + v.name + '}}'
+                        placeholder: showRouteList ? QSPanelWords.t('preview.hrefPlaceholder') : '{{' + v.name + '}}'
                     }, showBrowse ? (ASSET_BROWSABLE_TAGS[v.parentTag] || '') : null, datalistId);
                     paramSection.appendChild(row);
                     
@@ -6805,7 +6771,7 @@
             if (textKeyVars.length > 0) {
                 const textSection = document.createElement('div');
                 textSection.className = 'preview-variables-section';
-                textSection.appendChild(_renderVariablesSectionTitle(PreviewConfig.i18n.variablesSectionText || 'Text Variables'));
+                textSection.appendChild(_renderVariablesSectionTitle(QSPanelWords.t('preview.variablesSectionText')));
                 
                 const infoRow = document.createElement('div');
                 infoRow.className = 'preview-contextual-form__info';
@@ -6813,8 +6779,8 @@
                 infoRow.append(
                     QSDom.iconEl(QuickSiteUtils.ICON_PATHS.info, 14),
                     ' ',
-                    QSDom.el('span', { style: 'font-size:0.75rem;', text: textKeyVars.map(v => v.name).join(', ') + ' — '
-                        + (PreviewConfig.i18n.textKeyAutoGenerated || 'auto-generated text keys, editable in Text mode') })
+                    QSDom.el('span', { style: 'font-size:0.75rem;', text: QSPanelWords.t('preview.componentTextKeysNote',
+                        { names: textKeyVars.map(v => v.name).join(', ') }) })
                 );
                 textSection.appendChild(infoRow);
                 
@@ -6865,12 +6831,12 @@
                 if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorLoading());
             },
             showError: function() {
-                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.errorLoadingComponents || 'Error loading components'));
+                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorNote(QSPanelWords.t('preview.errorLoadingComponents')));
             },
             reset: function() {
                 sidebarAddSelectedComponentData = null;
                 if (hiddenInput) hiddenInput.value = '';
-                if (displayValue) displayValue.textContent = PreviewConfig.i18n.selectComponent || 'Select a component';
+                if (displayValue) displayValue.textContent = QSPanelWords.t('preview.selectComponent');
                 if (displayDesc) displayDesc.textContent = '';
                 if (previewPanel) previewPanel.style.display = 'none';
                 if (addComponentVars) addComponentVars.style.display = 'none';
@@ -6913,6 +6879,32 @@
     let selectedSnippetData = null;
     let snippetPreviewWithProjectStyle = true;
     let snippetPreviewShowKeys = false;
+
+    /** The word for the tier a listed snippet comes from: core, personal or the project. */
+    function snippetSourceLabel(source) {
+        if (source === 'core') return QSPanelWords.t('preview.snippetSourceCore');
+        if (source === 'personal') return QSPanelWords.t('preview.snippetSourcePersonal');
+        return QSPanelWords.t('preview.snippetSourceProject');
+    }
+
+    /** A snippet's name: a core snippet's in the panel's language, any other as its author wrote it (its own words). */
+    function snippetName(snippet) {
+        const key = 'preview.coreSnippets.' + snippet.id + '.name';
+        return snippet.source === 'core' && QSPanelWords.has(key) ? QSPanelWords.t(key) : (snippet.name || snippet.id);
+    }
+
+    /** A snippet's description, read as its name is. */
+    function snippetDescription(snippet) {
+        const key = 'preview.coreSnippets.' + snippet.id + '.description';
+        return snippet.source === 'core' && QSPanelWords.has(key) ? QSPanelWords.t(key) : (snippet.description || '');
+    }
+
+    /** A category's group header: its word, or a category outside the list as its own id, capitalised. */
+    function snippetCategoryLabel(category) {
+        const id = category.charAt(0).toUpperCase() + category.slice(1);
+        const key = 'preview.snippetCategory' + id;
+        return QSPanelWords.has(key) ? QSPanelWords.t(key) : id;
+    }
     
     // Searchable snippet dropdown (tag-dropdown pattern)
     function initSnippetSelector(selectorId) {
@@ -6934,13 +6926,6 @@
         const previewActions = document.getElementById(`${selectorId}-snippet-preview-actions`);
         
         let isOpen = false;
-        
-        // Source label helper: the three tiers a listed snippet comes from.
-        function sourceLabel(source) {
-            if (source === 'core') return PreviewConfig.i18n.snippetSourceCore;
-            if (source === 'personal') return PreviewConfig.i18n.snippetSourcePersonal;
-            return PreviewConfig.i18n.snippetSourceProject;
-        }
         
         function sourceFromSnippet(snippet) {
             return snippet.source;
@@ -6987,16 +6972,16 @@
             btn.type = 'button';
             btn.className = 'tag-dropdown__option';
             btn.dataset.snippetId = snippet.id;
-            btn.dataset.name = (snippet.name || snippet.id).toLowerCase();
-            btn.dataset.desc = (snippet.description || '').toLowerCase();
+            btn.dataset.name = snippetName(snippet).toLowerCase();
+            btn.dataset.desc = snippetDescription(snippet).toLowerCase();
             if (snippet.id === selectedSnippetId) btn.classList.add('selected');
             
             const src = sourceFromSnippet(snippet);
-            const srcText = sourceLabel(src);
+            const srcText = snippetSourceLabel(src);
             btn.append(
-                QSDom.el('span', { class: 'tag-dropdown__option-tag', text: snippet.name || snippet.id }),
+                QSDom.el('span', { class: 'tag-dropdown__option-tag', text: snippetName(snippet) }),
                 ' ',
-                QSDom.el('span', { class: 'tag-dropdown__option-desc', text: snippet.description || '' }),
+                QSDom.el('span', { class: 'tag-dropdown__option-desc', text: snippetDescription(snippet) }),
                 ' ',
                 QSDom.el('span', { class: 'snippet-selector__option-source snippet-selector__option-source--' + src, text: srcText })
             );
@@ -7014,7 +6999,7 @@
             
             const categories = Object.keys(snippetsData.byCategory || {});
             if (categories.length === 0) {
-                optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.noSnippetsFound || 'No snippets found'));
+                optionsContainer.replaceChildren(_renderSelectorNote(QSPanelWords.t('preview.noSnippetsFound')));
                 return;
             }
             
@@ -7025,7 +7010,7 @@
                 const header = document.createElement('button');
                 header.type = 'button';
                 header.className = 'tag-dropdown__group-header';
-                header.append(QSDom.el('span', { text: cat.charAt(0).toUpperCase() + cat.slice(1) }), ' ',
+                header.append(QSDom.el('span', { text: snippetCategoryLabel(cat) }), ' ',
                     QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronDown, 0, 'tag-dropdown__group-chevron'));
                 header.addEventListener('click', () => group.classList.toggle('collapsed'));
                 group.appendChild(header);
@@ -7081,8 +7066,8 @@
         
         // Update trigger display to reflect current selection
         function updateTriggerDisplay(snippet) {
-            if (displayValue) displayValue.textContent = snippet ? (snippet.name || snippet.id) : (PreviewConfig.i18n.selectSnippet || 'Select a snippet');
-            if (displayDesc) displayDesc.textContent = snippet ? (snippet.description || '') : '';
+            if (displayValue) displayValue.textContent = snippet ? snippetName(snippet) : QSPanelWords.t('preview.selectSnippet');
+            if (displayDesc) displayDesc.textContent = snippet ? snippetDescription(snippet) : '';
         }
         
         // Update option highlight
@@ -7100,7 +7085,7 @@
                 if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorLoading());
             },
             showError: function() {
-                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.errorLoadingSnippets || 'Error loading snippets'));
+                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorNote(QSPanelWords.t('preview.errorLoadingSnippets')));
             },
             reset: function() {
                 selectedSnippetId = null;
@@ -7160,18 +7145,16 @@
         if (addSnippetInput) addSnippetInput.value = snippet.id;
         
         const src = snippet.source;
-        const srcLabel = src === 'core' ? 'Core'
-            : (src === 'personal' ? 'Personal' : 'Project');
         
         // Show preview panel
         if (addSnippetPreview) {
             addSnippetPreview.style.display = 'block';
-            if (addSnippetPreviewTitle) addSnippetPreviewTitle.textContent = snippet.name || snippet.id;
+            if (addSnippetPreviewTitle) addSnippetPreviewTitle.textContent = snippetName(snippet);
             if (addSnippetPreviewSource) {
-                addSnippetPreviewSource.textContent = srcLabel;
+                addSnippetPreviewSource.textContent = snippetSourceLabel(src);
                 addSnippetPreviewSource.className = `snippet-selector__preview-source snippet-selector__preview-source--${src}`;
             }
-            if (addSnippetPreviewDesc) addSnippetPreviewDesc.textContent = snippet.description || '';
+            if (addSnippetPreviewDesc) addSnippetPreviewDesc.textContent = snippetDescription(snippet);
             
             // Show delete button only for non-core snippets
             if (addSnippetPreviewActions) {
@@ -7195,21 +7178,21 @@
     // Delete selected snippet (only for non-core snippets)
     async function deleteSelectedSnippet() {
         if (!selectedSnippetData || !selectedSnippetId) {
-            showToast(PreviewConfig.i18n.noSnippetSelected || 'No snippet selected', 'warning');
+            showToast(QSPanelWords.t('preview.noSnippetSelected'), 'warning');
             return;
         }
         
         const src = selectedSnippetData.source;
         if (src === 'core') {
-            showToast(PreviewConfig.i18n.cannotDeleteCore || 'Cannot delete core snippets', 'error');
+            showToast(QSPanelWords.t('preview.cannotDeleteCore'), 'error');
             return;
         }
         
-        const snippetName = selectedSnippetData.name || selectedSnippetId;
-        const asked = await QuickSiteUtils.confirm(PreviewConfig.i18n.deleteCannotBeUndone || 'This action cannot be undone.', {
-            title: (PreviewConfig.i18n.deleteSnippetTitle || 'Delete the snippet “{name}”?').split('{name}').join(snippetName),
+        const shownName = snippetName(selectedSnippetData);
+        const asked = await QuickSiteUtils.confirm(QSPanelWords.t('preview.deleteCannotBeUndone'), {
+            title: QSPanelWords.t('preview.deleteSnippetTitle', { name: shownName }),
             type: 'danger',
-            confirmText: PreviewConfig.i18n.delete || 'Delete'
+            confirmText: QSPanelWords.t('common.delete')
         });
         if (!asked) return;
         
@@ -7217,7 +7200,7 @@
             const response = await QuickSiteAdmin.apiRequest('deleteSnippet', 'DELETE', null, [], { id: selectedSnippetId });
             
             if (response.ok) {
-                showToast(PreviewConfig.i18n.snippetDeleted || 'Snippet deleted successfully', 'success');
+                showToast(QSPanelWords.t('preview.snippetDeleted'), 'success');
                 
                 // Reset selection and trigger
                 if (addSnippetSelector) addSnippetSelector.reset();
@@ -7226,11 +7209,11 @@
                 snippetsLoaded = false;
                 await loadSidebarSnippetsList();
             } else {
-                throw new Error(response.data?.message || 'Failed to delete snippet');
+                throw new Error(response.data?.message || QSPanelWords.t('preview.deleteSnippetFailed'));
             }
         } catch (error) {
             console.error('[Preview] Delete snippet error:', error);
-            showToast(error.message || PreviewConfig.i18n.deleteSnippetFailed || 'Failed to delete snippet', 'error');
+            showToast(error.message || QSPanelWords.t('preview.deleteSnippetFailed'), 'error');
         }
     }
     
@@ -7329,7 +7312,7 @@
     async function injectSnippetCss(mode) {
         if (!selectedSnippetId) return false;
         
-        const label = mode === 'missing' ? 'Adding missing CSS...' : 'Replacing CSS...';
+        const label = QSPanelWords.t(mode === 'missing' ? 'preview.snippetCssAdding' : 'preview.snippetCssReplacing');
         showToast(label, 'info');
         
         try {
@@ -7342,8 +7325,8 @@
                 const count = response.data?.data?.injected?.length || 0;
                 showToast(
                     mode === 'missing'
-                        ? (count > 0 ? `Added ${count} CSS rule(s)` : 'All selectors already present')
-                        : 'CSS replaced successfully',
+                        ? (count > 0 ? QSPanelWords.count('preview.snippetCssAdded', count) : QSPanelWords.t('preview.snippetCssAllPresent'))
+                        : QSPanelWords.t('preview.snippetCssReplaced'),
                     'success'
                 );
                 
@@ -7357,11 +7340,11 @@
                 }
                 return true;
             } else {
-                throw new Error(response.data?.message || 'CSS injection failed');
+                throw new Error(response.data?.message || QSPanelWords.t('preview.snippetCssInjectionFailed'));
             }
         } catch (error) {
             console.error('[Preview] CSS inject error:', error);
-            showToast(error.message || 'Failed to inject CSS', 'error');
+            showToast(error.message || QSPanelWords.t('preview.snippetCssInjectFailed'), 'error');
             return false;
         }
     }
@@ -7689,8 +7672,8 @@
             const svg = starBtn.querySelector('svg');
             if (svg) svg.setAttribute('fill', isFav ? 'currentColor' : 'none');
             if (starLabel) starLabel.textContent = isFav ? 
-                (PreviewConfig?.i18n?.unstarTag || 'Remove from favorites') : 
-                (PreviewConfig?.i18n?.starTag || 'Add to favorites');
+                QSPanelWords.t('preview.unstarTag') : 
+                QSPanelWords.t('preview.starTag');
         }
         
         function renderFavorites() {
@@ -7749,7 +7732,7 @@
                 QSDom.el('span', { class: 'tag-dropdown__option-desc', text: info.desc })
             );
             if (info.required) btn.append(' ', QSDom.el('span', {
-                class: 'tag-dropdown__option-required', title: PreviewConfig?.i18n?.requiresParams || 'Requires additional parameters', text: '*'
+                class: 'tag-dropdown__option-required', title: QSPanelWords.t('preview.requiresParams'), text: '*'
             }));
             btn.addEventListener('click', () => selectTag(tag));
             return btn;
@@ -8037,7 +8020,7 @@
                 chip.className = 'class-combobox__chip';
                 chip.append(
                     QSDom.el('span', { class: 'class-combobox__chip-text', text: cls }),
-                    QSControls.removeRow(PreviewConfig.i18n.remove, null, { className: 'class-combobox__chip-remove', attrs: { 'data-class': cls } })
+                    QSControls.removeRow(QSPanelWords.t('common.remove'), null, { className: 'class-combobox__chip-remove', attrs: { 'data-class': cls } })
                 );
                 chipsEl.appendChild(chip);
             });
@@ -8078,7 +8061,7 @@
             if (displayed.length === 0 && q) {
                 const hint = document.createElement('div');
                 hint.className = 'class-combobox__hint';
-                hint.textContent = `Press Enter to add "${q}"`;
+                hint.textContent = QSPanelWords.t('preview.classComboboxAdd', { name: q });
                 suggestionsEl.appendChild(hint);
             }
             
@@ -8094,7 +8077,7 @@
             if (matches.length > maxShow) {
                 const more = document.createElement('div');
                 more.className = 'class-combobox__hint';
-                more.textContent = `+${matches.length - maxShow} more…`;
+                more.textContent = QSPanelWords.count('preview.classComboboxMore', matches.length - maxShow);
                 suggestionsEl.appendChild(more);
             }
             
@@ -8176,7 +8159,7 @@
             if (!iframeInfo) {
                 iframeInfo = document.createElement('div');
                 iframeInfo.className = 'preview-iframe-info';
-                iframeInfo.appendChild(QSDom.el('small', { text: PreviewConfig.i18n.iframeInfo }));
+                iframeInfo.appendChild(QSDom.el('small', { text: QSPanelWords.t('preview.iframeInfo') }));
                 addMandatoryParamsContainer?.parentElement?.appendChild(iframeInfo);
             }
             iframeInfo.style.display = 'block';
@@ -8200,19 +8183,19 @@
         const keyInput = document.createElement('input');
         keyInput.type = 'text';
         keyInput.className = 'admin-input admin-input--sm preview-contextual-form__param-key';
-        keyInput.placeholder = PreviewConfig.i18n.paramName || 'name';
+        keyInput.placeholder = QSPanelWords.t('preview.paramName');
         if (index) keyInput.dataset.paramIndex = index;
         if (key) keyInput.value = key;
 
         const valueInput = document.createElement('input');
         valueInput.type = 'text';
         valueInput.className = 'admin-input admin-input--sm preview-contextual-form__param-value';
-        valueInput.placeholder = PreviewConfig.i18n.paramValue || 'value';
+        valueInput.placeholder = QSPanelWords.t('preview.paramValue');
         if (index) valueInput.dataset.paramIndex = index;
         if (value) valueInput.value = value;
 
         // Its class is data-attr-picker.js's hook: the row's description box goes with the row
-        const removeBtn = QSControls.removeRow(PreviewConfig.i18n.remove || 'Remove', () => row.remove(),
+        const removeBtn = QSControls.removeRow(QSPanelWords.t('common.remove'), () => row.remove(),
             { className: 'preview-contextual-form__remove-param' });
 
         row.appendChild(keyInput);
@@ -8242,9 +8225,8 @@
     // Cancel button — in edit mode, prompt if the form has unsaved changes.
     addCancelBtn?.addEventListener('click', async function() {
         if (_isEditModeDirty()) {
-            const msg = PreviewConfig.i18n.discardUnsavedParams
-                || 'You have unsaved param changes. Discard?';
-            if (!(await QuickSiteUtils.confirm(msg, { type: 'danger', confirmText: PreviewConfig.i18n.discard || 'Discard' }))) return;
+            const msg = QSPanelWords.t('preview.discardUnsavedParams');
+            if (!(await QuickSiteUtils.confirm(msg, { type: 'danger', confirmText: QSPanelWords.t('preview.discard') }))) return;
         }
         hideSidebarAddForm();
     });
@@ -8252,7 +8234,7 @@
     // Confirm button - add the element (or save params, in edit mode)
     addConfirmBtn?.addEventListener('click', async function() {
         if (selectedStruct == null || selectedNode == null) {
-            showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+            showToast(QSPanelWords.t('preview.selectNodeFirst'), 'warning');
             return;
         }
 
@@ -8262,7 +8244,7 @@
                 await editParamsNode();
             } catch (error) {
                 console.error('[Preview] Edit params error:', error);
-                showToast(error.message || PreviewConfig.i18n.editParamsError || 'Failed to save', 'error');
+                showToast(error.message || QSPanelWords.t('preview.editParamsError'), 'error');
             }
             return;
         }
@@ -8283,7 +8265,7 @@
             }
         } catch (error) {
             console.error('[Preview] Add node error:', error);
-            showToast(error.message || PreviewConfig.i18n.addNodeError, 'error');
+            showToast(error.message || QSPanelWords.t('preview.addElementFailed'), 'error');
         }
     });
 
@@ -8291,7 +8273,7 @@
     // Text + Snippet types (updateSidebarAddNodeTypeUI manages visibility).
     addConfirmAnotherBtn?.addEventListener('click', async function() {
         if (selectedStruct == null || selectedNode == null) {
-            showToast(PreviewConfig.i18n.selectNodeFirst, 'warning');
+            showToast(QSPanelWords.t('preview.selectNodeFirst'), 'warning');
             return;
         }
         if (contextualAddMode === 'edit') return;
@@ -8306,7 +8288,7 @@
             }
         } catch (error) {
             console.error('[Preview] Add another error:', error);
-            showToast(error.message || PreviewConfig.i18n.addNodeError, 'error');
+            showToast(error.message || QSPanelWords.t('preview.addElementFailed'), 'error');
         } finally {
             addAnotherMode = false;
         }
@@ -8332,12 +8314,12 @@
      */
     async function addComplexNode() {
         if (!addComplexKindSelect || !addComplexController) {
-            showToast(PreviewConfig.i18n.complexPickKindFirst || 'Pick a complex element kind first', 'warning');
+            showToast(QSPanelWords.t('preview.complexPickKindFirst'), 'warning');
             return;
         }
         const kind = addComplexKindSelect.value;
         if (!kind) {
-            showToast(PreviewConfig.i18n.complexPickKindFirst || 'Pick a complex element kind first', 'warning');
+            showToast(QSPanelWords.t('preview.complexPickKindFirst'), 'warning');
             return;
         }
 
@@ -8363,7 +8345,7 @@
             // that turns out to be gone has been left, and the element has nowhere to go.
             const moved = await refreshEditList();
             if (setupFailure) {
-                showToast(setupFailure.message ? setupFailure.message : 'Setup failed', 'error');
+                showToast(setupFailure.message ? setupFailure.message : QSPanelWords.t('preview.complexSetupFailed'), 'error');
                 return;
             }
             if (moved) return;
@@ -8374,7 +8356,7 @@
 
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
-            throw new Error('Invalid structure type');
+            throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         }
 
         // The targetNodeId / structType plumbing mirrors addNode/addComponentNode: the
@@ -8395,11 +8377,11 @@
         const result = await QuickSiteAdmin.apiRequest('addComplexElement', 'POST', body);
         if (!result || !result.ok) {
             const msg = (result && result.data && result.data.message)
-                || 'Failed to add complex element';
+                || QSPanelWords.t('preview.complexAddFailed');
             throw new Error(msg);
         }
         const data = result.data || {};
-        showToast(data.message || 'Complex element added', 'success');
+        showToast(data.message || QSPanelWords.t('preview.complexAdded'), 'success');
         // Save & add another (complex): keep the wizard as-is (prefilled with
         // the same config) so the next instance starts from these values.
         const keptOpen = _finalizeAdd(null);
@@ -8437,10 +8419,7 @@
                     nameInput.classList.add('admin-input--error');
                     nameInput.focus();
                 }
-                throw new Error(
-                    PreviewConfig.i18n.nameRequiredForInput
-                    || "A name is required for input type '" + typeVal + "'."
-                );
+                throw new Error(QSPanelWords.t('preview.nameRequiredForInput'));
             }
         }
         
@@ -8470,10 +8449,7 @@
                     addIdInput.classList.add('admin-input--error');
                     addIdInput.focus();
                 }
-                throw new Error(
-                    PreviewConfig.i18n.invalidId
-                    || 'Invalid ID — start with a letter or underscore; letters, digits, hyphens and underscores only (no spaces).'
-                );
+                throw new Error(QSPanelWords.t('preview.invalidId'));
             }
             params.id = idVal;
         }
@@ -8481,7 +8457,7 @@
         // Parse struct to get type and name
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
-            throw new Error('Invalid structure type');
+            throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         }
         
         const isRoot = !selectedNode && selectedNode !== 0;
@@ -8504,7 +8480,7 @@
             const targetStruct = selectedStruct;
             const targetNode = selectedNode;
             
-            showToast(PreviewConfig.i18n.nodeAdded || 'Element added', 'success');
+            showToast(QSPanelWords.t('preview.nodeAdded'), 'success');
 
             // Save & add another (tag): keep the form open, clear instance
             // fields (id + mandatory + custom params), keep tag + class. A
@@ -8539,7 +8515,7 @@
             }
             broadcastStructureChanged();
         } else {
-            throw new Error(response.data?.message || 'Failed to add element');
+            throw new Error(response.data?.message || QSPanelWords.t('preview.addElementFailed'));
         }
     }
 
@@ -8562,7 +8538,7 @@
         if (isRaw) {
             const value = addTextValueInput?.value || '';
             if (value.trim() === '') {
-                showToast(PreviewConfig.i18n?.textValueRequired || 'Please enter the text', 'warning');
+                showToast(QSPanelWords.t('preview.textValueRequired'), 'warning');
                 if (addTextValueInput) addTextValueInput.focus();
                 return;
             }
@@ -8570,7 +8546,7 @@
         } else {
             const pickedKey = (addTextKeyPickerInst && addTextKeyPickerInst.getValue()) || '';
             if (!pickedKey) {
-                showToast(PreviewConfig.i18n?.textKeyRequired || 'Pick or create a translation key', 'warning');
+                showToast(QSPanelWords.t('preview.textKeyRequired'), 'warning');
                 return;
             }
             textPayload = { textRaw: false, textKey: pickedKey };
@@ -8582,7 +8558,7 @@
         const position = picked === 'inside' ? 'inside-end' : picked;
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
-            throw new Error('Invalid structure type');
+            throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         }
         const isRoot = !selectedNode && selectedNode !== 0;
 
@@ -8601,7 +8577,7 @@
             const targetStruct = selectedStruct;
             const targetNode = selectedNode;
 
-            showToast(PreviewConfig.i18n?.nodeAdded || 'Text added', 'success');
+            showToast(QSPanelWords.t('preview.textAdded'), 'success');
             hideSidebarAddForm();
 
             if (data.html && targetNode) {
@@ -8617,7 +8593,7 @@
             }
             broadcastStructureChanged();
         } else {
-            throw new Error(response.data?.message || 'Failed to add text');
+            throw new Error(response.data?.message || QSPanelWords.t('preview.textAddFailed'));
         }
     }
 
@@ -8625,7 +8601,7 @@
     async function addComponentNode() {
         const componentName = addComponentSelect?.value;
         if (!componentName) {
-            showToast(PreviewConfig.i18n.selectComponent || 'Please select a component', 'warning');
+            showToast(QSPanelWords.t('preview.selectComponent'), 'warning');
             return;
         }
         
@@ -8642,7 +8618,7 @@
         // Parse struct to get type and name
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
-            throw new Error('Invalid structure type');
+            throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         }
         
         const isRoot = !selectedNode && selectedNode !== 0;
@@ -8679,7 +8655,7 @@
             const targetStruct = selectedStruct;
             const targetNode = selectedNode;
             
-            showToast(PreviewConfig.i18n.componentAdded || 'Component added', 'success');
+            showToast(QSPanelWords.t('preview.componentAdded'), 'success');
 
             // Save & add another (component): keep the variable inputs as-is
             // (prefilled with the same values) for the next instance.
@@ -8700,14 +8676,14 @@
             }
             broadcastStructureChanged();
         } else {
-            throw new Error(response.data?.message || 'Failed to add component');
+            throw new Error(response.data?.message || QSPanelWords.t('preview.componentAddFailed'));
         }
     }
     
     // Add snippet node (inserts snippet structure as nodes)
     async function addSnippetNode() {
         if (!selectedSnippetId || !selectedSnippetData) {
-            showToast(PreviewConfig.i18n.selectSnippet || 'Please select a snippet', 'warning');
+            showToast(QSPanelWords.t('preview.selectSnippet'), 'warning');
             return;
         }
 
@@ -8715,9 +8691,9 @@
         const cssAction = getSelectedCssAction();
         let cssWasInjected = false;
         if (cssAction === 'missing' || cssAction === 'replace') {
-            const confirmed = await QuickSiteUtils.confirm(PreviewConfig.i18n.snippetCssConfirm, {
+            const confirmed = await QuickSiteUtils.confirm(QSPanelWords.t('preview.snippetCssConfirm'), {
                 type: 'danger',
-                confirmText: PreviewConfig.i18n.snippetCssConfirmAction || 'Change the stylesheet'
+                confirmText: QSPanelWords.t('preview.snippetCssConfirmAction')
             });
             if (!confirmed) return;
 
@@ -8732,7 +8708,7 @@
         // Parse struct to get type and name
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
-            throw new Error('Invalid structure type');
+            throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         }
         
         // Use the new insertSnippet command which handles full structure + translations
@@ -8754,10 +8730,9 @@
             const targetStruct = selectedStruct;
             const targetNode = selectedNode;
             
-            const translationsMsg = data.translationsAdded > 0 
-                ? ` (${data.translationsAdded} translations added)` 
-                : '';
-            showToast((PreviewConfig.i18n.snippetAdded || 'Snippet added') + translationsMsg, 'success');
+            showToast(data.translationsAdded > 0
+                ? QSPanelWords.count('preview.snippetAddedTranslations', data.translationsAdded)
+                : QSPanelWords.t('preview.snippetAdded'), 'success');
             hideSidebarAddForm();
             
             // The live insert places one element; a snippet with several roots reloads.
@@ -8782,7 +8757,7 @@
             }
             broadcastStructureChanged();
         } else {
-            throw new Error(response.data?.message || 'Failed to insert snippet');
+            throw new Error(response.data?.message || QSPanelWords.t('preview.snippetInsertFailed'));
         }
     }
     
@@ -8809,15 +8784,15 @@
         const allowRoot = !!(opts && opts.allowRoot);
         // Must have selection
         if (selectedStruct == null || selectedNode == null) {
-            throw new Error(PreviewConfig.i18n.selectNodeFirst || 'Select an element first');
+            throw new Error(QSPanelWords.t('preview.selectNodeFirst'));
         }
         if (!allowRoot && selectedNode === '' && currentEditType !== 'component') {
-            throw new Error(PreviewConfig.i18n?.cannotModifyRoot || 'Cannot save the root. Select a child element.');
+            throw new Error(QSPanelWords.t('preview.cannotSaveRoot'));
         }
 
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
-            throw new Error('Invalid structure type');
+            throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         }
 
         // Fetch full structure
@@ -8827,13 +8802,13 @@
         }
         const response = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
         if (!response.ok || !response.data?.data?.structure) {
-            throw new Error('Failed to get structure');
+            throw new Error(QSPanelWords.t('preview.structureReadFailed'));
         }
 
         const structure = response.data.data.structure;
         const nodeData = selectedNode === '' ? structure : navigateToNode(structure, selectedNode);
         if (!nodeData) {
-            throw new Error('Node not found in structure');
+            throw new Error(QSPanelWords.t('preview.nodeNotFoundInStructure'));
         }
 
         return { nodeData: JSON.parse(JSON.stringify(nodeData)), structInfo };
@@ -8846,8 +8821,7 @@
         const childCount = (nodeData.children || []).length;
         container.replaceChildren(QSDom.el('code', { text: '<' + tag + (classes ? ' class="' + classes + '"' : '') + '>' }));
         if (childCount > 0) {
-            const label = childCount === 1 ? PreviewConfig.i18n.structureChildrenOne : PreviewConfig.i18n.structureChildren;
-            container.append(' ', QSDom.el('small', { text: label.replace('{n}', childCount) }));
+            container.append(' ', QSDom.el('small', { text: QSPanelWords.count('preview.structureChildCount', childCount) }));
         }
     }
 
@@ -8884,7 +8858,7 @@
 
         } catch (error) {
             console.error('[Preview] Save snippet form error:', error);
-            showToast(error.message || PreviewConfig.i18n.loadError || 'Failed to load element data', 'error');
+            showToast(error.message || QSPanelWords.t('preview.elementDataLoadFailed'), 'error');
         }
     }
     
@@ -8934,7 +8908,7 @@
 
         } catch (error) {
             console.error('[Preview] Save component form error:', error);
-            showToast(error.message || PreviewConfig.i18n.loadError || 'Failed to load element data', 'error');
+            showToast(error.message || QSPanelWords.t('preview.elementDataLoadFailed'), 'error');
         }
     }
 
@@ -9039,24 +9013,24 @@
     // Submit save component form
     async function submitSaveComponent() {
         if (!saveComponentStructureData) {
-            showToast(PreviewConfig.i18n.noStructureData || 'No structure data available', 'error');
+            showToast(QSPanelWords.t('preview.noStructureData'), 'error');
             return;
         }
 
         const name = saveComponentName?.value?.trim();
         if (!name) {
-            showToast(PreviewConfig.i18n.componentNameRequired || 'Component name is required', 'warning');
+            showToast(QSPanelWords.t('preview.componentNameRequired'), 'warning');
             saveComponentName?.focus();
             return;
         }
 
         if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)) {
-            showToast(PreviewConfig.i18n.componentNameInvalid || 'Invalid name. Use only letters, numbers, hyphens, and underscores.', 'warning');
+            showToast(QSPanelWords.t('preview.componentNameInvalid'), 'warning');
             saveComponentName?.focus();
             return;
         }
 
-        showToast(PreviewConfig.i18n.saving || 'Saving...', 'info');
+        showToast(QSPanelWords.t('common.saving'), 'info');
 
         try {
             // Clone structure and convert textKeys to {{placeholder}} variables
@@ -9072,7 +9046,7 @@
             });
 
             if (response.ok) {
-                showToast(PreviewConfig.i18n.componentSaved || 'Component saved successfully!', 'success');
+                showToast(QSPanelWords.t('preview.componentSaved'), 'success');
 
                 // Add to component dropdown in navigation if not already there
                 if (targetSelect && !targetSelect.querySelector('option[value="component:' + name + '"]')) {
@@ -9093,11 +9067,11 @@
 
                 hideSaveComponentForm();
             } else {
-                throw new Error(response.data?.message || 'Failed to save component');
+                throw new Error(response.data?.message || QSPanelWords.t('preview.componentSaveFailed'));
             }
         } catch (error) {
             console.error('[Preview] Save component error:', error);
-            showToast(error.message || PreviewConfig.i18n.saveFailed || 'Failed to save component', 'error');
+            showToast(error.message || QSPanelWords.t('common.saveFailed'), 'error');
         }
     }
     
@@ -9298,11 +9272,11 @@
             // open (the shared text-key picker, through QSSiteWords).
             variablesPanelStruct = selectedStruct || ('component-' + currentEditName);
             const structInfo = parseStruct(variablesPanelStruct);
-            if (!structInfo) throw new Error('Invalid struct');
+            if (!structInfo) throw new Error(QSPanelWords.t('preview.invalidStruct'));
             const urlParams = [structInfo.type];
             if (structInfo.name) urlParams.push(structInfo.name);
             const resp = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
-            if (!resp.ok || !resp.data?.data?.structure) throw new Error('Failed to get structure');
+            if (!resp.ok || !resp.data?.data?.structure) throw new Error(QSPanelWords.t('preview.structureReadFailed'));
             variablesPanelStructure = JSON.parse(JSON.stringify(resp.data.data.structure));
             
             // Extract available enum variable names from __enums__
@@ -9317,7 +9291,7 @@
             // Navigate to the selected node (fallback to root)
             const nodeId = (selectedNode != null) ? selectedNode : '';
             const targetNode = getNodeByPath(variablesPanelStructure, nodeId);
-            if (!targetNode) throw new Error('Node not found: ' + nodeId);
+            if (!targetNode) throw new Error(QSPanelWords.t('preview.nodeNotFoundNamed', { node: nodeId }));
             
             // Collect direct textKey items and params for this node
             const textKeyNodes = collectDirectTextKeys(targetNode, nodeId);
@@ -9337,8 +9311,8 @@
             // Show footer with selected node info
             if (variablesPanelFooter && variablesPanelFooterText) {
                 const tag = targetNode.tag || targetNode.component || '?';
-                const display = nodeId === '' ? tag + ' (root)' : tag + ' [' + nodeId + ']';
-                variablesPanelFooterText.textContent = (PreviewConfig.i18n?.variablesNodeInfo || 'Showing: %s').replace('%s', display);
+                const display = nodeId === '' ? QSPanelWords.t('preview.variablesNodeRoot', { tag: tag }) : tag + ' [' + nodeId + ']';
+                variablesPanelFooterText.textContent = QSPanelWords.t('preview.variablesNodeInfo', { name: display });
                 variablesPanelFooter.style.display = '';
             }
             
@@ -9365,7 +9339,7 @@
             const picker = QSComplexWizard.createTextKeyPicker({
                 container: wrapper,
                 value: currentValue || '',
-                placeholder: PreviewConfig.i18n?.variablesPlaceholderTranslation || undefined,
+                placeholder: QSPanelWords.t('preview.variablesPlaceholderTranslation'),
             });
             return { container: wrapper, getValue: () => picker.getValue().trim(), el: picker.input };
         }
@@ -9376,7 +9350,7 @@
             sel.className = 'preview-variable-card__value-select';
             const emptyOpt = document.createElement('option');
             emptyOpt.value = '';
-            emptyOpt.textContent = '— ' + (PreviewConfig.i18n?.variablesSelectEnum || 'Select an enum variable') + ' —';
+            emptyOpt.textContent = '— ' + QSPanelWords.t('preview.variablesSelectEnum') + ' —';
             sel.appendChild(emptyOpt);
             variablesPanelEnumVarNames.forEach(name => {
                 const opt = document.createElement('option');
@@ -9389,7 +9363,7 @@
             // Hint
             const hint = document.createElement('div');
             hint.className = 'preview-variable-card__hint';
-            hint.textContent = PreviewConfig.i18n?.variablesHintEnum || 'Resolved from enum definition at render time';
+            hint.textContent = QSPanelWords.t('preview.variablesHintEnum');
             wrapper.appendChild(hint);
             return { container: wrapper, getValue: () => sel.value, el: sel };
         }
@@ -9405,9 +9379,9 @@
         const hint = document.createElement('div');
         hint.className = 'preview-variable-card__hint';
         if (type === 'variable') {
-            hint.textContent = PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention';
+            hint.textContent = QSPanelWords.t('preview.variablesHintVariable');
         } else if (type === 'raw') {
-            hint.textContent = PreviewConfig.i18n?.variablesHintRaw || '__RAW__ added automatically — same in all languages';
+            hint.textContent = QSPanelWords.t('preview.variablesHintRaw');
         }
         wrapper.appendChild(hint);
 
@@ -9428,7 +9402,7 @@
             
             const title = document.createElement('h5');
             title.className = 'preview-variables-section__title';
-            title.append(_renderSectionIcon(ICON_TEXT_VARIABLES), PreviewConfig.i18n?.variablesSectionText || 'Text Variables');
+            title.append(_renderSectionIcon(ICON_TEXT_VARIABLES), QSPanelWords.t('preview.variablesSectionText'));
             section.appendChild(title);
             
             renderVariableCards(textKeyNodes, section);
@@ -9442,7 +9416,7 @@
             
             const title = document.createElement('h5');
             title.className = 'preview-variables-section__title';
-            title.append(_renderSectionIcon(ICON_PARAM), PreviewConfig.i18n?.variablesSectionParams || 'Parameters');
+            title.append(_renderSectionIcon(ICON_PARAM), QSPanelWords.t('preview.variablesSectionParams'));
             section.appendChild(title);
             
             renderParamCards(paramNodes, section);
@@ -9466,7 +9440,7 @@
             const pathEl = document.createElement('div');
             pathEl.className = 'preview-variable-card__path';
             pathEl.append(QSDom.iconEl(ICON_NODE_PATH, 0), QSDom.el('span', { text: item.path + ' [' + item.nodeId + ']' }));
-            pathEl.title = PreviewConfig.i18n?.variablesClickToSelect || 'Click to select this node';
+            pathEl.title = QSPanelWords.t('preview.variablesClickToSelect');
             pathEl.addEventListener('click', function() {
                 hideVariablesPanel();
                 // Select this node in the frame, by the struct the panel read
@@ -9481,10 +9455,10 @@
             typeDiv.className = 'preview-variable-card__type';
             const typeSelect = document.createElement('select');
             typeSelect.append(
-                _renderOption('translation', PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key', type === 'translation'),
-                _renderOption('variable', PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}', type === 'variable'),
-                _renderOption('enum', PreviewConfig.i18n?.variablesTypeEnum || 'Enum', type === 'enum'),
-                _renderOption('raw', PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text', type === 'raw')
+                _renderOption('translation', QSPanelWords.t('preview.variablesTypeTranslation'), type === 'translation'),
+                _renderOption('variable', QSPanelWords.t('preview.variablesTypeVariable'), type === 'variable'),
+                _renderOption('enum', QSPanelWords.t('preview.variablesTypeEnum'), type === 'enum'),
+                _renderOption('raw', QSPanelWords.t('preview.variablesTypeRaw'), type === 'raw')
             );
             typeDiv.appendChild(typeSelect);
             card.appendChild(typeDiv);
@@ -9498,7 +9472,7 @@
             const saveBtn = document.createElement('button');
             saveBtn.type = 'button';
             saveBtn.className = 'preview-variable-card__save-btn';
-            saveBtn.textContent = PreviewConfig.i18n?.save || 'Save';
+            saveBtn.textContent = QSPanelWords.t('common.save');
             valueDiv.appendChild(saveBtn);
             card.appendChild(valueDiv);
             
@@ -9518,7 +9492,7 @@
                 valueDiv.replaceChild(newEditor.container, editor.container);
                 editor = newEditor;
                 
-                previewEl.textContent = '\u2192 (empty)';
+                previewEl.textContent = '\u2192 ' + QSPanelWords.t('preview.variablesPreviewEmpty');
                 
                 // Attach enter key handler if input
                 if (editor.el && editor.el.tagName === 'INPUT') {
@@ -9536,7 +9510,7 @@
                 const currentType = typeSelect.value;
                 const currentVal = editor.getValue();
                 if (!currentVal) {
-                    showToast(PreviewConfig.i18n?.variablesValueRequired || 'Value cannot be empty', 'warning');
+                    showToast(QSPanelWords.t('preview.variablesValueRequired'), 'warning');
                     return;
                 }
                 const newTextKey = editValueToTextKey(currentVal, currentType);
@@ -9582,9 +9556,9 @@
             typeDiv.className = 'preview-variable-card__type';
             const typeSelect = document.createElement('select');
             typeSelect.append(
-                _renderOption('string', PreviewConfig.i18n?.variablesTypeString || 'Literal String', initialType === 'string'),
-                _renderOption('variable', PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}', initialType === 'variable'),
-                _renderOption('enum', PreviewConfig.i18n?.variablesTypeEnum || 'Enum', initialType === 'enum')
+                _renderOption('string', QSPanelWords.t('preview.variablesTypeString'), initialType === 'string'),
+                _renderOption('variable', QSPanelWords.t('preview.variablesTypeVariable'), initialType === 'variable'),
+                _renderOption('enum', QSPanelWords.t('preview.variablesTypeEnum'), initialType === 'enum')
             );
             typeDiv.appendChild(typeSelect);
             card.appendChild(typeDiv);
@@ -9600,15 +9574,15 @@
             inp.type = 'text';
             inp.value = isEnum ? '' : item.editValue;
             inp.placeholder = initialType === 'variable' 
-                ? (PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE')
-                : (PreviewConfig.i18n?.variablesPlaceholderParamString || 'e.g. /page/link');
+                ? QSPanelWords.t('preview.variablesPlaceholderVariable')
+                : QSPanelWords.t('preview.variablesPlaceholderParamString');
             
             // Enum select (for enum type)
             const enumSel = document.createElement('select');
             enumSel.className = 'preview-variable-card__value-select';
             const emptyOpt = document.createElement('option');
             emptyOpt.value = '';
-            emptyOpt.textContent = '— ' + (PreviewConfig.i18n?.variablesSelectEnum || 'Select an enum variable') + ' —';
+            emptyOpt.textContent = '— ' + QSPanelWords.t('preview.variablesSelectEnum') + ' —';
             enumSel.appendChild(emptyOpt);
             variablesPanelEnumVarNames.forEach(name => {
                 const opt = document.createElement('option');
@@ -9633,9 +9607,9 @@
             const hint = document.createElement('div');
             hint.className = 'preview-variable-card__hint';
             if (initialType === 'variable') {
-                hint.textContent = PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention';
+                hint.textContent = QSPanelWords.t('preview.variablesHintVariable');
             } else if (initialType === 'enum') {
-                hint.textContent = PreviewConfig.i18n?.variablesHintEnum || 'Resolved from enum definition at render time';
+                hint.textContent = QSPanelWords.t('preview.variablesHintEnum');
             } else {
                 hint.textContent = '';
                 hint.style.display = 'none';
@@ -9647,7 +9621,7 @@
             const saveBtn = document.createElement('button');
             saveBtn.type = 'button';
             saveBtn.className = 'preview-variable-card__save-btn';
-            saveBtn.textContent = PreviewConfig.i18n?.save || 'Save';
+            saveBtn.textContent = QSPanelWords.t('common.save');
             valueDiv.appendChild(saveBtn);
             card.appendChild(valueDiv);
             
@@ -9665,19 +9639,19 @@
                 if (newType === 'enum') {
                     inp.style.display = 'none';
                     enumSel.style.display = '';
-                    hint.textContent = PreviewConfig.i18n?.variablesHintEnum || 'Resolved from enum definition at render time';
+                    hint.textContent = QSPanelWords.t('preview.variablesHintEnum');
                     hint.style.display = '';
                     const selVal = enumSel.value;
-                    previewEl.textContent = '\u2192 ' + (selVal ? '{{' + selVal + '}}' : '(empty)');
+                    previewEl.textContent = '\u2192 ' + (selVal ? '{{' + selVal + '}}' : QSPanelWords.t('preview.variablesPreviewEmpty'));
                 } else {
                     inp.style.display = '';
                     enumSel.style.display = 'none';
                     const isVar = newType === 'variable';
                     inp.placeholder = isVar 
-                        ? (PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE')
-                        : (PreviewConfig.i18n?.variablesPlaceholderParamString || 'e.g. /page/link');
+                        ? QSPanelWords.t('preview.variablesPlaceholderVariable')
+                        : QSPanelWords.t('preview.variablesPlaceholderParamString');
                     if (isVar) {
-                        hint.textContent = PreviewConfig.i18n?.variablesHintVariable || '{{}} added automatically — use CAPS by convention';
+                        hint.textContent = QSPanelWords.t('preview.variablesHintVariable');
                         hint.style.display = '';
                     } else {
                         hint.textContent = '';
@@ -9685,7 +9659,7 @@
                     }
                     const currentVal = inp.value.trim();
                     const previewVal = isVar ? '{{' + currentVal + '}}' : currentVal;
-                    previewEl.textContent = '\u2192 ' + (previewVal || '(empty)');
+                    previewEl.textContent = '\u2192 ' + (previewVal || QSPanelWords.t('preview.variablesPreviewEmpty'));
                 }
             });
             
@@ -9694,13 +9668,13 @@
                 const isVar = typeSelect.value === 'variable';
                 const val = this.value.trim();
                 const previewVal = isVar ? '{{' + val + '}}' : val;
-                previewEl.textContent = '\u2192 ' + (previewVal || '(empty)');
+                previewEl.textContent = '\u2192 ' + (previewVal || QSPanelWords.t('preview.variablesPreviewEmpty'));
             });
             
             // Enum select change: update preview
             enumSel.addEventListener('change', function() {
                 const val = this.value;
-                previewEl.textContent = '\u2192 ' + (val ? '{{' + val + '}}' : '(empty)');
+                previewEl.textContent = '\u2192 ' + (val ? '{{' + val + '}}' : QSPanelWords.t('preview.variablesPreviewEmpty'));
             });
             
             // Save button
@@ -9710,7 +9684,7 @@
                 if (currentType === 'enum') {
                     const val = enumSel.value;
                     if (!val) {
-                        showToast(PreviewConfig.i18n?.variablesValueRequired || 'Value cannot be empty', 'warning');
+                        showToast(QSPanelWords.t('preview.variablesValueRequired'), 'warning');
                         return;
                     }
                     newParamValue = '{{' + val + '}}';
@@ -9718,7 +9692,7 @@
                     const isVar = currentType === 'variable';
                     const val = inp.value.trim();
                     if (!val) {
-                        showToast(PreviewConfig.i18n?.variablesValueRequired || 'Value cannot be empty', 'warning');
+                        showToast(QSPanelWords.t('preview.variablesValueRequired'), 'warning');
                         return;
                     }
                     newParamValue = isVar ? '{{' + val + '}}' : val;
@@ -9743,8 +9717,8 @@
      * Get placeholder text for input based on type
      */
     function getPlaceholderForType(type) {
-        if (type === 'variable') return PreviewConfig.i18n?.variablesPlaceholderVariable || 'e.g. SUBTITLE';
-        if (type === 'raw') return PreviewConfig.i18n?.variablesPlaceholderRaw || 'e.g. Raw Value';
+        if (type === 'variable') return QSPanelWords.t('preview.variablesPlaceholderVariable');
+        if (type === 'raw') return QSPanelWords.t('preview.variablesPlaceholderRaw');
         return '';
     }
     
@@ -9759,7 +9733,7 @@
         try {
             // Update in our local copy
             const updated = updateTextKeyInStructure(variablesPanelStructure, nodeId, newTextKey);
-            if (!updated) throw new Error('Node not found at ' + nodeId);
+            if (!updated) throw new Error(QSPanelWords.t('preview.nodeNotFoundAt', { node: nodeId }));
             
             // Send full structure to backend
             const result = await QuickSiteAdmin.apiRequest('editStructure', 'PUT', {
@@ -9768,9 +9742,9 @@
                 structure: variablesPanelStructure
             });
             
-            if (!result.ok) throw new Error(result.data?.message || 'Save failed');
+            if (!result.ok) throw new Error(result.data?.message || QSPanelWords.t('common.saveFailed'));
             
-            showToast(PreviewConfig.i18n?.variablesSaved || 'Variable saved', 'success');
+            showToast(QSPanelWords.t('preview.variablesSaved'), 'success');
             componentsLoaded = false; // Invalidate component cache
             
             // Reload preview to reflect change
@@ -9778,8 +9752,8 @@
             
         } catch (error) {
             console.error('[Preview] Variable save error:', error);
-            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
-            if (previewEl) previewEl.textContent = '\u2192 (save failed)';
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
+            if (previewEl) previewEl.textContent = '\u2192 ' + QSPanelWords.t('preview.variablesPreviewSaveFailed');
         } finally {
             cardEl.classList.remove('preview-variable-card--saving');
         }
@@ -9796,7 +9770,7 @@
         try {
             const nodeId = (selectedNode != null) ? selectedNode : '';
             const targetNode = getNodeByPath(variablesPanelStructure, nodeId);
-            if (!targetNode) throw new Error('Node not found');
+            if (!targetNode) throw new Error(QSPanelWords.t('preview.nodeNotFound'));
             
             if (!targetNode.params) targetNode.params = {};
             targetNode.params[paramName] = newValue;
@@ -9808,16 +9782,16 @@
                 structure: variablesPanelStructure
             });
             
-            if (!result.ok) throw new Error(result.data?.message || 'Save failed');
+            if (!result.ok) throw new Error(result.data?.message || QSPanelWords.t('common.saveFailed'));
             
-            showToast(PreviewConfig.i18n?.variablesSaved || 'Variable saved', 'success');
+            showToast(QSPanelWords.t('preview.variablesSaved'), 'success');
             componentsLoaded = false; // Invalidate component cache
             reloadPreview();
             
         } catch (error) {
             console.error('[Preview] Param save error:', error);
-            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
-            if (previewEl) previewEl.textContent = '\u2192 (save failed)';
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
+            if (previewEl) previewEl.textContent = '\u2192 ' + QSPanelWords.t('preview.variablesPreviewSaveFailed');
         } finally {
             cardEl.classList.remove('preview-variable-card--saving');
         }
@@ -9869,7 +9843,7 @@
         
         try {
             const structInfo = parseStruct(selectedStruct || ('component-' + currentEditName));
-            if (!structInfo) throw new Error('Invalid struct');
+            if (!structInfo) throw new Error(QSPanelWords.t('preview.invalidStruct'));
             
             const urlParams = [structInfo.type];
             if (structInfo.name) urlParams.push(structInfo.name);
@@ -9879,7 +9853,7 @@
                 window.QSSiteWords ? QSSiteWords.read() : Promise.resolve(null)
             ]);
 
-            if (!resp.ok || !resp.data?.data?.structure) throw new Error('Failed to get structure');
+            if (!resp.ok || !resp.data?.data?.structure) throw new Error(QSPanelWords.t('preview.structureReadFailed'));
 
             enumsPanelStructure = JSON.parse(JSON.stringify(resp.data.data.structure));
 
@@ -10009,14 +9983,14 @@
         nameSpan.textContent = varName;
 
         // The name's pencil; its class is addNewEnum()'s hook, which opens a new card's rename
-        const editBtn = QSControls.edit(PreviewConfig.i18n?.enumRenameTip || 'Rename', null,
+        const editBtn = QSControls.edit(QSPanelWords.t('preview.enumRenameTip'), null,
             { className: 'preview-enum-card__edit-name-btn' });
 
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'admin-input admin-input--sm preview-enum-card__name-input';
         nameInput.value = varName;
-        nameInput.placeholder = PreviewConfig.i18n?.enumNamePlaceholder || 'enum_name';
+        nameInput.placeholder = QSPanelWords.t('preview.enumNamePlaceholder');
         nameInput.style.display = 'none';
 
         const confirmBtn = document.createElement('button');
@@ -10047,14 +10021,14 @@
                 const newName = nameInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '_');
                 const oldName = card.dataset.varName;
                 if (!newName) {
-                    showToast(PreviewConfig.i18n?.enumNameRequired || 'Enum name is required', 'warning');
+                    showToast(QSPanelWords.t('preview.enumNameRequired'), 'warning');
                     nameInput.focus();
                     return;
                 }
                 // Check for duplicates (skip self)
                 const existing = enumsPanelStructure?.__enums__ || {};
                 if (newName !== oldName && existing[newName]) {
-                    showToast((PreviewConfig.i18n?.enumNameDuplicate || 'Enum "%s" already exists').replace('%s', newName), 'warning');
+                    showToast(QSPanelWords.t('preview.enumNameDuplicate', { name: newName }), 'warning');
                     nameInput.focus();
                     return;
                 }
@@ -10088,9 +10062,9 @@
         const sourceRow = document.createElement('div');
         sourceRow.className = 'preview-enum-card__field';
         sourceRow.append(
-            QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumSource || 'Source key') + ':' }),
+            QSDom.el('label', { class: 'preview-enum-card__label', text: QSPanelWords.t('preview.enumSourceLabel') }),
             QSDom.el('input', { type: 'text', class: 'admin-input admin-input--sm preview-enum-card__source-input', value: source,
-                placeholder: PreviewConfig.i18n.enumSourcePlaceholder })
+                placeholder: QSPanelWords.t('preview.enumSourcePlaceholder') })
         );
         card.appendChild(sourceRow);
         
@@ -10107,11 +10081,11 @@
         // Default value type dropdown (card-level)
         const typeRow = document.createElement('div');
         typeRow.className = 'preview-enum-card__field';
-        const valueLabel = PreviewConfig.i18n?.enumTypeAttributeValue || 'Attribute value';
-        const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
-        const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
+        const valueLabel = QSPanelWords.t('preview.enumTypeAttributeValue');
+        const rawLabel = QSPanelWords.t('preview.variablesTypeRaw');
+        const transLabel = QSPanelWords.t('preview.variablesTypeTranslation');
         typeRow.append(
-            QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumValueType || 'Value type') + ':' }),
+            QSDom.el('label', { class: 'preview-enum-card__label', text: QSPanelWords.t('preview.enumValueTypeLabel') }),
             QSDom.el('select', { class: 'admin-input admin-input--sm preview-enum-card__type-select' }, [
                 _renderOption('value', valueLabel, detectedDefault === 'value'),
                 _renderOption('raw', rawLabel, detectedDefault === 'raw'),
@@ -10124,7 +10098,7 @@
         const defaultRow = document.createElement('div');
         defaultRow.className = 'preview-enum-card__field';
         defaultRow.append(
-            QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumDefault || 'Default') + ':' }),
+            QSDom.el('label', { class: 'preview-enum-card__label', text: QSPanelWords.t('preview.enumDefaultLabel') }),
             QSDom.el('select', { class: 'admin-input admin-input--sm preview-enum-card__default-select' },
                 mapKeys.map(k => _renderOption(k, k, k === defaultKey)))
         );
@@ -10137,9 +10111,9 @@
         const table = document.createElement('table');
         table.className = 'preview-enum-card__table';
         table.appendChild(QSDom.el('thead', {}, [QSDom.el('tr', {}, [
-            QSDom.el('th', { text: PreviewConfig.i18n?.enumKey || 'Key' }),
-            QSDom.el('th', { text: PreviewConfig.i18n?.enumValue || 'Value' }),
-            QSDom.el('th', { text: PreviewConfig.i18n?.enumType || 'Type' }),
+            QSDom.el('th', { text: QSPanelWords.t('preview.enumKey') }),
+            QSDom.el('th', { text: QSPanelWords.t('preview.enumValue') }),
+            QSDom.el('th', { text: QSPanelWords.t('preview.enumType') }),
             QSDom.el('th')
         ])]));
         const tbody = document.createElement('tbody');
@@ -10177,7 +10151,7 @@
         const addOptionBtn = document.createElement('button');
         addOptionBtn.type = 'button';
         addOptionBtn.className = 'admin-btn admin-btn--outline preview-enum-card__add-option';
-        addOptionBtn.append(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.plus, 12), ' ' + (PreviewConfig.i18n?.enumAddOption || 'Add Option'));
+        addOptionBtn.append(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.plus, 12), ' ' + QSPanelWords.t('preview.enumAddOption'));
         addOptionBtn.addEventListener('click', () => {
             const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'raw';
             tbody.appendChild(createEnumMapRow('', '', null, currentCardType));
@@ -10192,11 +10166,11 @@
         const saveBtn = document.createElement('button');
         saveBtn.type = 'button';
         saveBtn.className = 'admin-btn admin-btn--primary';
-        saveBtn.textContent = PreviewConfig.i18n?.save || 'Save';
+        saveBtn.textContent = QSPanelWords.t('common.save');
         saveBtn.addEventListener('click', () => saveEnumCard(card, varName));
         
         actions.appendChild(saveBtn);
-        actions.appendChild(QSControls.bin(PreviewConfig.i18n?.delete || 'Delete', () => deleteEnumCard(varName)));
+        actions.appendChild(QSControls.bin(QSPanelWords.t('common.delete'), () => deleteEnumCard(varName)));
         card.appendChild(actions);
         
         return card;
@@ -10213,15 +10187,15 @@
         const tr = document.createElement('tr');
         tr.className = 'preview-enum-card__row';
         
-        const valueLabel = PreviewConfig.i18n?.enumTypeAttributeValue || 'Attribute value';
-        const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
-        const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
-        const defaultLabel = PreviewConfig.i18n?.enumTypeDefault || '(default)';
+        const valueLabel = QSPanelWords.t('preview.enumTypeAttributeValue');
+        const rawLabel = QSPanelWords.t('preview.variablesTypeRaw');
+        const transLabel = QSPanelWords.t('preview.variablesTypeTranslation');
+        const defaultLabel = QSPanelWords.t('preview.enumTypeDefault');
         
         // Key cell
         const keyTd = document.createElement('td');
         keyTd.appendChild(QSDom.el('input', { type: 'text', class: 'admin-input admin-input--sm preview-enum-card__key-input', value: String(key),
-            placeholder: PreviewConfig.i18n?.enumKeyPlaceholder || 'key' }));
+            placeholder: QSPanelWords.t('preview.enumKeyPlaceholder') }));
         
         // Value cell — contains both a text input and a translation select, one visible at a time
         const valueTd = document.createElement('td');
@@ -10230,13 +10204,13 @@
         valInput.type = 'text';
         valInput.className = 'admin-input admin-input--sm preview-enum-card__value-input';
         valInput.value = String(value);
-        valInput.placeholder = PreviewConfig.i18n?.enumValuePlaceholder || 'value';
+        valInput.placeholder = QSPanelWords.t('preview.enumValuePlaceholder');
         
         const valSelect = document.createElement('select');
         valSelect.className = 'admin-input admin-input--sm preview-enum-card__value-select';
         const emptyOpt = document.createElement('option');
         emptyOpt.value = '';
-        emptyOpt.textContent = '— ' + (PreviewConfig.i18n?.variablesPlaceholderTranslation || 'Select a translation key') + ' —';
+        emptyOpt.textContent = '— ' + QSPanelWords.t('preview.enumSelectTranslationKey') + ' —';
         valSelect.appendChild(emptyOpt);
         enumsPanelTranslationKeys.forEach(k => {
             const opt = document.createElement('option');
@@ -10268,7 +10242,7 @@
         const typeLabel = document.createElement('span');
         typeLabel.className = 'preview-enum-card__type-label';
         typeLabel.textContent = defaultLabel;
-        typeLabel.title = PreviewConfig.i18n?.enumTypeOverrideTip || 'Click to override type';
+        typeLabel.title = QSPanelWords.t('preview.enumTypeOverrideTip');
         
         const typeSelect = document.createElement('select');
         typeSelect.className = 'admin-input admin-input--sm preview-enum-card__row-type-select';
@@ -10312,7 +10286,7 @@
         
         // Remove cell: the row's small × (nothing is written until the card's Save)
         const removeTd = document.createElement('td');
-        removeTd.appendChild(QSControls.removeRow(PreviewConfig.i18n?.remove || 'Remove', () => {
+        removeTd.appendChild(QSControls.removeRow(QSPanelWords.t('common.remove'), () => {
             const card = tr.closest('.preview-enum-card');
             const tbody = tr.closest('tbody');
             tr.remove();
@@ -10387,7 +10361,7 @@
         const defaultVal = defaultSelect?.value || '';
         
         if (!source) {
-            showToast(PreviewConfig.i18n?.enumSourceRequired || 'Source key is required', 'warning');
+            showToast(QSPanelWords.t('preview.enumSourceRequired'), 'warning');
             sourceInput?.focus();
             return;
         }
@@ -10424,7 +10398,7 @@
         });
         
         if (Object.keys(map).length === 0) {
-            showToast(PreviewConfig.i18n?.enumNeedsOptions || 'At least one option is required', 'warning');
+            showToast(QSPanelWords.t('preview.enumNeedsOptions'), 'warning');
             return;
         }
         
@@ -10458,9 +10432,9 @@
                 structure: enumsPanelStructure
             });
             
-            if (!result.ok) throw new Error(result.data?.message || 'Save failed');
+            if (!result.ok) throw new Error(result.data?.message || QSPanelWords.t('common.saveFailed'));
             
-            showToast(PreviewConfig.i18n?.enumSaved || 'Enum saved', 'success');
+            showToast(QSPanelWords.t('preview.enumSaved'), 'success');
             componentsLoaded = false; // Invalidate component cache
             
             // Auto-create CSS stubs for class-bound enum values
@@ -10470,7 +10444,7 @@
             
         } catch (error) {
             console.error('[Preview] Enum save error:', error);
-            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
         } finally {
             card.classList.remove('preview-enum-card--saving');
         }
@@ -10483,9 +10457,9 @@
         if (!enumsPanelStructure) return;
         
         const asked = await QuickSiteUtils.confirm('', {
-            title: (PreviewConfig.i18n?.enumConfirmDelete || 'Delete enum "%s"?').split('%s').join(varName),
+            title: QSPanelWords.t('preview.enumConfirmDelete', { name: varName }),
             type: 'danger',
-            confirmText: PreviewConfig.i18n?.delete || 'Delete'
+            confirmText: QSPanelWords.t('common.delete')
         });
         if (!asked) return;
         
@@ -10505,9 +10479,9 @@
                 structure: enumsPanelStructure
             });
             
-            if (!result.ok) throw new Error(result.data?.message || 'Delete failed');
+            if (!result.ok) throw new Error(result.data?.message || QSPanelWords.t('preview.enumDeleteFailed'));
             
-            showToast(PreviewConfig.i18n?.enumDeleted || 'Enum deleted', 'success');
+            showToast(QSPanelWords.t('preview.enumDeleted'), 'success');
             
             // Refresh the panel
             showEnumsPanel();
@@ -10515,7 +10489,7 @@
             
         } catch (error) {
             console.error('[Preview] Enum delete error:', error);
-            showToast((PreviewConfig.i18n?.error || 'Error') + ': ' + error.message, 'error');
+            showToast(QSPanelWords.t('preview.errorDetail', { error: error.message }), 'error');
         }
     }
     
@@ -10600,8 +10574,7 @@
                 if (vars.routeParams.length === 0 && vars.resolved.length === 0) {
                     if (emulationPanelEmpty) {
                         emulationPanelEmpty.querySelector('span').textContent =
-                            PreviewConfig.i18n?.noVariablesToEmulatePage
-                                || 'No route params or resolved variables on this page';
+                            QSPanelWords.t('preview.noVariablesToEmulatePage');
                         emulationPanelEmpty.style.display = '';
                     }
                     return;
@@ -10670,13 +10643,13 @@
         // ── Component branch (existing flow) ──
         try {
             const structInfo = parseStruct(selectedStruct || ('component-' + currentEditName));
-            if (!structInfo) throw new Error('Invalid struct');
+            if (!structInfo) throw new Error(QSPanelWords.t('preview.invalidStruct'));
             
             const urlParams = [structInfo.type];
             if (structInfo.name) urlParams.push(structInfo.name);
             
             const resp = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, urlParams);
-            if (!resp.ok || !resp.data?.data?.structure) throw new Error('Failed to get structure');
+            if (!resp.ok || !resp.data?.data?.structure) throw new Error(QSPanelWords.t('preview.structureReadFailed'));
             
             const structure = resp.data.data.structure;
             const enums = structure.__enums__ || {};
@@ -10807,7 +10780,7 @@
         const resetBtn = document.createElement('button');
         resetBtn.type = 'button';
         resetBtn.className = 'preview-emulation-field__reset';
-        resetBtn.title = PreviewConfig.i18n?.emulationResetField || 'Reset';
+        resetBtn.title = QSPanelWords.t('preview.emulationResetField');
         resetBtn.appendChild(_renderSizedIcon(ICON_RESET, 12));
         resetBtn.addEventListener('click', () => {
             if (input.tagName === 'SELECT') {
@@ -10862,7 +10835,7 @@
         const resetBtn = document.createElement('button');
         resetBtn.type = 'button';
         resetBtn.className = 'preview-emulation-field__reset';
-        resetBtn.title = PreviewConfig.i18n?.emulationResetField || 'Reset';
+        resetBtn.title = QSPanelWords.t('preview.emulationResetField');
         resetBtn.appendChild(_renderSizedIcon(ICON_RESET, 12));
         resetBtn.addEventListener('click', () => { input.value = ''; });
 
@@ -10914,7 +10887,7 @@
                 localStorage.removeItem(storageKey);
             }
             reloadPreview();
-            showToast(PreviewConfig.i18n?.emulationApplied || 'Emulation applied', 'success');
+            showToast(QSPanelWords.t('preview.emulationApplied'), 'success');
             return;
         }
 
@@ -10941,7 +10914,7 @@
         }
 
         reloadPreview();
-        showToast(PreviewConfig.i18n?.emulationApplied || 'Emulation applied', 'success');
+        showToast(QSPanelWords.t('preview.emulationApplied'), 'success');
     }
 
     /**
@@ -10976,7 +10949,7 @@
         }
 
         reloadPreview();
-        showToast(PreviewConfig.i18n?.emulationReset || 'Emulation reset', 'success');
+        showToast(QSPanelWords.t('preview.emulationResetDone'), 'success');
     }
 
     /**
@@ -11026,8 +10999,8 @@
         _syncLiveBtnState(next, false);
         reloadPreview();
         showToast(next
-            ? (PreviewConfig.i18n?.emulationLiveOn || 'Live data ON — real resolver firing')
-            : (PreviewConfig.i18n?.emulationLiveOff || 'Live data OFF — using emulated values'),
+            ? QSPanelWords.t('preview.emulationLiveOn')
+            : QSPanelWords.t('preview.emulationLiveOff'),
             'success');
     }
 
@@ -11047,8 +11020,8 @@
         const label = emulationLiveBtn.querySelector('[data-emulation-live-label]');
         if (label) {
             label.textContent = useLive
-                ? (PreviewConfig.i18n?.emulationUsingLive || 'Using Live (click for emulated)')
-                : (PreviewConfig.i18n?.emulationUseLive || 'Use Live Data');
+                ? QSPanelWords.t('preview.emulationUsingLive')
+                : QSPanelWords.t('preview.emulationUseLive');
         }
     }
 
@@ -11088,8 +11061,7 @@
             }
             
             if (created.length > 0) {
-                const msg = (PreviewConfig.i18n?.enumCssStubsCreated || 'CSS stubs created: %s')
-                    .replace('%s', created.join(', '));
+                const msg = QSPanelWords.t('preview.enumCssStubsCreated', { list: created.join(', ') });
                 showToast(msg, 'success');
             }
         } catch (e) {
@@ -11245,7 +11217,7 @@
     // Submit save snippet form
     async function submitSaveSnippet() {
         if (!saveSnippetStructureData) {
-            showToast(PreviewConfig.i18n.noStructureData || 'No structure data available', 'error');
+            showToast(QSPanelWords.t('preview.noStructureData'), 'error');
             return;
         }
         
@@ -11256,25 +11228,25 @@
         const description = saveSnippetDesc?.value?.trim() || '';
         
         if (!name) {
-            showToast(PreviewConfig.i18n.snippetNameRequired || 'Snippet name is required', 'warning');
+            showToast(QSPanelWords.t('preview.snippetNameRequired'), 'warning');
             saveSnippetName?.focus();
             return;
         }
         
         if (!id) {
-            showToast(PreviewConfig.i18n.snippetIdRequired || 'Snippet ID is required', 'warning');
+            showToast(QSPanelWords.t('preview.snippetIdRequired'), 'warning');
             saveSnippetId?.focus();
             return;
         }
         
         // Validate ID format
         if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(id)) {
-            showToast(PreviewConfig.i18n.snippetIdInvalid || 'ID must start with a letter and contain only letters, numbers, dashes', 'warning');
+            showToast(QSPanelWords.t('preview.snippetIdInvalid'), 'warning');
             saveSnippetId?.focus();
             return;
         }
         
-        showToast(PreviewConfig.i18n.saving || 'Saving...', 'info');
+        showToast(QSPanelWords.t('common.saving'), 'info');
         
         try {
             // Clone structure and remap textKeys to snippet namespace
@@ -11302,7 +11274,7 @@
             const response = await QuickSiteAdmin.apiRequest('createSnippet', 'POST', requestData);
             
             if (response.ok) {
-                showToast(PreviewConfig.i18n.snippetSaved || 'Snippet saved successfully!', 'success');
+                showToast(QSPanelWords.t('preview.snippetSaved'), 'success');
                 
                 // Close form
                 hideSaveSnippetForm();
@@ -11310,11 +11282,11 @@
                 // Invalidate snippet cache so next tab switch reloads
                 snippetsLoaded = false;
             } else {
-                throw new Error(response.data?.message || 'Failed to save snippet');
+                throw new Error(response.data?.message || QSPanelWords.t('preview.snippetSaveFailed'));
             }
         } catch (error) {
             console.error('[Preview] Save snippet error:', error);
-            showToast(error.message || PreviewConfig.i18n.saveFailed || 'Failed to save snippet', 'error');
+            showToast(error.message || QSPanelWords.t('common.saveFailed'), 'error');
         }
     }
     
@@ -11376,7 +11348,7 @@
 
     /** The simple Add added its element: as the HTML Tag tab's add ends (the toast, the form closed, the element shown). */
     function _finishSimpleAdd(r) {
-        showToast(PreviewConfig.i18n.nodeAdded || 'Element added', 'success');
+        showToast(QSPanelWords.t('preview.nodeAdded'), 'success');
         hideSidebarAddForm();
         const t = r.target || {};
         if (r.command === 'addNode' && r.data && r.data.html && t.node) {
@@ -11467,16 +11439,15 @@
     (window.QuickSitePanelModeGuards = window.QuickSitePanelModeGuards || []).push(function (toMode) {
         const loss = _modeSwitchLoss(toMode);
         if (!loss) return true;
-        const words = PreviewConfig.i18n.modeSwitch || {};
-        const modeName = toMode === 'simple' ? (words.simple || 'Simple') : (words.advanced || 'Advanced');
+        const modeName = QSPanelWords.t(toMode === 'simple' ? 'nav.modeSimple' : 'nav.modeAdvanced');
         const message = loss.addForm
-            ? (words.redraws || 'Switching to {mode} starts the Add form again. Anything typed in it will be lost.')
-            : (words.closes || 'Switching to {mode} closes {tool}. Anything not saved there will be lost.').split('{tool}').join(loss.tool);
-        return QuickSiteUtils.confirm(message.split('{mode}').join(modeName), {
-            title: words.title || 'Switch mode?',
+            ? QSPanelWords.t('preview.modeSwitch.redraws', { mode: modeName })
+            : QSPanelWords.t('preview.modeSwitch.closes', { mode: modeName, tool: loss.tool });
+        return QuickSiteUtils.confirm(message, {
+            title: QSPanelWords.t('preview.modeSwitch.title'),
             type: 'warning',
-            confirmText: words.switch || 'Switch',
-            cancelText: words.stay || 'Stay'
+            confirmText: QSPanelWords.t('preview.modeSwitch.switch'),
+            cancelText: QSPanelWords.t('preview.modeSwitch.stay')
         });
     });
 

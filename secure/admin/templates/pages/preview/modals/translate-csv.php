@@ -14,7 +14,7 @@
     <div class="preview-translate-csv-modal__content">
         <div class="preview-translate-csv-modal__header">
             <h3>
-                <?= __admin('preview.translateCsvTitle', 'Translate from CSV') ?>
+                <?= adminEscape(__admin('preview.translateCsvTitle')) ?>
                 <code id="translate-csv-structure-id" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
             </h3>
             <button type="button" class="admin-modal__close" id="translate-csv-modal-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
@@ -22,23 +22,23 @@
 
         <div class="preview-translate-csv-modal__body">
             <p class="admin-hint" style="margin-top: 0;">
-                <?= __admin('preview.translateCsvHint', 'Paste a TSV / CSV in the target language. The grid must match the existing table\'s dimensions exactly — the backend refuses partial writes. No structural change is made; only translation values are written.') ?>
+                <?= adminEscape(__admin('preview.translateCsvHint')) ?>
             </p>
 
             <div class="admin-form-group">
                 <label class="admin-label" for="translate-csv-lang">
-                    <?= __admin('preview.translateCsvWriteToLang', 'Write values to language') ?>
+                    <?= adminEscape(__admin('preview.translateCsvWriteToLang')) ?>
                     <span>*</span>
                 </label>
                 <select class="admin-input" id="translate-csv-lang" style="max-width: 200px;">
-                    <option value="">(loading…)</option>
+                    <option value=""><?= adminEscape(__admin('preview.translateCsvLoading')) ?></option>
                 </select>
             </div>
 
             <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="translate-csv-has-head" checked>
-                    <span><?= __admin('preview.translateCsvIncludeHeader', 'Include header row (first pasted line becomes <thead>)') ?></span>
+                    <span><?= adminEscape(__admin('preview.translateCsvIncludeHeader')) ?></span>
                 </label>
             </div>
 
@@ -48,10 +48,10 @@
 
             <div class="admin-form-group">
                 <label class="admin-label" for="translate-csv-paste">
-                    <?= __admin('preview.translateCsvPaste', 'Paste TSV / CSV') ?>
+                    <?= adminEscape(__admin('preview.translateCsvPaste')) ?>
                     <span>*</span>
                 </label>
-                <textarea class="admin-input" id="translate-csv-paste" rows="8" placeholder="<?= __admin('preview.translateCsvPlaceholder', 'Paste TSV (copy from Excel / Sheets) or CSV…') ?>"></textarea>
+                <textarea class="admin-input" id="translate-csv-paste" rows="8" placeholder="<?= adminAttr(__admin('preview.translateCsvPlaceholder')) ?>"></textarea>
             </div>
 
             <p class="admin-hint" id="translate-csv-status" style="margin: 0; min-height: 1.2em;"></p>
@@ -59,10 +59,10 @@
 
         <div class="preview-translate-csv-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" id="translate-csv-cancel">
-                <?= __admin('common.cancel', 'Cancel') ?>
+                <?= adminEscape(__admin('common.cancel')) ?>
             </button>
             <button type="button" class="admin-btn admin-btn--primary" id="translate-csv-apply">
-                <?= __admin('preview.translateCsvApply', 'Apply') ?>
+                <?= adminEscape(__admin('preview.translateCsvApply')) ?>
             </button>
         </div>
     </div>

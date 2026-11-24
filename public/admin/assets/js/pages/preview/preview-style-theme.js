@@ -12,7 +12,7 @@
  * - Color picker integration
  * 
  * Dependencies:
- * - PreviewConfig (configuration and i18n)
+ * - QSPanelWords (the panel's words)
  * - PreviewState (for iframe access and showToast)
  * - QSColorPicker (optional, for color inputs)
  */
@@ -42,14 +42,6 @@
     let _loadAbortCtrl = null;          // AbortController for in-flight loadThemeVariables calls
     
     // ==================== Configuration ====================
-    
-    function getConfig() {
-        return window.PreviewConfig || {};
-    }
-    
-    function getI18n() {
-        return getConfig().i18n || {};
-    }
     
     function getIframe() {
         return window.PreviewState?.getIframe?.() || document.getElementById('preview-iframe');
@@ -157,8 +149,6 @@
         _loadAbortCtrl = new AbortController();
         const { signal } = _loadAbortCtrl;
 
-        const i18n = getI18n();
-        
         themeLoading.style.display = '';
         themeContent.style.display = 'none';
         if (themeSaveBtn) themeSaveBtn.disabled = true;
@@ -205,7 +195,7 @@
             themeLoading.replaceChildren(
                 _renderLoadErrorIcon(),
                 ' ',
-                QSDom.el('span', { style: 'color: #ef4444;', text: i18n.themeLoadError || 'Failed to load theme' })
+                QSDom.el('span', { style: 'color: #ef4444;', text: QSPanelWords.t('preview.themeLoadError') })
             );
             if (themeSaveBtn) themeSaveBtn.disabled = true;
             if (themeResetBtn) themeResetBtn.disabled = true;
@@ -338,10 +328,8 @@
         if (!container) return;
         container.replaceChildren();
 
-        const i18n = getI18n();
-
         if (variables.length === 0) {
-            container.replaceChildren(_renderEmptyNote(i18n.noColorVariables || 'No color variables'));
+            container.replaceChildren(_renderEmptyNote(QSPanelWords.t('preview.noColorVariables')));
             return;
         }
 
@@ -398,13 +386,11 @@
     }
     
     function renderFontInputs(container, variables) {
-        const i18n = getI18n();
-        renderTextInputs(container, variables, i18n.noFontVariables || 'No font variables');
+        renderTextInputs(container, variables, QSPanelWords.t('preview.noFontVariables'));
     }
     
     function renderSpacingInputs(container, variables) {
-        const i18n = getI18n();
-        renderTextInputs(container, variables, i18n.noSpacingVariables || 'No spacing variables', i18n.themeSpacingPlaceholder);
+        renderTextInputs(container, variables, QSPanelWords.t('preview.noSpacingVariables'), QSPanelWords.t('preview.themeSpacingPlaceholder'));
     }
     
     function renderOtherInputs(container, variables) {
@@ -461,17 +447,15 @@
     async function saveThemeVariables() {
         if (!themeSaveBtn) return;
         if (!themeVariablesLoaded) {
-            showToast(getI18n().themeLoadError || 'Theme data is still loading', 'warning');
+            showToast(QSPanelWords.t('preview.themeStillLoading'), 'warning');
             return;
         }
         
-        const i18n = getI18n();
-
         // Disable button and show loading. The button's own nodes are kept and
         // put back afterwards.
         themeSaveBtn.disabled = true;
         const originalContent = Array.from(themeSaveBtn.childNodes);
-        themeSaveBtn.replaceChildren(renderSavingSpinner(), document.createTextNode(' ' + (i18n.saving || 'Saving...')));
+        themeSaveBtn.replaceChildren(renderSavingSpinner(), document.createTextNode(' ' + QSPanelWords.t('common.saving')));
 
         try {
             const changedVariables = Object.fromEntries(
@@ -479,7 +463,7 @@
             );
 
             if (Object.keys(changedVariables).length === 0) {
-                showToast(i18n.noChanges || 'No changes to save', 'info');
+                showToast(QSPanelWords.t('preview.noChanges'), 'info');
                 return;
             }
 
@@ -500,7 +484,7 @@
                 currentThemeVariables = { ...originalThemeVariables };
                 
                 // Show success toast
-                showToast(i18n.themeSaved || 'Theme saved', 'success');
+                showToast(QSPanelWords.t('preview.themeSaved'), 'success');
                 
                 // Hot-reload CSS without full page reload
                 hotReloadCss();
@@ -509,7 +493,7 @@
             }
         } catch (error) {
             console.error('[PreviewStyleTheme] Error saving theme variables:', error);
-            showToast(i18n.themeSaveError || 'Failed to save theme', 'error');
+            showToast(QSPanelWords.t('preview.themeSaveError'), 'error');
         } finally {
             // Restore button
             themeSaveBtn.disabled = false;
@@ -541,8 +525,6 @@
      * Reset theme variables to original values
      */
     function resetThemeVariables() {
-        const i18n = getI18n();
-        
         currentThemeVariables = { ...originalThemeVariables };
         
         // Update all inputs
@@ -571,7 +553,7 @@
             console.warn('[PreviewStyleTheme] Could not reset iframe preview:', e);
         }
         
-        showToast(i18n.themeReset || 'Theme reset', 'info');
+        showToast(QSPanelWords.t('preview.themeReset'), 'info');
     }
     
     // ==================== Scope Switcher ====================
@@ -720,8 +702,6 @@
 
     if (themeConfigSaveBtn) {
         themeConfigSaveBtn.addEventListener('click', async function() {
-            const i18n = getI18n();
-
             const body = {};
             if (themeConfigEnabled  !== null) body.enabled    = themeConfigEnabled.checked;
             if (themeConfigDefault  !== null) body.default    = themeConfigDefault.value;
@@ -746,12 +726,12 @@
                     // Force a preview refresh so controls appear/disappear without full tab reload.
                     reloadPreview();
 
-                    showToast(i18n.themeConfigSaved || 'Theme settings saved', 'success');
+                    showToast(QSPanelWords.t('preview.themeConfigSaved'), 'success');
                 } else {
                     throw new Error(data.message || 'Failed to save');
                 }
             } catch (err) {
-                showToast(i18n.themeSaveError || 'Failed to save theme settings', 'error');
+                showToast(QSPanelWords.t('preview.themeConfigSaveError'), 'error');
                 console.error('[PreviewStyleTheme] setThemeMode error:', err);
             } finally {
                 themeConfigSaveBtn.disabled = false;
@@ -833,10 +813,9 @@
 
     function updateScopeBanner(banner) {
         if (!banner) return;
-        const i18n = getI18n();
         banner.textContent = currentScope === 'dark'
-            ? (i18n.themeAddVariableTargetDark  || 'Adding to: Dark scope')
-            : (i18n.themeAddVariableTargetLight || 'Adding to: Light scope');
+            ? QSPanelWords.t('preview.themeAddVariableTargetDark')
+            : QSPanelWords.t('preview.themeAddVariableTargetLight');
     }
 
     function refreshAllScopeBanners() {
@@ -856,17 +835,16 @@
     }
 
     async function submitThemeAddVariable(container, nameInput, valueInput, alsoOtherCb, submitBtn, closeForm) {
-        const i18n = getI18n();
         let name = (nameInput.value || '').trim();
         const value = (valueInput.value || '').trim();
 
         if (!name || name === '--') {
-            showToast(i18n.themeAddVariableNameRequired || 'Variable name is required', 'warning');
+            showToast(QSPanelWords.t('preview.themeAddVariableNameRequired'), 'warning');
             nameInput.focus();
             return;
         }
         if (!value) {
-            showToast(i18n.themeAddVariableValueRequired || 'Value is required', 'warning');
+            showToast(QSPanelWords.t('preview.themeAddVariableValueRequired'), 'warning');
             valueInput.focus();
             return;
         }
@@ -874,8 +852,7 @@
 
         if (Object.prototype.hasOwnProperty.call(originalThemeVariables, name)
             || Object.prototype.hasOwnProperty.call(currentThemeVariables, name)) {
-            const msg = (i18n.themeAddVariableNameExists || 'Variable {name} already exists').replace('{name}', name);
-            showToast(msg, 'warning');
+            showToast(QSPanelWords.t('preview.themeAddVariableNameExists', { name: name }), 'warning');
             nameInput.focus();
             return;
         }
@@ -900,15 +877,13 @@
             // grid divs that get cleared, so they stay intact.
             populateThemeEditor(originalThemeVariables);
 
-            const tpl = alsoOther
-                ? (i18n.themeAddVariableAddedBoth || 'Variable {name} added to both scopes')
-                : (i18n.themeAddVariableAdded     || 'Variable {name} added');
-            showToast(tpl.replace('{name}', name), 'success');
+            showToast(alsoOther
+                ? QSPanelWords.t('preview.themeAddVariableAddedBoth', { name: name })
+                : QSPanelWords.t('preview.themeAddVariableAdded', { name: name }), 'success');
             hotReloadCss();
             closeForm();
         } catch (err) {
-            const tpl = i18n.themeAddVariableAddError || 'Failed to add variable: {error}';
-            showToast(tpl.replace('{error}', (err && err.message) || ''), 'error');
+            showToast(QSPanelWords.t('preview.themeAddVariableAddError', { error: (err && err.message) || '' }), 'error');
         } finally {
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -920,7 +895,7 @@
 
         const result = await QuickSiteAdmin.apiRequest('setRootVariables', 'POST', body);
         if (!result.ok) {
-            throw new Error((result.data && (result.data.message || result.data.error)) || getI18n().saveFailed);
+            throw new Error((result.data && (result.data.message || result.data.error)) || QSPanelWords.t('common.saveFailed'));
         }
         return result.data;
     }

@@ -167,11 +167,6 @@ window.PreviewSimpleAdd = (function () {
 
     function $(id) { return document.getElementById(id); }
 
-    function word(key, fallback) {
-        const words = (window.PreviewConfig && PreviewConfig.i18n && PreviewConfig.i18n.simpleAdd) || {};
-        return typeof words[key] === 'string' ? words[key] : fallback;
-    }
-
     /**
      * Wire the form. `context` comes from preview.js:
      *   target()          {struct, node, frameNode}: the selection the Add form acts on
@@ -222,7 +217,7 @@ window.PreviewSimpleAdd = (function () {
         input.className = 'admin-input';
         input.autocomplete = 'off';
         input.setAttribute('data-simple-add-list-item', '');
-        const remove = QSControls.removeRow(word('listRemove', 'Remove this item'), null, { className: 'preview-simple-add__list-remove' });
+        const remove = QSControls.removeRow(QSPanelWords.t('preview.simpleAdd.listRemove'), null, { className: 'preview-simple-add__list-remove' });
         const row = document.createElement('div');
         row.className = 'preview-simple-add__list-row';
         row.append(input, remove);
@@ -235,7 +230,7 @@ window.PreviewSimpleAdd = (function () {
         rows.forEach((row, i) => {
             const input = row.querySelector('input');
             input.id = 'simple-add-list-' + (i + 1);
-            input.placeholder = word('listItem', 'Item {n}').split('{n}').join(String(i + 1));
+            input.placeholder = QSPanelWords.t('preview.simpleAdd.listItem', { n: QSPanelWords.number(i + 1) });
             row.querySelector('.preview-simple-add__list-remove').style.display = rows.length > 1 ? '' : 'none';
         });
     }
@@ -412,19 +407,19 @@ window.PreviewSimpleAdd = (function () {
     function missing(v) {
         if (['text', 'title', 'button', 'link'].indexOf(current) !== -1 && v.text === '') {
             const id = { text: 'simple-add-text', title: 'simple-add-title-text', button: 'simple-add-button-text', link: 'simple-add-link-text' }[current];
-            return [word('textRequired', 'Type the text first.'), id];
+            return [QSPanelWords.t('preview.simpleAdd.textRequired'), id];
         }
         if (current === 'link') {
             if (v.href === '') {
-                return v.outside ? [word('urlRequired', 'Type the address.'), 'simple-add-link-url']
-                    : [word('pageRequired', 'Choose a page, or an outside address.'), 'simple-add-link-page'];
+                return v.outside ? [QSPanelWords.t('preview.simpleAdd.urlRequired'), 'simple-add-link-url']
+                    : [QSPanelWords.t('preview.simpleAdd.pageRequired'), 'simple-add-link-page'];
             }
             if (v.outside && !OUTSIDE_SCHEMES.some(s => v.href.toLowerCase().indexOf(s) === 0)) {
-                return [word('urlInvalid', 'Type the full address, starting with https://'), 'simple-add-link-url'];
+                return [QSPanelWords.t('preview.simpleAdd.urlInvalid'), 'simple-add-link-url'];
             }
         }
         if (MEDIA_CATEGORY[current] && v.file === '') {
-            return [word('fileRequired', 'Choose a file first.'), 'simple-add-file-choose'];
+            return [QSPanelWords.t('preview.simpleAdd.fileRequired'), 'simple-add-file-choose'];
         }
         return null;
     }
@@ -453,7 +448,7 @@ window.PreviewSimpleAdd = (function () {
     async function existingKeys() {
         const list = await QSSiteWords.read({ fresh: true });
         if (!list || QSSiteWords.readFailed()) {
-            throw new Error(word('keysFailed', 'The text could not be saved, so nothing was added.'));
+            throw new Error(QSPanelWords.t('preview.simpleAdd.keysFailed'));
         }
         return QSSiteWords.keys(list);
     }
@@ -464,7 +459,7 @@ window.PreviewSimpleAdd = (function () {
         texts.forEach(t => { words[t.key] = t.value; });
         const done = await QSSiteWords.write(edited, words);
         if (!done.ok) {
-            throw new Error(done.message || word('keysFailed', 'The text could not be saved, so nothing was added.'));
+            throw new Error(done.message || QSPanelWords.t('preview.simpleAdd.keysFailed'));
         }
         return done.language;
     }
@@ -489,7 +484,7 @@ window.PreviewSimpleAdd = (function () {
         }
         const t = ctx.target();
         const info = ctx.structInfo();
-        if (!info || !info.type) throw new Error('Invalid structure type');
+        if (!info || !info.type) throw new Error(QSPanelWords.t('preview.invalidStructureType'));
         const isRoot = !t.node && t.node !== 0;
         const position = isRoot ? 'inside' : ctx.position();
         const env = { inForm: current === 'button' && landsInForm() };
@@ -517,7 +512,7 @@ window.PreviewSimpleAdd = (function () {
         const res = await QuickSiteAdmin.apiRequest(p.command, 'POST', body);
         if (!res || !res.ok) {
             if (written) await deleteKeys(p.texts.map(x => x.key), written);
-            throw new Error(res?.data?.message || word('addFailed', 'The element could not be added.'));
+            throw new Error(res?.data?.message || QSPanelWords.t('preview.simpleAdd.addFailed'));
         }
         ctx.finish({ command: p.command, data: (res.data && res.data.data) || {}, position: position, target: t });
         return true;

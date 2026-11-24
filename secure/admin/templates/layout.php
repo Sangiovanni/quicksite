@@ -186,6 +186,10 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-srcset-field.css') ?>">
     <!-- The three views: every media query of the panel. Stays the last stylesheet. -->
     <link rel="stylesheet" href="<?= $versionedAsset('/css/responsive.css') ?>">
+    <!-- The panel's words (QSPanelWords): the one way a script reads a panel word, first of every script. The sections
+         every page shares are handed here; a page hands its own in its template, before its scripts (__adminWords). -->
+    <script src="<?= $versionedAsset('/js/core/panel-words.js') ?>"></script>
+    <?= __adminWords(['common', 'nav']) ?>
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
     <!-- Shared DOM factory — must load before any page script that references QSDom -->

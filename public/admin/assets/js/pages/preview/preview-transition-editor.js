@@ -14,7 +14,7 @@
  * and managing base/trigger state styles with animations.
  *
  * Dependencies:
- * - PreviewConfig (for i18n and URLs)
+ * - QSPanelWords (the panel's words)
  * - QSPropertySelector, QSValueInput (property selection components)
  * - QSColorPicker (color picker)
  */
@@ -66,7 +66,6 @@ window.PreviewTransitionEditor = (function() {
     let transitionCubicBezier = null;
     let transitionPreviewCode = null;
     let transitionTriggerLabel = null;
-    let transitionAddHoverText = null;
 
     // Inline property editor DOM references
     let transitionBaseAddToggle = null;
@@ -140,7 +139,6 @@ window.PreviewTransitionEditor = (function() {
         transitionCubicBezier = document.getElementById('transition-cubic-bezier');
         transitionPreviewCode = document.getElementById('transition-preview-code');
         transitionTriggerLabel = document.getElementById('transition-trigger-label');
-        transitionAddHoverText = document.getElementById('transition-add-hover-text');
 
         // Inline property editor
         transitionBaseAddToggle = document.getElementById('transition-base-add-toggle');
@@ -302,7 +300,7 @@ window.PreviewTransitionEditor = (function() {
 
         } catch (error) {
             console.error('Failed to load selector states:', error);
-            showToast(PreviewConfig.i18n.loadTransitionFailed || 'Failed to load transition data', 'error');
+            showToast(QSPanelWords.t('preview.loadTransitionFailed'), 'error');
         }
     }
 
@@ -368,7 +366,7 @@ window.PreviewTransitionEditor = (function() {
 
         if (target === 'trigger' && transitionTriggerAnimHint) {
             const pseudo = transitionEditorCurrentPseudo || ':hover';
-            transitionTriggerAnimHint.textContent = `(${PreviewConfig.i18n.playsOn || 'plays on'} ${pseudo})`;
+            transitionTriggerAnimHint.textContent = QSPanelWords.t('preview.playsOnTriggerNamed', { state: pseudo });
         }
     }
 
@@ -618,7 +616,7 @@ window.PreviewTransitionEditor = (function() {
      * tooltip too) and its bin, which asks before it removes the property (deleteTransitionProperty).
      */
     function _renderPropertyRow(prop, value, target) {
-        const label = (PreviewConfig.i18n.removeNamed || 'Remove “{name}”').replace('{name}', () => prop);
+        const label = QSPanelWords.t('preview.removeNamed', { name: prop });
         return QSDom.el('div', { class: 'transition-editor__property', 'data-property': prop, 'data-target': target }, [
             QSDom.el('div', { class: 'transition-editor__property-info' }, [
                 QSDom.el('span', { class: 'transition-editor__property-name', text: prop }),
@@ -654,7 +652,7 @@ window.PreviewTransitionEditor = (function() {
             .filter(([key]) => key !== 'transition' && key !== 'animation');
 
         if (props.length === 0) {
-            transitionBasePropsEl.replaceChildren(_renderEmptyNote(PreviewConfig.i18n.noBaseStyles || 'No base styles defined'));
+            transitionBasePropsEl.replaceChildren(_renderEmptyNote(QSPanelWords.t('preview.noBaseStyles')));
             return;
         }
 
@@ -670,7 +668,7 @@ window.PreviewTransitionEditor = (function() {
         const props = Object.entries(transitionEditorHoverProperties);
 
         if (props.length === 0) {
-            transitionHoverPropsEl.replaceChildren(_renderEmptyNote(PreviewConfig.i18n.noTriggerStyles || 'No trigger state styles'));
+            transitionHoverPropsEl.replaceChildren(_renderEmptyNote(QSPanelWords.t('preview.noTriggerStyles')));
             return;
         }
 
@@ -686,14 +684,12 @@ window.PreviewTransitionEditor = (function() {
         const selector = target === 'base'
             ? transitionEditorSelector
             : transitionEditorSelector + transitionEditorCurrentPseudo;
-        const i18n = PreviewConfig.i18n;
-        const failed = i18n.deletePropertyFailed || 'Failed to delete property';
+        const failed = QSPanelWords.t('preview.deletePropertyFailed');
 
         await QuickSiteUtils.confirm('', {
-            title: (i18n.transitionRemovePropertyTitle || 'Remove “{property}” from {selector}?')
-                .replace('{property}', () => property).replace('{selector}', () => selector),
+            title: QSPanelWords.t('preview.transitionRemovePropertyTitle', { property: property, selector: selector }),
             type: 'danger',
-            confirmText: i18n.remove || 'Remove',
+            confirmText: QSPanelWords.t('common.remove'),
             // The last property of a state gone, the focus goes to that state's Add Property
             returnFocus: () => (target === 'base' ? transitionBaseAddToggle : transitionTriggerAddToggle),
             action: async () => {
@@ -710,7 +706,7 @@ window.PreviewTransitionEditor = (function() {
                     console.error('Failed to delete property:', error);
                     return { ok: false, message: failed };
                 }
-                showToast(i18n.propertyDeleted || 'Property deleted', 'success');
+                showToast(QSPanelWords.t('preview.propertyDeleted'), 'success');
                 await loadTransitionSelectorStates(transitionEditorSelector);
                 refreshPreviewFrame();
                 return true;
@@ -739,7 +735,7 @@ window.PreviewTransitionEditor = (function() {
             const result = response.data || {};
 
             if (result.status === 200) {
-                showToast(PreviewConfig.i18n.propertyAdded || 'Property added', 'success');
+                showToast(QSPanelWords.t('preview.propertyAdded'), 'success');
                 await loadTransitionSelectorStates(transitionEditorSelector);
                 refreshPreviewFrame();
                 return true;
@@ -748,7 +744,7 @@ window.PreviewTransitionEditor = (function() {
             }
         } catch (error) {
             console.error('Failed to add property:', error);
-            showToast(PreviewConfig.i18n.addPropertyFailed || 'Failed to add property', 'error');
+            showToast(QSPanelWords.t('preview.addPropertyFailed'), 'error');
             return false;
         }
     }
@@ -964,17 +960,17 @@ window.PreviewTransitionEditor = (function() {
                         kfList = Object.keys(kfObj).map(name => ({ name }));
                     }
                     if (kfList.length === 0) {
-                        showToast(PreviewConfig.i18n.noKeyframesFound || 'No keyframes found', 'warning');
+                        showToast(QSPanelWords.t('preview.noKeyframesFound'), 'warning');
                     } else {
                         showAnimationPickerDropdown(target, kfList);
                     }
                 } else {
-                    showToast(PreviewConfig.i18n.noKeyframesFound || 'No keyframes found', 'warning');
+                    showToast(QSPanelWords.t('preview.noKeyframesFound'), 'warning');
                 }
             })
             .catch((err) => {
                 console.error('[QuickSite] Error loading keyframes:', err);
-                showToast(PreviewConfig.i18n.errorLoadingKeyframes || 'Error loading keyframes', 'error');
+                showToast(QSPanelWords.t('preview.errorLoadingKeyframes'), 'error');
             });
         } else {
             showAnimationPickerDropdown(target, keyframesData);
@@ -986,7 +982,7 @@ window.PreviewTransitionEditor = (function() {
      */
     function showAnimationPickerDropdown(target, keyframesData) {
         if (!keyframesData || keyframesData.length === 0) {
-            showToast(PreviewConfig.i18n.noKeyframesFound || 'No keyframes found', 'warning');
+            showToast(QSPanelWords.t('preview.noKeyframesFound'), 'warning');
             return;
         }
 
@@ -1059,7 +1055,7 @@ window.PreviewTransitionEditor = (function() {
 
             const result = response.data || {};
             if (result.status === 200) {
-                showToast(PreviewConfig.i18n.animationAdded || 'Animation added', 'success');
+                showToast(QSPanelWords.t('preview.animationAdded'), 'success');
 
                 if (target === 'base') {
                     transitionEditorBaseAnimation = { name: keyframeName, duration: 1000, iterations: 1, infinite: false };
@@ -1072,11 +1068,11 @@ window.PreviewTransitionEditor = (function() {
                 renderAnimationSection(target);
                 refreshPreviewFrame();
             } else {
-                showToast(result.message || PreviewConfig.i18n.errorAddingAnimation || 'Error adding animation', 'error');
+                showToast(result.message || QSPanelWords.t('preview.errorAddingAnimation'), 'error');
             }
         } catch (error) {
             console.error('Failed to add animation:', error);
-            showToast(PreviewConfig.i18n.errorAddingAnimation || 'Error adding animation', 'error');
+            showToast(QSPanelWords.t('preview.errorAddingAnimation'), 'error');
         }
     }
 
@@ -1090,14 +1086,12 @@ window.PreviewTransitionEditor = (function() {
         if (!animation) return;
         const selector = target === 'base' ? transitionEditorSelector :
             `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
-        const i18n = PreviewConfig.i18n;
-        const failed = i18n.errorRemovingAnimation || 'Error removing animation';
+        const failed = QSPanelWords.t('preview.errorRemovingAnimation');
 
         await QuickSiteUtils.confirm('', {
-            title: (i18n.transitionRemoveAnimationTitle || 'Remove the animation “{name}” from {selector}?')
-                .replace('{name}', () => animation.name).replace('{selector}', () => selector),
+            title: QSPanelWords.t('preview.transitionRemoveAnimationTitle', { name: animation.name, selector: selector }),
             type: 'danger',
-            confirmText: i18n.remove || 'Remove',
+            confirmText: QSPanelWords.t('common.remove'),
             // The bin goes with the animation: the focus goes to the state's Add Animation, shown in its place
             returnFocus: () => (target === 'base' ? transitionBaseAnimAddBtn : transitionTriggerAnimAddBtn),
             action: async () => {
@@ -1114,7 +1108,7 @@ window.PreviewTransitionEditor = (function() {
                     console.error('Failed to remove animation:', error);
                     return { ok: false, message: failed };
                 }
-                showToast(i18n.animationRemoved || 'Animation removed', 'success');
+                showToast(QSPanelWords.t('preview.animationRemoved'), 'success');
                 if (target === 'base') {
                     transitionEditorBaseAnimation = null;
                     delete transitionEditorBaseProperties.animation;
@@ -1135,7 +1129,7 @@ window.PreviewTransitionEditor = (function() {
     async function previewAnimation(target) {
         const animation = target === 'base' ? transitionEditorBaseAnimation : transitionEditorTriggerAnimation;
         if (!animation || !animation.name) {
-            showToast(PreviewConfig.i18n.noAnimationToPreview || 'No animation to preview', 'warning');
+            showToast(QSPanelWords.t('preview.noAnimationToPreview'), 'warning');
             return;
         }
 
@@ -1150,14 +1144,14 @@ window.PreviewTransitionEditor = (function() {
         const keyframesData = getKeyframesData();
         const keyframe = keyframesData?.find(kf => kf.name === animation.name);
         if (!keyframe) {
-            showToast(PreviewConfig.i18n.keyframeNotFound || 'Keyframe not found', 'error');
+            showToast(QSPanelWords.t('preview.keyframeNotFound'), 'error');
             return;
         }
 
         if (typeof openAnimationPreviewModal === 'function') {
             openAnimationPreviewModal(keyframe.name);
         } else {
-            showToast(PreviewConfig.i18n.previewNotAvailable || 'Preview not available', 'warning');
+            showToast(QSPanelWords.t('preview.previewNotAvailable'), 'warning');
         }
     }
 
@@ -1232,15 +1226,9 @@ window.PreviewTransitionEditor = (function() {
      */
     function updateTriggerStateLabels() {
         const pseudo = transitionEditorCurrentPseudo || ':hover';
-        const pseudoName = pseudo.replace(':', '');
-        const pseudoCapitalized = pseudoName.charAt(0).toUpperCase() + pseudoName.slice(1);
 
         if (transitionTriggerLabel) {
-            transitionTriggerLabel.textContent = `${pseudo} ${PreviewConfig.i18n.state || 'State'}`;
-        }
-
-        if (transitionAddHoverText) {
-            transitionAddHoverText.textContent = `${PreviewConfig.i18n.addStyle || 'Add'} ${pseudo} ${PreviewConfig.i18n.style || 'style'}`;
+            transitionTriggerLabel.textContent = QSPanelWords.t('preview.triggerStateNamed', { state: pseudo });
         }
     }
 
@@ -1295,7 +1283,7 @@ window.PreviewTransitionEditor = (function() {
             const result = response.data || {};
 
             if (result.status === 200) {
-                showToast(PreviewConfig.i18n.transitionSaved || 'Transition saved', 'success');
+                showToast(QSPanelWords.t('preview.transitionSaved'), 'success');
 
                 refreshPreviewFrame();
 
@@ -1310,7 +1298,7 @@ window.PreviewTransitionEditor = (function() {
 
         } catch (error) {
             console.error('Failed to save transition:', error);
-            showToast(PreviewConfig.i18n.saveTransitionFailed || 'Failed to save transition', 'error');
+            showToast(QSPanelWords.t('preview.saveTransitionFailed'), 'error');
         }
     }
 
@@ -1324,7 +1312,7 @@ window.PreviewTransitionEditor = (function() {
         try {
             const elements = iframe.contentDocument.querySelectorAll(transitionEditorSelector);
             if (elements.length === 0) {
-                showToast(PreviewConfig.i18n.noElementsFound || 'No elements found', 'warning');
+                showToast(QSPanelWords.t('preview.noElementsFound'), 'warning');
                 return;
             }
 
@@ -1373,7 +1361,7 @@ window.PreviewTransitionEditor = (function() {
                 }, HOVER_SETTLE_MS);
             }, HOVER_HOLD_MS);
 
-            showToast(PreviewConfig.i18n.previewingHover || 'Previewing hover effect', 'info');
+            showToast(QSPanelWords.t('preview.previewingHover'), 'info');
 
         } catch (error) {
             console.error('Failed to preview hover:', error);

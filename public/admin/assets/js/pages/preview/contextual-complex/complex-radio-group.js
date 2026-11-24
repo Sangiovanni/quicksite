@@ -23,6 +23,8 @@
 (function () {
     'use strict';
 
+    var t = window.QSComplexWizard.t;
+
     // ---- small render helpers --------------------------------------------
     // Each helper returns ONE Element (per CLAUDE.md). Keeps the main
     // renderWizard body short + each helper independently inspectable.
@@ -77,7 +79,7 @@
         r1.value = 'stacked';
         r1.checked = true;
         var s1 = document.createElement('span');
-        s1.textContent = 'Stacked (one per line)';
+        s1.textContent = t('common.layoutStacked');
         l1.appendChild(r1);
         l1.appendChild(s1);
 
@@ -88,7 +90,7 @@
         r2.name = name;
         r2.value = 'inline';
         var s2 = document.createElement('span');
-        s2.textContent = 'Inline (side-by-side)';
+        s2.textContent = t('common.layoutInline');
         l2.appendChild(r2);
         l2.appendChild(s2);
 
@@ -114,7 +116,7 @@
         var valueInput = document.createElement('input');
         valueInput.type = 'text';
         valueInput.className = 'admin-input qs-radio-option-row__value';
-        valueInput.placeholder = 'value (e.g. yes)';
+        valueInput.placeholder = t('radioGroup.valuePlaceholder');
         valueInput.autocomplete = 'off';
         valueInput.style.flex = '0 0 33%';
         if (d.value !== undefined) valueInput.value = d.value;
@@ -130,7 +132,7 @@
         // on a WeakMap so readRow can extract its current value later.
         var picker = window.QSComplexWizard.createTextKeyPicker({
             container: labelMount,
-            placeholder: 'e.g. form.consent.yes',
+            placeholder: t('radioGroup.labelPlaceholder'),
             value: d.labelKey || '',
         });
         labelPickers.set(row, picker);
@@ -143,27 +145,27 @@
         var wrap = document.createElement('div');
 
         // -- name --
-        var nameInput = _renderTextInput('ce-rg-name', 'e.g. consent (letters/digits/_/- only)');
+        var nameInput = _renderTextInput('ce-rg-name', t('radioGroup.namePlaceholder'));
         var nameGroup = _renderGroup();
-        nameGroup.appendChild(_renderLabel('Name (shared by every radio)', true));
+        nameGroup.appendChild(_renderLabel(t('radioGroup.name'), true));
         nameGroup.appendChild(nameInput);
         wrap.appendChild(nameGroup);
 
         // -- legendKey (textKey picker) --
         var legendGroup = _renderGroup();
-        legendGroup.appendChild(_renderLabel('Legend (translation key)', true));
+        legendGroup.appendChild(_renderLabel(t('common.legendKey'), true));
         var legendMount = document.createElement('div');
         legendGroup.appendChild(legendMount);
         wrap.appendChild(legendGroup);
         var legendPicker = window.QSComplexWizard.createTextKeyPicker({
             container: legendMount,
-            placeholder: 'e.g. form.consent.legend',
+            placeholder: t('radioGroup.legendPlaceholder'),
             value: '',
         });
 
         // -- layout --
         var layoutGroup = _renderGroup();
-        layoutGroup.appendChild(_renderLabel('Layout'));
+        layoutGroup.appendChild(_renderLabel(t('common.layout')));
         layoutGroup.appendChild(_renderLayoutRadios('ce-rg-layout'));
         wrap.appendChild(layoutGroup);
 
@@ -171,8 +173,8 @@
 
         // -- options list --
         var optsGroup = _renderGroup();
-        optsGroup.appendChild(_renderLabel('Options', true));
-        optsGroup.appendChild(_renderHint('Each option has a value (the literal submitted on form submit) and a label (translation key).'));
+        optsGroup.appendChild(_renderLabel(t('common.options'), true));
+        optsGroup.appendChild(_renderHint(t('common.optionsHint')));
         var optsHost = document.createElement('div');
         optsGroup.appendChild(optsHost);
         wrap.appendChild(optsGroup);
@@ -182,12 +184,12 @@
         // user can only pick a default that actually exists. Rebuilt on
         // every options change via onChange below.
         var defaultGroup = _renderGroup();
-        defaultGroup.appendChild(_renderLabel('Default selected (optional)'));
+        defaultGroup.appendChild(_renderLabel(t('radioGroup.defaultSelected')));
         var defaultSelect = document.createElement('select');
         defaultSelect.className = 'admin-input';
         defaultSelect.id = 'ce-rg-default';
         defaultGroup.appendChild(defaultSelect);
-        defaultGroup.appendChild(_renderHint('Pick one of the option values to mark `checked`, or "(none)" to leave the group unchecked.'));
+        defaultGroup.appendChild(_renderHint(t('radioGroup.defaultSelectedHint')));
         wrap.appendChild(defaultGroup);
 
         container.appendChild(wrap);
@@ -199,7 +201,7 @@
         var labelPickers = new WeakMap();
         var optsEditor = window.QSComplexWizard.createRowEditor({
             container: optsHost,
-            addButtonLabel: '+ Add option',
+            addButtonLabel: t('common.addOption'),
             minRows: 1,
             initialRows: [
                 { value: '', labelKey: '' },
@@ -228,7 +230,7 @@
 
             var noneOpt = document.createElement('option');
             noneOpt.value = '';
-            noneOpt.textContent = '(none — no radio checked at first)';
+            noneOpt.textContent = t('radioGroup.noDefault');
             defaultSelect.appendChild(noneOpt);
 
             rows.forEach(function (r) {
@@ -280,18 +282,19 @@
         function validate() {
             var cfg = getConfig();
             if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(cfg.name)) {
-                return 'Name must start with a letter and use only letters, digits, hyphens, underscores.';
+                return t('common.errors.groupNameFormat');
             }
-            if (!cfg.legendKey) return 'Pick a legend translation key.';
-            if (cfg.options.length === 0) return 'Add at least one option.';
+            if (!cfg.legendKey) return t('common.errors.legendRequired');
+            if (cfg.options.length === 0) return t('common.errors.noOption');
             // Per-row validation (caught server-side too, but cheaper here).
             var seen = {};
             for (var i = 0; i < cfg.options.length; i++) {
                 var o = cfg.options[i];
-                if (o.value === '') return 'Option #' + (i + 1) + ' is missing a value.';
-                if (!o.labelKey) return 'Option #' + (i + 1) + ' is missing a label key.';
+                var nth = { number: QSPanelWords.number(i + 1) };
+                if (o.value === '') return t('common.errors.optionValue', nth);
+                if (!o.labelKey) return t('common.errors.optionLabel', nth);
                 if (Object.prototype.hasOwnProperty.call(seen, o.value)) {
-                    return 'Duplicate option value "' + o.value + '" — values must be unique.';
+                    return t('common.errors.duplicateOption', { value: o.value });
                 }
                 seen[o.value] = true;
             }
@@ -310,8 +313,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['radio-group'] = {
-        label: 'Radio group',
-        description: window.QSComplexWizard.t('radioGroup.description'),
+        label: t('radioGroup.label'),
+        description: t('radioGroup.description'),
         renderWizard: renderWizard
     };
 })();

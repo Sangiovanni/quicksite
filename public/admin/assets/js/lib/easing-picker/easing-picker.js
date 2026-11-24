@@ -3,7 +3,8 @@
  *
  * Self-contained popover. SVG curve canvas with two draggable handles +
  * preset chips + numeric inputs for x1, y1, x2, y2. Confirm returns a
- * `cubic-bezier(...)` (or named) string via opts.onConfirm. No deps.
+ * `cubic-bezier(...)` (or named) string via opts.onConfirm. Its words are
+ * the panel's, read through QSPanelWords (loaded first on every page).
  *
  * Usage:
  *   QSEasingPicker.open({
@@ -108,11 +109,11 @@
         header.className = 'qs-easing-picker__header';
         var title = document.createElement('h3');
         title.className = 'qs-easing-picker__title';
-        title.textContent = i18n('easingPickerTitle', 'Easing curve');
+        title.textContent = QSPanelWords.t('preview.easingPickerTitle');
         _closeBtn = document.createElement('button');
         _closeBtn.type = 'button';
         _closeBtn.className = 'qs-easing-picker__close';
-        _closeBtn.setAttribute('aria-label', i18n('close', 'Close'));
+        _closeBtn.setAttribute('aria-label', QSPanelWords.t('common.close'));
         _closeBtn.textContent = '×';
         _closeBtn.addEventListener('click', handleCancel);
         header.appendChild(title);
@@ -258,7 +259,7 @@
         _replayBtn = document.createElement('button');
         _replayBtn.type = 'button';
         _replayBtn.className = 'qs-easing-picker__replay';
-        _replayBtn.textContent = i18n('easingPickerReplay', '▶ Replay');
+        _replayBtn.textContent = QSPanelWords.t('preview.easingPickerReplay');
         _replayBtn.addEventListener('click', replayPreview);
         previewRow.appendChild(_previewBar);
         previewRow.appendChild(_replayBtn);
@@ -270,12 +271,12 @@
         _cancelBtn = document.createElement('button');
         _cancelBtn.type = 'button';
         _cancelBtn.className = 'admin-btn admin-btn--ghost';
-        _cancelBtn.textContent = i18n('cancel', 'Cancel');
+        _cancelBtn.textContent = QSPanelWords.t('common.cancel');
         _cancelBtn.addEventListener('click', handleCancel);
         _applyBtn = document.createElement('button');
         _applyBtn.type = 'button';
         _applyBtn.className = 'admin-btn admin-btn--primary';
-        _applyBtn.textContent = i18n('apply', 'Apply');
+        _applyBtn.textContent = QSPanelWords.t('preview.apply');
         _applyBtn.addEventListener('click', handleApply);
         footer.appendChild(_cancelBtn);
         footer.appendChild(_applyBtn);
@@ -551,17 +552,6 @@
         var cb = _onCancel;
         close();
         if (cb) cb();
-    }
-
-    // ── i18n helper (defensive — works even if PreviewConfig is absent) ──
-
-    function i18n(key, fallback) {
-        var dict = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        return dict['easingPicker' + capitalize(key)] || dict[key] || fallback;
-    }
-
-    function capitalize(s) {
-        return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
     }
 
     // ── Public namespace ──

@@ -10,6 +10,8 @@
 (function () {
     'use strict';
 
+    var t = window.QSComplexWizard.t;
+
     function _renderLabel(text, required) {
         var l = document.createElement('label');
         l.className = 'admin-label';
@@ -45,7 +47,7 @@
         var summaryWrap = document.createElement('div');
         var summaryLabel = document.createElement('div');
         summaryLabel.className = 'admin-hint';
-        summaryLabel.textContent = 'Summary (title shown when collapsed)';
+        summaryLabel.textContent = t('accordion.summary');
         var summaryMount = document.createElement('div');
         summaryWrap.appendChild(summaryLabel);
         summaryWrap.appendChild(summaryMount);
@@ -54,7 +56,7 @@
         var contentWrap = document.createElement('div');
         var contentLabel = document.createElement('div');
         contentLabel.className = 'admin-hint';
-        contentLabel.textContent = 'Content (text shown when expanded — wrapped in <p>)';
+        contentLabel.textContent = t('accordion.content');
         var contentMount = document.createElement('div');
         contentWrap.appendChild(contentLabel);
         contentWrap.appendChild(contentMount);
@@ -67,7 +69,7 @@
         openCb.className = 'qs-accordion-row__open';
         if (d.openByDefault) openCb.checked = true;
         var openSpan = document.createElement('span');
-        openSpan.textContent = 'Open by default';
+        openSpan.textContent = t('accordion.openByDefault');
         openLabel.appendChild(openCb);
         openLabel.appendChild(openSpan);
 
@@ -77,12 +79,12 @@
 
         var summaryPicker = window.QSComplexWizard.createTextKeyPicker({
             container: summaryMount,
-            placeholder: 'e.g. faq.shipping.q1',
+            placeholder: t('accordion.summaryPlaceholder'),
             value: d.summaryKey || '',
         });
         var contentPicker = window.QSComplexWizard.createTextKeyPicker({
             container: contentMount,
-            placeholder: 'e.g. faq.shipping.a1',
+            placeholder: t('accordion.contentPlaceholder'),
             value: d.contentKey || '',
         });
         pickerMap.set(row, { summary: summaryPicker, content: contentPicker });
@@ -93,8 +95,8 @@
         var wrap = document.createElement('div');
 
         var itemsGroup = _renderGroup();
-        itemsGroup.appendChild(_renderLabel('Items', true));
-        itemsGroup.appendChild(_renderHint('Each item is a (summary, content) pair rendered as a native <details>/<summary> disclosure widget.'));
+        itemsGroup.appendChild(_renderLabel(t('common.items'), true));
+        itemsGroup.appendChild(_renderHint(t('accordion.itemsHint')));
         var itemsHost = document.createElement('div');
         itemsGroup.appendChild(itemsHost);
         wrap.appendChild(itemsGroup);
@@ -104,7 +106,7 @@
         var pickerMap = new WeakMap();
         var editor = window.QSComplexWizard.createRowEditor({
             container: itemsHost,
-            addButtonLabel: '+ Add item',
+            addButtonLabel: t('common.addItem'),
             minRows: 1,
             initialRows: [
                 { summaryKey: '', contentKey: '', openByDefault: false },
@@ -130,11 +132,12 @@
 
         function validate() {
             var cfg = getConfig();
-            if (cfg.items.length === 0) return 'Add at least one item.';
+            if (cfg.items.length === 0) return t('accordion.errors.noItem');
             for (var i = 0; i < cfg.items.length; i++) {
                 var it = cfg.items[i];
-                if (!it.summaryKey) return 'Item #' + (i + 1) + ' is missing a summary key.';
-                if (!it.contentKey) return 'Item #' + (i + 1) + ' is missing a content key.';
+                var nth = { number: QSPanelWords.number(i + 1) };
+                if (!it.summaryKey) return t('accordion.errors.summaryKey', nth);
+                if (!it.contentKey) return t('accordion.errors.contentKey', nth);
             }
             return null;
         }
@@ -150,8 +153,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['accordion'] = {
-        label: 'Accordion (FAQ)',
-        description: window.QSComplexWizard.t('accordion.description'),
+        label: t('accordion.label'),
+        description: t('accordion.description'),
         renderWizard: renderWizard
     };
 })();

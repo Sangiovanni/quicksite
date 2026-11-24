@@ -4,26 +4,26 @@
     <div class="preview-toolbar__left">
         <!-- Unified Edit Target (Pages + Components) -->
         <div class="preview-toolbar__group">
-            <label class="preview-toolbar__label" for="preview-target"><?= __admin('preview.editTarget') ?? 'Edit' ?>:</label>
+            <label class="preview-toolbar__label" for="preview-target"><?= adminEscape(__admin('preview.editTarget')) ?>:</label>
             <select id="preview-target" class="preview-toolbar__select">
-                <optgroup label="🏗️ <?= __admin('preview.layout') ?? 'Layout' ?>">
-                    <option value="layout:menu"><?= __admin('preview.menu') ?? 'Menu (header)' ?></option>
-                    <option value="layout:footer"><?= __admin('preview.footer') ?? 'Footer' ?></option>
+                <optgroup label="🏗️ <?= adminAttr(__admin('preview.layout')) ?>">
+                    <option value="layout:menu"><?= adminEscape(__admin('preview.menu')) ?></option>
+                    <option value="layout:footer"><?= adminEscape(__admin('preview.footer')) ?></option>
                 </optgroup>
-                <optgroup label="📄 <?= __admin('preview.pages') ?? 'Pages' ?>">
+                <optgroup label="📄 <?= adminAttr(__admin('preview.pages')) ?>">
                     <?php foreach ($routes as $route): ?>
                         <option value="page:<?= adminEscape($route) ?>"><?= adminEscape($route) ?></option>
                     <?php endforeach; ?>
                 </optgroup>
                 <?php if (!empty($components)): ?>
-                <optgroup label="🧩 <?= __admin('preview.components') ?? 'Components' ?>">
+                <optgroup label="🧩 <?= adminAttr(__admin('preview.components')) ?>">
                     <?php foreach ($components as $component): ?>
                         <option value="component:<?= adminEscape($component) ?>"><?= adminEscape($component) ?></option>
                     <?php endforeach; ?>
                 </optgroup>
                 <?php endif; ?>
             </select>
-            <button type="button" id="preview-create-component" class="preview-toolbar__add-btn" title="<?= __admin('preview.createComponent') ?? 'New component' ?>">
+            <button type="button" id="preview-create-component" class="preview-toolbar__add-btn" title="<?= adminAttr(__admin('preview.createComponent')) ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
@@ -36,7 +36,7 @@
         
         <!-- Language Selector: shown for a project with more than one language. A run can change that while the page is open, so it is always there (preview.js rebuildLanguageList()) -->
         <div class="preview-toolbar__group"<?= $isMultilingual && count($languages) > 1 ? '' : ' style="display: none;"' ?>>
-            <label class="preview-toolbar__label" for="preview-lang"><?= __admin('preview.language') ?>:</label>
+            <label class="preview-toolbar__label" for="preview-lang"><?= adminEscape(__admin('preview.language')) ?>:</label>
             <select id="preview-lang" class="preview-toolbar__select preview-toolbar__select--sm">
                 <?php foreach ($languages as $lang): ?>
                     <option value="<?= adminEscape($lang) ?>" <?= $lang === $defaultLang ? 'selected' : '' ?>><?= strtoupper(adminEscape($lang)) ?></option>
@@ -46,9 +46,9 @@
 
         <!-- Page title: the page's title in the language shown (shown while a page is the edit target, to a role that can change it) -->
         <div class="preview-toolbar__group" id="preview-page-title-group" style="display: none;"<?= qs_editor_control_attrs('toolbar.title') ?>>
-            <label class="preview-toolbar__label" for="preview-page-title"><?= __admin('preview.pageTitle') ?>:</label>
+            <label class="preview-toolbar__label" for="preview-page-title"><?= adminEscape(__admin('preview.pageTitle')) ?>:</label>
             <input type="text" id="preview-page-title" class="preview-toolbar__input" maxlength="200" autocomplete="off"
-                   title="<?= adminEscape(__admin('preview.pageTitleHint')) ?>">
+                   title="<?= adminAttr(__admin('preview.pageTitleHint')) ?>">
         </div>
 
         <!-- Page description: the page's description in the language shown, beside its title (a page of the site, not a
@@ -57,11 +57,11 @@
              (preview.js, from getSocialPreview's table). -->
         <?php require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php'; ?>
         <div class="preview-toolbar__group" id="preview-page-description-group" style="display: none;"<?= qs_editor_control_attrs('toolbar.description') ?>>
-            <label class="preview-toolbar__label" for="preview-page-description"><?= __admin('preview.pageDescription') ?>:</label>
+            <label class="preview-toolbar__label" for="preview-page-description"><?= adminEscape(__admin('preview.pageDescription')) ?>:</label>
             <input type="text" id="preview-page-description" class="preview-toolbar__input" maxlength="<?= (int) QS_SOCIAL_DESCRIPTION_MAX ?>" autocomplete="off"
-                   title="<?= adminEscape(__admin('preview.pageDescriptionHint')) ?>" aria-describedby="preview-page-description-cut">
+                   title="<?= adminAttr(__admin('preview.pageDescriptionHint')) ?>" aria-describedby="preview-page-description-cut">
             <button type="button" id="preview-page-description-expand" class="admin-btn admin-btn--ghost admin-btn--icon-only preview-toolbar__expand"
-                    title="<?= adminEscape(__admin('preview.pageDescriptionExpand')) ?>" aria-label="<?= adminEscape(__admin('preview.pageDescriptionExpand')) ?>" aria-haspopup="dialog">
+                    title="<?= adminAttr(__admin('preview.pageDescriptionExpand')) ?>" aria-label="<?= adminAttr(__admin('preview.pageDescriptionExpand')) ?>" aria-haspopup="dialog">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <polyline points="15 3 21 3 21 9"/>
                     <polyline points="9 21 3 21 3 15"/>
@@ -74,40 +74,40 @@
 
         <!-- Theme Preview Toggle (always rendered; visibility managed by JS/config) -->
         <div class="preview-toolbar__group" id="preview-theme-toggle-group" style="display: <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
-            <label class="preview-toolbar__label"><?= __admin('preview.themePreview') ?? 'Theme' ?>:</label>
+            <label class="preview-toolbar__label"><?= adminEscape(__admin('preview.themePreview')) ?>:</label>
             <div class="preview-toolbar__segmented" id="preview-theme-mode-switcher">
-                <button type="button" class="preview-toolbar__seg-btn preview-toolbar__seg-btn--active" data-theme-preview="light" title="<?= __admin('preview.themeLight') ?? 'Preview light mode' ?>">
-                    <span aria-hidden="true">☀</span> <?= __admin('preview.light') ?? 'Light' ?>
+                <button type="button" class="preview-toolbar__seg-btn preview-toolbar__seg-btn--active" data-theme-preview="light" title="<?= adminAttr(__admin('preview.themeLight')) ?>">
+                    <span aria-hidden="true">☀</span> <?= adminEscape(__admin('preview.light')) ?>
                 </button>
-                <button type="button" class="preview-toolbar__seg-btn" data-theme-preview="dark" title="<?= __admin('preview.themeDark') ?? 'Preview dark mode' ?>">
-                    <span aria-hidden="true">🌙</span> <?= __admin('preview.dark') ?? 'Dark' ?>
+                <button type="button" class="preview-toolbar__seg-btn" data-theme-preview="dark" title="<?= adminAttr(__admin('preview.themeDark')) ?>">
+                    <span aria-hidden="true">🌙</span> <?= adminEscape(__admin('preview.dark')) ?>
                 </button>
             </div>
         </div>
         <!-- Layout toggles (shown only when editing a page) -->
-        <div class="preview-toolbar__group preview-toolbar__layout-toggles" id="preview-layout-toggles" style="display: none;" title="<?= __admin('preview.layoutTogglesHint') ?? 'Show or hide shared sections on this page' ?>">
-            <label class="preview-toolbar__toggle" title="<?= __admin('preview.menuToggleHint') ?? 'Show or hide the menu on this page' ?>">
+        <div class="preview-toolbar__group preview-toolbar__layout-toggles" id="preview-layout-toggles" style="display: none;" title="<?= adminAttr(__admin('preview.layoutTogglesHint')) ?>">
+            <label class="preview-toolbar__toggle" title="<?= adminAttr(__admin('preview.menuToggleHint')) ?>">
                 <input type="checkbox" id="preview-toggle-menu" checked>
-                <span class="preview-toolbar__toggle-label"><?= __admin('preview.menuToggle') ?? 'Menu' ?></span>
+                <span class="preview-toolbar__toggle-label"><?= adminEscape(__admin('preview.menuToggle')) ?></span>
             </label>
-            <label class="preview-toolbar__toggle" title="<?= __admin('preview.footerToggleHint') ?? 'Show or hide the footer on this page' ?>">
+            <label class="preview-toolbar__toggle" title="<?= adminAttr(__admin('preview.footerToggleHint')) ?>">
                 <input type="checkbox" id="preview-toggle-footer" checked>
-                <span class="preview-toolbar__toggle-label"><?= __admin('preview.footerToggle') ?? 'Footer' ?></span>
+                <span class="preview-toolbar__toggle-label"><?= adminEscape(__admin('preview.footerToggle')) ?></span>
             </label>
-            <label class="preview-toolbar__toggle" id="preview-toggle-consent-banner-label" style="display: none;" title="<?= __admin('preview.consentBannerToggleHint', 'Show or hide the cookie banner in this preview (does not persist)') ?>">
+            <label class="preview-toolbar__toggle" id="preview-toggle-consent-banner-label" style="display: none;" title="<?= adminAttr(__admin('preview.consentBannerToggleHint')) ?>">
                 <input type="checkbox" id="preview-toggle-consent-banner">
-                <span class="preview-toolbar__toggle-label"><?= __admin('preview.consentBannerToggle', 'Cookie banner') ?></span>
+                <span class="preview-toolbar__toggle-label"><?= adminEscape(__admin('preview.consentBannerToggle')) ?></span>
             </label>
-            <label class="preview-toolbar__toggle" id="preview-toggle-consent-popup-label" style="display: none;" title="<?= __admin('preview.consentPopupToggleHint', 'Show or hide the cookie preferences popup in this preview (does not persist)') ?>">
+            <label class="preview-toolbar__toggle" id="preview-toggle-consent-popup-label" style="display: none;" title="<?= adminAttr(__admin('preview.consentPopupToggleHint')) ?>">
                 <input type="checkbox" id="preview-toggle-consent-popup">
-                <span class="preview-toolbar__toggle-label"><?= __admin('preview.consentPopupToggle', 'Cookie popup') ?></span>
+                <span class="preview-toolbar__toggle-label"><?= adminEscape(__admin('preview.consentPopupToggle')) ?></span>
             </label>
         </div>
     </div>
     
     <!-- Right: Actions -->
     <div class="preview-toolbar__right">
-        <button type="button" id="preview-reload" class="admin-btn admin-btn--ghost admin-btn--icon-only" title="<?= __admin('preview.reload') ?>">
+        <button type="button" id="preview-reload" class="admin-btn admin-btn--ghost admin-btn--icon-only" title="<?= adminAttr(__admin('preview.reload')) ?>">
             <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"/>
                 <polyline points="1 20 1 14 7 14"/>
@@ -116,9 +116,7 @@
         </button>
         <!-- Hides the editor's rows and panel, and brings them back: the page alone under the header -->
         <button type="button" id="preview-rows-toggle" class="admin-btn admin-btn--ghost admin-btn--icon-only" aria-pressed="false"
-                title="<?= adminEscape(__admin('preview.rowsHide', "Hide the editor's rows and show the whole page")) ?>"
-                data-title-hide="<?= adminEscape(__admin('preview.rowsHide', "Hide the editor's rows and show the whole page")) ?>"
-                data-title-show="<?= adminEscape(__admin('preview.rowsShow', "Show the editor's rows")) ?>">
+                title="<?= adminAttr(__admin('preview.rowsHide')) ?>">
             <svg class="admin-btn__icon preview-rows-toggle__hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <polyline points="17 11 12 6 7 11"/>
                 <polyline points="17 18 12 13 7 18"/>

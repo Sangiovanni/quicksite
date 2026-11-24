@@ -4,7 +4,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
         </svg>
-        <span><?= __admin('preview.styleModeHint') ?? 'Click an element to edit its style, or use the sections below' ?></span>
+        <span><?= adminEscape(__admin('preview.styleModeHint')) ?></span>
     </div>
     <!-- Advanced top row: Source (raw stylesheet editor). Role-gated on
          editStyles and left out of the simple view (editorTools.php, style.source):
@@ -12,23 +12,23 @@
          lacks the command. Hidden until Style mode activates (preview.js toggles
          display alongside the tabs row). -->
     <div class="preview-contextual-style-advanced" id="contextual-style-advanced"<?= qs_editor_control_attrs('style.source') ?> style="display: none;">
-        <button type="button" class="preview-contextual-style-source-btn" id="contextual-style-source-btn" data-tab="source" title="<?= __admin('preview.styleSourceHint', 'Edit the full style.css source') ?>">
+        <button type="button" class="preview-contextual-style-source-btn" id="contextual-style-source-btn" data-tab="source" title="<?= adminAttr(__admin('preview.styleSourceHint')) ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                 <polyline points="16 18 22 12 16 6"/>
                 <polyline points="8 6 2 12 8 18"/>
             </svg>
-            <span><?= __admin('preview.styleSource', 'Source') ?></span>
+            <span><?= adminEscape(__admin('preview.styleSource')) ?></span>
         </button>
     </div>
     <div class="preview-contextual-style-tabs" id="contextual-style-tabs" style="display: none;">
         <button type="button" class="preview-contextual-style-tab preview-contextual-style-tab--active" data-tab="theme">
-            <?= __admin('preview.themeVariables') ?? 'Theme' ?>
+            <?= adminEscape(__admin('preview.themeVariables')) ?>
         </button>
         <button type="button" class="preview-contextual-style-tab" data-tab="selectors">
-            <?= __admin('preview.selectors') ?? 'Selectors' ?>
+            <?= adminEscape(__admin('preview.selectors')) ?>
         </button>
         <button type="button" class="preview-contextual-style-tab" data-tab="animations"<?= qs_editor_control_attrs('style.animations') ?>>
-            <?= __admin('preview.animations') ?? 'Animations' ?>
+            <?= adminEscape(__admin('preview.animations')) ?>
         </button>
     </div>
     <div id="contextual-style-content" style="display: none;">
@@ -39,7 +39,7 @@
                     <circle cx="12" cy="12" r="10" opacity="0.25"/>
                     <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
                 </svg>
-                <span><?= __admin('common.loading') ?>...</span>
+                <span><?= adminEscape(__admin('common.loading')) ?></span>
             </div>
             
             <div class="preview-theme-content" id="theme-content" style="display: none;">
@@ -50,36 +50,36 @@
                             <circle cx="12" cy="12" r="3"/>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                         </svg>
-                        <?= __admin('preview.themeModeConfig') ?? 'Theme Mode Settings' ?>
+                        <?= adminEscape(__admin('preview.themeModeConfig')) ?>
                         <svg class="preview-theme-config-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
                     </button>
                     <div class="preview-theme-config-body" id="theme-config-body" style="display: none;">
                         <div class="preview-theme-config-row">
-                            <span class="preview-theme-config-label"><?= __admin('preview.themeModeEnabled') ?? 'Dark mode support' ?></span>
+                            <span class="preview-theme-config-label"><?= adminEscape(__admin('preview.themeModeEnabled')) ?></span>
                             <label>
                                 <input type="checkbox" id="theme-config-enabled" <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
                         </div>
                         <div class="preview-theme-config-row">
-                            <span class="preview-theme-config-label"><?= __admin('preview.themeDefault') ?? 'Default mode' ?></span>
+                            <span class="preview-theme-config-label"><?= adminEscape(__admin('preview.themeDefault')) ?></span>
                             <select id="theme-config-default" class="preview-toolbar__select preview-toolbar__select--sm">
-                                <option value="light" <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'light' ? 'selected' : '' ?>>☀ <?= __admin('preview.light') ?? 'Light' ?></option>
-                                <option value="dark"  <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'dark'  ? 'selected' : '' ?>>🌙 <?= __admin('preview.dark') ?? 'Dark' ?></option>
-                                <option value="system"<?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'system'? 'selected' : '' ?>>⚙ <?= __admin('preview.system') ?? 'System' ?></option>
+                                <option value="light" <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'light' ? 'selected' : '' ?>>☀ <?= adminEscape(__admin('preview.light')) ?></option>
+                                <option value="dark"  <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'dark'  ? 'selected' : '' ?>>🌙 <?= adminEscape(__admin('preview.dark')) ?></option>
+                                <option value="system"<?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'system'? 'selected' : '' ?>>⚙ <?= adminEscape(__admin('preview.system')) ?></option>
                             </select>
                         </div>
                         <div class="preview-theme-config-row">
-                            <span class="preview-theme-config-label"><?= __admin('preview.themeUserToggle') ?? 'Visitor can switch' ?></span>
+                            <span class="preview-theme-config-label"><?= adminEscape(__admin('preview.themeUserToggle')) ?></span>
                             <label>
                                 <input type="checkbox" id="theme-config-usertoggle" <?= ($editConfig['THEME_USER_TOGGLE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
                         </div>
                         <button type="button" class="admin-btn admin-btn--primary" id="theme-config-save-btn" style="margin-top: 8px; width: 100%;">
-                            <?= __admin('preview.saveThemeConfig') ?? 'Save Settings' ?>
+                            <?= adminEscape(__admin('preview.saveThemeConfig')) ?>
                         </button>
                     </div>
                 </div>
@@ -87,10 +87,10 @@
                 <!-- Light / Dark scope switcher (always rendered; visibility managed by JS/config) -->
                 <div class="preview-theme-scope" id="theme-scope-switcher" style="display: <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
                     <button type="button" class="preview-theme-scope__btn preview-theme-scope__btn--active" data-scope="light">
-                        <span aria-hidden="true">☀</span> <?= __admin('preview.light') ?? 'Light' ?>
+                        <span aria-hidden="true">☀</span> <?= adminEscape(__admin('preview.light')) ?>
                     </button>
                     <button type="button" class="preview-theme-scope__btn" data-scope="dark">
-                        <span aria-hidden="true">🌙</span> <?= __admin('preview.dark') ?? 'Dark' ?>
+                        <span aria-hidden="true">🌙</span> <?= adminEscape(__admin('preview.dark')) ?>
                     </button>
                 </div>
                 <div class="preview-theme-section" id="theme-colors-section">
@@ -98,7 +98,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                             <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
                         </svg>
-                        <?= __admin('preview.themeColors') ?? 'Colors' ?>
+                        <?= adminEscape(__admin('preview.themeColors')) ?>
                     </h4>
                     <div class="preview-theme-grid" id="theme-colors-grid">
                         <!-- Color inputs populated by JS -->
@@ -109,32 +109,32 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            <span><?= __admin('preview.themeAddVariable', 'Add variable') ?></span>
+                            <span><?= adminEscape(__admin('preview.themeAddVariable')) ?></span>
                         </button>
                         <div class="preview-theme-add__form" data-form hidden>
                             <div class="preview-theme-add__scope-banner" data-scope-banner></div>
                             <label class="preview-theme-add__also-other" data-also-other-row<?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
                                 <input type="checkbox" data-also-other>
-                                <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
+                                <span><?= adminEscape(__admin('preview.themeAddVariableAlsoOtherScope')) ?></span>
                             </label>
                             <div class="preview-theme-add__row">
                                 <input type="text"
                                        class="preview-theme-add__input"
                                        data-input-name
                                        placeholder="--color-name"
-                                       aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
+                                       aria-label="<?= adminAttr(__admin('preview.themeAddVariableNameLabel')) ?>">
                                 <input type="text"
                                        class="preview-theme-add__input"
                                        data-input-value
-                                       placeholder="<?= __admin('preview.themeAddVariableValueExampleColor', 'e.g. #c2703e') ?>"
-                                       aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
+                                       placeholder="<?= adminAttr(__admin('preview.themeAddVariableValueExampleColor')) ?>"
+                                       aria-label="<?= adminAttr(__admin('preview.themeAddVariableValueLabel')) ?>">
                             </div>
                             <div class="preview-theme-add__actions">
                                 <button type="button" class="admin-btn admin-btn--ghost" data-action="cancel">
-                                    <?= __admin('common.cancel') ?? 'Cancel' ?>
+                                    <?= adminEscape(__admin('common.cancel')) ?>
                                 </button>
                                 <button type="button" class="admin-btn admin-btn--primary" data-action="submit">
-                                    <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
+                                    <?= adminEscape(__admin('preview.themeAddVariableSubmit')) ?>
                                 </button>
                             </div>
                         </div>
@@ -147,7 +147,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                             <polyline points="4,7 4,4 20,4 20,7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
                         </svg>
-                        <?= __admin('preview.themeFonts') ?? 'Fonts' ?>
+                        <?= adminEscape(__admin('preview.themeFonts')) ?>
                     </h4>
                     <div class="preview-theme-grid" id="theme-fonts-grid">
                         <!-- Font inputs populated by JS -->
@@ -158,32 +158,32 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            <span><?= __admin('preview.themeAddVariable', 'Add variable') ?></span>
+                            <span><?= adminEscape(__admin('preview.themeAddVariable')) ?></span>
                         </button>
                         <div class="preview-theme-add__form" data-form hidden>
                             <div class="preview-theme-add__scope-banner" data-scope-banner></div>
                             <label class="preview-theme-add__also-other" data-also-other-row<?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
                                 <input type="checkbox" data-also-other>
-                                <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
+                                <span><?= adminEscape(__admin('preview.themeAddVariableAlsoOtherScope')) ?></span>
                             </label>
                             <div class="preview-theme-add__row">
                                 <input type="text"
                                        class="preview-theme-add__input"
                                        data-input-name
                                        placeholder="--font-name"
-                                       aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
+                                       aria-label="<?= adminAttr(__admin('preview.themeAddVariableNameLabel')) ?>">
                                 <input type="text"
                                        class="preview-theme-add__input"
                                        data-input-value
-                                       placeholder="<?= __admin('preview.themeAddVariableValueExampleFont', 'e.g. Roboto, sans-serif') ?>"
-                                       aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
+                                       placeholder="<?= adminAttr(__admin('preview.themeAddVariableValueExampleFont')) ?>"
+                                       aria-label="<?= adminAttr(__admin('preview.themeAddVariableValueLabel')) ?>">
                             </div>
                             <div class="preview-theme-add__actions">
                                 <button type="button" class="admin-btn admin-btn--ghost" data-action="cancel">
-                                    <?= __admin('common.cancel') ?? 'Cancel' ?>
+                                    <?= adminEscape(__admin('common.cancel')) ?>
                                 </button>
                                 <button type="button" class="admin-btn admin-btn--primary" data-action="submit">
-                                    <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
+                                    <?= adminEscape(__admin('preview.themeAddVariableSubmit')) ?>
                                 </button>
                             </div>
                         </div>
@@ -196,7 +196,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                             <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>
                         </svg>
-                        <?= __admin('preview.themeSpacing') ?? 'Spacing' ?>
+                        <?= adminEscape(__admin('preview.themeSpacing')) ?>
                     </h4>
                     <div class="preview-theme-grid" id="theme-spacing-grid">
                         <!-- Spacing inputs populated by JS -->
@@ -207,32 +207,32 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            <span><?= __admin('preview.themeAddVariable', 'Add variable') ?></span>
+                            <span><?= adminEscape(__admin('preview.themeAddVariable')) ?></span>
                         </button>
                         <div class="preview-theme-add__form" data-form hidden>
                             <div class="preview-theme-add__scope-banner" data-scope-banner></div>
                             <label class="preview-theme-add__also-other" data-also-other-row<?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : ' hidden' ?>>
                                 <input type="checkbox" data-also-other>
-                                <span><?= __admin('preview.themeAddVariableAlsoOtherScope', 'Also add to the other scope') ?></span>
+                                <span><?= adminEscape(__admin('preview.themeAddVariableAlsoOtherScope')) ?></span>
                             </label>
                             <div class="preview-theme-add__row">
                                 <input type="text"
                                        class="preview-theme-add__input"
                                        data-input-name
                                        placeholder="--spacing-name"
-                                       aria-label="<?= __admin('preview.themeAddVariableNameLabel', 'Name') ?>">
+                                       aria-label="<?= adminAttr(__admin('preview.themeAddVariableNameLabel')) ?>">
                                 <input type="text"
                                        class="preview-theme-add__input"
                                        data-input-value
-                                       placeholder="<?= __admin('preview.themeAddVariableValueExampleSpacing', 'e.g. 1rem, 16px') ?>"
-                                       aria-label="<?= __admin('preview.themeAddVariableValueLabel', 'Value') ?>">
+                                       placeholder="<?= adminAttr(__admin('preview.themeAddVariableValueExampleSpacing')) ?>"
+                                       aria-label="<?= adminAttr(__admin('preview.themeAddVariableValueLabel')) ?>">
                             </div>
                             <div class="preview-theme-add__actions">
                                 <button type="button" class="admin-btn admin-btn--ghost" data-action="cancel">
-                                    <?= __admin('common.cancel') ?? 'Cancel' ?>
+                                    <?= adminEscape(__admin('common.cancel')) ?>
                                 </button>
                                 <button type="button" class="admin-btn admin-btn--primary" data-action="submit">
-                                    <?= __admin('preview.themeAddVariableSubmit', 'Add') ?>
+                                    <?= adminEscape(__admin('preview.themeAddVariableSubmit')) ?>
                                 </button>
                             </div>
                         </div>
@@ -245,7 +245,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                         </svg>
-                        <?= __admin('preview.themeOther') ?? 'Other' ?>
+                        <?= adminEscape(__admin('preview.themeOther')) ?>
                     </h4>
                     <div class="preview-theme-grid" id="theme-other-grid">
                         <!-- Other variables populated by JS -->
@@ -258,14 +258,14 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                         </svg>
-                        <?= __admin('common.reset') ?? 'Reset' ?>
+                        <?= adminEscape(__admin('common.reset')) ?>
                     </button>
                     <button type="button" class="admin-btn admin-btn--primary" id="theme-save-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                             <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
                         </svg>
-                        <?= __admin('preview.saveTheme') ?? 'Save Theme' ?>
+                        <?= adminEscape(__admin('preview.saveTheme')) ?>
                     </button>
                 </div>
             </div>
@@ -282,7 +282,7 @@
                     <input type="text" 
                            id="selector-search-input" 
                            class="preview-selectors-search__input" 
-                           placeholder="<?= __admin('preview.searchSelectors') ?? 'Search selectors...' ?>"
+                           placeholder="<?= adminAttr(__admin('preview.searchSelectors')) ?>"
                            autocomplete="off">
                     <button type="button" class="preview-selectors-search__clear" id="selector-search-clear" data-qs-icon="row" aria-label="<?= adminAttr(__admin('common.clear')) ?>" title="<?= adminAttr(__admin('common.clear')) ?>" style="display: none;"></button>
                 </div>
@@ -294,7 +294,7 @@
                     <circle cx="12" cy="12" r="10" opacity="0.25"/>
                     <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
                 </svg>
-                <span><?= __admin('common.loading') ?>...</span>
+                <span><?= adminEscape(__admin('common.loading')) ?></span>
             </div>
             
             <!-- Selector Groups (populated by JS) -->
@@ -305,7 +305,7 @@
                         <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        <span class="preview-selectors-group__title"><?= __admin('preview.selectorsTags') ?? 'Tags' ?></span>
+                        <span class="preview-selectors-group__title"><?= adminEscape(__admin('preview.selectorsTags')) ?></span>
                         <span class="preview-selectors-group__count" id="selectors-tags-count">0</span>
                     </button>
                     <div class="preview-selectors-group__list" id="selectors-tags-list"></div>
@@ -317,7 +317,7 @@
                         <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        <span class="preview-selectors-group__title"><?= __admin('preview.selectorsClasses') ?? 'Classes' ?></span>
+                        <span class="preview-selectors-group__title"><?= adminEscape(__admin('preview.selectorsClasses')) ?></span>
                         <span class="preview-selectors-group__count" id="selectors-classes-count">0</span>
                     </button>
                     <div class="preview-selectors-group__list" id="selectors-classes-list"></div>
@@ -329,7 +329,7 @@
                         <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        <span class="preview-selectors-group__title"><?= __admin('preview.selectorsIds') ?? 'IDs' ?></span>
+                        <span class="preview-selectors-group__title"><?= adminEscape(__admin('preview.selectorsIds')) ?></span>
                         <span class="preview-selectors-group__count" id="selectors-ids-count">0</span>
                     </button>
                     <div class="preview-selectors-group__list" id="selectors-ids-list"></div>
@@ -341,7 +341,7 @@
                         <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        <span class="preview-selectors-group__title"><?= __admin('preview.selectorsAttributes') ?? 'Attributes' ?></span>
+                        <span class="preview-selectors-group__title"><?= adminEscape(__admin('preview.selectorsAttributes')) ?></span>
                         <span class="preview-selectors-group__count" id="selectors-attributes-count">0</span>
                     </button>
                     <div class="preview-selectors-group__list" id="selectors-attributes-list"></div>
@@ -353,7 +353,7 @@
                         <svg class="preview-selectors-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polyline points="6 9 12 15 18 9"/>
                         </svg>
-                        <span class="preview-selectors-group__title"><?= __admin('preview.selectorsMedia') ?? 'Media Queries' ?></span>
+                        <span class="preview-selectors-group__title"><?= adminEscape(__admin('preview.selectorsMedia')) ?></span>
                         <span class="preview-selectors-group__count" id="selectors-media-count">0</span>
                     </button>
                     <div class="preview-selectors-group__list" id="selectors-media-list" style="display: none;"></div>
@@ -363,15 +363,13 @@
             <!-- Selected Selector Info (shows when a selector is selected) -->
             <div class="preview-selector-selected" id="selector-selected" style="display: none;">
                 <div class="preview-selector-selected__header">
-                    <span class="preview-selector-selected__label"><?= __admin('preview.selectedSelector') ?? 'Selected' ?>:</span>
+                    <span class="preview-selector-selected__label"><?= adminEscape(__admin('preview.selectedSelector')) ?>:</span>
                     <code class="preview-selector-selected__value" id="selector-selected-value"></code>
                     <span class="preview-rule-media" id="selector-selected-media" hidden></span>
                     <button type="button" class="preview-selector-selected__clear" id="selector-selected-clear" data-qs-icon="row" aria-label="<?= adminAttr(__admin('common.clear')) ?>" title="<?= adminAttr(__admin('common.clear')) ?>"></button>
                 </div>
                 <div class="preview-selector-selected__info">
-                    <span class="preview-selector-selected__matches" id="selector-matches">
-                        <?= __admin('preview.affectsElements') ?? 'Affects' ?> <strong id="selector-match-count">0</strong> <?= __admin('preview.elements') ?? 'elements' ?>
-                    </span>
+                    <span class="preview-selector-selected__matches" id="selector-matches"></span>
                 </div>
                 <div class="preview-selector-selected__actions">
                     <button type="button" class="admin-btn admin-btn--ghost admin-action admin-action--edit" id="selector-edit-btn" data-qs-icon="edit"
@@ -380,22 +378,22 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                         </svg>
-                        <?= __admin('preview.copyStyleFrom') ?? 'Copy From…' ?>
+                        <?= adminEscape(__admin('preview.copyStyleFrom')) ?>
                     </button>
                     <button type="button" class="admin-btn" id="selector-animate-btn"<?= qs_editor_control_attrs('style.animate') ?>>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
-                        <?= __admin('preview.animate') ?? 'Animate' ?>
+                        <?= adminEscape(__admin('preview.animate')) ?>
                     </button>
                 </div>
                 <!-- Copy From selector picker (hidden by default) -->
                 <div class="preview-selector-copy-picker" id="selector-copy-picker" style="display: none;">
                     <div class="preview-selector-copy-picker__header">
-                        <span><?= __admin('preview.copyStyleFromLabel') ?? 'Copy styles from:' ?></span>
+                        <span><?= adminEscape(__admin('preview.copyStyleFromLabel')) ?></span>
                         <button type="button" class="admin-modal__close" id="selector-copy-picker-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
                     </div>
-                    <input type="text" class="admin-input admin-input--sm preview-selector-copy-picker__search" id="selector-copy-search" placeholder="<?= __admin('preview.searchSelectors') ?? 'Search selectors…' ?>">
+                    <input type="text" class="admin-input admin-input--sm preview-selector-copy-picker__search" id="selector-copy-search" placeholder="<?= adminAttr(__admin('preview.searchSelectors')) ?>">
                     <div class="preview-selector-copy-picker__list" id="selector-copy-list"></div>
                 </div>
             </div>
@@ -409,15 +407,13 @@
                     <circle cx="12" cy="12" r="10" opacity="0.25"/>
                     <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
                 </svg>
-                <span><?= __admin('common.loading') ?>...</span>
+                <span><?= adminEscape(__admin('common.loading')) ?></span>
             </div>
             
-            <!-- Motion Content (A3-companion: reordered + relabeled. DOM ids
-                 stay on the old "animations" / "triggers" / "keyframes" names
-                 since the JS module's internal wiring is unchanged — only the
-                 user-facing labels move via i18n. Selectors-with-motion comes
-                 first (primary editing surface); Keyframes library is the
-                 secondary "toolbox" view below it. -->
+            <!-- Motion Content. Its DOM ids keep the JS module's own names
+                 ("animations", "triggers", "keyframes"); only the words say Motion.
+                 Selectors with motion come first (the primary editing surface); the
+                 Keyframes library is the secondary "toolbox" view below it. -->
             <div class="preview-animations-content" id="animations-content" style="display: none;">
 
                 <!-- Selectors with motion (primary, expanded by default) -->
@@ -427,7 +423,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                             </svg>
-                            <?= __admin('preview.animatedSelectors') ?? 'Selectors with motion' ?>
+                            <?= adminEscape(__admin('preview.animatedSelectors')) ?>
                         </h4>
                     </div>
 
@@ -437,7 +433,7 @@
                             <svg class="preview-animations-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>
-                            <span class="preview-animations-group__title"><?= __admin('preview.transitions') ?? 'Transitions' ?></span>
+                            <span class="preview-animations-group__title"><?= adminEscape(__admin('preview.transitions')) ?></span>
                             <span class="preview-animations-group__count" id="transitions-count">0</span>
                         </button>
                         <div class="preview-animations-group__list" id="transitions-list">
@@ -451,7 +447,7 @@
                             <svg class="preview-animations-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>
-                            <span class="preview-animations-group__title"><?= __admin('preview.animationsProperty') ?? 'Animations' ?></span>
+                            <span class="preview-animations-group__title"><?= adminEscape(__admin('preview.animationsProperty')) ?></span>
                             <span class="preview-animations-group__count" id="animations-count">0</span>
                         </button>
                         <div class="preview-animations-group__list" id="animations-list">
@@ -462,12 +458,12 @@
                     <!-- Hover-state-only Group (pseudo-state property changes
                          without a transition declared). data-group="triggers"
                          + DOM ids kept for backward compat with the JS module. -->
-                    <div class="preview-animations-group preview-animations-group--triggers" data-group="triggers" title="<?= htmlspecialchars(__admin('preview.hoverStateOnlyTooltip', 'Selectors that change appearance in :hover, :focus, etc., without a transition declared.'), ENT_QUOTES) ?>">
+                    <div class="preview-animations-group preview-animations-group--triggers" data-group="triggers" title="<?= adminAttr(__admin('preview.hoverStateOnlyTooltip')) ?>">
                         <button type="button" class="preview-animations-group__header">
                             <svg class="preview-animations-group__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <polyline points="6 9 12 15 18 9"/>
                             </svg>
-                            <span class="preview-animations-group__title"><?= __admin('preview.triggersNoTransition') ?? 'Hover-state-only' ?></span>
+                            <span class="preview-animations-group__title"><?= adminEscape(__admin('preview.triggersNoTransition')) ?></span>
                             <svg class="preview-animations-group__info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true">
                                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                             </svg>
@@ -483,7 +479,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
                             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                         </svg>
-                        <span><?= __admin('preview.noAnimatedSelectors') ?? 'No selectors with transitions or animations' ?></span>
+                        <span><?= adminEscape(__admin('preview.noAnimatedSelectors')) ?></span>
                     </div>
                 </div>
 
@@ -494,10 +490,10 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
-                            <?= __admin('preview.keyframesLibrary') ?? 'Keyframes library' ?>
+                            <?= adminEscape(__admin('preview.keyframesLibrary')) ?>
                         </h4>
                         <span class="preview-animations-section__count" id="keyframes-count">0</span>
-                        <button type="button" class="admin-btn admin-btn--ghost" id="keyframe-add-btn" title="<?= __admin('preview.createKeyframe') ?? 'Create new @keyframes' ?>">
+                        <button type="button" class="admin-btn admin-btn--ghost" id="keyframe-add-btn" title="<?= adminAttr(__admin('preview.createKeyframe')) ?>">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
@@ -508,7 +504,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
-                        <span><?= __admin('preview.noKeyframes') ?? 'No @keyframes defined yet' ?></span>
+                        <span><?= adminEscape(__admin('preview.noKeyframes')) ?></span>
                     </div>
 
                     <div class="preview-keyframes-list" id="keyframes-list">
@@ -526,20 +522,20 @@
         <div class="preview-source-panel" id="source-panel" data-tab="source" style="display: none;">
             <div class="preview-source-sidebar">
                 <div class="preview-source-sidebar__row">
-                    <span class="preview-source-sidebar__label"><?= __admin('preview.styleSourceFile', 'File') ?>:</span>
+                    <span class="preview-source-sidebar__label"><?= adminEscape(__admin('preview.styleSourceFile')) ?>:</span>
                     <code class="preview-source-sidebar__file" id="source-sidebar-file">style.css</code>
                 </div>
                 <!-- Dirty indicator. Hidden when content === server. JS toggles
                      the --dirty modifier when state changes. -->
                 <div class="preview-source-sidebar__status preview-source-sidebar__status--clean" id="source-sidebar-status">
                     <span class="preview-source-sidebar__status-dot" aria-hidden="true">●</span>
-                    <span id="source-sidebar-status-text"><?= __admin('preview.styleSourceClean', 'All saved') ?></span>
+                    <span id="source-sidebar-status-text"><?= adminEscape(__admin('preview.styleSourceClean')) ?></span>
                 </div>
                 <div class="preview-source-sidebar__hint">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <polyline points="9 18 15 12 9 6"/>
                     </svg>
-                    <span><?= __admin('preview.styleSourceEditInCanvas', 'Edit style.css in the canvas') ?></span>
+                    <span><?= adminEscape(__admin('preview.styleSourceEditInCanvas')) ?></span>
                 </div>
                 <div class="preview-source-sidebar__actions">
                     <button type="button"
@@ -551,7 +547,7 @@
                             <polyline points="17 21 17 13 7 13 7 21"/>
                             <polyline points="7 3 7 8 15 8"/>
                         </svg>
-                        <span id="source-sidebar-save-label"><?= __admin('preview.styleSourceSave', 'Save') ?></span>
+                        <span id="source-sidebar-save-label"><?= adminEscape(__admin('preview.styleSourceSave')) ?></span>
                     </button>
                     <button type="button"
                             id="source-sidebar-cancel-btn"
@@ -561,7 +557,7 @@
                             <polyline points="1 4 1 10 7 10"/>
                             <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                         </svg>
-                        <span><?= __admin('preview.styleSourceCancel', 'Cancel') ?></span>
+                        <span><?= adminEscape(__admin('preview.styleSourceCancel')) ?></span>
                     </button>
                 </div>
                 <!-- Refine link navigates in the SAME tab.
@@ -575,7 +571,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                     </svg>
-                    <span><?= __admin('preview.styleSourceRefine', 'Refine in CSS Refiner') ?></span>
+                    <span><?= adminEscape(__admin('preview.styleSourceRefine')) ?></span>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="opacity: 0.6;">
                         <polyline points="9 18 15 12 9 6"/>
                     </svg>
@@ -586,17 +582,17 @@
         <!-- Style Editor Panel - shows when editing a selector -->
         <div class="preview-style-editor" id="style-editor" style="display: none;">
             <div class="preview-style-editor__header">
-                <button type="button" class="preview-style-editor__back" id="style-editor-back" title="<?= __admin('common.back') ?? 'Back' ?>">
+                <button type="button" class="preview-style-editor__back" id="style-editor-back" title="<?= adminAttr(__admin('common.back')) ?>">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                         <polyline points="15 18 9 12 15 6"/>
                     </svg>
                 </button>
                 <div class="preview-style-editor__title">
-                    <span class="preview-style-editor__label" id="style-editor-label" title="<?= __admin('preview.clickToGoBack') ?? 'Click to go back' ?>"><?= __admin('preview.editingSelector') ?? 'Editing' ?>:</span>
+                    <span class="preview-style-editor__label" id="style-editor-label" title="<?= adminAttr(__admin('preview.clickToGoBack')) ?>"><?= adminEscape(__admin('preview.editingSelector')) ?>:</span>
                     <code class="preview-style-editor__selector" id="style-editor-selector"></code>
                     <span class="preview-rule-media" id="style-editor-media" hidden></span>
                 </div>
-                <span class="preview-style-editor__badge" id="style-editor-badge" title="<?= __admin('preview.affectedElementsHint') ?? 'Number of elements affected by this selector' ?>">
+                <span class="preview-style-editor__badge" id="style-editor-badge" title="<?= adminAttr(__admin('preview.affectedElementsHint')) ?>">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                     </svg>
@@ -610,7 +606,7 @@
                     <circle cx="12" cy="12" r="10" opacity="0.25"/>
                     <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
                 </svg>
-                <span><?= __admin('common.loading') ?>...</span>
+                <span><?= adminEscape(__admin('common.loading')) ?></span>
             </div>
             
             <!-- Empty State (selector has no styles) -->
@@ -619,12 +615,12 @@
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                     <polyline points="14 2 14 8 20 8"/>
                 </svg>
-                <span><?= __admin('preview.noStylesDefined') ?? 'No styles defined for this selector' ?></span>
+                <span><?= adminEscape(__admin('preview.noStylesDefined')) ?></span>
                 <button type="button" class="admin-btn admin-btn--ghost" id="style-editor-add-first">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    <?= __admin('preview.addProperty') ?? 'Add Property' ?>
+                    <?= adminEscape(__admin('preview.addProperty')) ?>
                 </button>
             </div>
             
@@ -639,7 +635,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                     </svg>
-                    <?= __admin('preview.addProperty') ?? 'Add Property' ?>
+                    <?= adminEscape(__admin('preview.addProperty')) ?>
                 </button>
             </div>
             
@@ -649,14 +645,14 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                     </svg>
-                    <?= __admin('common.reset') ?? 'Reset' ?>
+                    <?= adminEscape(__admin('common.reset')) ?>
                 </button>
                 <button type="button" class="admin-btn admin-btn--primary" id="style-editor-save">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                         <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
                     </svg>
-                    <?= __admin('common.save') ?? 'Save' ?>
+                    <?= adminEscape(__admin('common.save')) ?>
                 </button>
             </div>
         </div>

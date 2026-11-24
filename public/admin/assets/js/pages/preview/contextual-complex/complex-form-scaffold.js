@@ -387,14 +387,12 @@
                 return;
             }
             autoseedGroup.style.display = '';
-            autoseedHint.textContent = propNames.length === 1
-                ? t('formScaffold.schemaFieldsOne')
-                : t('formScaffold.schemaFieldsMany', { n: propNames.length });
+            autoseedHint.textContent = QSPanelWords.count('complexWizard.formScaffold.schemaFields', propNames.length);
 
             const namedCount = _currentNamedFieldCount();
             if (namedCount > 0) {
-                autoseedBtn.textContent = t('formScaffold.reset', { n: namedCount });
-                autoseedBtn.title = t('formScaffold.resetTitle', { n: namedCount });
+                autoseedBtn.textContent = t('formScaffold.reset', { n: QSPanelWords.number(namedCount) });
+                autoseedBtn.title = QSPanelWords.count('complexWizard.formScaffold.resetTooltip', namedCount);
             } else {
                 autoseedBtn.textContent = t('formScaffold.prefill');
                 autoseedBtn.title = '';
@@ -406,7 +404,7 @@
             // Replacing fields the user has named asks first, with the panel's own dialog.
             const namedCount = _currentNamedFieldCount();
             if (namedCount > 0) {
-                const ok = await QuickSiteUtils.confirm(t('formScaffold.confirmMessage', { n: namedCount }), {
+                const ok = await QuickSiteUtils.confirm(QSPanelWords.count('complexWizard.formScaffold.confirmReplace', namedCount), {
                     title: t('formScaffold.confirmTitle'),
                     type: 'danger',
                     confirmText: t('formScaffold.confirmButton'),
@@ -499,10 +497,10 @@
             for (let i = 0; i < cfg.fields.length; i++) {
                 const f = cfg.fields[i];
                 if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(f.name)) {
-                    return t('formScaffold.errors.fieldName', { name: f.name, row: i + 1 });
+                    return t('formScaffold.errors.fieldName', { name: f.name, row: QSPanelWords.number(i + 1) });
                 }
                 if (!f.labelKey) {
-                    return t('formScaffold.errors.fieldLabel', { name: f.name, row: i + 1 });
+                    return t('formScaffold.errors.fieldLabel', { name: f.name, row: QSPanelWords.number(i + 1) });
                 }
             }
             if (cfg.fetchOnSubmit && cfg.submitMode === 'api' && (!cfg.apiId || !cfg.endpointId)) {

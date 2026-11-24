@@ -13,6 +13,7 @@
 // Include tag examples for preview panel
 require_once __DIR__ . '/_tag-examples.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php'; // qs_inline_script_json
 
 // Ensure $selectorId is set
 $selectorId = $selectorId ?? 'add';
@@ -56,7 +57,7 @@ foreach ($tagCategories as $catId => $category) {
         <!-- Trigger button (shows current selection) -->
         <button type="button" class="tag-dropdown__trigger" id="<?= $selectorId ?>-tag-trigger">
             <span class="tag-dropdown__value" id="<?= $selectorId ?>-tag-display">&lt;div&gt;</span>
-            <span class="tag-dropdown__desc" id="<?= $selectorId ?>-tag-display-desc"><?= __admin('preview.tagDesc.div') ?? 'Generic container' ?></span>
+            <span class="tag-dropdown__desc" id="<?= $selectorId ?>-tag-display-desc"><?= adminEscape(__admin('preview.tagDesc.div')) ?></span>
             <svg class="tag-dropdown__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"/>
             </svg>
@@ -72,7 +73,7 @@ foreach ($tagCategories as $catId => $category) {
                 <input type="text" 
                        class="tag-dropdown__search-input admin-input" 
                        id="<?= $selectorId ?>-tag-search"
-                       placeholder="<?= __admin('preview.searchTags') ?? 'Search tags... (Enter = quick add)' ?>"
+                       placeholder="<?= adminAttr(__admin('preview.searchTags')) ?>"
                        autocomplete="off">
             </div>
             
@@ -82,7 +83,7 @@ foreach ($tagCategories as $catId => $category) {
                 <div class="tag-dropdown__group tag-dropdown__group--favorites" id="<?= $selectorId ?>-tag-favorites-group" style="display: none;">
                     <button type="button" class="tag-dropdown__group-header" data-group="favorites">
                         <span class="tag-dropdown__group-icon">★</span>
-                        <span class="tag-dropdown__group-label"><?= __admin('preview.favorites') ?? 'Favorites' ?></span>
+                        <span class="tag-dropdown__group-label"><?= adminEscape(__admin('preview.favorites')) ?></span>
                         <svg class="tag-dropdown__group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
                     <div class="tag-dropdown__group-items" id="<?= $selectorId ?>-tag-favorites-items">
@@ -94,7 +95,7 @@ foreach ($tagCategories as $catId => $category) {
                 <div class="tag-dropdown__group tag-dropdown__group--suggested" id="<?= $selectorId ?>-tag-suggested-group" style="display: none;">
                     <button type="button" class="tag-dropdown__group-header" data-group="suggested">
                         <span class="tag-dropdown__group-icon">✦</span>
-                        <span class="tag-dropdown__group-label"><?= __admin('preview.suggested') ?? 'Suggested' ?></span>
+                        <span class="tag-dropdown__group-label"><?= adminEscape(__admin('preview.suggested')) ?></span>
                         <svg class="tag-dropdown__group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
                     <div class="tag-dropdown__group-items" id="<?= $selectorId ?>-tag-suggested-items">
@@ -121,7 +122,7 @@ foreach ($tagCategories as $catId => $category) {
                             <code class="tag-dropdown__option-tag">&lt;<?= $tagName ?>&gt;</code>
                             <span class="tag-dropdown__option-desc"><?= htmlspecialchars($tagInfo['desc']) ?></span>
                             <?php if (!empty($tagInfo['required'])): ?>
-                            <span class="tag-dropdown__option-required" title="<?= __admin('preview.requiresParams') ?? 'Requires parameters' ?>">*</span>
+                            <span class="tag-dropdown__option-required" title="<?= adminAttr(__admin('preview.requiresParams')) ?>">*</span>
                             <?php endif; ?>
                         </button>
                         <?php endforeach; ?>
@@ -134,18 +135,18 @@ foreach ($tagCategories as $catId => $category) {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </svg>
-                    <span><?= __admin('preview.noTagsFound') ?? 'No tags found' ?></span>
+                    <span><?= adminEscape(__admin('preview.noTagsFound')) ?></span>
                 </div>
             </div>
         </div>
     </div>
     
     <!-- Star button (below dropdown) -->
-    <button type="button" class="tag-dropdown__star-btn" id="<?= $selectorId ?>-tag-star" title="<?= __admin('preview.starTag') ?? 'Add to favorites' ?>">
+    <button type="button" class="tag-dropdown__star-btn" id="<?= $selectorId ?>-tag-star" title="<?= adminAttr(__admin('preview.starTag')) ?>">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
         </svg>
-        <span id="<?= $selectorId ?>-tag-star-label"><?= __admin('preview.starTag') ?? 'Add to favorites' ?></span>
+        <span id="<?= $selectorId ?>-tag-star-label"><?= adminEscape(__admin('preview.starTag')) ?></span>
     </button>
     
     <!-- Hidden input to store selected tag value -->
@@ -155,7 +156,7 @@ foreach ($tagCategories as $catId => $category) {
     <div class="tag-selector__preview" id="<?= $selectorId ?>-tag-preview">
         <div class="tag-selector__preview-header">
             <code class="tag-selector__preview-tag" id="<?= $selectorId ?>-tag-preview-name">&lt;div&gt;</code>
-            <button type="button" class="tag-selector__code-toggle" id="<?= $selectorId ?>-tag-code-toggle" title="<?= __admin('preview.showHtml') ?? 'Show HTML' ?>">
+            <button type="button" class="tag-selector__code-toggle" id="<?= $selectorId ?>-tag-code-toggle" title="<?= adminAttr(__admin('preview.showHtml')) ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="16 18 22 12 16 6"></polyline>
                     <polyline points="8 6 2 12 8 18"></polyline>
@@ -163,7 +164,7 @@ foreach ($tagCategories as $catId => $category) {
             </button>
         </div>
         <p class="tag-selector__preview-desc" id="<?= $selectorId ?>-tag-preview-desc">
-            <?= __admin('preview.tagDesc.div') ?? 'Generic container' ?>
+            <?= adminEscape(__admin('preview.tagDesc.div')) ?>
         </p>
         <!-- The example is a visitor's markup: its titles stay the browser's, never the panel's bubble -->
         <div class="tag-selector__preview-render" id="<?= $selectorId ?>-tag-preview-render" data-qs-native-title>
@@ -176,7 +177,7 @@ foreach ($tagCategories as $catId => $category) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
-            <span><?= __admin('preview.noVisualPreview') ?? 'No visual preview' ?></span>
+            <span><?= adminEscape(__admin('preview.noVisualPreview')) ?></span>
         </div>
     </div>
     
@@ -189,10 +190,10 @@ foreach ($tagCategories as $catId => $category) {
     <!-- Tag data for JS (categories, each tag's description and parameters) -->
     <script type="application/json" id="<?= $selectorId ?>-tag-data">
     <?php 
-    echo json_encode([
+    echo qs_inline_script_json([
         'tags' => $tagDataForJs,
         'categories' => array_map(fn($c) => ['label' => $c['label']], $tagCategories),
-    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+    ]);
     ?>
     </script>
 </div>

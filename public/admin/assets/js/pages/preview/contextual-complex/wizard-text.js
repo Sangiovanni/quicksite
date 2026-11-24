@@ -2,10 +2,11 @@
  * The complex wizards' words (Add Element → Complex tab).
  *
  *   QSComplexWizard.t(key, params)
- *     The `complexWizard` translations preview-config.php emits as
- *     window.QS_COMPLEX_WIZARD_I18N. A key the file lacks shows as its own path
- *     (`complexWizard.<key>`), so a missing one is seen rather than hidden.
- *     `{name}` placeholders take `params[name]`.
+ *     A word of the `complexWizard` section, `complexWizard.<key>`, read through
+ *     the panel's one lookup (QSPanelWords): a word no file holds shows its path,
+ *     and `{name}` placeholders take `params[name]`. The editor hands the whole
+ *     section; the APIs page hands `complexWizard.storageKeyPicker`, all its
+ *     storage-key picker reads.
  *
  *   QSComplexWizard.codeText(text, codes)
  *     A sentence whose `{name}` markers are code: each becomes a <code> element
@@ -22,17 +23,7 @@
     'use strict';
 
     function t(key, params) {
-        const tree = (window.QS_COMPLEX_WIZARD_I18N && window.QS_COMPLEX_WIZARD_I18N.complexWizard) || {};
-        let value = String(key).split('.').reduce(function (node, part) {
-            return node && typeof node === 'object' ? node[part] : undefined;
-        }, tree);
-        if (typeof value !== 'string') return 'complexWizard.' + key;
-        if (params) {
-            Object.keys(params).forEach(function (name) {
-                value = value.split('{' + name + '}').join(String(params[name]));
-            });
-        }
-        return value;
+        return window.QSPanelWords.t('complexWizard.' + key, params);
     }
 
     function codeText(text, codes) {

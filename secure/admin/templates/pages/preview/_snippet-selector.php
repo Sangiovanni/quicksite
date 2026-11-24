@@ -20,7 +20,7 @@ $selectorId = $selectorId ?? 'add';
     <div class="tag-dropdown" id="<?= $selectorId ?>-snippet-dropdown">
         <!-- Trigger button (shows current selection) -->
         <button type="button" class="tag-dropdown__trigger" id="<?= $selectorId ?>-snippet-trigger">
-            <span class="tag-dropdown__value" id="<?= $selectorId ?>-snippet-display"><?= __admin('preview.selectSnippet', 'Select a snippet') ?></span>
+            <span class="tag-dropdown__value" id="<?= $selectorId ?>-snippet-display"><?= adminEscape(__admin('preview.selectSnippet')) ?></span>
             <span class="tag-dropdown__desc" id="<?= $selectorId ?>-snippet-display-desc"></span>
             <svg class="tag-dropdown__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"/>
@@ -37,7 +37,7 @@ $selectorId = $selectorId ?? 'add';
                 <input type="text" 
                        class="tag-dropdown__search-input admin-input" 
                        id="<?= $selectorId ?>-snippet-search"
-                       placeholder="<?= __admin('preview.searchSnippets', 'Search snippets...') ?>"
+                       placeholder="<?= adminAttr(__admin('preview.searchSnippets')) ?>"
                        autocomplete="off">
             </div>
             
@@ -45,7 +45,7 @@ $selectorId = $selectorId ?? 'add';
             <div class="tag-dropdown__options" id="<?= $selectorId ?>-snippet-options">
                 <div class="snippet-selector__loading">
                     <div></div>
-                    <?= __admin('common.loading', 'Loading...') ?>
+                    <?= adminEscape(__admin('common.loading')) ?>
                 </div>
             </div>
             
@@ -54,7 +54,7 @@ $selectorId = $selectorId ?? 'add';
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
-                <span><?= __admin('preview.noSnippetsFound', 'No snippets found') ?></span>
+                <span><?= adminEscape(__admin('preview.noSnippetsFound')) ?></span>
             </div>
         </div>
     </div>
@@ -77,18 +77,18 @@ $selectorId = $selectorId ?? 'add';
         </div>
         <label class="snippet-selector__style-toggle" id="<?= $selectorId ?>-snippet-style-toggle" style="display: none;">
             <input type="checkbox" id="<?= $selectorId ?>-snippet-style-toggle-input">
-            <span><?= __admin('preview.withoutProjectStyle', 'Without current project style') ?></span>
+            <span><?= adminEscape(__admin('preview.withoutProjectStyle')) ?></span>
         </label>
         <label class="snippet-selector__style-toggle" id="<?= $selectorId ?>-snippet-keys-toggle">
             <input type="checkbox" id="<?= $selectorId ?>-snippet-keys-toggle-input">
-            <span><?= __admin('preview.snippetShowKeys') ?></span>
+            <span><?= adminEscape(__admin('preview.snippetShowKeys')) ?></span>
         </label>
         <!-- CSS Selector Status (populated by JS from getSnippet response) -->
         <div class="snippet-selector__css-status" id="<?= $selectorId ?>-snippet-css-status" style="display: none;">
             <div class="snippet-selector__css-status-header">
-                <span>CSS Selectors</span>
+                <span><?= adminEscape(__admin('preview.snippetCssSelectors')) ?></span>
                 <button type="button" class="snippet-selector__css-toggle" id="<?= $selectorId ?>-snippet-css-toggle">
-                    <?= __admin('preview.savedCss', 'Saved CSS') ?> ▼
+                    <?= adminEscape(__admin('preview.savedCss')) ?> ▼
                 </button>
             </div>
             <div class="snippet-selector__css-selectors" id="<?= $selectorId ?>-snippet-css-selectors"></div>
@@ -96,18 +96,18 @@ $selectorId = $selectorId ?? 'add';
             <div class="snippet-selector__css-options" id="<?= $selectorId ?>-snippet-css-options" style="display: none;">
                 <label class="snippet-selector__css-option">
                     <input type="radio" name="<?= $selectorId ?>-snippet-css-action" value="skip" checked>
-                    <span><?= __admin('preview.cssSkip', "Don't touch CSS") ?></span>
+                    <span><?= adminEscape(__admin('preview.cssSkip')) ?></span>
                 </label>
                 <label class="snippet-selector__css-option" id="<?= $selectorId ?>-snippet-css-option-missing">
                     <input type="radio" name="<?= $selectorId ?>-snippet-css-action" value="missing">
-                    <span><?= __admin('preview.cssMissing', 'Add only missing CSS') ?></span>
+                    <span><?= adminEscape(__admin('preview.cssMissing')) ?></span>
                 </label>
                 <label class="snippet-selector__css-option">
                     <input type="radio" name="<?= $selectorId ?>-snippet-css-action" value="replace">
-                    <span><?= __admin('preview.cssReplace', 'Replace all snippet CSS') ?></span>
+                    <span><?= adminEscape(__admin('preview.cssReplace')) ?></span>
                 </label>
                 <div class="snippet-selector__css-warning" id="<?= $selectorId ?>-snippet-css-warning" style="display: none;">
-                    <span>⚠</span> <?= __admin('preview.cssWarning', 'This will permanently modify the project stylesheet and may affect all pages.') ?>
+                    <span>⚠</span> <?= adminEscape(__admin('preview.cssWarning')) ?>
                 </div>
             </div>
             <pre class="snippet-selector__css-code" id="<?= $selectorId ?>-snippet-css-code" style="display: none;"></pre>
@@ -116,7 +116,7 @@ $selectorId = $selectorId ?? 'add';
         <!-- Actions for non-core snippets -->
         <div class="snippet-selector__preview-actions" id="<?= $selectorId ?>-snippet-preview-actions" style="display: none;">
             <button type="button" class="admin-btn admin-btn--ghost admin-action admin-action--delete" id="delete-snippet-btn" data-qs-icon="trash"
-                    title="<?= adminAttr(__admin('preview.deleteSnippet', 'Delete Snippet')) ?>" aria-label="<?= adminAttr(__admin('preview.deleteSnippet', 'Delete Snippet')) ?>"></button>
+                    title="<?= adminAttr(__admin('preview.deleteSnippet')) ?>" aria-label="<?= adminAttr(__admin('preview.deleteSnippet')) ?>"></button>
         </div>
     </div>
 </div>

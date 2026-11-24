@@ -5,7 +5,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;">
                 <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
-            <?= __admin('preview.emulation') ?? 'Variable Emulation' ?>
+            <?= adminEscape(__admin('preview.emulation')) ?>
         </h4>
         <button type="button" class="admin-modal__close" id="emulation-panel-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
     </div>
@@ -13,7 +13,7 @@
     <!-- Loading state -->
     <div class="preview-emulation-panel__loading" id="emulation-panel-loading">
         <span class="admin-spinner"></span>
-        <span><?= __admin('common.loading') ?? 'Loading...' ?></span>
+        <span><?= adminEscape(__admin('common.loading')) ?></span>
     </div>
 
     <!-- Empty state (no variables) -->
@@ -21,7 +21,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:32px;height:32px;opacity:0.4;">
             <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        <span><?= __admin('preview.noVariablesToEmulate') ?? 'No variables found in this component' ?></span>
+        <span><?= adminEscape(__admin('preview.noVariablesToEmulate')) ?></span>
     </div>
 
     <!-- Variables form container (populated by JS) -->
@@ -33,7 +33,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <polygon points="5 3 19 12 5 21 5 3"/>
             </svg>
-            <?= __admin('preview.emulationApply') ?? 'Apply Preview' ?>
+            <?= adminEscape(__admin('preview.emulationApply')) ?>
         </button>
         <!-- Live-data toggle. Visible only for page-edit
              mode; component emulation has no resolver to go live against.
@@ -42,13 +42,13 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/>
             </svg>
-            <span data-emulation-live-label><?= __admin('preview.emulationUseLive') ?? 'Use Live Data' ?></span>
+            <span data-emulation-live-label><?= adminEscape(__admin('preview.emulationUseLive')) ?></span>
         </button>
         <button type="button" class="admin-btn admin-btn--outline" id="emulation-reset-btn">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
             </svg>
-            <?= __admin('preview.emulationReset') ?? 'Reset All' ?>
+            <?= adminEscape(__admin('preview.emulationReset')) ?>
         </button>
     </div>
 </div>

@@ -9,9 +9,9 @@
     <div class="apply-keyframe-modal__dialog" role="dialog" aria-labelledby="apply-keyframe-modal-title">
         <div class="apply-keyframe-modal__header">
             <h3 class="apply-keyframe-modal__title" id="apply-keyframe-modal-title">
-                <span><?= __admin('preview.applyKeyframeTitle', 'Apply') ?></span>
+                <span><?= adminEscape(__admin('preview.applyKeyframeTitle')) ?></span>
                 <code id="apply-keyframe-modal-name">@keyframes</code>
-                <span><?= __admin('preview.applyKeyframeTitleTo', 'to selector') ?></span>
+                <span><?= adminEscape(__admin('preview.applyKeyframeTitleTo')) ?></span>
             </h3>
             <button type="button" class="admin-modal__close" id="apply-keyframe-modal-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
@@ -19,7 +19,7 @@
             <input type="text"
                    class="apply-keyframe-modal__search admin-input"
                    id="apply-keyframe-modal-search"
-                   placeholder="<?= __admin('preview.searchSelectors', 'Search selectors…') ?>"
+                   placeholder="<?= adminAttr(__admin('preview.searchSelectors')) ?>"
                    autocomplete="off"
                    spellcheck="false">
             <div class="apply-keyframe-modal__list" id="apply-keyframe-modal-list" role="listbox">
@@ -28,10 +28,10 @@
         </div>
         <div class="apply-keyframe-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" id="apply-keyframe-modal-cancel">
-                <?= __admin('common.cancel') ?? 'Cancel' ?>
+                <?= adminEscape(__admin('common.cancel')) ?>
             </button>
             <button type="button" class="admin-btn admin-btn--primary" id="apply-keyframe-modal-apply" disabled>
-                <?= __admin('preview.applyKeyframeAction', 'Apply') ?>
+                <?= adminEscape(__admin('preview.applyKeyframeAction')) ?>
             </button>
         </div>
     </div>

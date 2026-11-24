@@ -16,10 +16,10 @@
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
         <span class="preview-iframe-warning__text">
-            <?= __admin('preview.iframeWarningText') ?>
+            <?= adminEscape(__admin('preview.iframeWarningText')) ?>
         </span>
         <?php if ($router->isEmbedSecurityShown()): ?>
-        <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link"><?= __admin('preview.iframeWarningLink') ?> &rarr;</a>
+        <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link"><?= adminEscape(__admin('preview.iframeWarningLink')) ?> &rarr;</a>
         <?php endif; ?>
         <button type="button" class="admin-modal__close" id="preview-iframe-warning-close" data-qs-icon="close"
                 aria-label="<?= adminAttr(__admin('preview.iframeWarningDismiss')) ?>" title="<?= adminAttr(__admin('preview.iframeWarningDismiss')) ?>"></button>
@@ -50,7 +50,7 @@
                     <input type="text"
                            id="preview-source-search-input"
                            class="preview-source-canvas__search-input"
-                           placeholder="<?= __admin('preview.styleSourceFindPlaceholder', 'Find… (type :N to jump to line N)') ?>"
+                           placeholder="<?= adminAttr(__admin('preview.styleSourceFindPlaceholder')) ?>"
                            autocomplete="off"
                            spellcheck="false">
                 </div>
@@ -58,7 +58,7 @@
                 <button type="button"
                         id="preview-source-search-prev"
                         class="preview-source-canvas__search-btn"
-                        title="<?= __admin('preview.styleSourceFindPrev', 'Previous match (Shift+Enter)') ?>"
+                        title="<?= adminAttr(__admin('preview.styleSourceFindPrev')) ?>"
                         disabled>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <polyline points="18 15 12 9 6 15"/>
@@ -67,7 +67,7 @@
                 <button type="button"
                         id="preview-source-search-next"
                         class="preview-source-canvas__search-btn"
-                        title="<?= __admin('preview.styleSourceFindNext', 'Next match (Enter)') ?>"
+                        title="<?= adminAttr(__admin('preview.styleSourceFindNext')) ?>"
                         disabled>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                         <polyline points="6 9 12 15 18 9"/>
@@ -85,19 +85,19 @@
                 <polyline points="3 3 3 8 8 8"/>
             </svg>
             <div class="preview-source-canvas__restore-text">
-                <span class="preview-source-canvas__restore-title"><?= __admin('preview.styleSourceRestoreTitle', 'Unsaved draft available') ?></span>
+                <span class="preview-source-canvas__restore-title"><?= adminEscape(__admin('preview.styleSourceRestoreTitle')) ?></span>
                 <span class="preview-source-canvas__restore-detail" id="preview-source-restore-detail"></span>
             </div>
             <div class="preview-source-canvas__restore-actions">
                 <button type="button"
                         id="preview-source-restore-accept"
                         class="admin-btn admin-btn--primary">
-                    <?= __admin('preview.styleSourceRestoreAccept', 'Restore') ?>
+                    <?= adminEscape(__admin('preview.styleSourceRestoreAccept')) ?>
                 </button>
                 <button type="button"
                         id="preview-source-restore-decline"
                         class="admin-btn admin-btn--ghost">
-                    <?= __admin('preview.styleSourceRestoreDecline', 'Discard') ?>
+                    <?= adminEscape(__admin('preview.styleSourceRestoreDecline')) ?>
                 </button>
             </div>
         </div>
@@ -113,21 +113,21 @@
                 <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <div class="preview-source-canvas__restore-text">
-                <span class="preview-source-canvas__restore-title"><?= __admin('preview.styleSourceConflictTitle') ?></span>
-                <span class="preview-source-canvas__restore-detail"><?= __admin('preview.styleSourceConflictDetail') ?></span>
+                <span class="preview-source-canvas__restore-title"><?= adminEscape(__admin('preview.styleSourceConflictTitle')) ?></span>
+                <span class="preview-source-canvas__restore-detail"><?= adminEscape(__admin('preview.styleSourceConflictDetail')) ?></span>
             </div>
             <div class="preview-source-canvas__restore-actions">
                 <button type="button"
                         id="preview-source-conflict-reload"
                         class="admin-btn admin-btn--primary"
-                        title="<?= __admin('preview.styleSourceConflictReloadHint') ?>">
-                    <?= __admin('preview.styleSourceConflictReload') ?>
+                        title="<?= adminAttr(__admin('preview.styleSourceConflictReloadHint')) ?>">
+                    <?= adminEscape(__admin('preview.styleSourceConflictReload')) ?>
                 </button>
                 <button type="button"
                         id="preview-source-conflict-overwrite"
                         class="admin-btn admin-btn--ghost"
-                        title="<?= __admin('preview.styleSourceConflictOverwriteHint') ?>">
-                    <?= __admin('preview.styleSourceConflictOverwrite') ?>
+                        title="<?= adminAttr(__admin('preview.styleSourceConflictOverwriteHint')) ?>">
+                    <?= adminEscape(__admin('preview.styleSourceConflictOverwrite')) ?>
                 </button>
             </div>
         </div>
@@ -138,7 +138,7 @@
                     <circle cx="12" cy="12" r="10" opacity="0.25"/>
                     <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
                 </svg>
-                <span><?= __admin('preview.styleSourceLoading', 'Loading style.css…') ?></span>
+                <span><?= adminEscape(__admin('preview.styleSourceLoading')) ?></span>
             </div>
         </div>
     </div>
@@ -169,13 +169,13 @@
                 id="preview-iframe"
                 class="preview-iframe"
                 src="<?= $siteUrl ?>"
-                title="<?= __admin('preview.iframeTitle') ?>"
+                title="<?= adminAttr(__admin('preview.iframeTitle')) ?>"
             ></iframe>
             
             <!-- Loading Overlay -->
             <div class="preview-loading" id="preview-loading">
                 <div class="preview-loading__spinner"></div>
-                <span><?= __admin('common.loading') ?></span>
+                <span><?= adminEscape(__admin('common.loading')) ?></span>
             </div>
 
             <!-- The frame's handles, shown with the bar: its right edge, its bottom edge and its corner -->

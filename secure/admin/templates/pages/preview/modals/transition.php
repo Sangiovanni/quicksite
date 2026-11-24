@@ -8,7 +8,7 @@
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content transition-editor__content">
         <div class="preview-keyframe-modal__header">
-            <h3><?= __admin('preview.stateAnimationEditor') ?? 'State & Animation Editor' ?></h3>
+            <h3><?= adminEscape(__admin('preview.stateAnimationEditor')) ?></h3>
             <span class="transition-editor__selector" id="transition-editor-selector">.selector</span>
             <span class="preview-rule-media" id="transition-editor-media" hidden></span>
             <button type="button" class="admin-modal__close" id="transition-editor-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
@@ -20,12 +20,12 @@
                 <!-- Base State Panel -->
                 <div class="transition-editor__state-panel">
                     <div class="transition-editor__state-header">
-                        <span class="transition-editor__state-label"><?= __admin('preview.baseState') ?? 'Base State' ?></span>
+                        <span class="transition-editor__state-label"><?= adminEscape(__admin('preview.baseState')) ?></span>
                         <code class="transition-editor__state-selector" id="transition-base-selector">.selector</code>
                     </div>
                     <div class="transition-editor__state-properties" id="transition-base-properties">
                         <!-- Base state properties will be rendered here -->
-                        <div class="transition-editor__empty"><?= __admin('preview.selectSelectorFirst') ?? 'Select a selector first' ?></div>
+                        <div class="transition-editor__empty"><?= adminEscape(__admin('preview.selectSelectorFirst')) ?></div>
                     </div>
                     <!-- Inline Add Property Form for Base State -->
                     <div class="transition-editor__add-property" id="transition-base-add-property">
@@ -33,7 +33,7 @@
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            <?= __admin('preview.addProperty') ?? 'Add Property' ?>
+                            <?= adminEscape(__admin('preview.addProperty')) ?>
                         </button>
                         <div class="transition-editor__add-property-form" id="transition-base-add-form" style="display: none;">
                             <div id="transition-base-prop-selector"></div>
@@ -41,12 +41,12 @@
                                 <div class="transition-editor__value-container" id="transition-base-value-container"></div>
                             </div>
                             <div class="transition-editor__add-property-actions">
-                                <button type="button" class="admin-btn admin-btn--ghost" id="transition-base-add-cancel"><?= __admin('common.cancel') ?></button>
+                                <button type="button" class="admin-btn admin-btn--ghost" id="transition-base-add-cancel"><?= adminEscape(__admin('common.cancel')) ?></button>
                                 <button type="button" class="admin-btn admin-btn--primary" id="transition-base-add-confirm">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                                     </svg>
-                                    <?= __admin('common.add') ?>
+                                    <?= adminEscape(__admin('common.add')) ?>
                                 </button>
                             </div>
                         </div>
@@ -64,7 +64,7 @@
                 <!-- Trigger State Panel -->
                 <div class="transition-editor__state-panel">
                     <div class="transition-editor__state-header">
-                        <span class="transition-editor__state-label" id="transition-trigger-label"><?= __admin('preview.triggerState') ?? 'Trigger State' ?></span>
+                        <span class="transition-editor__state-label" id="transition-trigger-label"><?= adminEscape(__admin('preview.triggerState')) ?></span>
                         <select class="transition-editor__pseudo-select" id="transition-pseudo-select">
                             <option value=":hover">:hover</option>
                             <option value=":focus">:focus</option>
@@ -75,7 +75,7 @@
                     </div>
                     <div class="transition-editor__state-properties" id="transition-hover-properties">
                         <!-- Trigger state properties will be rendered here -->
-                        <div class="transition-editor__empty"><?= __admin('preview.noTriggerStyles') ?? 'No trigger styles defined' ?></div>
+                        <div class="transition-editor__empty"><?= adminEscape(__admin('preview.noTriggerStyles')) ?></div>
                     </div>
                     <!-- Inline Add Property Form for Trigger State -->
                     <div class="transition-editor__add-property" id="transition-trigger-add-property">
@@ -83,7 +83,7 @@
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            <span id="transition-trigger-add-text"><?= __admin('preview.addProperty') ?? 'Add Property' ?></span>
+                            <span id="transition-trigger-add-text"><?= adminEscape(__admin('preview.addProperty')) ?></span>
                         </button>
                         <div class="transition-editor__add-property-form" id="transition-trigger-add-form" style="display: none;">
                             <div id="transition-trigger-prop-selector"></div>
@@ -91,12 +91,12 @@
                                 <div class="transition-editor__value-container" id="transition-trigger-value-container"></div>
                             </div>
                             <div class="transition-editor__add-property-actions">
-                                <button type="button" class="admin-btn admin-btn--ghost" id="transition-trigger-add-cancel"><?= __admin('common.cancel') ?></button>
+                                <button type="button" class="admin-btn admin-btn--ghost" id="transition-trigger-add-cancel"><?= adminEscape(__admin('common.cancel')) ?></button>
                                 <button type="button" class="admin-btn admin-btn--primary" id="transition-trigger-add-confirm">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                                     </svg>
-                                    <?= __admin('common.add') ?>
+                                    <?= adminEscape(__admin('common.add')) ?>
                                 </button>
                             </div>
                         </div>
@@ -107,28 +107,28 @@
             <!-- Transition Settings -->
             <div class="transition-editor__settings">
                 <div class="transition-editor__settings-header">
-                    <h4 class="transition-editor__settings-title"><?= __admin('preview.transitionSettings') ?? 'Transition Settings' ?></h4>
-                    <span class="transition-editor__settings-hint" title="<?= __admin('preview.transitionHint') ?? 'Transitions animate property changes between states. Defined on base, applies to all state changes.' ?>">
+                    <h4 class="transition-editor__settings-title"><?= adminEscape(__admin('preview.transitionSettings')) ?></h4>
+                    <span class="transition-editor__settings-hint" title="<?= adminAttr(__admin('preview.transitionHint')) ?>">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                         </svg>
                     </span>
                 </div>
-                <p class="transition-editor__settings-description"><?= __admin('preview.transitionDescription') ?? 'Smoothly animates property changes when triggered (hover, focus, etc.)' ?></p>
+                <p class="transition-editor__settings-description"><?= adminEscape(__admin('preview.transitionDescription')) ?></p>
                 
                 <div class="transition-editor__settings-grid">
                     <!-- Properties to Transition -->
                     <div class="transition-editor__setting">
-                        <label><?= __admin('preview.transitionProperty') ?? 'Properties' ?>:</label>
+                        <label><?= adminEscape(__admin('preview.transitionProperty')) ?>:</label>
                         <select class="transition-editor__property-select" id="transition-property-select">
-                            <option value="all"><?= __admin('preview.allProperties') ?? 'All Properties' ?></option>
-                            <option value="specific"><?= __admin('preview.specificProperties') ?? 'Specific Properties...' ?></option>
+                            <option value="all"><?= adminEscape(__admin('preview.allProperties')) ?></option>
+                            <option value="specific"><?= adminEscape(__admin('preview.specificProperties')) ?></option>
                         </select>
                     </div>
                     
                     <!-- Duration, Delay and Timing Function: All Properties' one set (each Specific row has its own) -->
                     <div class="transition-editor__setting transition-editor__all-setting">
-                        <label><?= __admin('preview.transitionDuration') ?? 'Duration' ?>:</label>
+                        <label><?= adminEscape(__admin('preview.transitionDuration')) ?>:</label>
                         <div class="transition-editor__input-group">
                             <input type="number" id="transition-duration" class="admin-input" value="0.3" min="0" max="60" step="0.1">
                             <select class="transition-editor__unit-select" id="transition-duration-unit">
@@ -140,7 +140,7 @@
                     
                     <!-- Delay -->
                     <div class="transition-editor__setting transition-editor__all-setting">
-                        <label><?= __admin('preview.transitionDelay') ?? 'Delay' ?>:</label>
+                        <label><?= adminEscape(__admin('preview.transitionDelay')) ?>:</label>
                         <div class="transition-editor__input-group">
                             <input type="number" id="transition-delay" class="admin-input" value="0" min="0" max="60" step="0.1">
                             <select class="transition-editor__unit-select" id="transition-delay-unit">
@@ -152,7 +152,7 @@
                     
                     <!-- Timing Function -->
                     <div class="transition-editor__setting transition-editor__setting--wide transition-editor__all-setting">
-                        <label><?= __admin('preview.timingFunction') ?? 'Timing Function' ?>:</label>
+                        <label><?= adminEscape(__admin('preview.timingFunction')) ?>:</label>
                         <div class="transition-editor__timing-row">
                             <select class="transition-editor__timing-select" id="transition-timing-select">
                                 <option value="ease">ease</option>
@@ -160,7 +160,7 @@
                                 <option value="ease-in">ease-in</option>
                                 <option value="ease-out">ease-out</option>
                                 <option value="ease-in-out">ease-in-out</option>
-                                <option value="cubic-bezier"><?= __admin('preview.customCubicBezier') ?? 'Custom cubic-bezier...' ?></option>
+                                <option value="cubic-bezier"><?= adminEscape(__admin('preview.customCubicBezier')) ?></option>
                             </select>
                             <div class="transition-editor__cubic-bezier" id="transition-cubic-bezier" style="display: none;">
                                 <span>cubic-bezier(</span>
@@ -179,17 +179,17 @@
                     <!-- Specific Properties: a row per property, each with its own duration, delay and timing -->
                     <div class="transition-editor__setting transition-editor__setting--wide" id="transition-specific-props" style="display: none;">
                         <div class="transition-editor__rows-head">
-                            <span><?= __admin('preview.transitionProperty') ?></span>
-                            <span><?= __admin('preview.transitionDuration') ?></span>
-                            <span><?= __admin('preview.transitionDelay') ?></span>
-                            <span><?= __admin('preview.timingFunction') ?></span>
+                            <span><?= adminEscape(__admin('preview.transitionProperty')) ?></span>
+                            <span><?= adminEscape(__admin('preview.transitionDuration')) ?></span>
+                            <span><?= adminEscape(__admin('preview.transitionDelay')) ?></span>
+                            <span><?= adminEscape(__admin('preview.timingFunction')) ?></span>
                         </div>
                         <div class="transition-editor__rows" id="transition-rows"></div>
                         <button type="button" class="transition-editor__add-property-toggle" id="transition-add-row">
                             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                             </svg>
-                            <?= __admin('preview.addProperty') ?>
+                            <?= adminEscape(__admin('preview.addProperty')) ?>
                         </button>
                     </div>
                 </div>
@@ -200,26 +200,26 @@
                     <div class="transition-editor__row">
                         <div class="transition-editor__row-property"></div>
                         <div class="transition-editor__input-group">
-                            <input type="number" class="admin-input" value="0.3" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
-                            <select class="transition-editor__unit-select" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
+                            <input type="number" class="admin-input" value="0.3" min="0" max="60" step="0.1" title="<?= adminAttr(__admin('preview.transitionDuration')) ?>">
+                            <select class="transition-editor__unit-select" title="<?= adminAttr(__admin('preview.transitionDuration')) ?>">
                                 <option value="s">s</option>
                                 <option value="ms">ms</option>
                             </select>
                         </div>
                         <div class="transition-editor__input-group">
-                            <input type="number" class="admin-input" value="0" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
-                            <select class="transition-editor__unit-select" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
+                            <input type="number" class="admin-input" value="0" min="0" max="60" step="0.1" title="<?= adminAttr(__admin('preview.transitionDelay')) ?>">
+                            <select class="transition-editor__unit-select" title="<?= adminAttr(__admin('preview.transitionDelay')) ?>">
                                 <option value="s">s</option>
                                 <option value="ms">ms</option>
                             </select>
                         </div>
-                        <select class="transition-editor__timing-select" title="<?= adminEscape(__admin('preview.timingFunction')) ?>">
+                        <select class="transition-editor__timing-select" title="<?= adminAttr(__admin('preview.timingFunction')) ?>">
                             <option value="ease">ease</option>
                             <option value="linear">linear</option>
                             <option value="ease-in">ease-in</option>
                             <option value="ease-out">ease-out</option>
                             <option value="ease-in-out">ease-in-out</option>
-                            <option value="cubic-bezier"><?= __admin('preview.customCubicBezier') ?></option>
+                            <option value="cubic-bezier"><?= adminEscape(__admin('preview.customCubicBezier')) ?></option>
                         </select>
                         <button type="button" class="admin-row-remove transition-editor__row-remove" data-qs-icon="row" aria-label="<?= adminAttr(__admin('common.remove')) ?>" title="<?= adminAttr(__admin('common.remove')) ?>"></button>
                         <div class="transition-editor__cubic-bezier transition-editor__row-bezier" style="display: none;">
@@ -238,7 +238,7 @@
                 
                 <!-- Transition Preview String -->
                 <div class="transition-editor__preview-value">
-                    <label><?= __admin('preview.transitionValue') ?? 'Transition Value' ?>:</label>
+                    <label><?= adminEscape(__admin('preview.transitionValue')) ?>:</label>
                     <code id="transition-preview-code">all 0.3s ease</code>
                 </div>
             </div>
@@ -249,7 +249,7 @@
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
                     </svg>
-                    <span><?= __admin('preview.animationsIndependent') ?? 'Animations are independent from transitions. You can use one, both, or neither.' ?></span>
+                    <span><?= adminEscape(__admin('preview.animationsIndependent')) ?></span>
                 </div>
                 
                 <div class="transition-editor__animations-row">
@@ -260,18 +260,18 @@
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                                 <polygon points="5 3 19 12 5 21 5 3"/>
                             </svg>
-                            <?= __admin('preview.baseAnimation') ?? 'Base Animation' ?>
+                            <?= adminEscape(__admin('preview.baseAnimation')) ?>
                         </span>
-                        <span class="transition-editor__animation-hint"><?= __admin('preview.playsOnLoad') ?? '(plays on load)' ?></span>
+                        <span class="transition-editor__animation-hint"><?= adminEscape(__admin('preview.playsOnLoad')) ?></span>
                     </div>
                     <div class="transition-editor__animation-content" id="transition-base-animation">
                         <div class="transition-editor__animation-empty" id="transition-base-animation-empty">
-                            <?= __admin('preview.noAnimationSet') ?? 'No animation set' ?>
+                            <?= adminEscape(__admin('preview.noAnimationSet')) ?>
                         </div>
                         <div class="transition-editor__animation-config" id="transition-base-animation-config" style="display: none;">
                             <div class="transition-editor__animation-name">
                                 <span id="transition-base-animation-name">@keyframes name</span>
-                                <button type="button" class="transition-editor__animation-preview" id="transition-base-animation-preview-btn" title="<?= __admin('preview.previewAnimation') ?? 'Preview' ?>">
+                                <button type="button" class="transition-editor__animation-preview" id="transition-base-animation-preview-btn" title="<?= adminAttr(__admin('preview.previewAnimation')) ?>">
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                                         <polygon points="5 3 19 12 5 21 5 3"/>
                                     </svg>
@@ -281,16 +281,16 @@
                             </div>
                             <div class="transition-editor__animation-settings">
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= __admin('preview.animDuration') ?? 'Duration' ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.animDuration')) ?>:</label>
                                     <input type="number" id="transition-base-anim-duration" class="admin-input admin-input--mini" value="1000" min="0" step="100">
                                     <span>ms</span>
                                 </div>
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= __admin('preview.iterations') ?? 'Iterations' ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.iterations')) ?>:</label>
                                     <input type="number" id="transition-base-anim-iterations" class="admin-input admin-input--mini" value="1" min="1" max="100">
                                     <label class="transition-editor__anim-checkbox">
                                         <input type="checkbox" id="transition-base-anim-infinite">
-                                        <?= __admin('preview.infinite') ?? '∞' ?>
+                                        <?= adminEscape(__admin('preview.infinite')) ?>
                                     </label>
                                 </div>
                             </div>
@@ -300,7 +300,7 @@
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
-                        <?= __admin('preview.addAnimation') ?? 'Add Animation' ?>
+                        <?= adminEscape(__admin('preview.addAnimation')) ?>
                     </button>
                 </div>
                 
@@ -313,18 +313,18 @@
                                 <circle cx="12" cy="10" r="3"/>
                                 <circle cx="12" cy="12" r="10"/>
                             </svg>
-                            <span id="transition-trigger-animation-label"><?= __admin('preview.triggerAnimation') ?? 'Trigger Animation' ?></span>
+                            <span id="transition-trigger-animation-label"><?= adminEscape(__admin('preview.triggerAnimation')) ?></span>
                         </span>
-                        <span class="transition-editor__animation-hint" id="transition-trigger-animation-hint"><?= __admin('preview.playsOnTrigger') ?? '(plays on :hover)' ?></span>
+                        <span class="transition-editor__animation-hint" id="transition-trigger-animation-hint"><?= adminEscape(__admin('preview.playsOnTrigger')) ?></span>
                     </div>
                     <div class="transition-editor__animation-content" id="transition-trigger-animation">
                         <div class="transition-editor__animation-empty" id="transition-trigger-animation-empty">
-                            <?= __admin('preview.noAnimationSet') ?? 'No animation set' ?>
+                            <?= adminEscape(__admin('preview.noAnimationSet')) ?>
                         </div>
                         <div class="transition-editor__animation-config" id="transition-trigger-animation-config" style="display: none;">
                             <div class="transition-editor__animation-name">
                                 <span id="transition-trigger-animation-name">@keyframes name</span>
-                                <button type="button" class="transition-editor__animation-preview" id="transition-trigger-animation-preview-btn" title="<?= __admin('preview.previewAnimation') ?? 'Preview' ?>">
+                                <button type="button" class="transition-editor__animation-preview" id="transition-trigger-animation-preview-btn" title="<?= adminAttr(__admin('preview.previewAnimation')) ?>">
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                                         <polygon points="5 3 19 12 5 21 5 3"/>
                                     </svg>
@@ -334,16 +334,16 @@
                             </div>
                             <div class="transition-editor__animation-settings">
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= __admin('preview.animDuration') ?? 'Duration' ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.animDuration')) ?>:</label>
                                     <input type="number" id="transition-trigger-anim-duration" class="admin-input admin-input--mini" value="1000" min="0" step="100">
                                     <span>ms</span>
                                 </div>
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= __admin('preview.iterations') ?? 'Iterations' ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.iterations')) ?>:</label>
                                     <input type="number" id="transition-trigger-anim-iterations" class="admin-input admin-input--mini" value="1" min="1" max="100">
                                     <label class="transition-editor__anim-checkbox">
                                         <input type="checkbox" id="transition-trigger-anim-infinite">
-                                        <?= __admin('preview.infinite') ?? '∞' ?>
+                                        <?= adminEscape(__admin('preview.infinite')) ?>
                                     </label>
                                 </div>
                             </div>
@@ -353,7 +353,7 @@
                         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                         </svg>
-                        <?= __admin('preview.addAnimation') ?? 'Add Animation' ?>
+                        <?= adminEscape(__admin('preview.addAnimation')) ?>
                     </button>
                 </div>
                 </div><!-- end animations-row -->
@@ -366,12 +366,12 @@
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
-                    <?= __admin('preview.previewHover') ?? 'Preview Hover' ?>
+                    <?= adminEscape(__admin('preview.previewHover')) ?>
                 </button>
             </div>
             <div class="preview-keyframe-modal__footer-right">
-                <button type="button" class="admin-btn admin-btn--ghost" id="transition-cancel"><?= __admin('common.cancel') ?></button>
-                <button type="button" class="admin-btn admin-btn--primary" id="transition-save"><?= __admin('common.save') ?></button>
+                <button type="button" class="admin-btn admin-btn--ghost" id="transition-cancel"><?= adminEscape(__admin('common.cancel')) ?></button>
+                <button type="button" class="admin-btn admin-btn--primary" id="transition-save"><?= adminEscape(__admin('common.save')) ?></button>
             </div>
         </div>
     </div>

@@ -1063,10 +1063,6 @@
     letter-spacing: 0.5px;
 }
 
-.preview-contextual-ai-tools__footer-value {
-    color: var(--admin-text);
-}
-
 .preview-contextual-ai-tools__footer-commands {
     display: inline-flex;
     flex-wrap: wrap;

@@ -138,20 +138,11 @@ window.PreviewAiTools = (function () {
     var _phaseCostEl = null;             // the AI exchange's cost: the AI phase it serves
     var _costEl = null;                  // the Run zone's cost block: the run's total and each AI phase
 
-    // ──────────────────────────── i18n ──────────────────────────────────
+    // ──────────────────────────── Words ─────────────────────────────────
 
-    function _t(key, fallback) {
-        var panel = (window.PreviewConfig
-                     && window.PreviewConfig.i18nPanels
-                     && window.PreviewConfig.i18nPanels.aiTools) || {};
-        return panel[key] || fallback;
-    }
-
-    // One of the panel-wide words layout.php ships (QuickSiteUtils.tCommon): an unset one shows its key.
-    function _commonWord(name) {
-        var utils = window.QuickSiteUtils;
-        return utils && typeof utils.tCommon === 'function' ? utils.tCommon(name) : 'common.' + name;
-    }
+    // A word of the editor's own section, named by the rest of its key's path (_t('aiToolsRunActive') reads
+    // preview.aiToolsRunActive); a word of another section, or a counted one, is read through QSPanelWords itself.
+    function _t(name, params) { return QSPanelWords.t('preview.' + name, params); }
 
     // ──────────────────────────── Init ──────────────────────────────────
 
@@ -293,7 +284,7 @@ window.PreviewAiTools = (function () {
         if (!_backupBtnEl) return;
         var origLabel = _backupBtnEl.textContent;
         _backupBtnEl.disabled = true;
-        _backupBtnEl.textContent = _t('backupCreating', 'Creating backup…');
+        _backupBtnEl.textContent = _t('aiToolsBackupCreating');
         var toaster = (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
             ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
             : null;
@@ -306,11 +297,11 @@ window.PreviewAiTools = (function () {
             }
             var path = (json.data && (json.data.path || json.data.backupPath)) || '';
             if (toaster) {
-                toaster(_t('backupSuccess', 'Backup created ({path})').replace('{path}', path || '✓'), 'success');
+                toaster(_t('aiToolsBackupSuccess', { path: path || '✓' }), 'success');
             }
         }).catch(function (err) {
             if (toaster) {
-                toaster(_t('backupFailed', 'Backup failed: {error}').replace('{error}', (err && err.message) || String(err)), 'error');
+                toaster(_t('aiToolsBackupFailed', { error: (err && err.message) || String(err) }), 'error');
             }
         }).then(function () {
             _backupBtnEl.disabled = false;
@@ -438,7 +429,7 @@ window.PreviewAiTools = (function () {
             if (e.effect !== 'delete') return;
             var own = _effectDoes(e);
             if (own) {
-                var line = _t(own.line[0], own.line[1]);
+                var line = _t(own.line);
                 if (does.indexOf(line) === -1) does.push(line);
                 return;
             }
@@ -455,34 +446,33 @@ window.PreviewAiTools = (function () {
             changes.push(_whatWord(e.what));
         });
         if (deletes.length > 0) {
-            parts.push({ kind: 'delete', text: _t('factCanDelete', 'Can delete: {what}').replace('{what}', function () { return deletes.join(', '); }) });
+            parts.push({ kind: 'delete', text: _t('workflowsFactCanDelete', { what: deletes.join(', ') }) });
         }
         does.forEach(function (line) { parts.push({ kind: 'delete', text: line }); });
         if (changes.length > 0) {
-            parts.push({ kind: 'change', text: _t('factChanges', 'Changes: {what}').replace('{what}', function () { return changes.join(', '); }) });
+            parts.push({ kind: 'change', text: _t('workflowsFactChanges', { what: changes.join(', ') }) });
         }
-        if (f.anyCommand) parts.push({ kind: 'delete', text: _t('factAnyCommand', 'Can run any command, one that deletes included') });
+        if (f.anyCommand) parts.push({ kind: 'delete', text: _t('workflowsFactAnyCommand') });
         if (f.needs) parts.push({ kind: 'need', text: String(f.needs) });
         return parts;
     }
 
     /** AI or not, and how many requests a run sends (and how long the answer runs, when the workflow's file says). */
     function _aiWords(f) {
-        if (f.paste) return _t('factPaste', 'No AI: you paste the commands');
-        if (!f.ai) return _t('factNoAi', 'No AI');
+        if (f.paste) return _t('workflowsFactPaste');
+        if (!f.ai) return _t('workflowsFactNoAi');
         var several = f.requests > 1;
         if (f.answerLength === 'long') {
-            return several ? _t('factAiSeveralLong', 'Uses AI: several requests, long answers') : _t('factAiOneLong', 'Uses AI: one request, long answer');
+            return several ? _t('workflowsFactAiSeveralLong') : _t('workflowsFactAiOneLong');
         }
         if (f.answerLength === 'short') {
-            return several ? _t('factAiSeveralShort', 'Uses AI: several requests, short answers') : _t('factAiOneShort', 'Uses AI: one request, short answer');
+            return several ? _t('workflowsFactAiSeveralShort') : _t('workflowsFactAiOneShort');
         }
-        return several ? _t('factAiSeveral', 'Uses AI: several requests') : _t('factAiOne', 'Uses AI: one request');
+        return several ? _t('workflowsFactAiSeveral') : _t('workflowsFactAiOne');
     }
 
     function _whatWord(what) {
-        var words = EFFECT_WHAT[what] || EFFECT_WHAT.other;
-        return _t(words[0], words[1]);
+        return _t(EFFECT_WHAT[what] || EFFECT_WHAT.other);
     }
 
     /** Whether a run can delete: a step that deletes, or an answer that may send any command. */
@@ -542,7 +532,7 @@ window.PreviewAiTools = (function () {
         var parts = [_noAiSwitch, _nothingDeletedSwitch]
             .filter(function (input) { return input && input.checked; })
             .map(function (input) { return input.parentNode.textContent.trim(); });
-        if (hidden > 0) parts.push(_t('optionsHidden', '{n} hidden').replace('{n}', String(hidden)));
+        if (hidden > 0) parts.push(_t('workflowsOptionsHidden', { n: QSPanelWords.number(hidden) }));
         _optionsSummary.textContent = parts.length > 0 ? ': ' + parts.join(' · ') : '';
     }
 
@@ -631,7 +621,7 @@ window.PreviewAiTools = (function () {
         _groups.forEach(function (g, i) { index[g.id] = i; });
         var at = function (w) { return Object.prototype.hasOwnProperty.call(index, w.category) ? index[w.category] : _groups.length; };
         return rows.slice().sort(function (a, b) {
-            return at(a) - at(b) || String(a.title || a.id).localeCompare(String(b.title || b.id), undefined, { sensitivity: 'base' });
+            return at(a) - at(b) || String(a.title || a.id).localeCompare(String(b.title || b.id), QSPanelWords.lang, { sensitivity: 'base' });
         });
     }
 
@@ -664,7 +654,7 @@ window.PreviewAiTools = (function () {
             header.appendChild(document.createTextNode(' '));
             var countEl = document.createElement('span');
             countEl.className = 'preview-contextual-ai-tools__category-count';
-            countEl.textContent = '(' + count + ')';
+            countEl.textContent = '(' + QSPanelWords.number(count) + ')';
             header.appendChild(countEl);
         }
         if (group.line) {
@@ -680,7 +670,7 @@ window.PreviewAiTools = (function () {
     function _renderRecent(rows) {
         var el = document.createElement('section');
         el.className = 'preview-contextual-ai-tools__recent';
-        el.appendChild(_renderGroupHeader({ id: 'recent', title: _t('recentTitle', 'Recently used'), line: '' }, null));
+        el.appendChild(_renderGroupHeader({ id: 'recent', title: _t('workflowsRecent'), line: '' }, null));
         el.appendChild(_renderRows(rows));
         return el;
     }
@@ -766,7 +756,7 @@ window.PreviewAiTools = (function () {
     function _renderUnrunnableLine() {
         var line = document.createElement('span');
         line.className = 'preview-contextual-ai-tools__tool-card-unrunnable';
-        line.textContent = _t('unrunnable', 'Your role can\'t run this workflow');
+        line.textContent = _t('workflowsUnrunnable');
         return line;
     }
 
@@ -782,7 +772,7 @@ window.PreviewAiTools = (function () {
         card.className = 'preview-contextual-ai-tools__small-card'
             + (inert ? ' preview-contextual-ai-tools__small-card--unrunnable' : '');
         card.dataset.id = workflow.id;
-        card.title = inert ? name + ' · ' + _t('unrunnable', 'Your role can\'t run this workflow') : name;
+        card.title = inert ? name + ' · ' + _t('workflowsUnrunnable') : name;
 
         var face = document.createElement(inert ? 'div' : 'button');
         face.className = 'preview-contextual-ai-tools__small-card-open';
@@ -918,7 +908,7 @@ window.PreviewAiTools = (function () {
             if (!res.ok) throw new Error('HTTP ' + res.status);
             return res.json();
         }).then(function (json) {
-            if (!json || !json.success) throw new Error((json && json.error) || 'Unknown error');
+            if (!json || !json.success) throw new Error((json && json.error) || QSPanelWords.t('common.unknownError'));
             return json.data || {};
         });
     }
@@ -1224,7 +1214,7 @@ window.PreviewAiTools = (function () {
         _runnerView.appendChild(_renderRunnerHeader(workflow));
         var loading = document.createElement('div');
         loading.className = 'preview-contextual-ai-tools__runner-loading';
-        loading.textContent = _t('runnerLoading', 'Loading workflow…');
+        loading.textContent = _t('aiToolsRunnerLoading');
         _runnerView.appendChild(loading);
     }
 
@@ -1235,8 +1225,7 @@ window.PreviewAiTools = (function () {
         _runnerView.appendChild(_renderRunnerHeader(_activeWorkflowSummary || {}));
         var err = document.createElement('div');
         err.className = 'preview-contextual-ai-tools__runner-error';
-        var tpl = _t('runnerError', 'Failed to load workflow: {error}');
-        err.textContent = tpl.replace('{error}', message);
+        err.textContent = _t('aiToolsRunnerError', { error: message });
         _runnerView.appendChild(err);
     }
 
@@ -1309,7 +1298,7 @@ window.PreviewAiTools = (function () {
         var backBtn = document.createElement('button');
         backBtn.type = 'button';
         backBtn.className = 'preview-contextual-ai-tools__runner-back';
-        backBtn.textContent = _t('backToList', '← Back');
+        backBtn.textContent = _t('aiToolsBackToList');
         backBtn.addEventListener('click', _onBackToList);
         bar.appendChild(backBtn);
 
@@ -1354,7 +1343,7 @@ window.PreviewAiTools = (function () {
     var _renderedWithAi = false;
 
     function _renderInputsZone(spec, isAI) {
-        var z = _renderZone('inputs', _t('zoneInputs', 'Inputs'));
+        var z = _renderZone('inputs', _t('aiToolsZoneInputs'));
         if (isAI) {
             z.body.appendChild(_renderSectionYourPrompt());
         }
@@ -1393,7 +1382,7 @@ window.PreviewAiTools = (function () {
             _secondaryActionBtn = document.createElement('button');
             _secondaryActionBtn.type = 'button';
             _secondaryActionBtn.className = 'preview-contextual-ai-tools__action-btn--secondary';
-            _secondaryActionBtn.textContent = _t('actionGenerateForCopy', 'Generate for copy');
+            _secondaryActionBtn.textContent = _t('aiToolsActionGenerateForCopy');
             _secondaryActionBtn.addEventListener('click', _onSecondaryActionClick);
             row.appendChild(_secondaryActionBtn);
         }
@@ -1407,7 +1396,7 @@ window.PreviewAiTools = (function () {
         row.className = 'preview-contextual-ai-tools__model-row';
         var label = document.createElement('span');
         label.className = 'preview-contextual-ai-tools__model-row-label';
-        label.textContent = _t('modelLabel', 'Model:');
+        label.textContent = _t('aiToolsModelLabel');
         row.appendChild(label);
 
         _modelSelectEl = document.createElement('select');
@@ -1440,7 +1429,7 @@ window.PreviewAiTools = (function () {
     }
 
     function _renderAiExchangeZone(spec, hasBYOK) {
-        var z = _renderZone('exchange', _t('zoneExchange', 'AI exchange'));
+        var z = _renderZone('exchange', _t('aiToolsZoneExchange'));
         _exchangeHeaderEl = z.section.querySelector('.preview-contextual-ai-tools__zone-header');
         z.body.appendChild(_renderSectionGeneralPrompt(hasBYOK));
         z.body.appendChild(_renderSectionAiResponseTextarea(hasBYOK));
@@ -1448,7 +1437,7 @@ window.PreviewAiTools = (function () {
     }
 
     function _renderExecutionZone(spec) {
-        var z = _renderZone('execution', _t('zoneExecution', 'Run'));
+        var z = _renderZone('execution', _t('aiToolsZoneExecution'));
         z.body.appendChild(_renderExecuteRow());
         _runLineEl = document.createElement('p');
         _runLineEl.className = 'preview-contextual-ai-tools__run-line';
@@ -1481,8 +1470,8 @@ window.PreviewAiTools = (function () {
         // than was confirmed still asks).
         var toggles = document.createElement('div');
         toggles.className = 'preview-contextual-ai-tools__toggles';
-        var toggle = _renderToggle('aiAutoExecute', _t('runWithoutStoppingLabel', 'Run without stopping'));
-        toggle.title = _t('runWithoutStoppingHint', "Executes the AI's commands once its answer is parsed, and goes from one part of a workflow to the next without a review. A part that deletes content is still confirmed.");
+        var toggle = _renderToggle('aiAutoExecute', _t('aiToolsRunWithoutStoppingLabel'));
+        toggle.title = _t('aiToolsRunWithoutStoppingHint');
         toggles.appendChild(toggle);
         wrap.appendChild(toggles);
 
@@ -1491,7 +1480,7 @@ window.PreviewAiTools = (function () {
         _executeBtnEl = document.createElement('button');
         _executeBtnEl.type = 'button';
         _executeBtnEl.className = 'preview-contextual-ai-tools__action-btn--primary';
-        _executeBtnEl.textContent = _t('actionExecute', 'Execute commands');
+        _executeBtnEl.textContent = _t('aiToolsActionExecute');
         _executeBtnEl.style.display = 'none';
         _executeBtnEl.addEventListener('click', _onExecuteClick);
         wrap.appendChild(_executeBtnEl);
@@ -1503,7 +1492,7 @@ window.PreviewAiTools = (function () {
         footer.className = 'preview-contextual-ai-tools__footer';
         var commands = _relatedCommandNames(spec);
         if (commands.length > 0) {
-            footer.appendChild(_renderFooterItem(_t('footerTouches', 'Touches'), _renderFooterCommands(commands)));
+            footer.appendChild(_renderFooterItem(_t('aiToolsFooterTouches'), _renderFooterCommands(commands)));
         }
         return footer;
     }
@@ -1531,19 +1520,6 @@ window.PreviewAiTools = (function () {
         item.appendChild(labelEl);
         item.appendChild(valueEl);
         return item;
-    }
-
-    function _renderFooterModel(connection) {
-        var span = document.createElement('span');
-        span.className = 'preview-contextual-ai-tools__footer-value';
-        if (connection) {
-            var name = connection.name || connection.providerType || '';
-            var model = connection.model || '';
-            span.textContent = model ? (name + ' · ' + model) : name;
-        } else {
-            span.textContent = _t('sectionModelNone', 'Not configured');
-        }
-        return span;
     }
 
     function _renderFooterCommands(commands) {
@@ -1610,7 +1586,7 @@ window.PreviewAiTools = (function () {
 
     function _renderSectionYourPrompt() {
         var s = _renderCollapsibleSection({
-            title: _t('sectionYourPrompt', 'Your prompt'),
+            title: _t('aiToolsSectionYourPrompt'),
             defaultOpen: true,
             dataKey: 'your-prompt'
         });
@@ -1654,7 +1630,7 @@ window.PreviewAiTools = (function () {
         ta.className = 'preview-contextual-ai-tools__user-prompt';
         ta.id = 'ai-tools-request-' + key.replace(/[^\w-]/g, '-') + (idSuffix || '');
         ta.dataset.requestKey = key;
-        ta.placeholder = _t('yourPromptPlaceholder', 'Describe what you want.');
+        ta.placeholder = _t('aiToolsYourPromptPlaceholder');
         ta.value = _requests[key] || '';
         ta.disabled = !!(_run && ((_run.started && _run.started[key]) || _run.activeRequest === key));
         ta.addEventListener('input', function () {
@@ -1670,8 +1646,8 @@ window.PreviewAiTools = (function () {
             label.className = 'preview-contextual-ai-tools__request-label';
             label.htmlFor = ta.id;
             label.textContent = shared && idSuffix
-                ? _t('requestShared', "Your prompt — shared by this run's AI phases")
-                : _t('requestFor', 'For {name}').replace('{name}', phase.title || phase.workflowId);
+                ? _t('aiToolsRequestShared')
+                : _t('aiToolsRequestFor', { name: phase.title || phase.workflowId });
             wrap.appendChild(label);
         }
         wrap.appendChild(ta);
@@ -1680,7 +1656,7 @@ window.PreviewAiTools = (function () {
 
     function _renderSectionParameters(params) {
         var s = _renderCollapsibleSection({
-            title: _t('sectionParameters', 'Parameters'),
+            title: _t('aiToolsSectionParameters'),
             defaultOpen: true,
             dataKey: 'parameters'
         });
@@ -1892,7 +1868,7 @@ window.PreviewAiTools = (function () {
         if (!sel) {
             var empty = document.createElement('span');
             empty.className = 'preview-contextual-ai-tools__selector-empty';
-            empty.textContent = _t('selectorEmpty', 'No element selected — click one in the iframe.');
+            empty.textContent = _t('aiToolsSelectorEmpty');
             wrap.appendChild(empty);
             return;
         }
@@ -1905,7 +1881,7 @@ window.PreviewAiTools = (function () {
         if (sel.struct) {
             var struct = document.createElement('span');
             struct.className = 'preview-contextual-ai-tools__selector-struct';
-            struct.textContent = ' ' + _t('selectorIn', 'in') + ' ' + sel.struct;
+            struct.textContent = ' ' + _t('aiToolsSelectorIn') + ' ' + sel.struct;
             wrap.appendChild(struct);
         }
     }
@@ -1923,7 +1899,7 @@ window.PreviewAiTools = (function () {
     function _renderEmptyOptionsPlaceholder() {
         var ph = document.createElement('div');
         ph.className = 'preview-contextual-ai-tools__param-placeholder';
-        ph.textContent = _t('paramOptionsEmpty', 'No options available.');
+        ph.textContent = _t('aiToolsParamOptionsEmpty');
         return ph;
     }
 
@@ -1991,7 +1967,7 @@ window.PreviewAiTools = (function () {
             kinds.push(byValue[o.value]);
         }
         if (kinds.length === 0) return [];
-        var other = { value: '', label: _t('templateKindOther', 'Other'), templates: [] };
+        var other = { value: '', label: _t('workflowsTemplateKindOther'), templates: [] };
         for (var t = 0; t < list.length; t++) {
             (byValue[list[t].kind] || other).templates.push(list[t]);
         }
@@ -2058,21 +2034,20 @@ window.PreviewAiTools = (function () {
         var row = document.createElement('div');
         row.className = 'preview-contextual-ai-tools__template-kinds';
         row.setAttribute('role', 'group');
-        row.setAttribute('aria-label', _t('templateKinds', 'Show'));
-        var word = _t('templateKindCount', '{name} ({count})');
+        row.setAttribute('aria-label', _t('workflowsTemplateKinds'));
         var add = function (value, label, count) {
             var b = document.createElement('button');
             b.type = 'button';
             b.className = 'preview-contextual-ai-tools__template-kind-btn';
             b.dataset.kind = value === null ? '*' : value;
-            b.textContent = word.replace('{name}', label).replace('{count}', String(count));
+            b.textContent = _t('workflowsTemplateKindCount', { count: QSPanelWords.number(count), name: label });
             b.addEventListener('click', function () {
                 _templateKindShown[param.id] = value;
                 _showTemplateKind(param, group);
             });
             row.appendChild(b);
         };
-        add(null, _t('templateKindAll', 'All'), total);
+        add(null, _t('workflowsTemplateKindAll'), total);
         for (var i = 0; i < kinds.length; i++) add(kinds[i].value, kinds[i].label, kinds[i].templates.length);
         return row;
     }
@@ -2168,8 +2143,8 @@ window.PreviewAiTools = (function () {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'preview-contextual-ai-tools__template-preview';
-        btn.textContent = _t('templatePreview', 'Preview');
-        btn.setAttribute('aria-label', _t('templatePreviewOf', 'Preview {name}').replace('{name}', template.title || template.id));
+        btn.textContent = _t('workflowsTemplatePreview');
+        btn.setAttribute('aria-label', _t('workflowsTemplatePreviewOf', { name: template.title || template.id }));
         btn.addEventListener('click', function () { _openTemplatePreview(param, template); });
         return btn;
     }
@@ -2217,14 +2192,14 @@ window.PreviewAiTools = (function () {
         var title = document.createElement('h2');
         title.id = 'ai-tools-template-preview-title';
         title.className = 'preview-contextual-ai-tools__template-dialog-title';
-        title.textContent = _t('templatePreviewTitle', 'Preview: {name}').replace('{name}', name);
+        title.textContent = _t('workflowsTemplatePreviewTitle', { name: name });
         head.appendChild(title);
 
         var frame = document.createElement('iframe');
         frame.className = 'preview-contextual-ai-tools__template-frame';
         frame.setAttribute('sandbox', preview.scripts ? 'allow-scripts' : '');
         frame.setAttribute('referrerpolicy', 'no-referrer');
-        frame.title = _t('templatePreviewFrame', 'Preview of {name}').replace('{name}', name);
+        frame.title = _t('workflowsTemplatePreviewFrame', { name: name });
 
         var themeButtons = [];
         var show = function (theme) {
@@ -2235,13 +2210,13 @@ window.PreviewAiTools = (function () {
             var themes = document.createElement('div');
             themes.className = 'preview-contextual-ai-tools__template-themes';
             themes.setAttribute('role', 'group');
-            themes.setAttribute('aria-label', _t('templateTheme', 'Theme'));
+            themes.setAttribute('aria-label', _t('workflowsTemplateTheme'));
             preview.themes.forEach(function (theme) {
                 var b = document.createElement('button');
                 b.type = 'button';
                 b.className = 'preview-contextual-ai-tools__template-theme';
                 b.dataset.theme = theme;
-                b.textContent = theme === 'dark' ? _t('templateThemeDark', 'Dark') : _t('templateThemeLight', 'Light');
+                b.textContent = theme === 'dark' ? _t('workflowsTemplateThemeDark') : _t('workflowsTemplateThemeLight');
                 b.addEventListener('click', function () { show(theme); });
                 themeButtons.push(b);
                 themes.appendChild(b);
@@ -2258,7 +2233,7 @@ window.PreviewAiTools = (function () {
         outside.setAttribute('role', 'status');
         var onMessage = function (e) {
             if (e.source !== frame.contentWindow || e.origin !== 'null' || !_isPreviewOutsideMessage(e.data)) return;
-            outside.textContent = _t('templatePreviewOutside', 'This link is switched off in the preview. On your site, it works.');
+            outside.textContent = _t('workflowsTemplatePreviewOutside');
         };
         window.addEventListener('message', onMessage);
         // The line goes when the frame shows another page (a theme pressed, a page of the preview opened).
@@ -2277,7 +2252,7 @@ window.PreviewAiTools = (function () {
         notes.className = 'preview-contextual-ai-tools__template-dialog-notes';
         var note = document.createElement('p');
         note.className = 'preview-contextual-ai-tools__template-dialog-note';
-        note.textContent = _t('templatePreviewNote', "The preview shows every option on: all the template's languages and its light/dark button. A run builds only what you choose.");
+        note.textContent = _t('workflowsTemplatePreviewNote');
         notes.appendChild(note);
         notes.appendChild(outside);
         modal.appendChild(notes);
@@ -2339,7 +2314,7 @@ window.PreviewAiTools = (function () {
         field.type = 'search';
         field.className = 'preview-contextual-ai-tools__param-input';
         field.id = _paramControlId(param.id);
-        field.placeholder = _commonWord('search');
+        field.placeholder = QSPanelWords.t('common.search');
         field.autocomplete = 'off';
         var none = document.createElement('p');
         none.className = 'preview-contextual-ai-tools__tag-search-none';
@@ -2364,7 +2339,7 @@ window.PreviewAiTools = (function () {
             if (hit) matched++;
             rows[i].hidden = !hit && !(box && box.checked);
         }
-        none.textContent = _commonWord('noMatchesFor').replace(':query', query.trim());
+        none.textContent = QSPanelWords.t('common.noMatchesFor').replace(':query', function () { return query.trim(); });
         none.hidden = q === '' || matched > 0;
     }
 
@@ -2395,14 +2370,14 @@ window.PreviewAiTools = (function () {
 
     function _renderSectionGeneralPrompt(hasBYOK) {
         var s = _renderCollapsibleSection({
-            title: _t('sectionGeneralPrompt', 'General prompt'),
+            title: _t('aiToolsSectionGeneralPrompt'),
             defaultOpen: !hasBYOK,
             dataKey: 'general-prompt'
         });
 
         _generalPromptTextarea = document.createElement('textarea');
         _generalPromptTextarea.className = 'preview-contextual-ai-tools__general-prompt';
-        _generalPromptTextarea.placeholder = _t('generalPromptPlaceholder', 'Click the action button to assemble the final prompt.');
+        _generalPromptTextarea.placeholder = _t('aiToolsGeneralPromptPlaceholder');
         _generalPromptTextarea.value = _generatedPrompt;
         _generalPromptTextarea.readOnly = true;
         s.body.appendChild(_generalPromptTextarea);
@@ -2412,7 +2387,7 @@ window.PreviewAiTools = (function () {
         _copyBtn = document.createElement('button');
         _copyBtn.type = 'button';
         _copyBtn.className = 'preview-contextual-ai-tools__small-btn';
-        _copyBtn.textContent = _t('copyBtn', 'Copy');
+        _copyBtn.textContent = _t('aiToolsCopyBtn');
         _copyBtn.addEventListener('click', _onCopyPromptClick);
         actions.appendChild(_copyBtn);
         s.body.appendChild(actions);
@@ -2421,7 +2396,7 @@ window.PreviewAiTools = (function () {
         if (!hasBYOK) {
             var hint = document.createElement('p');
             hint.className = 'preview-contextual-ai-tools__hint';
-            hint.textContent = _t('copyHint', 'Copy this to your AI assistant, then paste the reply below.');
+            hint.textContent = _t('aiToolsCopyHint');
             s.body.appendChild(hint);
         }
         // The starred pictures to attach with this prompt (_renderAttach()).
@@ -2434,14 +2409,14 @@ window.PreviewAiTools = (function () {
 
     function _renderSectionAiResponseTextarea(hasBYOK) {
         var s = _renderCollapsibleSection({
-            title: _t('sectionAiResponse', 'AI response'),
+            title: _t('aiToolsSectionAiResponse'),
             defaultOpen: true,
             dataKey: 'ai-response-input'
         });
 
         _aiResponseTextarea = document.createElement('textarea');
         _aiResponseTextarea.className = 'preview-contextual-ai-tools__ai-response';
-        _aiResponseTextarea.placeholder = _t('aiResponsePlaceholder', '{"commands": [...]}');
+        _aiResponseTextarea.placeholder = _t('aiToolsAiResponsePlaceholder');
         _aiResponseTextarea.value = _aiResponseText;
         _aiResponseTextarea.addEventListener('input', _onAiResponseInput);
         s.body.appendChild(_aiResponseTextarea);
@@ -2468,7 +2443,7 @@ window.PreviewAiTools = (function () {
         if (!hasBYOK) {
             var hint = document.createElement('p');
             hint.className = 'preview-contextual-ai-tools__hint';
-            hint.textContent = _t('pasteHint', 'Paste the JSON reply here.');
+            hint.textContent = _t('aiToolsPasteHint');
             s.body.appendChild(hint);
         }
         return s.section;
@@ -2479,9 +2454,9 @@ window.PreviewAiTools = (function () {
         // (it doesn't reflect forEach expansion). The real command count
         // lives in the state header and updates as the batch resolves.
         var s = _renderCollapsibleSection({
-            title: _t('batchTitle', 'Batch'),
+            title: _t('aiToolsBatchTitle'),
             defaultOpen: false,
-            stateHeader: _t('stateIdle', 'Idle'),
+            stateHeader: _t('aiToolsStateIdle'),
             dataKey: 'batch'
         });
         _stepsBody = s.body;
@@ -2567,10 +2542,10 @@ window.PreviewAiTools = (function () {
             ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
             : null;
         var ok = function () {
-            if (toaster) toaster(okMessage || _t('copiedToast', 'Prompt copied to clipboard'), 'success');
+            if (toaster) toaster(okMessage || _t('aiToolsCopiedToast'), 'success');
         };
         var fail = function () {
-            if (toaster) toaster(_t('copyFailedToast', 'Could not auto-copy — use the Copy button or Ctrl+C'), 'warning');
+            if (toaster) toaster(_t('aiToolsCopyFailedToast'), 'warning');
         };
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2614,7 +2589,7 @@ window.PreviewAiTools = (function () {
     async function _sendToAi(connection, continuation) {
         if (!connection) return;
         if (!window.QSAiCall || !window.QSProviderCatalog) {
-            _aiResponseStatus = { type: 'error', message: 'AI caller not loaded.', plain: true, cause: 'refused' };
+            _aiResponseStatus = { type: 'error', message: _t('workflowsAiCallerNotLoaded'), plain: true, cause: 'refused' };
             _updateAiResponseStatusUI();
             _updateActionStates();
             return;
@@ -2625,7 +2600,7 @@ window.PreviewAiTools = (function () {
             || (connection.models && connection.models[0])
             || (connection.model);
         if (!model) {
-            _aiResponseStatus = { type: 'error', message: 'No model configured on the active connection.', plain: true, cause: 'refused' };
+            _aiResponseStatus = { type: 'error', message: _t('workflowsConnectionNoModel'), plain: true, cause: 'refused' };
             _updateAiResponseStatusUI();
             _updateActionStates();
             return;
@@ -2643,7 +2618,7 @@ window.PreviewAiTools = (function () {
         }
         _cancelAutoExecute();
         _aiSending = true;
-        _morphPrimary(_t('sendingToAi', 'Sending to {model}…').replace('{model}', model));
+        _morphPrimary(_t('aiToolsSendingToAi', { model: model }));
         _updateActionStates();
 
         // Elapsed-time ticker so the user has a "still working" cue during
@@ -2652,22 +2627,13 @@ window.PreviewAiTools = (function () {
         var startedAt = (window.performance && performance.now)
             ? performance.now() : Date.now();
         var lastChars = 0;
-        var sendingTpl = _t('sendingWithElapsed', 'Sending to {model}… ({sec}s)');
-        var streamTpl = _t('streamingWithElapsed', 'Receiving from {model}… ({chars} chars, {sec}s)');
         function refreshSendStatus() {
             if (!_aiResponseStatusEl) return;
             var now = (window.performance && performance.now) ? performance.now() : Date.now();
-            var sec = ((now - startedAt) / 1000).toFixed(1);
-            if (lastChars > 0) {
-                _aiResponseStatusEl.textContent = streamTpl
-                    .replace('{model}', model)
-                    .replace('{chars}', String(lastChars))
-                    .replace('{sec}', sec);
-            } else {
-                _aiResponseStatusEl.textContent = sendingTpl
-                    .replace('{model}', model)
-                    .replace('{sec}', sec);
-            }
+            var sec = QSPanelWords.number((now - startedAt) / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+            _aiResponseStatusEl.textContent = lastChars > 0
+                ? QSPanelWords.count('preview.workflowsStreamingWithElapsed', lastChars, { sec: sec, model: model })
+                : _t('aiToolsSendingWithElapsed', { sec: sec, model: model });
         }
         refreshSendStatus();
         var statusTickerId = setInterval(refreshSendStatus, 300);
@@ -2719,10 +2685,8 @@ window.PreviewAiTools = (function () {
             var finish = result && result.finish;
             if (finish === 'length' || finish === 'other') {
                 _aiResponseStatus = { type: 'error', plain: true, cause: finish === 'length' ? 'cut' : 'stopped', message: finish === 'length'
-                    ? _t('answerCut', "The answer was cut at the connection's output limit ({n} tokens), so none of it runs. Raise the limit in AI connections, or ask for less.")
-                        .replace('{n}', String(window.QSProviderCatalog.maxOutputTokens(connection)))
-                    : _t('answerStopped', 'The AI stopped its answer early ({reason}), so none of it runs.')
-                        .replace('{reason}', String(result.finishReason)) };
+                    ? _t('aiToolsAnswerCut', { n: QSPanelWords.number(window.QSProviderCatalog.maxOutputTokens(connection)) })
+                    : _t('aiToolsAnswerStopped', { reason: String(result.finishReason) }) };
                 _currentCommands = [];
                 _answerPhase = null;
                 if (_run) _showPhaseInBatch(_run.index); else _renderBatch();
@@ -2741,9 +2705,8 @@ window.PreviewAiTools = (function () {
             _tallyCall(call);
             _aiResponseText = partial;
             _aiResponseStatus = { type: 'error', plain: true, cause: partial ? 'brokeOff' : 'refused', message: partial
-                ? _t('answerBrokeOff', 'The answer broke off after {chars} characters: {error}')
-                    .replace('{chars}', String(partial.length)).replace('{error}', msg)
-                : _t('sendFailed', 'Send failed: {error}').replace('{error}', msg) };
+                ? QSPanelWords.count('preview.workflowsAnswerBrokeOff', partial.length, { error: msg })
+                : _t('aiToolsSendFailed', { error: msg }) };
             _currentCommands = [];
             _answerPhase = null;
             if (_run) _showPhaseInBatch(_run.index); else _renderBatch();
@@ -2752,7 +2715,7 @@ window.PreviewAiTools = (function () {
         } finally {
             clearInterval(statusTickerId);
             _aiSending = false;
-            if (_run) _morphPrimary(_t('runActive', 'Running…'));
+            if (_run) _morphPrimary(_t('aiToolsRunActive'));
             _updateActionStates();
         }
     }
@@ -2868,9 +2831,9 @@ window.PreviewAiTools = (function () {
         return sums;
     }
 
-    /** A count as the viewer's locale writes it. */
+    /** A count as the panel's language writes it. */
     function _costNumber(n) {
-        return Number(n || 0).toLocaleString();
+        return QSPanelWords.number(Number(n || 0));
     }
 
     /**
@@ -2886,27 +2849,26 @@ window.PreviewAiTools = (function () {
             var missing = sums.callCount - sums.countedCalls - failed;
             var parts = [];
             if (missing > 0 && sums.countedCalls > 0) {
-                parts.push(_t('costWithoutCounts', '{n} without counts').replace('{n}', _costNumber(missing)));
+                parts.push(_t('aiToolsCostWithoutCounts', { n: _costNumber(missing) }));
             }
             if (failed > 0 && missing + sums.countedCalls > 0) {
-                parts.push(_t('costFailed', '{n} failed').replace('{n}', _costNumber(failed)));
+                parts.push(_t('aiToolsCostFailed', { n: _costNumber(failed) }));
             }
             var calls = _costNumber(sums.callCount) + (parts.length > 0 ? ' (' + parts.join(', ') + ')' : '');
             if (sums.countedCalls > 0) {
-                lines.push(_t('costTokens', 'Tokens — sent: {sent} · received: {received} · calls: {calls}')
-                    .replace('{sent}', _costNumber(sums.sentTokens)).replace('{received}', _costNumber(sums.receivedTokens))
-                    .replace('{calls}', calls));
+                lines.push(_t('aiToolsCostTokens', {
+                    sent: _costNumber(sums.sentTokens), received: _costNumber(sums.receivedTokens), calls: calls
+                }));
             } else if (missing > 0) {
-                lines.push(_t('costTokensNone', 'Tokens — calls: {calls}; the provider sent no counts').replace('{calls}', calls));
+                lines.push(_t('aiToolsCostTokensNone', { calls: calls }));
             } else {
-                lines.push(_t('costTokensFailed', 'Tokens — calls: {calls}; failed, no counts').replace('{calls}', calls));
+                lines.push(_t('aiToolsCostTokensFailed', { calls: calls }));
             }
-            lines.push(_t('costCharsKey', 'Characters — sent: {sent} · received: {received}')
-                .replace('{sent}', _costNumber(sums.sentChars)).replace('{received}', _costNumber(sums.receivedChars)));
+            lines.push(_t('aiToolsCostCharsKey', { sent: _costNumber(sums.sentChars), received: _costNumber(sums.receivedChars) }));
         } else {
-            lines.push(_t('costCharsPaste', 'Characters — copied: {sent} · pasted: {received} · prompts: {calls}')
-                .replace('{sent}', _costNumber(sums.sentChars)).replace('{received}', _costNumber(sums.receivedChars))
-                .replace('{calls}', _costNumber(sums.callCount)));
+            lines.push(_t('aiToolsCostCharsPaste', {
+                sent: _costNumber(sums.sentChars), received: _costNumber(sums.receivedChars), calls: _costNumber(sums.callCount)
+            }));
         }
         return lines;
     }
@@ -2924,8 +2886,8 @@ window.PreviewAiTools = (function () {
 
     /** How a phase's last answer ended, when not as asked ('' otherwise). */
     function _costFinish(phase) {
-        if (phase.finish === 'length') return _t('costCut', 'its last answer was cut at the output limit');
-        if (phase.finish === 'other') return _t('costStopped', 'its last answer was stopped by the AI');
+        if (phase.finish === 'length') return _t('aiToolsCostCut');
+        if (phase.finish === 'other') return _t('aiToolsCostStopped');
         return '';
     }
 
@@ -2965,7 +2927,7 @@ window.PreviewAiTools = (function () {
         _costEl.replaceChildren();
         _costEl.hidden = !record;
         if (!record) return;
-        _costEl.appendChild(_renderCostLine(_t('costTitle', "This run's AI cost"), 'cost-title'));
+        _costEl.appendChild(_renderCostLine(_t('aiToolsCostTitle'), 'cost-title'));
         ['key', 'paste'].forEach(function (unit) {
             if (!record.totals[unit]) return;
             _costLines(record.totals[unit], unit).forEach(function (text) { _costEl.appendChild(_renderCostLine(text)); });
@@ -3011,7 +2973,7 @@ window.PreviewAiTools = (function () {
         var toaster = _toaster();
         // Kept steps come first: a new run would plan over a page they were planned for.
         if (!opts.resume && _readKept()) {
-            toaster(_t('keptBlocking', 'Run or discard the kept steps first.'), 'warning');
+            toaster(_t('aiToolsKeptBlocking'), 'warning');
             _renderKept();
             return;
         }
@@ -3046,7 +3008,7 @@ window.PreviewAiTools = (function () {
         _executing = true;
         _setRunLocked(true);
         _updateActionStates();
-        _morphPrimary(_t('runActive', 'Running…'));
+        _morphPrimary(_t('aiToolsRunActive'));
         try {
             run.plan = await _fetchPlan(run.params);
             run.index = run.first;
@@ -3082,12 +3044,13 @@ window.PreviewAiTools = (function () {
             }
             if (_stepsHeaderState) {
                 _stepsHeaderState.textContent = run.fail === 0
-                    ? _t('executionDone', 'Done ({ok} succeeded)').replace('{ok}', String(run.ok))
-                    : _t('executionDoneWithErrors', 'Done ({ok}/{total} succeeded, {fail} failed)')
-                        .replace('{ok}', String(run.ok)).replace('{total}', String(run.ok + run.fail)).replace('{fail}', String(run.fail));
+                    ? _t('aiToolsExecutionDone', { ok: QSPanelWords.number(run.ok) })
+                    : _t('aiToolsExecutionDoneWithErrors', {
+                        ok: QSPanelWords.number(run.ok), total: QSPanelWords.number(run.ok + run.fail), fail: QSPanelWords.number(run.fail)
+                    });
             }
             // A run that had no step to run says so: the project was already as asked.
-            if (!run.ran) toaster(_t('noChanges', 'No changes were needed here.'), 'success');
+            if (!run.ran) toaster(_t('aiToolsNoChanges'), 'success');
         } catch (err) {
             if (err && err.planChanged) {
                 // What ran stays done; nothing is kept: the rest was planned against a plan that no longer holds.
@@ -3097,7 +3060,7 @@ window.PreviewAiTools = (function () {
                 toaster(err.message, 'warning');
             } else {
                 console.error('[PreviewAiTools] run failed:', err);
-                var failMsg = _t('runFailed', 'The run stopped: {error}').replace('{error}', (err && err.message) || String(err));
+                var failMsg = _t('aiToolsRunFailed', { error: (err && err.message) || String(err) });
                 if (_stepsHeaderState) _stepsHeaderState.textContent = failMsg;
                 toaster(failMsg, 'error');
             }
@@ -3193,8 +3156,8 @@ window.PreviewAiTools = (function () {
             _renderAttach(run, phase);
             if (_exchangeHeaderEl) {
                 _exchangeHeaderEl.textContent = _aiPhases().length > 1
-                    ? _t('exchangeFor', 'AI exchange — {name}').replace('{name}', phase.title)
-                    : _t('zoneExchange', 'AI exchange');
+                    ? _t('aiToolsExchangeFor', { name: phase.title })
+                    : _t('aiToolsZoneExchange');
             }
             _aiResponseText = '';
             if (_aiResponseTextarea) _aiResponseTextarea.value = '';
@@ -3209,10 +3172,10 @@ window.PreviewAiTools = (function () {
             _showAwaitingAnswer(run, k, phase);
             _updateActionStates();
             if (run.send && conn) {
-                _morphPrimary(_t('sendingToAi', 'Sending to {model}…').replace('{model}', conn.defaultModel || conn.model || ''));
+                _morphPrimary(_t('aiToolsSendingToAi', { model: conn.defaultModel || conn.model || '' }));
                 await _sendToAi(conn);
             } else {
-                _morphPrimary(_t('runActive', 'Running…'));
+                _morphPrimary(_t('aiToolsRunActive'));
                 _focusGeneralPrompt();
                 _autoCopyPromptWithToast();
                 _tallyPrompt(run, k, _generatedPrompt.length);
@@ -3297,18 +3260,14 @@ window.PreviewAiTools = (function () {
             var backAt = (api && api.getWriteRate ? api.getWriteRate().windows || [] : []).reduce(function (m, w) {
                 return w.remaining <= 0 ? Math.max(m, w.resetAt) : m;
             }, 0);
-            msg = _t('rateStopped', 'Stopped: the change allowance is used up until {time}. The {n} steps not run are kept; run them from here once it is back.')
-                .replace('{time}', backAt && api ? api.clockText(backAt) : '')
-                .replace('{n}', String(steps.length));
+            msg = QSPanelWords.count('preview.workflowsRateStopped', steps.length,
+                { time: backAt && api ? api.clockText(backAt) : '' });
         } else if (outcome.stop === 'parts') {
-            msg = _t('rateKeptRest', 'The other {n} steps are kept; run them from here once the allowance is back.')
-                .replace('{n}', String(steps.length));
+            msg = QSPanelWords.count('preview.workflowsRateKeptRest', steps.length);
         } else if (outcome.stop === 'abort') {
-            msg = _t('stoppedByStep', 'Stopped: {command} failed, and its step stops the run when it fails. The rest is kept: run it from the banner at the top once the cause is fixed.')
-                .replace('{command}', outcome.command || '');
+            msg = _t('aiToolsStoppedByStep', { command: outcome.command || '' });
         } else {
-            msg = _t('stoppedByUser', 'Stopped before {name}. The rest of the run is kept: run it from the banner at the top.')
-                .replace('{name}', outcome.phase.title);
+            msg = _t('aiToolsStoppedByUser', { name: outcome.phase.title });
         }
         if (_stepsHeaderState) _stepsHeaderState.textContent = msg;
         toaster(msg, outcome.stop === 'user' || outcome.stop === 'parts' ? 'info' : 'warning');
@@ -3318,6 +3277,18 @@ window.PreviewAiTools = (function () {
      * Whether the run may start against the write rate: the steps the plan knows now (an AI phase's
      * are not known yet) counted as one batch is today. Each phase is counted again when it runs.
      */
+    /**
+     * Why a run cannot start now: what it needs and what is left, two counted sentences (either count may be 1), then when
+     * enough is back.
+     */
+    function _rateRefusalWords(counted, plan, api) {
+        return QSPanelWords.count('preview.workflowsRateRunNeeds', counted) + ' '
+            + QSPanelWords.count('preview.workflowsRateLeft', plan.left, {
+                time: api.clockText(plan.backAt),
+                wait: api.waitText((plan.backAt - Date.now()) / 1000)
+            });
+    }
+
     function _rateAllowsStart(run) {
         var api = window.QuickSiteAPI;
         var rate = (api && typeof api.getWriteRate === 'function') ? api.getWriteRate() : { windows: [], waitSeconds: 0 };
@@ -3326,11 +3297,7 @@ window.PreviewAiTools = (function () {
         if (rate.windows.length === 0 || counted === 0) return true;
         var plan = _planRun(counted, rate);
         if (plan.start || (plan.reason === 'never' && plan.fitsNow > 0)) return true;
-        var waitMsg = _t('rateRefusedToStart', 'This run needs {needs} changes and {left} are left on this server. Enough is back at {time} (in {wait}).')
-            .replace('{needs}', String(counted))
-            .replace('{left}', String(plan.left))
-            .replace('{time}', api.clockText(plan.backAt))
-            .replace('{wait}', api.waitText((plan.backAt - Date.now()) / 1000));
+        var waitMsg = _rateRefusalWords(counted, plan, api);
         if (_stepsHeaderState) _stepsHeaderState.textContent = waitMsg;
         _toaster()(waitMsg, 'warning');
         return false;
@@ -3361,47 +3328,38 @@ window.PreviewAiTools = (function () {
         });
     }
 
+    // What a step deletes or changes, by the server's group of it (an effect's `what`): the word naming it, by the rest
+    // of its key's path (_t()). A group with no entry here is named as other commands.
     var EFFECT_WHAT = {
-        pages: ['whatPages', 'Pages'],
-        menu: ['whatMenu', 'The menu'],
-        footer: ['whatFooter', 'The footer'],
-        components: ['whatComponents', 'Components'],
-        snippets: ['whatSnippets', 'Snippets'],
-        languages: ['whatLanguages', 'Languages'],
-        defaultLanguage: ['whatDefaultLanguage', 'The default language'],
-        texts: ['whatTexts', 'Texts'],
-        translationFiles: ['whatTranslationFiles', 'Translation files of languages the project no longer has'],
-        media: ['whatMedia', 'Media files'],
-        stylesheet: ['whatStylesheet', 'The stylesheet'],
-        interactions: ['whatInteractions', 'Interactions'],
-        privacy: ['whatPrivacy', 'Privacy pages and settings'],
-        other: ['whatOther', 'Other commands']
+        pages: 'aiToolsWhatPages',
+        menu: 'aiToolsWhatMenu',
+        footer: 'aiToolsWhatFooter',
+        components: 'aiToolsWhatComponents',
+        snippets: 'aiToolsWhatSnippets',
+        languages: 'aiToolsWhatLanguages',
+        defaultLanguage: 'aiToolsWhatDefaultLanguage',
+        texts: 'aiToolsWhatTexts',
+        translationFiles: 'aiToolsWhatTranslationFiles',
+        media: 'aiToolsWhatMedia',
+        stylesheet: 'aiToolsWhatStylesheet',
+        interactions: 'aiToolsWhatInteractions',
+        privacy: 'aiToolsWhatPrivacy',
+        other: 'aiToolsWhatOther'
     };
     var EFFECT_LIST_MAX = 8;
 
     /**
      * What a command flagged destructive does, for one that deletes nothing: a short word for a step and a
-     * phase, and a line for a warning. Its step stops a run exactly as a deletion does, so `effect` stays
-     * 'delete' and every gate reads that; only what the run says about it comes from here. A flagged command
-     * with no entry here reads as a deletion, which is what cleanOrphanTranslations is.
+     * phase, and a line for a warning, each by the rest of its key's path (_t()). Its step stops a run exactly
+     * as a deletion does, so `effect` stays 'delete' and every gate reads that; only what the run says about it
+     * comes from here. A flagged command with no entry here reads as a deletion, which is what
+     * cleanOrphanTranslations is.
      */
     var EFFECT_DOES = {
-        restoreBackup: {
-            word: ['effectRestores', 'Restores'],
-            line: ['effectRestoresLine', "Puts a backup back, over the project's current state"]
-        },
-        transferOwnership: {
-            word: ['effectTransfers', 'Transfers'],
-            line: ['effectTransfersLine', 'Hands the project to another member, who becomes its owner']
-        },
-        setOAuthCredentials: {
-            word: ['effectSetsKeys', 'Sets keys'],
-            line: ['effectSetsKeysLine', "Sets or clears the project's keys for a sign-in provider"]
-        },
-        generateConsentLayer: {
-            word: ['effectRegenerates', 'Regenerates'],
-            line: ['effectRegeneratesLine', 'Writes the cookie banner and popup again, over what is there']
-        }
+        restoreBackup: { word: 'aiToolsEffectRestores', line: 'aiToolsEffectRestoresLine' },
+        transferOwnership: { word: 'aiToolsEffectTransfers', line: 'aiToolsEffectTransfersLine' },
+        setOAuthCredentials: { word: 'aiToolsEffectSetsKeys', line: 'aiToolsEffectSetsKeysLine' },
+        generateConsentLayer: { word: 'aiToolsEffectRegenerates', line: 'aiToolsEffectRegeneratesLine' }
     };
 
     /** What a warned step does in words of its own, or null when "Deletes" or "Changes" says it. */
@@ -3442,14 +3400,12 @@ window.PreviewAiTools = (function () {
             });
         });
         return groups.map(function (g) {
-            var what = EFFECT_WHAT[g.what] || EFFECT_WHAT.other;
-            var verb = g.effect === 'delete' ? _t('effectDeletes', 'Deletes') : _t('effectChanges', 'Changes');
-            var line = g.does ? _t(g.does.line[0], g.does.line[1]) : verb + ' — ' + _t(what[0], what[1]);
+            var verb = g.effect === 'delete' ? _t('aiToolsEffectDeletes') : _t('aiToolsEffectChanges');
+            var line = g.does ? _t(g.does.line) : verb + ' — ' + _whatWord(g.what);
             if (g.targets.length > 0) {
                 var shown = g.targets.slice(0, EFFECT_LIST_MAX).join(', ');
                 if (g.targets.length > EFFECT_LIST_MAX) {
-                    shown = _t('effectMore', '{items} and {n} more').replace('{items}', shown)
-                        .replace('{n}', String(g.targets.length - EFFECT_LIST_MAX));
+                    shown = _t('aiToolsEffectMore', { n: QSPanelWords.number(g.targets.length - EFFECT_LIST_MAX), items: shown });
                 }
                 line += ': ' + shown;
             }
@@ -3472,15 +3428,14 @@ window.PreviewAiTools = (function () {
             parts.push(g.phase.title + ':\n' + lines.map(function (l) { return '• ' + l.text; }).join('\n'));
         });
         aiPhases.forEach(function (p) {
-            parts.push(_t('confirmAiAnnounce', "{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.")
-                .replace('{name}', p.title));
+            parts.push(_t('aiToolsConfirmAiAnnounce', { name: p.title }));
         });
         return utils.confirm(parts.join('\n\n'), {
             type: 'danger',
-            title: word === 'delete' ? _t('confirmTitleDelete', 'Delete content?')
-                : (word === 'act' ? _t('confirmTitleAct', 'Run these commands?') : _t('confirmTitleChange', 'Change content?')),
-            confirmText: word === 'delete' ? _t('confirmRunDelete', 'Delete and run')
-                : (word === 'act' ? _t('confirmRunAct', 'Confirm and run') : _t('confirmRunChange', 'Change and run'))
+            title: word === 'delete' ? _t('aiToolsConfirmTitleDelete')
+                : (word === 'act' ? _t('aiToolsConfirmTitleAct') : _t('aiToolsConfirmTitleChange')),
+            confirmText: word === 'delete' ? _t('aiToolsConfirmRunDelete')
+                : (word === 'act' ? _t('aiToolsConfirmRunAct') : _t('aiToolsConfirmRunChange'))
         });
     }
 
@@ -3531,25 +3486,26 @@ window.PreviewAiTools = (function () {
 
         var title = document.createElement('p');
         title.className = 'preview-contextual-ai-tools__review-title';
-        title.textContent = _t('reviewNext', 'Next — {current} of {total}: {name}')
-            .replace('{current}', String(k + 1)).replace('{total}', String(run.plan.length)).replace('{name}', phase.title);
+        title.textContent = _t('aiToolsReviewNext', {
+            current: QSPanelWords.number(k + 1), total: QSPanelWords.number(run.plan.length), name: phase.title
+        });
         _reviewEl.appendChild(title);
 
         var what = document.createElement('p');
         what.className = 'preview-contextual-ai-tools__review-what';
         what.textContent = phase.ai
-            ? _t('reviewAi', 'Its prompt is built from the project as it now is.')
-            : _t('reviewSteps', '{n} steps').replace('{n}', String((phase.steps || []).length));
+            ? _t('aiToolsReviewAi')
+            : QSPanelWords.count('preview.workflowsReviewSteps', (phase.steps || []).length);
         _reviewEl.appendChild(what);
 
         if (run.last) {
             var last = document.createElement('p');
             last.className = 'preview-contextual-ai-tools__review-last';
-            last.textContent = (run.last.fail > 0
-                ? _t('reviewLastFailed', '{name}: {ok} of {total} succeeded, {fail} failed')
-                : _t('reviewLast', '{name}: {ok} of {total} succeeded'))
-                .replace('{name}', run.last.name).replace('{ok}', String(run.last.ok))
-                .replace('{total}', String(run.last.total)).replace('{fail}', String(run.last.fail));
+            var lastWords = {
+                ok: QSPanelWords.number(run.last.ok), total: QSPanelWords.number(run.last.total),
+                fail: QSPanelWords.number(run.last.fail), name: run.last.name
+            };
+            last.textContent = run.last.fail > 0 ? _t('aiToolsReviewLastFailed', lastWords) : _t('aiToolsReviewLast', lastWords);
             _reviewEl.appendChild(last);
         }
 
@@ -3565,13 +3521,13 @@ window.PreviewAiTools = (function () {
         go.type = 'button';
         go.className = 'admin-btn ' + (deletes ? 'admin-btn--danger' : 'admin-btn--primary');
         var word = _effectWord(warned);
-        go.textContent = word === 'delete' ? _t('reviewContinueDelete', 'Delete and continue')
-            : (word === 'act' ? _t('reviewContinueAct', 'Confirm and continue')
-                : (lines.length ? _t('reviewContinueChange', 'Change and continue') : _t('reviewContinue', 'Continue')));
+        go.textContent = word === 'delete' ? _t('aiToolsReviewContinueDelete')
+            : (word === 'act' ? _t('aiToolsReviewContinueAct')
+                : (lines.length ? _t('aiToolsReviewContinueChange') : _t('aiToolsReviewContinue')));
         var stop = document.createElement('button');
         stop.type = 'button';
         stop.className = 'admin-btn';
-        stop.textContent = _t('reviewStop', 'Stop');
+        stop.textContent = _t('aiToolsReviewStop');
         go.addEventListener('click', function () { resolve(true); });
         stop.addEventListener('click', function () { resolve(false); });
         actions.appendChild(go);
@@ -3579,7 +3535,7 @@ window.PreviewAiTools = (function () {
         _reviewEl.appendChild(actions);
         if (_stepsSetOpen && !phase.ai) _stepsSetOpen(true);
         if (_stepsHeaderState) {
-            _stepsHeaderState.textContent = _t('stepsReady', '{n} commands ready').replace('{n}', String((phase.steps || []).length));
+            _stepsHeaderState.textContent = QSPanelWords.count('preview.workflowsStepsReady', (phase.steps || []).length);
         }
         go.focus();
     }
@@ -3595,24 +3551,25 @@ window.PreviewAiTools = (function () {
         _reviewEl.className = 'preview-contextual-ai-tools__review';
         var title = document.createElement('p');
         title.className = 'preview-contextual-ai-tools__review-title';
-        title.textContent = _t('reviewAwaiting', "{current} of {total}: waiting for {name}'s answer — it runs from AI response.")
-            .replace('{current}', String(k + 1)).replace('{total}', String(run.plan.length)).replace('{name}', phase.title);
+        title.textContent = _t('aiToolsReviewAwaiting', {
+            current: QSPanelWords.number(k + 1), total: QSPanelWords.number(run.plan.length), name: phase.title
+        });
         _reviewEl.appendChild(title);
         var actions = document.createElement('div');
         actions.className = 'preview-contextual-ai-tools__review-actions';
         _recoveryEls = {
-            continueBtn: _renderRecoveryButton('continue', 'admin-btn--primary', _t('continueAnswer', 'Continue the answer'),
+            continueBtn: _renderRecoveryButton('continue', 'admin-btn--primary', _t('aiToolsContinueAnswer'),
                 _onContinueAnswerClick),
-            sendAgainBtn: _renderRecoveryButton('send-again', '', _t('sendAgain', 'Send again'),
+            sendAgainBtn: _renderRecoveryButton('send-again', '', _t('aiToolsSendAgain'),
                 _onSendAgainClick)
         };
-        _recoveryEls.sendAgainBtn.title = _t('sendAgainTitle', 'Sends the same prompt again, for a new answer.');
+        _recoveryEls.sendAgainBtn.title = _t('aiToolsSendAgainTitle');
         actions.appendChild(_recoveryEls.continueBtn);
         actions.appendChild(_recoveryEls.sendAgainBtn);
         var stop = document.createElement('button');
         stop.type = 'button';
         stop.className = 'admin-btn';
-        stop.textContent = _t('reviewStop', 'Stop');
+        stop.textContent = _t('aiToolsReviewStop');
         stop.addEventListener('click', function () {
             if (!_answerWaiter) return;
             var waiter = _answerWaiter;
@@ -3686,7 +3643,7 @@ window.PreviewAiTools = (function () {
             var item = document.createElement('span');
             var state = _run ? (_run.states[i] || 'pending') : 'pending';
             item.className = 'preview-contextual-ai-tools__run-phase--' + state;
-            item.textContent = (marks[state] ? marks[state] + ' ' : '') + p.title + (p.ai ? ' (' + _t('kindAi', 'AI') + ')' : '');
+            item.textContent = (marks[state] ? marks[state] + ' ' : '') + p.title + (p.ai ? ' (' + _t('aiToolsKindAi') + ')' : '');
             _runLineEl.appendChild(item);
         });
     }
@@ -3803,11 +3760,7 @@ window.PreviewAiTools = (function () {
         if (rate.windows.length > 0 && counted > 0) {
             var plan = _planRun(counted, rate);
             if (!plan.start && (plan.reason === 'wait' || plan.fitsNow <= 0)) {
-                var waitMsg = _t('rateRefusedToStart', 'This run needs {needs} changes and {left} are left on this server. Enough is back at {time} (in {wait}).')
-                    .replace('{needs}', String(counted))
-                    .replace('{left}', String(plan.left))
-                    .replace('{time}', api.clockText(plan.backAt))
-                    .replace('{wait}', api.waitText((plan.backAt - Date.now()) / 1000));
+                var waitMsg = _rateRefusalWords(counted, plan, api);
                 if (_stepsHeaderState) _stepsHeaderState.textContent = waitMsg;
                 toaster(waitMsg, 'warning');
                 out.stoppedAt = 0;
@@ -3817,15 +3770,15 @@ window.PreviewAiTools = (function () {
             if (!plan.start) {
                 // More than a whole window: never in one go. Offered in parts.
                 var fits = _firstPart(steps, plan.fitsNow);
-                var neverMsg = _t('rateNeverOneGo', 'This run needs {needs} changes; this server allows {max} per {period}, so it cannot run in one go.')
-                    .replace('{needs}', String(counted))
-                    .replace('{max}', String(plan.window.max))
-                    .replace('{period}', api.periodText(plan.window.period));
-                var partsMsg = _t('rateRunInParts', 'Run the first {fits} steps now and keep the other {rest} for later?')
-                    .replace('{fits}', String(fits))
-                    .replace('{rest}', String(steps.length - fits));
+                var neverMsg = _t('aiToolsRateNeverOneGo', {
+                    needs: QSPanelWords.number(counted),
+                    max: QSPanelWords.number(plan.window.max),
+                    period: api.periodText(plan.window.period)
+                });
+                var partsMsg = QSPanelWords.count('preview.workflowsRateRunInParts', fits,
+                    { rest: QSPanelWords.number(steps.length - fits) });
                 var go = window.QuickSiteUtils && typeof window.QuickSiteUtils.confirm === 'function'
-                    ? await window.QuickSiteUtils.confirm(neverMsg + ' ' + partsMsg, { confirmText: _t('rateRunPart', 'Run the first part') })
+                    ? await window.QuickSiteUtils.confirm(neverMsg + ' ' + partsMsg, { confirmText: _t('aiToolsRateRunPart') })
                     : false;
                 if (!go) {
                     if (_stepsHeaderState) _stepsHeaderState.textContent = neverMsg;
@@ -3847,13 +3800,12 @@ window.PreviewAiTools = (function () {
             if (body) body.appendChild(row.el);
         }
 
-        var runTpl = _t('executionRunning', 'Running {current}/{total}');
         var last = keepAfter !== null ? keepAfter : steps.length;
         for (var j = 0; j < last; j++) {
             if (_stepsHeaderState) {
-                _stepsHeaderState.textContent = runTpl
-                    .replace('{current}', String(j + 1))
-                    .replace('{total}', String(steps.length)) + (opts.name ? ' · ' + opts.name : '');
+                _stepsHeaderState.textContent = _t('aiToolsExecutionRunning', {
+                    current: QSPanelWords.number(j + 1), total: QSPanelWords.number(steps.length)
+                }) + (opts.name ? ' · ' + opts.name : '');
             }
             _updateStepRow(rows[j], 'running');
             var result;
@@ -3883,7 +3835,7 @@ window.PreviewAiTools = (function () {
                 continue;
             }
             out.fail++;
-            _updateStepRow(rows[j], 'error', result.error || 'Failed');
+            _updateStepRow(rows[j], 'error', result.error || '');
             if (steps[j].abortOnFail === true) {
                 out.stoppedAt = j;
                 out.reason = 'abort';
@@ -3917,16 +3869,16 @@ window.PreviewAiTools = (function () {
         var attempt = 0;
         while (!result.ok && !result.rateLimited && attempt < max && retryOn.indexOf(result.status) !== -1) {
             attempt++;
-            _updateStepRow(row, 'retry', _t('stepRetry', 'Retrying ({attempt} of {max}) in {seconds} s — {error}')
-                .replace('{attempt}', String(attempt)).replace('{max}', String(max))
-                .replace('{seconds}', String(delay / 1000)).replace('{error}', result.error || ''));
+            _updateStepRow(row, 'retry', _t('aiToolsStepRetry', {
+                attempt: QSPanelWords.number(attempt), max: QSPanelWords.number(max),
+                seconds: QSPanelWords.number(delay / 1000), error: result.error || ''
+            }));
             await new Promise(function (resolve) { setTimeout(resolve, delay); });
             _updateStepRow(row, 'running');
             result = await _executeOneCommand(step);
         }
         if (!result.ok && !result.rateLimited && attempt > 0) {
-            result.error = _t('stepFailedAfterRetries', '{error} (after {n} retries)')
-                .replace('{n}', String(attempt)).replace('{error}', result.error || '');
+            result.error = QSPanelWords.count('preview.workflowsStepFailedAfterRetries', attempt, { error: result.error || '' });
         }
         return result;
     }
@@ -3939,8 +3891,8 @@ window.PreviewAiTools = (function () {
             var tick = function () {
                 var left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
                 if (_stepsHeaderState) {
-                    _stepsHeaderState.textContent = _t('rateWaiting', 'Waiting for the change allowance… {wait}')
-                        .replace('{wait}', api ? api.waitText(left) : left + ' s');
+                    _stepsHeaderState.textContent = _t('aiToolsRateWaiting',
+                        { wait: api ? api.waitText(left) : QSPanelWords.number(left) + ' s' });
                 }
                 if (left <= 0) {
                     resolve();
@@ -3960,7 +3912,7 @@ window.PreviewAiTools = (function () {
      */
     async function _executeOneCommand(cmd) {
         var commandName = cmd.command || cmd.name;
-        if (!commandName) return { ok: false, status: 0, error: 'Missing command name' };
+        if (!commandName) return { ok: false, status: 0, error: _t('workflowsStepMissingCommand') };
         var method = String(cmd.method || 'POST').toUpperCase();
         var res = await window.QuickSiteAdmin.apiRequest(commandName, method, method !== 'GET' ? (cmd.params || null) : null);
         var data = res.data || {};
@@ -4180,11 +4132,11 @@ window.PreviewAiTools = (function () {
         if (_outsideEl.hidden) return;
         var title = document.createElement('p');
         title.className = 'preview-contextual-ai-tools__outside-title';
-        title.textContent = _t('outsideTitle', 'Pictures from outside the site');
+        title.textContent = _t('aiToolsOutsideTitle');
         _outsideEl.appendChild(title);
         var line = document.createElement('p');
         line.className = 'preview-contextual-ai-tools__outside-line';
-        line.textContent = _t('outsideLine', 'Not one of your assets: replace it, or it may disappear.');
+        line.textContent = _t('aiToolsOutsideLine');
         _outsideEl.appendChild(line);
         var list = document.createElement('ul');
         list.className = 'preview-contextual-ai-tools__outside-list';
@@ -4242,7 +4194,7 @@ window.PreviewAiTools = (function () {
         download.className = 'preview-contextual-ai-tools__attach-download';
         download.href = url;
         download.setAttribute('download', asset.filename);
-        download.textContent = _t('attachDownload', 'Download');
+        download.textContent = _t('aiToolsAttachDownload');
         item.appendChild(download);
         return item;
     }
@@ -4259,7 +4211,7 @@ window.PreviewAiTools = (function () {
         if (run.send && _getDefaultConnection()) {
             var line = document.createElement('p');
             line.className = 'preview-contextual-ai-tools__attach-line';
-            line.textContent = _t('attachConnection', 'Sent through your AI connection: no picture is attached, the AI reads their descriptions only.');
+            line.textContent = _t('aiToolsAttachConnection');
             _attachEl.appendChild(line);
             _attachEl.hidden = false;
             return;
@@ -4275,11 +4227,11 @@ window.PreviewAiTools = (function () {
         if (_run !== run || pictures.length === 0) return;
         var title = document.createElement('p');
         title.className = 'preview-contextual-ai-tools__attach-title';
-        title.textContent = _t('attachTitle', 'Your starred pictures: attach them to your AI chat with the prompt');
+        title.textContent = _t('aiToolsAttachTitle');
         _attachEl.appendChild(title);
         var hint = document.createElement('p');
         hint.className = 'preview-contextual-ai-tools__hint';
-        hint.textContent = _t('attachHint', 'So the AI can match their colours and mood. Download each one, then attach it in your chat.');
+        hint.textContent = _t('aiToolsAttachHint');
         _attachEl.appendChild(hint);
         var list = document.createElement('ul');
         list.className = 'preview-contextual-ai-tools__attach-list';
@@ -4368,22 +4320,21 @@ window.PreviewAiTools = (function () {
 
         var title = document.createElement('p');
         title.className = 'preview-contextual-ai-tools__kept-title';
-        title.textContent = (steps.length > 0
-            ? _t('keptTitle', '{n} steps kept from a stopped run ({label}, planned at {time})').replace('{n}', String(steps.length))
-            : _t('keptBefore', '{label}: stopped before {name} (planned at {time})').replace('{name}', kept.phaseTitle || ''))
-            .replace('{label}', kept.label || '—')
-            .replace('{time}', api ? api.clockText(kept.savedAt) : '');
+        var keptWords = { time: api ? api.clockText(kept.savedAt) : '', label: kept.label || '—' };
+        title.textContent = steps.length > 0
+            ? QSPanelWords.count('preview.workflowsKeptTitle', steps.length, keptWords)
+            : _t('aiToolsKeptBefore', Object.assign({ name: kept.phaseTitle || '' }, keptWords));
         _keptEl.appendChild(title);
         var later = Array.isArray(kept.later) ? kept.later : [];
         if (later.length > 0) {
             var then = document.createElement('p');
             then.className = 'preview-contextual-ai-tools__kept-then';
-            then.textContent = _t('keptThen', 'Then: {names}').replace('{names}', later.join(', '));
+            then.textContent = _t('aiToolsKeptThen', { names: later.join(', ') });
             _keptEl.appendChild(then);
         }
         var warn = document.createElement('p');
         warn.className = 'preview-contextual-ai-tools__kept-warning';
-        warn.textContent = _t('keptWarning', 'The page may have changed since they were planned: node positions can shift.');
+        warn.textContent = _t('aiToolsKeptWarning');
         _keptEl.appendChild(warn);
 
         var actions = document.createElement('div');
@@ -4391,9 +4342,9 @@ window.PreviewAiTools = (function () {
         var run = document.createElement('button');
         run.type = 'button';
         run.className = 'admin-btn admin-btn--primary';
-        run.textContent = _t('keptRun', 'Run them');
+        run.textContent = _t('aiToolsKeptRun');
         var canRun = plan.start || (plan.reason === 'never' && plan.fitsNow > 0);
-        var notYetText = canRun ? '' : _t('keptNotYet', 'Enough is back at {time}.').replace('{time}', api.clockText(plan.backAt));
+        var notYetText = canRun ? '' : _t('aiToolsKeptNotYet', { time: api.clockText(plan.backAt) });
         // Not yet: the button looks unavailable but still answers a click with
         // when it will be (a disabled button would swallow the click silently).
         run.disabled = _executing;
@@ -4411,7 +4362,7 @@ window.PreviewAiTools = (function () {
         var discard = document.createElement('button');
         discard.type = 'button';
         discard.className = 'admin-btn';
-        discard.textContent = _t('keptDiscard', 'Discard');
+        discard.textContent = _t('aiToolsKeptDiscard');
         discard.addEventListener('click', function () {
             _clearKept();
             _renderKept();
@@ -4442,7 +4393,7 @@ window.PreviewAiTools = (function () {
             if (_allWorkflows[i].id === kept.workflowId) workflow = _allWorkflows[i];
         }
         if (!workflow) {
-            _toaster()(_t('keptMissing', '{label} is not in the list any more: discard what was kept.').replace('{label}', kept.label || kept.workflowId), 'warning');
+            _toaster()(_t('aiToolsKeptMissing', { label: kept.label || kept.workflowId }), 'warning');
             return;
         }
         await _onCardClick(workflow, { restore: { params: kept.params || {}, requests: kept.requests || {} } });
@@ -4491,14 +4442,14 @@ window.PreviewAiTools = (function () {
      */
     function _fetchPhase(params, k, extra) {
         return _workflowRequest(Object.assign({ params: params, phase: k }, extra || {})).then(function (data) {
-            if (!data.phase) throw new Error('No such phase');
+            if (!data.phase) throw new Error(_t('workflowsNoSuchPhase'));
             return data.phase;
         });
     }
 
     /** The run's plan changed under it (the server's 409, or a kept rest whose phase moved): the run stops there. */
     function _planChangedError() {
-        var err = new Error(_t('planChanged', "The run's plan changed: start the run again."));
+        var err = new Error(_t('aiToolsPlanChanged'));
         err.planChanged = true;
         return err;
     }
@@ -4547,7 +4498,7 @@ window.PreviewAiTools = (function () {
         if (rows.steps.length === 0 && phase.ai) {
             var pending = document.createElement('p');
             pending.className = 'preview-contextual-ai-tools__batch-pending';
-            pending.textContent = _t('batchAiPending', 'Its commands appear when the AI answers.');
+            pending.textContent = _t('aiToolsBatchAiPending');
             body.appendChild(pending);
         }
         for (var s = 0; s < rows.steps.length; s++) {
@@ -4582,8 +4533,8 @@ window.PreviewAiTools = (function () {
         }
         if (_stepsHeaderState && !_run) {
             _stepsHeaderState.textContent = total > 0
-                ? _t('stepsReady', '{n} commands ready').replace('{n}', String(total))
-                : _t('stateIdle', 'Idle');
+                ? QSPanelWords.count('preview.workflowsStepsReady', total)
+                : _t('aiToolsStateIdle');
         }
     }
 
@@ -4624,22 +4575,22 @@ window.PreviewAiTools = (function () {
         header.appendChild(name);
         var meta = document.createElement('span');
         meta.className = 'preview-contextual-ai-tools__phase-meta';
-        var kind = phase.kind === 'pre' ? _t('kindBefore', 'before') : (phase.kind === 'post' ? _t('kindAfter', 'after') : '');
+        var kind = phase.kind === 'pre' ? _t('aiToolsKindBefore') : (phase.kind === 'post' ? _t('aiToolsKindAfter') : '');
         var parts = [];
         if (kind) parts.push(kind);
-        if (phase.ai) parts.push(_t('kindAi', 'AI'));
-        parts.push(_t('reviewSteps', '{n} steps').replace('{n}', String(steps.length)));
+        if (phase.ai) parts.push(_t('aiToolsKindAi'));
+        parts.push(QSPanelWords.count('preview.workflowsReviewSteps', steps.length));
         var warned = _warnedEffects(effects);
         var warnWord = _effectWord(warned);
-        if (warnWord === 'delete') parts.push(_t('effectDeletes', 'Deletes'));
+        if (warnWord === 'delete') parts.push(_t('aiToolsEffectDeletes'));
         else if (warnWord === 'act') {
             var seen = {};
             warned.forEach(function (e) {
                 var does = _effectDoes(e);
-                if (does && !seen[e.command]) parts.push(_t(does.word[0], does.word[1]));
+                if (does && !seen[e.command]) parts.push(_t(does.word));
                 if (does) seen[e.command] = true;
             });
-        } else if (warnWord === 'change') parts.push(_t('effectChanges', 'Changes'));
+        } else if (warnWord === 'change') parts.push(_t('aiToolsEffectChanges'));
         meta.textContent = parts.join(' · ');
         header.appendChild(meta);
         var body = document.createElement('div');
@@ -4655,7 +4606,7 @@ window.PreviewAiTools = (function () {
 
     /** A step's row; `effect` (the server's, or null) marks what it deletes or changes. */
     function _renderStepRow(cmd, effect) {
-        var commandName = cmd.command || cmd.name || '(unnamed)';
+        var commandName = cmd.command || cmd.name || _t('workflowsStepUnnamed');
         var hasParams = cmd.params && typeof cmd.params === 'object' && Object.keys(cmd.params).length > 0;
 
         var el = document.createElement('div');
@@ -4677,8 +4628,8 @@ window.PreviewAiTools = (function () {
             var tag = document.createElement('span');
             tag.className = 'preview-contextual-ai-tools__step-effect preview-contextual-ai-tools__step-effect--' + effect.effect;
             var stepDoes = _effectDoes(effect);
-            tag.textContent = stepDoes ? _t(stepDoes.word[0], stepDoes.word[1])
-                : (effect.effect === 'delete' ? _t('effectDeletes', 'Deletes') : _t('effectChanges', 'Changes'));
+            tag.textContent = stepDoes ? _t(stepDoes.word)
+                : (effect.effect === 'delete' ? _t('aiToolsEffectDeletes') : _t('aiToolsEffectChanges'));
             body.appendChild(tag);
         }
 
@@ -4691,7 +4642,7 @@ window.PreviewAiTools = (function () {
 
         var status = document.createElement('span');
         status.className = 'preview-contextual-ai-tools__step-status';
-        status.textContent = _t('stepPending', 'Pending');
+        status.textContent = _t('aiToolsStepPending');
         body.appendChild(status);
 
         var paramsFull = null;
@@ -4743,7 +4694,7 @@ window.PreviewAiTools = (function () {
         );
         if (state === 'running') {
             row.icon.textContent = '⏳';
-            row.status.textContent = _t('stepRunning', 'Running…');
+            row.status.textContent = _t('aiToolsStepRunning');
             row.el.classList.add('preview-contextual-ai-tools__step--running');
         } else if (state === 'retry') {
             // A step sent again (its retryOn): the row says which attempt and when.
@@ -4756,8 +4707,8 @@ window.PreviewAiTools = (function () {
             row.el.classList.add('preview-contextual-ai-tools__step--ok');
         } else if (state === 'error') {
             row.icon.textContent = '❌';
-            var tpl = _t('stepError', 'Failed: {error}');
-            row.status.textContent = tpl.replace('{error}', message || 'Failed');
+            // The step's error after the word; a failure that gave none is said in the one word.
+            row.status.textContent = message ? _t('aiToolsStepError', { error: message }) : _t('workflowsStepFailed');
             row.el.classList.add('preview-contextual-ai-tools__step--error');
         }
     }
@@ -4785,7 +4736,7 @@ window.PreviewAiTools = (function () {
                 || value === ''
                 || (Array.isArray(value) && value.length === 0);
             if (isEmpty) {
-                msgs.push(_t('validationRequired', 'Required'));
+                msgs.push(_t('aiToolsValidationRequired'));
                 return msgs;
             }
         }
@@ -4798,29 +4749,25 @@ window.PreviewAiTools = (function () {
 
         if (Array.isArray(value)) {
             if (v.minItems != null && value.length < v.minItems) {
-                var tplMin = _t('validationMinItems', 'Pick at least {n}');
-                msgs.push(tplMin.replace('{n}', String(v.minItems)));
+                msgs.push(_t('aiToolsValidationMinItems', { n: QSPanelWords.number(Number(v.minItems)) }));
             }
             if (v.maxItems != null && value.length > v.maxItems) {
-                var tplMax = _t('validationMaxItems', 'Pick at most {n}');
-                msgs.push(tplMax.replace('{n}', String(v.maxItems)));
+                msgs.push(_t('aiToolsValidationMaxItems', { n: QSPanelWords.number(Number(v.maxItems)) }));
             }
         }
 
         if (typeof value === 'string') {
             if (v.minLength != null && value.length < v.minLength) {
-                var tplL = _t('validationMinLength', 'At least {n} characters');
-                msgs.push(tplL.replace('{n}', String(v.minLength)));
+                msgs.push(QSPanelWords.count('preview.workflowsValidationMinLength', Number(v.minLength)));
             }
             if (v.maxLength != null && value.length > v.maxLength) {
-                var tplLM = _t('validationMaxLength', 'At most {n} characters');
-                msgs.push(tplLM.replace('{n}', String(v.maxLength)));
+                msgs.push(QSPanelWords.count('preview.workflowsValidationMaxLength', Number(v.maxLength)));
             }
             if (v.pattern) {
                 try {
                     var re = new RegExp('^(?:' + v.pattern + ')$');
                     if (!re.test(value)) {
-                        msgs.push(_t('validationPattern', "Doesn't match the required pattern"));
+                        msgs.push(_t('aiToolsValidationPattern'));
                     }
                 } catch (e) {
                     console.warn('[PreviewAiTools] invalid pattern in workflow:', v.pattern, e);
@@ -4831,13 +4778,12 @@ window.PreviewAiTools = (function () {
         if (typeof value === 'number'
             || (typeof value === 'string' && value !== '' && !isNaN(Number(value)))) {
             var num = Number(value);
+            // A bound is shown whole, every decimal the workflow's file gives it.
             if (v.min != null && num < v.min) {
-                var tplNm = _t('validationMin', 'Minimum {n}');
-                msgs.push(tplNm.replace('{n}', String(v.min)));
+                msgs.push(_t('aiToolsValidationMin', { n: QSPanelWords.number(Number(v.min), { maximumFractionDigits: 20 }) }));
             }
             if (v.max != null && num > v.max) {
-                var tplNx = _t('validationMax', 'Maximum {n}');
-                msgs.push(tplNx.replace('{n}', String(v.max)));
+                msgs.push(_t('aiToolsValidationMax', { n: QSPanelWords.number(Number(v.max), { maximumFractionDigits: 20 }) }));
             }
         }
 
@@ -4880,7 +4826,7 @@ window.PreviewAiTools = (function () {
                 _primaryActionBtn.title = '';
             } else if (hasParamErrors) {
                 _primaryActionBtn.disabled = true;
-                _primaryActionBtn.title = _t('runBlockedTooltip', 'Fix the highlighted parameters before running.');
+                _primaryActionBtn.title = _t('aiToolsRunBlockedTooltip');
                 _primaryActionBtn.textContent = _computePrimaryLabel();
             } else {
                 _primaryActionBtn.disabled = false;
@@ -4902,9 +4848,9 @@ window.PreviewAiTools = (function () {
             var warned = _answerPhase ? _warnedEffects(_answerPhase.effects) : [];
             var deletes = warned.some(function (e) { return e.effect === 'delete'; });
             var word = _effectWord(warned);
-            _executeBtnEl.textContent = word === 'delete' ? _t('confirmRunDelete', 'Delete and run')
-                : (word === 'act' ? _t('confirmRunAct', 'Confirm and run')
-                    : (word === 'change' ? _t('confirmRunChange', 'Change and run') : _t('actionExecute', 'Execute commands')));
+            _executeBtnEl.textContent = word === 'delete' ? _t('aiToolsConfirmRunDelete')
+                : (word === 'act' ? _t('aiToolsConfirmRunAct')
+                    : (word === 'change' ? _t('aiToolsConfirmRunChange') : _t('aiToolsActionExecute')));
             _executeBtnEl.className = deletes
                 ? 'preview-contextual-ai-tools__action-btn--primary preview-contextual-ai-tools__action-btn--danger'
                 : 'preview-contextual-ai-tools__action-btn--primary';
@@ -4918,10 +4864,10 @@ window.PreviewAiTools = (function () {
             var open = target !== null || (_run === null && !_executing && _firstPhaseIsAi());
             _aiResponseTextarea.readOnly = !open;
             _aiResponseTextarea.placeholder = !open
-                ? _t('answerAfterRun', 'Run first: the parts before it prepare the project, then its prompt is built.')
+                ? _t('aiToolsAnswerAfterRun')
                 : (_continuation
-                    ? _t('continueWaiting', 'The rest of the answer goes here; the commands that arrived whole ({n}) are kept.').replace('{n}', String(_continuation.kept.length))
-                    : _t('aiResponsePlaceholder', '{"commands": [...]}'));
+                    ? _t('aiToolsContinueWaiting', { n: QSPanelWords.number(_continuation.kept.length) })
+                    : _t('aiToolsAiResponsePlaceholder'));
         }
         _refreshRecovery();
     }
@@ -4932,10 +4878,10 @@ window.PreviewAiTools = (function () {
      * Run with AI / Send to AI by the switch.
      */
     function _computePrimaryLabel() {
-        if (!_chainHasAi()) return _t('actionRun', 'Run');
+        if (!_chainHasAi()) return _t('aiToolsActionRun');
         var conn = _getDefaultConnection();
-        if (!conn) return _firstPhaseIsAi() ? _t('actionGeneratePrompt', 'Generate prompt') : _t('actionRun', 'Run');
-        return _autoContinue() ? _t('actionRunWithAi', 'Run with AI') : _t('actionSendToAi', 'Send to AI');
+        if (!conn) return _firstPhaseIsAi() ? _t('aiToolsActionGeneratePrompt') : _t('aiToolsActionRun');
+        return _autoContinue() ? _t('aiToolsActionRunWithAi') : _t('aiToolsActionSendToAi');
     }
 
     function _morphPrimary(label) {
@@ -4951,7 +4897,7 @@ window.PreviewAiTools = (function () {
         var done = function () {
             if (!_copyBtn) return;
             var orig = _copyBtn.textContent;
-            _copyBtn.textContent = _t('copied', 'Copied!');
+            _copyBtn.textContent = _t('aiToolsCopied');
             setTimeout(function () {
                 if (_copyBtn) _copyBtn.textContent = orig;
             }, 1200);
@@ -4996,7 +4942,7 @@ window.PreviewAiTools = (function () {
         var plan = _continuePlan();
         _recoveryEls.continueBtn.style.display = plan ? '' : 'none';
         _recoveryEls.continueBtn.title = plan
-            ? _t('continueAnswerTitle', 'Keeps the commands that arrived whole ({n}) and asks the AI only for the rest, from the command that was cut. The answer put together runs only when you click Execute.').replace('{n}', String(plan.kept.length))
+            ? _t('aiToolsContinueAnswerTitle', { n: QSPanelWords.number(plan.kept.length) })
             : '';
         _recoveryEls.sendAgainBtn.style.display = _canSendAgain() ? '' : 'none';
     }
@@ -5044,7 +4990,7 @@ window.PreviewAiTools = (function () {
         } else {
             if (_generalPromptTextarea) _generalPromptTextarea.value = request;
             _focusGeneralPrompt();
-            _autoCopyPromptWithToast(request, _t('continueCopied', 'Copied: a request for the rest of the answer. Paste it to your AI assistant, then paste its reply in AI response.'));
+            _autoCopyPromptWithToast(request, _t('aiToolsContinueCopied'));
             if (_run) _tallyPrompt(_run, _run.index, request.length);
         }
         if (_run) _showPhaseInBatch(_run.index);
@@ -5062,15 +5008,17 @@ window.PreviewAiTools = (function () {
         _sendToAi(_getDefaultConnection());
     }
 
-    /** What Continue asks the AI: the commands still missing, from the one that was cut, as one JSON object. */
+    /**
+     * What Continue asks the AI: the commands still missing, from the one that was cut, as one JSON object. The
+     * count is written as digits, as the rest of a prompt is; the cut command's text, the AI's own, is filled last.
+     */
     function _continuationRequest(plan) {
         var n = String(plan.kept.length);
         if (!plan.cut) {
-            return _t('continueRequestBoundary', 'Your answer above was cut off before it ended, after the commands that arrived whole ({n} of them). Reply with only the commands still missing, as one JSON object {"commands": [...]}, with no text before or after it and none of the commands already given.').split('{n}').join(n);
+            return _t('aiToolsContinueRequestBoundary', { n: n });
         }
         var cut = plan.cut.length > 240 ? plan.cut.slice(0, 240) + '…' : plan.cut;
-        return _t('continueRequest', 'Your answer above was cut off before it ended. The commands before the cut arrived whole ({n} of them); the command after them was cut, and it began:\n\n{cut}\n\nReply with only the commands still missing, starting again from that cut command, as one JSON object {"commands": [...]}, with no text before or after it and none of the commands that arrived whole.')
-            .split('{n}').join(n).replace('{cut}', function () { return cut; });
+        return _t('aiToolsContinueRequest', { n: n, cut: cut });
     }
 
     /** Where an answer's list of commands begins ({"commands": [ … ] or a bare [ … ]), or -1. */
@@ -5274,7 +5222,7 @@ window.PreviewAiTools = (function () {
         if ((_answerPhase.steps || []).length === 0) return;
 
         if (_autoExecHintEl) {
-            _autoExecHintEl.textContent = _t('autoExecHint', 'Auto-executing in 1.5s — edit response to cancel');
+            _autoExecHintEl.textContent = _t('aiToolsAutoExecHint');
             _autoExecHintEl.style.display = '';
         }
         _pasteAutoExecTimer = setTimeout(function () {
@@ -5301,7 +5249,7 @@ window.PreviewAiTools = (function () {
             commands = parsed.commands;
         }
         if (!commands || commands.length === 0) {
-            return { type: 'error', message: _t('aiResponseEmpty', 'No commands found in response.'), empty: true };
+            return { type: 'error', message: _t('aiToolsAiResponseEmpty'), empty: true };
         }
         return { type: 'ok', commandCount: commands.length, parsed: parsed };
     }
@@ -5318,32 +5266,30 @@ window.PreviewAiTools = (function () {
             // Once the server has read the answer, what runs is what it kept.
             var runnable = _answerPhase ? (_answerPhase.steps || []).length : _aiResponseStatus.commandCount;
             var refused = (_answerPhase && _answerPhase.refused) || [];
-            var tpl = _answerParts > 1
-                ? _t('assembledReady', '{n} commands ready, put together from {parts} answers: they run only when you click Execute.')
-                : _t('aiResponseValid', '{n} commands ready');
             _aiResponseStatusEl.textContent = runnable === 0 && refused.length > 0
-                ? _t('answerNothingRuns', 'Nothing in this answer can run.')
-                : tpl.replace('{n}', String(runnable)).replace('{parts}', String(_answerParts));
+                ? _t('aiToolsAnswerNothingRuns')
+                : (_answerParts > 1
+                    ? QSPanelWords.count('preview.workflowsAssembledReady', runnable, { parts: QSPanelWords.number(_answerParts) })
+                    : QSPanelWords.count('preview.workflowsAiResponseValid', runnable));
             _aiResponseStatusEl.classList.add(runnable === 0 && refused.length > 0
                 ? 'preview-contextual-ai-tools__ai-response-status--error'
                 : 'preview-contextual-ai-tools__ai-response-status--ok');
             if (refused.length > 0) _aiResponseStatusEl.appendChild(_renderAnswerLeftOut(refused));
         } else {
-            var errTpl = _t('aiResponseInvalid', 'Invalid JSON: {error}');
             // An answer that does not parse says so; a failure to get one (a send, a reading) is said as it is.
             _aiResponseStatusEl.textContent = _aiResponseStatus.empty || _aiResponseStatus.plain
                 ? _aiResponseStatus.message
-                : errTpl.replace('{error}', _aiResponseStatus.message);
+                : _t('aiToolsAiResponseInvalid', { error: _aiResponseStatus.message });
             _aiResponseStatusEl.classList.add('preview-contextual-ai-tools__ai-response-status--error');
         }
     }
 
-    /** What the server left out of an answer, one line per reason, naming what it refused. */
+    /** What the server left out of an answer, one line per reason (its word by the rest of its key's path), naming what it refused. */
     function _renderAnswerLeftOut(refused) {
         var words = {
-            command: _t('answerLeftOutCommand', 'Left out, as this workflow does not send them: {list}'),
-            selector: _t('answerLeftOutSelector', 'Left out, as this workflow only styles its own elements: {list}'),
-            property: _t('answerLeftOutProperty', 'Left out, as this workflow may not set: {list}')
+            command: 'aiToolsAnswerLeftOutCommand',
+            selector: 'aiToolsAnswerLeftOutSelector',
+            property: 'aiToolsAnswerLeftOutProperty'
         };
         var box = document.createElement('div');
         box.className = 'preview-contextual-ai-tools__ai-response-left-out';
@@ -5353,7 +5299,7 @@ window.PreviewAiTools = (function () {
                 .filter(function (target, i, all) { return all.indexOf(target) === i; });
             if (targets.length === 0) return;
             var line = document.createElement('div');
-            line.textContent = words[reason].replace('{list}', targets.join(', '));
+            line.textContent = _t(words[reason], { list: targets.join(', ') });
             box.appendChild(line);
         });
         return box;

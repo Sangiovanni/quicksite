@@ -867,6 +867,12 @@ input.admin-checkbox {
     color: var(--admin-accent);
 }
 
+/* A hint that asks for something before the form can go on (a field a chosen mode needs): shown only while it is
+   needed, in the warning colour. */
+.admin-hint--warning {
+    color: var(--admin-warning);
+}
+
 /* =============================================================================
    LOGIN PAGE
    ============================================================================= */

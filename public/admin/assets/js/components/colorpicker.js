@@ -1,6 +1,8 @@
 /**
  * QuickSite Color Picker
  * A lightweight, dependency-free RGBA color picker
+ * Its words are common.colorPicker.* and common.close (QSPanelWords): it runs on more than one page,
+ * and every page is handed common.
  * 
  * Usage:
  *   const picker = new QSColorPicker(textInput, options);
@@ -296,11 +298,13 @@
             `;
             
             const headerTitle = document.createElement('span');
-            headerTitle.textContent = 'Color Picker';
+            headerTitle.textContent = QSPanelWords.t('common.colorPicker.title');
             headerTitle.style.cssText = 'font-weight: 500; color: #333;';
             
             this.closeBtn = document.createElement('button');
             this.closeBtn.textContent = '×';
+            this.closeBtn.setAttribute('aria-label', QSPanelWords.t('common.close'));
+            this.closeBtn.title = QSPanelWords.t('common.close');
             this.closeBtn.style.cssText = `
                 background: none;
                 border: none;
@@ -538,7 +542,7 @@
             // Label
             const label = document.createElement('div');
             label.style.cssText = 'font-size:11px;color:#666;margin-bottom:6px;';
-            label.textContent = 'CSS Variables:';
+            label.textContent = QSPanelWords.t('common.colorPicker.cssVariables');
             varContainer.appendChild(label);
             
             // Scrollable list of variables

@@ -24,9 +24,8 @@
  *
  * Design notes:
  *  - <datalist> is purely an autocomplete suggestion — the user can
- *    still type any string (e.g. an external URL like https://...).
- *    This matches the planning spec ("each input has a route picker
- *    AND still works for external URLs").
+ *    still type any string (e.g. an external URL like https://...):
+ *    each input has a route picker AND still works for external URLs.
  *  - One datalist per editor session, shared across N inputs. Cheap.
  *  - getRoutes returns `flat_routes` as an array of dot/slash paths
  *    (e.g. ["test/complex-element", "documentation/commands"]). We

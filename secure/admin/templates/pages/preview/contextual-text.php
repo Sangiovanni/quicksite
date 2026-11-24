@@ -6,24 +6,24 @@
             <line x1="9" y1="20" x2="15" y2="20"/>
             <line x1="12" y1="4" x2="12" y2="20"/>
         </svg>
-        <span><?= __admin('preview.textModeHint') ?? 'Click any text in the preview to edit it inline' ?></span>
+        <span><?= adminEscape(__admin('preview.textModeHint')) ?></span>
     </div>
     <!-- Text-only node actions (shown when a text-only node is selected) -->
     <div class="preview-contextual-info" id="contextual-text-info" style="display: none;">
         <div id="ctx-text-summary">
-            <span class="preview-contextual-info__label"><?= __admin('preview.textKey') ?? 'Text key' ?>:</span>
+            <span class="preview-contextual-info__label"><?= adminEscape(__admin('preview.textKey')) ?>:</span>
             <code id="ctx-text-key">-</code>
         </div>
         <div class="preview-contextual-info__actions" id="ctx-text-actions">
-            <label class="admin-checkbox" id="ctx-text-keep-keys-label" title="<?= __admin('preview.keepTranslationKeysHint') ?? 'Keep the translation key in language files after deleting the node' ?>">
+            <label class="admin-checkbox" id="ctx-text-keep-keys-label" title="<?= adminAttr(__admin('preview.keepTranslationKeysHint')) ?>">
                 <input type="checkbox" id="ctx-text-keep-keys">
-                <span><?= __admin('preview.keepTranslationKeys') ?? 'Keep translation keys' ?></span>
+                <span><?= adminEscape(__admin('preview.keepTranslationKeys')) ?></span>
             </label>
             <!-- Delete: red, its bin and its name as Select's actions are, or its bin alone with the tools' names off
                  (Show names, preview.js), its title the tooltip and its aria-label the name; it asks first -->
             <button type="button" class="admin-btn admin-btn--danger" id="ctx-text-delete" data-qs-icon="trash"
                     title="<?= adminAttr(__admin('preview.deleteTextNode')) ?>" aria-label="<?= adminAttr(__admin('preview.deleteTextNode')) ?>">
-                <span><?= __admin('preview.deleteTextNode') ?></span>
+                <span><?= adminEscape(__admin('preview.deleteTextNode')) ?></span>
             </button>
         </div>
     </div>

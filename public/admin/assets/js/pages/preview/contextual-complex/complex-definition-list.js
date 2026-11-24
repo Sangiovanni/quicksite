@@ -9,6 +9,8 @@
 (function () {
     'use strict';
 
+    var t = window.QSComplexWizard.t;
+
     function _renderLabel(text, required) {
         var l = document.createElement('label');
         l.className = 'admin-label';
@@ -53,12 +55,12 @@
 
         var termPicker = window.QSComplexWizard.createTextKeyPicker({
             container: termMount,
-            placeholder: 'term key (e.g. glossary.api.term)',
+            placeholder: t('definitionList.termPlaceholder'),
             value: d.termKey || '',
         });
         var descPicker = window.QSComplexWizard.createTextKeyPicker({
             container: descMount,
-            placeholder: 'description key (e.g. glossary.api.desc)',
+            placeholder: t('definitionList.descPlaceholder'),
             value: d.descKey || '',
         });
         pickerMap.set(row, { term: termPicker, desc: descPicker });
@@ -69,8 +71,8 @@
         var wrap = document.createElement('div');
 
         var itemsGroup = _renderGroup();
-        itemsGroup.appendChild(_renderLabel('Items', true));
-        itemsGroup.appendChild(_renderHint('Each item is a (term, description) pair rendered as <dt>+<dd>.'));
+        itemsGroup.appendChild(_renderLabel(t('common.items'), true));
+        itemsGroup.appendChild(_renderHint(t('definitionList.itemsHint')));
         var itemsHost = document.createElement('div');
         itemsGroup.appendChild(itemsHost);
         wrap.appendChild(itemsGroup);
@@ -80,7 +82,7 @@
         var pickerMap = new WeakMap();
         var editor = window.QSComplexWizard.createRowEditor({
             container: itemsHost,
-            addButtonLabel: '+ Add item',
+            addButtonLabel: t('common.addItem'),
             minRows: 1,
             initialRows: [
                 { termKey: '', descKey: '' },
@@ -104,11 +106,12 @@
 
         function validate() {
             var cfg = getConfig();
-            if (cfg.items.length === 0) return 'Add at least one (term, description) pair.';
+            if (cfg.items.length === 0) return t('definitionList.errors.noItem');
             for (var i = 0; i < cfg.items.length; i++) {
                 var it = cfg.items[i];
-                if (!it.termKey) return 'Item #' + (i + 1) + ' is missing a term key.';
-                if (!it.descKey) return 'Item #' + (i + 1) + ' is missing a description key.';
+                var nth = { number: QSPanelWords.number(i + 1) };
+                if (!it.termKey) return t('definitionList.errors.termKey', nth);
+                if (!it.descKey) return t('definitionList.errors.descKey', nth);
             }
             return null;
         }
@@ -124,8 +127,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['definition-list'] = {
-        label: 'Definition list (dl)',
-        description: window.QSComplexWizard.t('definitionList.description'),
+        label: t('definitionList.label'),
+        description: t('definitionList.description'),
         renderWizard: renderWizard
     };
 })();

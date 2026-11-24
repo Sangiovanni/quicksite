@@ -26,10 +26,8 @@ $qsLocationTypes = static fn(string $location): string => implode(' ', array_key
 <script>
 window.QS_APIS_I18N = <?= json_encode($qsApisI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
-<script>
-// The storage-key picker's own words, and only them: this page uses one of the wizards' helpers.
-window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['storageKeyPicker' => AdminTranslation::getInstance()->getRaw('complexWizard.storageKeyPicker') ?: new stdClass()]]) ?>;
-</script>
+<?php // The storage-key picker's own words, and only them: this page uses one of the wizards' helpers. ?>
+<?= __adminWords(['complexWizard.storageKeyPicker']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/wizard-text.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-text.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>

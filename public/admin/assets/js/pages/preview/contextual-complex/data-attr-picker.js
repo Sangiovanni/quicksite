@@ -58,6 +58,10 @@
     var DROPDOWN_ID = 'qs-data-attr-picker-dropdown';
     var DESC_CLASS = 'qs-data-attr-picker-desc';
 
+    function t(key, params) {
+        return window.QSComplexWizard.t('dataAttrPicker.' + key, params);
+    }
+
     // ─── Catalog cache ──────────────────────────────────────────────
     var catalogPromise = null;
 
@@ -199,12 +203,14 @@
             var none = document.createElement('div');
             none.style.padding = '8px 12px';
             none.style.color = 'var(--admin-text-muted, #888)';
-            none.textContent = 'No matching data-* attributes. You can still type any value — the field is not constrained.';
+            none.textContent = t('noMatch');
             d.appendChild(none);
             return;
         }
 
-        // Group filtered matches by category, preserving category order
+        // Group filtered matches by category, preserving category order. A category is the
+        // catalog's own name, shown as it is; 'other' is the one listDataBindings groups an entry
+        // without a category under.
         var byCategory = {};
         var categoryOrder = [];
         matches.forEach(function (e) {
@@ -499,9 +505,9 @@
             var vhLabel = document.createElement('span');
             vhLabel.style.color = 'var(--admin-text-muted, #888)';
             vhLabel.style.fontFamily = 'sans-serif';
-            vhLabel.textContent = 'Value shape: ';
+            vhLabel.textContent = t('valueShape');
             vh.appendChild(vhLabel);
-            vh.appendChild(document.createTextNode(entry.valuePlaceholder));
+            vh.appendChild(document.createTextNode(' ' + entry.valuePlaceholder));
             box.appendChild(vh);
         }
 
@@ -521,7 +527,7 @@
 
             var chLabel = document.createElement('span');
             chLabel.style.color = 'var(--admin-text-muted, #888)';
-            chLabel.textContent = 'Often paired with:';
+            chLabel.textContent = t('pairedWith');
             ch.appendChild(chLabel);
 
             entry.companion.forEach(function (n) {
@@ -531,7 +537,7 @@
                 btn.style.fontFamily = 'monospace';
                 btn.style.fontSize = '0.75rem';
                 btn.style.padding = '2px 8px';
-                btn.setAttribute('title', 'Add ' + n + ' as a new custom param');
+                btn.setAttribute('title', t('addCompanion', { name: n }));
                 // "+ data-foo" — leading + signals add-action
                 var plus = document.createElement('span');
                 plus.textContent = '+ ';
@@ -584,7 +590,7 @@
 
         var ph = document.createElement('option');
         ph.value = '';
-        ph.textContent = '(pick a value)';
+        ph.textContent = t('pickValue');
         sel.appendChild(ph);
         entry.valueOptions.forEach(function (v) {
             var o = document.createElement('option');
@@ -628,7 +634,7 @@
         var loading = document.createElement('div');
         loading.style.color = 'var(--admin-text-muted, #888)';
         loading.style.fontSize = '0.75rem';
-        loading.textContent = 'Loading state stores…';
+        loading.textContent = t('storesLoading');
         wrap.appendChild(loading);
 
         fetchCurrentPageStores().then(function (stores) {
@@ -639,7 +645,7 @@
                 var empty = document.createElement('div');
                 empty.style.color = 'var(--admin-text-muted, #888)';
                 empty.style.fontSize = '0.75rem';
-                empty.textContent = 'No state stores on this page yet. Create one in the State stores panel (JS mode), then come back to bind.';
+                empty.textContent = t('noStores');
                 wrap.appendChild(empty);
                 return;
             }
@@ -649,7 +655,7 @@
             storeSel.style.maxWidth = '160px';
             var phS = document.createElement('option');
             phS.value = '';
-            phS.textContent = '(pick store)';
+            phS.textContent = t('pickStore');
             storeSel.appendChild(phS);
             storeNames.forEach(function (sid) {
                 var o = document.createElement('option');
@@ -672,7 +678,7 @@
                 fieldSel.disabled = true;
                 var phF = document.createElement('option');
                 phF.value = '';
-                phF.textContent = '(pick field)';
+                phF.textContent = t('pickField');
                 fieldSel.appendChild(phF);
                 wrap.appendChild(fieldSel);
             }

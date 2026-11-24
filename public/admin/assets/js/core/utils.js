@@ -146,25 +146,28 @@ window.QuickSiteUtils = (function() {
     }
 
     /**
-     * Human-readable byte count — the client-side twin of PHP's qs_format_size.
-     *
-     * The dashboard grew one of these and the builds page needed the same thing,
-     * so it lives here instead of being copied a third time. dashboard.js
-     * delegates to it and produces byte-identical output.
-     *
-     * NOTE: assets.js still carries its OWN copy with different rules (one
-     * decimal, an em dash for zero, no GB tier). Folding it in would change what
-     * that page prints, so it is left alone deliberately rather than quietly
-     * unified.
+     * The panel's one size: bytes under 1024 as a whole number, then KB, MB or GB
+     * with two decimals (1024 bytes to the KB), the number in the panel's language
+     * (QSPanelWords.number: "1.50 KB" in English, "1,50" in French) and the unit a
+     * word of its own (common.size.bytes, kilobytes, megabytes, gigabytes), so a
+     * language writes its own units. No digit grouping: a figure stays under 1024
+     * before its unit grows.
      *
      * @param {number} bytes
      * @returns {string}
      */
     function formatSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        const W = window.QSPanelWords;
+        const n = Number(bytes) || 0;
+        const tiers = [['gigabytes', 1024 * 1024 * 1024], ['megabytes', 1024 * 1024], ['kilobytes', 1024]];
+        for (const [unit, size] of tiers) {
+            if (n >= size) {
+                return W.t('common.size.' + unit, {
+                    size: W.number(n / size, { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
+                });
+            }
+        }
+        return W.t('common.size.bytes', { size: W.number(n, { useGrouping: false }) });
     }
 
     // ============================================
@@ -692,19 +695,6 @@ window.QuickSiteUtils = (function() {
     // SVG Icon Helpers
     // ============================================
 
-    /**
-     * Build an inline SVG string
-     * @param {string} paths - Raw SVG path/shape markup to embed inside the `<svg>`
-     * @param {number} [size=14] - Width and height in pixels (0 = no size attributes)
-     * @param {string} [cls] - Optional CSS class for the `<svg>` element
-     * @param {string} [attrs] - Optional extra attribute string appended to the `<svg>` tag
-     * @returns {string} HTML string containing the SVG element
-     */
-    function svgIcon(paths, size = 14, cls, attrs) {
-        const sizeAttr = size ? ` width="${size}" height="${size}"` : '';
-        return `<svg${cls ? ` class="${cls}"` : ''}${attrs ? ' ' + attrs : ''} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"${sizeAttr}>${paths}</svg>`;
-    }
-
     const ICON_PATHS = {
         trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
         edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
@@ -738,48 +728,6 @@ window.QuickSiteUtils = (function() {
         copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
         home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'
     };
-
-    function iconCheck(size) { return svgIcon(ICON_PATHS.check, size); }
-    function iconRefresh(size) { return svgIcon(ICON_PATHS.refresh, size); }
-    function iconChevronRight(size) { return svgIcon(ICON_PATHS.chevronRight, size); }
-    function iconChevronLeft(size) { return svgIcon(ICON_PATHS.chevronLeft, size); }
-    function iconChevronDown(size) { return svgIcon(ICON_PATHS.chevronDown, size); }
-    function iconChevronUp(size) { return svgIcon(ICON_PATHS.chevronUp, size); }
-    function iconPlus(size) { return svgIcon(ICON_PATHS.plus, size); }
-    function iconPlay(size) { return svgIcon(ICON_PATHS.play, size); }
-    function iconInfo(size) { return svgIcon(ICON_PATHS.info, size); }
-    function iconAlertCircle(size) { return svgIcon(ICON_PATHS.alertCircle, size); }
-    function iconWarning(size) { return svgIcon(ICON_PATHS.warning, size); }
-    function iconSpinner(size) { return svgIcon(ICON_PATHS.spinner, size); }
-    function iconList(size) { return svgIcon(ICON_PATHS.list, size); }
-    function iconClock(size) { return svgIcon(ICON_PATHS.clock, size); }
-    function iconEye(size) { return svgIcon(ICON_PATHS.eye, size); }
-    function iconEyeOff(size) { return svgIcon(ICON_PATHS.eyeOff, size); }
-    function iconKey(size) { return svgIcon(ICON_PATHS.key, size); }
-    function iconUpload(size) { return svgIcon(ICON_PATHS.upload, size); }
-    function iconFile(size) { return svgIcon(ICON_PATHS.file, size); }
-    function iconArrowRight(size) { return svgIcon(ICON_PATHS.arrowRight, size); }
-    function iconBan(size) { return svgIcon(ICON_PATHS.ban, size); }
-    function iconFolder(size) { return svgIcon(ICON_PATHS.folder, size); }
-    function iconExternalLink(size) { return svgIcon(ICON_PATHS.externalLink, size); }
-    function iconStar(size) { return svgIcon(ICON_PATHS.star, size); }
-    function iconGear(size) { return svgIcon(ICON_PATHS.gear, size); }
-    function iconSave(size) { return svgIcon(ICON_PATHS.save, size); }
-    function iconCopy(size) { return svgIcon(ICON_PATHS.copy, size); }
-    function iconHome(size) { return svgIcon(ICON_PATHS.home, size); }
-
-    // ============================================
-    // HTML Fragment Helpers
-    // ============================================
-
-    /**
-     * Render an animated spinner element
-     * @param {number} [size] - Size in pixels (omit to use CSS default)
-     * @returns {string} HTML string for a spinner `<span>`
-     */
-    function htmlSpinner(size) {
-        return `<span class="admin-spinner"${size ? ` style="width:${size}px;height:${size}px;"` : ''}></span>`;
-    }
 
     // ============================================
     // Initialize on Load
@@ -828,40 +776,8 @@ window.QuickSiteUtils = (function() {
         // Clipboard
         copyToClipboard,
         
-        // SVG Icons
-        svgIcon,
-        ICON_PATHS,
-        iconCheck,
-        iconRefresh,
-        iconChevronRight,
-        iconChevronLeft,
-        iconChevronDown,
-        iconChevronUp,
-        iconPlus,
-        iconPlay,
-        iconInfo,
-        iconAlertCircle,
-        iconWarning,
-        iconSpinner,
-        iconList,
-        iconClock,
-        iconEye,
-        iconKey,
-        iconUpload,
-        iconFile,
-        iconArrowRight,
-        iconBan,
-        iconFolder,
-        iconExternalLink,
-        iconStar,
-        iconGear,
-        iconSave,
-        iconCopy,
-        iconHome,
-        iconEyeOff,
-
-        // HTML Fragment Helpers
-        htmlSpinner
+        // The panel's icons (drawn by QSDom.iconEl and QSControls)
+        ICON_PATHS
     };
 
 })();

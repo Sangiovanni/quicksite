@@ -357,19 +357,49 @@ function __adminJs(string $key, array $params = []): string {
 }
 
 /**
- * Helper to resolve workflow translation keys.
+ * The panel's words a page's scripts read, handed the one way: each path's whole subtree, in the panel's language
+ * (English laid under a word it lacks), placed at its own path and given to QSPanelWords (core/panel-words.js, which
+ * layout.php loads before any other script) by one inline script. The value goes through qs_inline_script_json(), the
+ * encoder that writes "<" escaped, so a word can never end the script. A path is a section ('preview') or a part of
+ * one ('complexWizard.storageKeyPicker'), never renamed on the way: a script reads each word by its key's whole path.
+ * A path that holds nothing hands nothing (the language inventory fails on it).
  *
- * Workflows are SHIPPED (core only) since the custom workflow feature was
- * removed, so every key resolves directly through __admin().
+ * @param string[] $paths
+ */
+function __adminWords(array $paths): string {
+    require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+    $instance = AdminTranslation::getInstance();
+    $tree = [];
+    foreach ($paths as $path) {
+        $value = $instance->getRaw($path);
+        if ($value === null) {
+            continue;
+        }
+        $node = &$tree;
+        foreach (explode('.', $path) as $segment) {
+            if (!isset($node[$segment]) || !is_array($node[$segment])) {
+                $node[$segment] = [];
+            }
+            $node = &$node[$segment];
+        }
+        $node = is_array($value) ? array_replace_recursive($node, $value) : $value;
+        unset($node);
+    }
+    return '<script>QSPanelWords.add(' . qs_inline_script_json($tree === [] ? new stdClass() : $tree) . ');</script>';
+}
+
+/**
+ * A workflow's word: the word of the key its file names, or the key's path when no language holds it; where the file
+ * names no key, the file's own text ($specText: its id, its plain name), which is the workflow's data, not a word.
  *
  * @param array $spec  The workflow spec (unused; kept for call-site stability)
- * @param string $key  Translation key
- * @param string $fallback  Fallback if nothing resolves
+ * @param string $key  The key the workflow's file names, or ''
+ * @param string $specText  What the file says itself when it names no key
  * @return string
  */
-function __workflow(array $spec, string $key, string $fallback = ''): string {
+function __workflow(array $spec, string $key, string $specText = ''): string {
     if ($key === '') {
-        return $fallback;
+        return $specText;
     }
-    return __admin($key, $fallback);
+    return __admin($key);
 }

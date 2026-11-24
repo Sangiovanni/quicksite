@@ -229,8 +229,7 @@ window.PreviewTranslation = (function () {
         _showEmpty(false);
         var p = document.createElement('p');
         p.className = 'preview-contextual-translation__no-matches';
-        p.textContent = (window.PreviewConfig && PreviewConfig.i18n
-            && PreviewConfig.i18n.translationReadFailed) || 'The site\'s words could not be read.';
+        p.textContent = QSPanelWords.t('translations.loadFailedNone');
         _rowsContainer.replaceChildren(p);
     }
 
@@ -280,28 +279,26 @@ window.PreviewTranslation = (function () {
         // Always include "Whole site" first.
         var siteOpt = document.createElement('option');
         siteOpt.value = 'site';
-        siteOpt.textContent = (window.PreviewConfig && PreviewConfig.i18n
-            && PreviewConfig.i18n.translationScopeSite) || 'Whole site';
+        siteOpt.textContent = QSPanelWords.t('preview.translationScopeSite');
         _scopeSelect.appendChild(siteOpt);
 
         // The sources where the site names keys, grouped as the Translations page groups them
         // (QSSiteWords.sourceGroups()): the pages by their routes, the layout (menu, footer), the
-        // components (their bare names), and the site's own texts (site:<name>), each named by its words.
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
+        // components (their bare names), and the site's own texts (site:<name>), each named by its
+        // word on the Translations page (translations.source.<name>).
         var groupLabels = {
-            pages: i18n.translationScopePages || 'Pages',
-            layout: i18n.translationScopeLayout || 'Layout',
-            components: i18n.translationScopeComponents || 'Components',
-            site: i18n.translationScopeSiteSources || 'Site'
+            pages: QSPanelWords.t('preview.translationScopePages'),
+            layout: QSPanelWords.t('preview.translationScopeLayout'),
+            components: QSPanelWords.t('preview.translationScopeComponents'),
+            site: QSPanelWords.t('translations.groupSite')
         };
-        var sourceNames = i18n.translationSourceNames || {};
         QSSiteWords.sourceGroups(_keysBySource).forEach(function (group) {
             var optgroup = document.createElement('optgroup');
             optgroup.label = groupLabels[group.group];
             group.sources.forEach(function (source) {
                 var opt = document.createElement('option');
                 opt.value = source.id;
-                opt.textContent = group.group === 'site' && sourceNames[source.name] ? sourceNames[source.name] : source.name;
+                opt.textContent = group.group === 'site' ? QSPanelWords.t('translations.source.' + source.name) : source.name;
                 optgroup.appendChild(opt);
             });
             _scopeSelect.appendChild(optgroup);
@@ -344,19 +341,16 @@ window.PreviewTranslation = (function () {
             _coverageBar.textContent = '';
             var coverageText = document.createElement('span');
             coverageText.className = 'preview-contextual-translation__coverage-pct';
-            // i18n template: "Coverage: {pct}% ({used}/{total})"
-            var tpl = (window.PreviewConfig && PreviewConfig.i18n
-                && PreviewConfig.i18n.translationCoverage)
-                || 'Coverage: {pct}% ({used}/{total})';
-            coverageText.textContent = tpl
-                .replace('{pct}', String(coveragePct))
-                .replace('{used}', String(usedCount))
-                .replace('{total}', String(denominator));
+            coverageText.textContent = QSPanelWords.t('preview.translationCoverage', {
+                pct: QSPanelWords.number(coveragePct),
+                used: QSPanelWords.number(usedCount),
+                total: QSPanelWords.number(denominator)
+            });
             _coverageBar.appendChild(coverageText);
         }
-        if (_countUsed) _countUsed.textContent = String(usedCount);
-        if (_countUnset) _countUnset.textContent = String(unsetCount);
-        if (_countUnused) _countUnused.textContent = String(unusedCount);
+        if (_countUsed) _countUsed.textContent = QSPanelWords.number(usedCount);
+        if (_countUnset) _countUnset.textContent = QSPanelWords.number(unsetCount);
+        if (_countUnused) _countUnused.textContent = QSPanelWords.number(unusedCount);
 
         // Site-wide totals (NOT scoped) drive the "no data" empty state
         // and the bulk remove-unused button. The button label says
@@ -422,9 +416,7 @@ window.PreviewTranslation = (function () {
         if (filtered.length === 0) {
             var noMatch = document.createElement('p');
             noMatch.className = 'preview-contextual-translation__no-matches';
-            noMatch.textContent = (window.PreviewConfig && PreviewConfig.i18n
-                && PreviewConfig.i18n.translationNoMatches)
-                || 'No keys match the current filters.';
+            noMatch.textContent = QSPanelWords.t('preview.translationNoMatches');
             _rowsContainer.appendChild(noMatch);
             return;
         }
@@ -556,9 +548,7 @@ window.PreviewTranslation = (function () {
         valueEl.className = 'preview-contextual-translation__row-value';
         if (entry.status === 'unset') {
             valueEl.classList.add('preview-contextual-translation__row-value--unset');
-            valueEl.textContent = (window.PreviewConfig && PreviewConfig.i18n
-                && PreviewConfig.i18n.translationUnsetPlaceholder)
-                || '(not set)';
+            valueEl.textContent = QSPanelWords.t('preview.translationUnsetPlaceholder');
         } else {
             valueEl.textContent = _truncate(entry.value, _VALUE_TRUNCATE_AT);
             if (entry.value.length > _VALUE_TRUNCATE_AT) {
@@ -571,12 +561,9 @@ window.PreviewTranslation = (function () {
         actions.className = 'preview-contextual-translation__row-actions';
 
         var editLabel = entry.status === 'unset'
-            ? ((window.PreviewConfig && PreviewConfig.i18n
-                && PreviewConfig.i18n.translationActionSetValue) || 'Set value')
-            : ((window.PreviewConfig && PreviewConfig.i18n
-                && PreviewConfig.i18n.translationActionEdit) || 'Edit');
-        var deleteLabel = ((window.PreviewConfig && PreviewConfig.i18n
-            && PreviewConfig.i18n.translationDeleteKey) || 'Delete {key}').split('{key}').join(entry.key);
+            ? QSPanelWords.t('preview.translationActionSetValue')
+            : QSPanelWords.t('preview.translationActionEdit');
+        var deleteLabel = QSPanelWords.t('translations.deleteKey', { key: entry.key });
 
         actions.appendChild(_renderActionButton(
             editLabel,
@@ -609,7 +596,6 @@ window.PreviewTranslation = (function () {
      * below its row as a sibling in _rowsContainer.
      */
     function _renderEditor(entry) {
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
         var editor = document.createElement('div');
         editor.className = 'preview-contextual-translation__row-editor';
         editor.dataset.key = entry.key;
@@ -617,7 +603,7 @@ window.PreviewTranslation = (function () {
         var textarea = document.createElement('textarea');
         textarea.className = 'preview-contextual-translation__row-editor-textarea';
         textarea.value = entry.value || '';
-        textarea.placeholder = i18n.translationEditPlaceholder || 'Translation value…';
+        textarea.placeholder = QSPanelWords.t('preview.translationEditPlaceholder');
         textarea.spellcheck = false;
         textarea.rows = 3;
         if (_busyKey === entry.key) textarea.disabled = true;
@@ -646,7 +632,7 @@ window.PreviewTranslation = (function () {
         var cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
         cancelBtn.className = 'admin-btn';
-        cancelBtn.textContent = i18n.translationEditCancel || 'Cancel';
+        cancelBtn.textContent = QSPanelWords.t('preview.translationEditCancel');
         if (_busyKey === entry.key) cancelBtn.disabled = true;
         cancelBtn.addEventListener('click', _handleCancelEdit);
         actions.appendChild(cancelBtn);
@@ -655,10 +641,10 @@ window.PreviewTranslation = (function () {
         saveBtn.type = 'button';
         saveBtn.className = 'admin-btn admin-btn--primary';
         if (_busyKey === entry.key) {
-            saveBtn.textContent = i18n.translationEditSaving || 'Saving…';
+            saveBtn.textContent = QSPanelWords.t('preview.translationEditSaving');
             saveBtn.disabled = true;
         } else {
-            saveBtn.textContent = i18n.translationEditSave || 'Save';
+            saveBtn.textContent = QSPanelWords.t('preview.translationEditSave');
         }
         saveBtn.addEventListener('click', function () {
             _handleSaveKey(entry.key, textarea.value);
@@ -710,10 +696,8 @@ window.PreviewTranslation = (function () {
     }
 
     function _formatSaveError(e) {
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var tpl = i18n.translationEditSaveError || 'Failed to save: {error}';
         var msg = (e && e.message) ? e.message : String(e);
-        return tpl.replace('{error}', msg);
+        return QSPanelWords.t('preview.translationEditSaveError', { error: msg });
     }
 
     // ──────────────────────────── Delete flows ──────────────────────────
@@ -725,15 +709,15 @@ window.PreviewTranslation = (function () {
      * question open (_deleteAndReload()).
      */
     function _handleDeleteKey(entry) {
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
         var allLangs = false;
         var multiLang = _renderMultiLangCheckbox(allLangs, function (checked) { allLangs = checked; });
         QuickSiteUtils.confirm(_truncate(entry.value, 200), {
-            title: (i18n.translationDeletePrompt || 'Delete {key} from {lang}.json?')
-                .split('{key}').join(entry.key)
-                .split('{lang}').join((_currentLang || '').toUpperCase()),
+            title: QSPanelWords.t('preview.translationDeletePrompt', {
+                key: entry.key,
+                lang: (_currentLang || '').toUpperCase()
+            }),
             type: 'danger',
-            confirmText: i18n.translationConfirmDelete || 'Delete',
+            confirmText: QSPanelWords.t('preview.translationConfirmDelete'),
             body: multiLang,
             action: function () {
                 return _deleteAndReload(_targetLangs(allLangs), [entry.key]);
@@ -749,16 +733,14 @@ window.PreviewTranslation = (function () {
     function _handleRemoveUnused() {
         var keys = _bulkUnusedKeys();
         if (!keys.length) return;
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var n = String(keys.length);
         var allLangs = true;
         var multiLang = _renderMultiLangCheckbox(allLangs, function (checked) { allLangs = checked; });
-        QuickSiteUtils.confirm((i18n.translationBulkDeleteHeader || 'These {n} unused keys will be deleted from {lang}.json:')
-            .split('{n}').join(n)
-            .split('{lang}').join((_currentLang || '').toUpperCase()), {
-            title: (i18n.translationBulkDeleteTitle || 'Delete the {n} unused keys?').split('{n}').join(n),
+        QuickSiteUtils.confirm(QSPanelWords.count('preview.translationRemoveUnusedList', keys.length, {
+            lang: (_currentLang || '').toUpperCase()
+        }), {
+            title: QSPanelWords.count('preview.translationRemoveUnusedTitle', keys.length),
             type: 'danger',
-            confirmText: (i18n.translationBulkDeleteConfirm || 'Delete {n} keys').split('{n}').join(n),
+            confirmText: QSPanelWords.count('preview.translationRemoveUnusedConfirm', keys.length),
             body: [_renderUnusedList(keys), multiLang],
             action: function () {
                 return _deleteAndReload(_targetLangs(allLangs), keys);
@@ -793,7 +775,6 @@ window.PreviewTranslation = (function () {
      */
     function _renderMultiLangCheckbox(checked, onChange) {
         if (!_availableLangs || _availableLangs.length < 2) return null;
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
         var wrap = document.createElement('label');
         wrap.className = 'preview-contextual-translation__multi-lang';
         var input = document.createElement('input');
@@ -802,10 +783,11 @@ window.PreviewTranslation = (function () {
         input.addEventListener('change', function () { onChange(input.checked); });
         wrap.appendChild(input);
         var text = document.createElement('span');
-        var tpl = i18n.translationDeleteAllLangs || 'Delete from all {n} languages ({list})';
-        text.textContent = tpl
-            .replace('{n}', String(_availableLangs.length))
-            .replace('{list}', _availableLangs.map(function (l) { return l.toUpperCase(); }).join(', '));
+        // Shown with two languages or more only, so the word is always plural.
+        text.textContent = QSPanelWords.t('preview.translationDeleteAllLangs', {
+            n: QSPanelWords.number(_availableLangs.length),
+            list: _availableLangs.map(function (l) { return l.toUpperCase(); }).join(', ')
+        });
         wrap.appendChild(text);
         return wrap;
     }
@@ -849,24 +831,22 @@ window.PreviewTranslation = (function () {
     }
 
     function _formatMultiLangDeleteError(failures, total) {
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
         if (total === 1 || failures.length === 1) {
             // Single-call or single-failure case → plain "Failed to delete" line.
-            var tpl = i18n.translationDeleteError || 'Failed to delete: {error}';
             var first = failures[0];
             var label = total > 1
                 ? '[' + first.lang.toUpperCase() + '] ' + first.error
                 : first.error;
-            return tpl.replace('{error}', label);
+            return QSPanelWords.t('preview.translationDeleteError', { error: label });
         }
-        var multi = i18n.translationDeleteMultiError
-            || 'Failed for {n}/{total} languages: {details}';
-        return multi
-            .replace('{n}', String(failures.length))
-            .replace('{total}', String(total))
-            .replace('{details}', failures.map(function (f) {
+        // Here {total} is two languages or more, so the word is always plural.
+        return QSPanelWords.t('preview.translationDeleteMultiError', {
+            n: QSPanelWords.number(failures.length),
+            total: QSPanelWords.number(total),
+            details: failures.map(function (f) {
                 return f.lang.toUpperCase() + ': ' + f.error;
-            }).join(' | '));
+            }).join(' | ')
+        });
     }
 
     /**

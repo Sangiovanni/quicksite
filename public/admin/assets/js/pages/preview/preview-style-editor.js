@@ -6,7 +6,7 @@
  * 
  * Dependencies:
  * - PreviewState global (from preview-state.js)
- * - PreviewConfig global
+ * - QSPanelWords (the panel's words)
  * - QSPropertySelector class
  * - QSValueInput class
  * - QSColorPicker class
@@ -135,7 +135,7 @@
             styleEditorMedia.textContent = editingMediaQuery ? '@media ' + editingMediaQuery : '';
             styleEditorMedia.hidden = !editingMediaQuery;
         }
-        if (styleEditorCount) styleEditorCount.textContent = matchCount;
+        if (styleEditorCount) styleEditorCount.textContent = QSPanelWords.number(matchCount);
         
         // Show loading state
         showStyleEditorState('loading');
@@ -194,7 +194,7 @@
             }
         } catch (error) {
             console.error('Failed to load styles:', error);
-            showToast(PreviewConfig.i18n.failedToLoadStyles, 'error');
+            showToast(QSPanelWords.t('preview.failedToLoadStyles'), 'error');
             closeStyleEditor();
         }
     }
@@ -423,7 +423,7 @@
             colorSwatch.type = 'button';
             colorSwatch.className = 'preview-style-property__color';
             colorSwatch.style.background = swatchColor;
-            colorSwatch.title = PreviewConfig.i18n.clickToPickColor;
+            colorSwatch.title = QSPanelWords.t('preview.clickToPickColor');
             colorSwatch.addEventListener('click', () => {
                 const currentProp = row.dataset.property;
                 openColorPickerForProperty(currentProp, resolvedValue, colorSwatch);
@@ -456,7 +456,7 @@
         varDropdownBtn.type = 'button';
         varDropdownBtn.className = 'preview-style-property__var-btn';
         varDropdownBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronDown, 12));
-        varDropdownBtn.title = PreviewConfig.i18n.selectVariable;
+        varDropdownBtn.title = QSPanelWords.t('preview.selectVariable');
         varDropdownBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             showVarDropdown(row.dataset.property, input, varDropdownBtn);
@@ -475,7 +475,7 @@
         row.appendChild(valueContainer);
         
         // The row's ×: the property leaves the form, removed from the rule on Save (deletedProperties)
-        row.appendChild(QSControls.removeRow(PreviewConfig.i18n.remove, () => {
+        row.appendChild(QSControls.removeRow(QSPanelWords.t('common.remove'), () => {
             deleteProperty(row.dataset.property, isNew);
         }, { className: 'preview-style-property__delete' }));
 
@@ -541,7 +541,7 @@
             colorSwatch.type = 'button';
             colorSwatch.className = 'preview-style-property__color';
             colorSwatch.style.background = currentValue || '#ffffff';
-            colorSwatch.title = PreviewConfig.i18n.clickToPickColor;
+            colorSwatch.title = QSPanelWords.t('preview.clickToPickColor');
             colorSwatch.addEventListener('click', () => {
                 openColorPickerForProperty(row.dataset.property, currentValue, colorSwatch);
             });
@@ -586,7 +586,7 @@
      * Show warning when user replaces var() with fixed value
      */
     function showVarReplacementWarning(property, newValue) {
-        showToast(PreviewConfig.i18n.varReplacementWarning, 'warning', 5000);
+        showToast(QSPanelWords.t('preview.varReplacementWarning'), 'warning', 5000);
     }
     
     /**
@@ -598,7 +598,7 @@
         const themeVariables = getThemeVariables();
         const allVariables = Object.keys(themeVariables);
         if (allVariables.length === 0) {
-            showToast(PreviewConfig.i18n.noVariablesAvailable, 'info');
+            showToast(QSPanelWords.t('preview.noVariablesAvailable'), 'info');
             return;
         }
         
@@ -614,17 +614,17 @@
             const fontVars = allVariables.filter(v => v.includes('font') || v.includes('text') || v.includes('line') || v.includes('letter'));
             const otherVars = allVariables.filter(v => !fontVars.includes(v));
             variables = [...fontVars, ...otherVars];
-            filterHint = fontVars.length > 0 ? ' ' + PreviewConfig.i18n.varFilterFont.replace('{n}', fontVars.length) : '';
+            filterHint = fontVars.length > 0 ? ' ' + QSPanelWords.count('preview.varFilterFontCount', fontVars.length) : '';
         } else if (isColorProperty) {
             const colorVars = allVariables.filter(v => v.includes('color') || v.includes('bg') || v.includes('border') || v.includes('text'));
             const otherVars = allVariables.filter(v => !colorVars.includes(v));
             variables = [...colorVars, ...otherVars];
-            filterHint = colorVars.length > 0 ? ' ' + PreviewConfig.i18n.varFilterColor.replace('{n}', colorVars.length) : '';
+            filterHint = colorVars.length > 0 ? ' ' + QSPanelWords.count('preview.varFilterColorCount', colorVars.length) : '';
         } else if (isSizeProperty) {
             const sizeVars = allVariables.filter(v => v.includes('spacing') || v.includes('gap') || v.includes('size') || v.includes('radius') || v.includes('width') || v.includes('height'));
             const otherVars = allVariables.filter(v => !sizeVars.includes(v));
             variables = [...sizeVars, ...otherVars];
-            filterHint = sizeVars.length > 0 ? ' ' + PreviewConfig.i18n.varFilterSize.replace('{n}', sizeVars.length) : '';
+            filterHint = sizeVars.length > 0 ? ' ' + QSPanelWords.count('preview.varFilterSizeCount', sizeVars.length) : '';
         }
         
         // Create dropdown
@@ -635,7 +635,7 @@
         const searchInput = document.createElement('input');
         searchInput.type = 'text';
         searchInput.className = 'preview-var-dropdown__search';
-        searchInput.placeholder = PreviewConfig.i18n.search + filterHint;
+        searchInput.placeholder = QSPanelWords.t('common.search') + filterHint;
         dropdown.appendChild(searchInput);
         
         const list = document.createElement('div');
@@ -682,7 +682,7 @@
             if (list.children.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'preview-var-dropdown__empty';
-                empty.textContent = PreviewConfig.i18n.noResults;
+                empty.textContent = QSPanelWords.t('common.noResults');
                 list.appendChild(empty);
             }
         };
@@ -959,7 +959,7 @@
         }
         
         applyLivePreview();
-        showToast(PreviewConfig.i18n.stylesReset, 'info');
+        showToast(QSPanelWords.t('preview.stylesReset'), 'info');
     }
     
     /**
@@ -1015,13 +1015,13 @@
                     }
                 }
                 
-                showToast(PreviewConfig.i18n.stylesSaved, 'success');
+                showToast(QSPanelWords.t('preview.stylesSaved'), 'success');
             } else {
-                showToast(result.message || PreviewConfig.i18n.saveFailed, 'error');
+                showToast(result.message || QSPanelWords.t('common.saveFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to save styles:', error);
-            showToast(PreviewConfig.i18n.saveFailed, 'error');
+            showToast(QSPanelWords.t('common.saveFailed'), 'error');
         }
     }
     

@@ -20,7 +20,7 @@ $selectorId = $selectorId ?? 'add';
     <div class="tag-dropdown" id="<?= $selectorId ?>-component-dropdown">
         <!-- Trigger button -->
         <button type="button" class="tag-dropdown__trigger" id="<?= $selectorId ?>-component-trigger">
-            <span class="tag-dropdown__value" id="<?= $selectorId ?>-component-display"><?= __admin('preview.selectComponent', 'Select a component') ?></span>
+            <span class="tag-dropdown__value" id="<?= $selectorId ?>-component-display"><?= adminEscape(__admin('preview.selectComponent')) ?></span>
             <span class="tag-dropdown__desc" id="<?= $selectorId ?>-component-display-desc"></span>
             <svg class="tag-dropdown__arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="6 9 12 15 18 9"/>
@@ -37,7 +37,7 @@ $selectorId = $selectorId ?? 'add';
                 <input type="text" 
                        class="tag-dropdown__search-input admin-input" 
                        id="<?= $selectorId ?>-component-search"
-                       placeholder="<?= __admin('preview.searchComponents', 'Search components...') ?>"
+                       placeholder="<?= adminAttr(__admin('preview.searchComponents')) ?>"
                        autocomplete="off">
             </div>
             
@@ -45,7 +45,7 @@ $selectorId = $selectorId ?? 'add';
             <div class="tag-dropdown__options" id="<?= $selectorId ?>-component-options">
                 <div class="snippet-selector__loading">
                     <div></div>
-                    <?= __admin('common.loading', 'Loading...') ?>
+                    <?= adminEscape(__admin('common.loading')) ?>
                 </div>
             </div>
             
@@ -54,7 +54,7 @@ $selectorId = $selectorId ?? 'add';
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
-                <span><?= __admin('preview.noComponentsFound', 'No components found') ?></span>
+                <span><?= adminEscape(__admin('preview.noComponentsFound')) ?></span>
             </div>
         </div>
     </div>
