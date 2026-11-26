@@ -70,10 +70,9 @@
 
     if (window.QSSearchableSelect) return; // load-guard for double include
 
-    /** One of the panel's words; an unset one shows its key, as QuickSiteUtils.tCommon does. */
-    function word(name) {
-        const utils = window.QuickSiteUtils;
-        return utils && typeof utils.tCommon === 'function' ? utils.tCommon(name) : 'common.' + name;
+    /** A word of the panel's `common` section (layout.php hands it on every page); a word nothing hands shows its path. */
+    function word(name, params) {
+        return QSPanelWords.t('common.' + name, params);
     }
 
     let idSeq = 0;
@@ -483,7 +482,7 @@
                     createItem.setAttribute('role', 'option');
                     createItem.textContent = this.options.createLabel
                         ? this.options.createLabel(rawQuery)
-                        : word('createFromSearch').replace(':query', rawQuery);
+                        : word('createFromSearch', { query: rawQuery });
                     createItem.addEventListener('click', () => {
                         this.close();
                         this.options.onCreateFromSearch(rawQuery);
@@ -495,7 +494,7 @@
                 } else {
                     const empty = document.createElement('div');
                     empty.className = 'qs-searchable-select__empty';
-                    empty.textContent = rawQuery ? word('noMatchesFor').replace(':query', rawQuery) : this.emptyText;
+                    empty.textContent = rawQuery ? word('noMatchesFor', { query: rawQuery }) : this.emptyText;
                     this.listEl.appendChild(empty);
                     this.focusedIndex = -1;
                 }

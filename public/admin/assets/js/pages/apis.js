@@ -2,9 +2,8 @@
  * API Registry Page JavaScript
  * Manages external API definitions and endpoints for the QuickSite admin interface.
  *
- * Strings come from window.QS_APIS_I18N, emitted by apis.php: the `apis` and
- * `common` translation sub-trees under the same dot paths PHP uses. Read it
- * through t() below, never directly.
+ * Its words come the panel's one way: apis.php hands the `apis` section, and every word is read by its key's
+ * whole path through QSPanelWords (core/panel-words.js); `common` comes with every page.
  *
  * DOM is built with createElement + textContent through QSDom and named
  * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
@@ -12,34 +11,6 @@
 
 (function() {
     'use strict';
-
-    /**
-     * Resolve one admin string by its FULL dot path.
-     *
-     * A path that resolves to nothing returns THE PATH ITSELF, so a string no
-     * word file holds is visible on screen and findable by a scan instead of
-     * being hidden behind an English fallback here (a word a language lacks
-     * arrives in English, laid under it by the server).
-     *
-     * @param {string} path      e.g. 'apis.form.paramName'
-     * @param {Object} [params]  :name markers to substitute, as PHP's t() does
-     * @returns {string}
-     */
-    function t(path, params) {
-        let node = window.QS_APIS_I18N || {};
-        for (const part of String(path).split('.')) {
-            if (node === null || typeof node !== 'object' || !(part in node)) return path;
-            node = node[part];
-        }
-        if (typeof node !== 'string') return path;
-        let value = node;
-        if (params) {
-            for (const name of Object.keys(params)) {
-                value = value.split(':' + name).join(String(params[name]));
-            }
-        }
-        return value;
-    }
 
     // State
     let apisData = {};
@@ -194,11 +165,11 @@
                 updateStats(apisData, totalEndpoints);
                 renderApisList(apisData);
             } else {
-                showToast(response.data?.message || t('apis.toast.loadFailed'), 'error');
+                showToast(response.data?.message || QSPanelWords.t('apis.toast.loadFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to load APIs:', error);
-            showToast(t('apis.toast.loadFailedDetail', { message: error.message }), 'error');
+            showToast(QSPanelWords.t('apis.toast.loadFailedDetail', { message: error.message }), 'error');
         } finally {
             showLoading(false);
         }
@@ -298,12 +269,12 @@
         const hasAuth = !!(api.auth?.type && api.auth.type !== 'none');
 
         const headCells = [
-            QSDom.el('th', { style: 'width: 80px;', text: t('apis.form.method') }),
-            QSDom.el('th', { text: t('apis.columns.endpoint') }),
-            QSDom.el('th', { text: t('apis.form.path') })
+            QSDom.el('th', { style: 'width: 80px;', text: QSPanelWords.t('apis.form.method') }),
+            QSDom.el('th', { text: QSPanelWords.t('apis.columns.endpoint') }),
+            QSDom.el('th', { text: QSPanelWords.t('apis.form.path') })
         ];
         if (_endpointActionsShown()) {
-            headCells.push(QSDom.el('th', { style: 'width: 120px;', text: t('apis.columns.actions') }));
+            headCells.push(QSDom.el('th', { style: 'width: 120px;', text: QSPanelWords.t('apis.columns.actions') }));
         }
 
         const tbody = QSDom.el('tbody');
@@ -315,7 +286,7 @@
                 QSDom.el('td', {
                     colspan: String(headCells.length),
                     style: 'text-align: center; padding: var(--space-md);',
-                    text: t('apis.noEndpoints')
+                    text: QSPanelWords.t('apis.noEndpoints')
                 })
             ]));
         }
@@ -344,14 +315,14 @@
 
         const headerActions = [];
         if (canRun('editApi')) {
-            headerActions.push(_renderApiAction('add-endpoint', apiId, t('apis.addEndpoint'),
+            headerActions.push(_renderApiAction('add-endpoint', apiId, QSPanelWords.t('apis.addEndpoint'),
                 QuickSiteUtils.ICON_PATHS.plus));
-            headerActions.push(QSControls.edit(t('apis.editApi'), null, {
+            headerActions.push(QSControls.edit(QSPanelWords.t('apis.editApi'), null, {
                 attrs: { 'data-action': 'edit-api', 'data-api': apiId }, focusKey: 'api-edit:' + apiId
             }));
         }
         if (canRun('deleteApi')) {
-            headerActions.push(QSControls.bin(t('apis.deleteApi'), null, {
+            headerActions.push(QSControls.bin(QSPanelWords.t('apis.deleteApi'), null, {
                 attrs: { 'data-action': 'delete-api', 'data-api': apiId }, focusKey: 'api-delete:' + apiId
             }));
         }
@@ -367,9 +338,7 @@
                         heading,
                         QSDom.el('p', { class: 'api-card__meta' }, [
                             QSDom.el('code', { text: apiId }),
-                            ' · ' + api.baseUrl + ' · ' + t(endpoints.length !== 1
-                                ? 'apis.endpointCountMany'
-                                : 'apis.endpointCountOne', { count: endpoints.length })
+                            ' · ' + api.baseUrl + ' · ' + QSPanelWords.count('apis.endpointCount', endpoints.length)
                         ])
                     ])
                 ]),
@@ -421,20 +390,20 @@
         const eyeOff = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eyeOff, 16, 'icon-eye-off');
         if (eyeOff) eyeOff.style.display = 'none';
         return QSDom.el('div', { class: 'api-auth-token' }, [
-            QSDom.el('label', { class: 'api-auth-token__label', text: t('apis.authTokenLabel') }),
+            QSDom.el('label', { class: 'api-auth-token__label', text: QSPanelWords.t('apis.authTokenLabel') }),
             QSDom.el('div', { class: 'api-auth-token__field' }, [
                 QSDom.el('input', {
                     type: 'password',
                     class: 'admin-input admin-input--sm api-auth-token__input',
                     'data-api': apiId,
                     value: loadAuthToken(apiId),
-                    placeholder: t('apis.authTokenPlaceholder', { type: authType })
+                    placeholder: QSPanelWords.t('apis.authTokenPlaceholder', { type: authType })
                 }),
                 QSDom.el('button', {
                     type: 'button',
                     class: 'admin-btn admin-btn--ghost api-auth-token__toggle',
                     'data-api': apiId,
-                    title: t('apis.test.showHide')
+                    title: QSPanelWords.t('apis.test.showHide')
                 }, [
                     QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eye, 16, 'icon-eye'),
                     eyeOff
@@ -443,7 +412,7 @@
                     type: 'button',
                     class: 'admin-btn admin-btn--ghost api-auth-token__save',
                     'data-api': apiId,
-                    title: t('apis.test.saveToken')
+                    title: QSPanelWords.t('apis.test.saveToken')
                 }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.save, 16)])
             ])
         ]);
@@ -468,7 +437,7 @@
         if (authLabel) {
             idCell.appendChild(QSDom.el('span', {
                 class: 'admin-badge admin-badge--info',
-                title: t('apis.authBadgeTitle', { type: authLabel }),
+                title: QSPanelWords.t('apis.authBadgeTitle', { type: authLabel }),
                 style: 'font-size: 0.7em;',
                 text: '🔐 ' + authLabel
             }));
@@ -496,14 +465,14 @@
         const actions = [];
         if (canRun('testApiEndpoint')) {
             actions.push(_renderEndpointAction('test-endpoint', apiId, endpoint.id,
-                t('apis.actions.test'), QuickSiteUtils.ICON_PATHS.play));
+                QSPanelWords.t('apis.actions.test'), QuickSiteUtils.ICON_PATHS.play));
         }
         if (canRun('editApi')) {
             const attrs = { 'data-action': 'edit-endpoint', 'data-api': apiId, 'data-endpoint': endpoint.id };
-            actions.push(QSControls.edit(t('common.edit'), null, {
+            actions.push(QSControls.edit(QSPanelWords.t('common.edit'), null, {
                 attrs: attrs, focusKey: 'endpoint-edit:' + apiId + '/' + endpoint.id
             }));
-            actions.push(QSControls.bin(t('common.delete'), null, {
+            actions.push(QSControls.bin(QSPanelWords.t('common.delete'), null, {
                 attrs: Object.assign({}, attrs, { 'data-action': 'delete-endpoint' }), focusKey: 'endpoint-delete:' + apiId + '/' + endpoint.id
             }));
         }
@@ -589,11 +558,11 @@
         document.getElementById('api-edit-mode').value = mode;
         // An API's id is fixed once saved: endpoints, pages and interactions refer to it by this id.
         document.getElementById('api-id').readOnly = mode === 'edit';
-        document.getElementById('api-id-hint').textContent = t(mode === 'edit' ? 'apis.form.apiIdFixed' : 'apis.form.apiIdHint');
+        document.getElementById('api-id-hint').textContent = QSPanelWords.t(mode === 'edit' ? 'apis.form.apiIdFixed' : 'apis.form.apiIdHint');
 
         if (mode === 'edit' && apiId && apisData[apiId]) {
             const api = apisData[apiId];
-            title.textContent = t('apis.editApi');
+            title.textContent = QSPanelWords.t('apis.editApi');
             document.getElementById('api-id').value = apiId;
             document.getElementById('api-name').value = api.name || '';
             document.getElementById('api-base-url').value = api.baseUrl || '';
@@ -615,7 +584,7 @@
             // existing config is visible at a glance on edit.
             document.getElementById('auth-refresh-group').open = !!api.auth?.refreshEndpoint;
         } else {
-            title.textContent = t('apis.addApi');
+            title.textContent = QSPanelWords.t('apis.addApi');
             tokenSource.load('');
             refreshTokenSource.load('');
             populateRefreshEndpointDropdown('');
@@ -751,7 +720,7 @@
         const select = document.getElementById('api-refresh-endpoint');
         if (!select) return;
 
-        const noneText = t('apis.form.refreshNone');
+        const noneText = QSPanelWords.t('apis.form.refreshNone');
         // Drop existing dynamic options but keep the empty default.
         while (select.firstChild) select.removeChild(select.firstChild);
         const placeholder = document.createElement('option');
@@ -780,7 +749,7 @@
         if (selected && !refs.includes(selected)) {
             const stale = document.createElement('option');
             stale.value = selected;
-            stale.textContent = selected + ' (missing)';
+            stale.textContent = QSPanelWords.t('apis.form.refreshEndpointMissing', { ref: selected });
             select.appendChild(stale);
         }
     }
@@ -789,8 +758,8 @@
     function updateTokenSourceWords() {
         const prefix = document.getElementById('api-token-source-prefix').value;
         const isHeader = prefix === 'header';
-        document.getElementById('api-token-source-key-label').textContent = t(isHeader ? 'apis.form.headerName' : 'apis.form.storageKeyName');
-        document.getElementById('api-token-source-hint').textContent = t(isHeader ? 'apis.form.headerNameHint' : 'apis.form.storageKeyHint');
+        document.getElementById('api-token-source-key-label').textContent = QSPanelWords.t(isHeader ? 'apis.form.headerName' : 'apis.form.storageKeyName');
+        document.getElementById('api-token-source-hint').textContent = QSPanelWords.t(isHeader ? 'apis.form.headerNameHint' : 'apis.form.storageKeyHint');
         document.getElementById('api-token-source-key').placeholder = isHeader ? 'X-API-Key' : 'authToken';
     }
 
@@ -805,26 +774,26 @@
      */
     function _validateSchemaShape(schema, label) {
         if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) {
-            return t('apis.schema.mustBeObject', { label: label });
+            return QSPanelWords.t('apis.schema.mustBeObject', { label: label });
         }
         // Double-wrap detection: the user pasted the outer container.
         if (!schema.type && (schema.responseSchema || schema.requestSchema)) {
             const wrapKey = schema.responseSchema ? 'responseSchema' : 'requestSchema';
-            return t('apis.schema.doubleWrapped', { label: label, wrapKey: wrapKey });
+            return QSPanelWords.t('apis.schema.doubleWrapped', { label: label, wrapKey: wrapKey });
         }
         if (!schema.type) {
-            return t('apis.schema.needsType', { label: label });
+            return QSPanelWords.t('apis.schema.needsType', { label: label });
         }
         const typeIsValid = typeof schema.type === 'string' || Array.isArray(schema.type);
         if (!typeIsValid) {
-            return t('apis.schema.typeShape', { label: label });
+            return QSPanelWords.t('apis.schema.typeShape', { label: label });
         }
         const isObjectType = schema.type === 'object'
             || (Array.isArray(schema.type) && schema.type.indexOf('object') !== -1);
         const propertiesIsEmptyList = Array.isArray(schema.properties) && schema.properties.length === 0;
         if (isObjectType && !propertiesIsEmptyList
             && (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties))) {
-            return t('apis.schema.needsProperties', { label: label });
+            return QSPanelWords.t('apis.schema.needsProperties', { label: label });
         }
         return null;
     }
@@ -845,7 +814,7 @@
         const auth = _authToSave(savedAuth, authType);
         if (_carriesToken(authType)) {
             if (!tokenSource.key()) {
-                showToast(t('apis.toast.tokenSourceMissing'), 'error');
+                showToast(QSPanelWords.t('apis.toast.tokenSourceMissing'), 'error');
                 return;
             }
             auth.tokenSource = `${tokenSource.prefix()}:${tokenSource.key()}`;
@@ -865,12 +834,12 @@
             const anyRefresh = rEndpoint || rKey || rBody || rPath || rRefreshPath;
             if (anyRefresh) {
                 const missing = [];
-                if (!rEndpoint) missing.push(t('apis.refreshMissing.endpoint'));
-                if (!rKey) missing.push(t('apis.refreshMissing.storageKey'));
-                if (!rBody) missing.push(t('apis.refreshMissing.bodyField'));
-                if (!rPath) missing.push(t('apis.refreshMissing.tokenPath'));
+                if (!rEndpoint) missing.push(QSPanelWords.t('apis.refreshMissing.endpoint'));
+                if (!rKey) missing.push(QSPanelWords.t('apis.refreshMissing.storageKey'));
+                if (!rBody) missing.push(QSPanelWords.t('apis.refreshMissing.bodyField'));
+                if (!rPath) missing.push(QSPanelWords.t('apis.refreshMissing.tokenPath'));
                 if (missing.length) {
-                    showToast(t('apis.toast.refreshIncomplete', { list: missing.join(', ') }), 'error');
+                    showToast(QSPanelWords.t('apis.toast.refreshIncomplete', { list: QSPanelWords.list(missing, 'unit') }), 'error');
                     return;
                 }
                 auth.refreshEndpoint = rEndpoint;
@@ -904,17 +873,17 @@
             }
 
             if (response.ok) {
-                showToast(response.data?.message || t('apis.toast.apiSaved'), 'success');
+                showToast(response.data?.message || QSPanelWords.t('apis.toast.apiSaved'), 'success');
                 const gone = _authKeysLeft(savedAuth).filter((key) => !(key in auth));
-                if (gone.length > 0) showToast(t('apis.toast.authKeysDropped', { list: gone.join(', ') }), 'warning');
+                if (gone.length > 0) showToast(QSPanelWords.t('apis.toast.authKeysDropped', { list: QSPanelWords.list(gone, 'unit') }), 'warning');
                 closeModal(document.getElementById('modal-api'));
                 loadApis();
             } else {
-                showToast(response.data?.message || t('apis.toast.apiSaveFailed'), 'error');
+                showToast(response.data?.message || QSPanelWords.t('apis.toast.apiSaveFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to save API:', error);
-            showToast(t('apis.toast.apiSaveFailedDetail', { message: error.message }), 'error');
+            showToast(QSPanelWords.t('apis.toast.apiSaveFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -966,7 +935,7 @@
         if (mode === 'edit' && endpointId && apisData[apiId]) {
             const endpoint = (apisData[apiId].endpoints || []).find(ep => ep.id === endpointId);
             if (endpoint) {
-                title.textContent = t('apis.editEndpoint');
+                title.textContent = QSPanelWords.t('apis.editEndpoint');
                 document.getElementById('endpoint-id').value = endpoint.id;
                 document.getElementById('endpoint-method').value = endpoint.method;
                 document.getElementById('endpoint-name').value = endpoint.name || '';
@@ -982,7 +951,7 @@
                 (endpoint.parameters || []).forEach(p => addParamRow(p));
             }
         } else {
-            title.textContent = t('apis.addEndpoint');
+            title.textContent = QSPanelWords.t('apis.addEndpoint');
             // New endpoints default to auto-derive.
             document.getElementById('endpoint-callable-from').value = '';
         }
@@ -1005,7 +974,7 @@
         const select = document.getElementById('endpoint-auth');
         Array.from(select.options).filter((option) => option.value === AUTH_OWN).forEach((option) => option.remove());
         if (auth && typeof auth === 'object') {
-            select.appendChild(QSDom.el('option', { value: AUTH_OWN, text: t('apis.form.authOwn', { type: auth.type || '' }) }));
+            select.appendChild(QSDom.el('option', { value: AUTH_OWN, text: QSPanelWords.t('apis.form.authOwn', { type: auth.type || '' }) }));
             select.value = AUTH_OWN;
             return true;
         }
@@ -1041,7 +1010,8 @@
         const ownAuth = (api?.endpoints || []).find(ep => ep.id === endpointId)?.auth;
         const authType = ((ownAuth && typeof ownAuth === 'object') ? ownAuth.type : api?.auth?.type) || 'none';
         const derived  = (authType === 'apiKey') ? 'server' : 'both';
-        valueEl.textContent = derived;
+        // The value Auto resolves to, in words: callableFromResolves.server or .both.
+        valueEl.textContent = QSPanelWords.t('apis.form.callableFromResolves.' + derived);
 
         // Show the preview only when the select is on "Auto" (empty value).
         preview.style.display = (select.value === '') ? '' : 'none';
@@ -1072,13 +1042,13 @@
         });
         requiredInput.checked = !!existing?.required;
 
-        const requiredLabel = t('apis.form.paramRequired');
-        const removeLabel = t('common.delete');
+        const requiredLabel = QSPanelWords.t('apis.form.paramRequired');
+        const removeLabel = QSPanelWords.t('common.delete');
 
         row.appendChild(QSDom.el('input', {
             type: 'text',
             class: 'admin-input apis-param-row__name',
-            placeholder: t('apis.form.paramName'),
+            placeholder: QSPanelWords.t('apis.form.paramName'),
             value: existing?.name || ''
         }));
         row.appendChild(typeSelect);
@@ -1150,14 +1120,14 @@
             const reqSchemaText = document.getElementById('endpoint-request-schema').value.trim();
             if (reqSchemaText) {
                 requestSchema = JSON.parse(reqSchemaText);
-                const shapeErr = _validateSchemaShape(requestSchema, t('apis.schema.request'));
+                const shapeErr = _validateSchemaShape(requestSchema, QSPanelWords.t('apis.schema.request'));
                 if (shapeErr) {
                     showToast(shapeErr, 'error');
                     return;
                 }
             }
         } catch (err) {
-            showToast(t('apis.toast.invalidRequestSchema'), 'error');
+            showToast(QSPanelWords.t('apis.toast.invalidRequestSchema'), 'error');
             return;
         }
 
@@ -1165,14 +1135,14 @@
             const resSchemaText = document.getElementById('endpoint-response-schema').value.trim();
             if (resSchemaText) {
                 responseSchema = JSON.parse(resSchemaText);
-                const shapeErr = _validateSchemaShape(responseSchema, t('apis.schema.response'));
+                const shapeErr = _validateSchemaShape(responseSchema, QSPanelWords.t('apis.schema.response'));
                 if (shapeErr) {
                     showToast(shapeErr, 'error');
                     return;
                 }
             }
         } catch (err) {
-            showToast(t('apis.toast.invalidResponseSchema'), 'error');
+            showToast(QSPanelWords.t('apis.toast.invalidResponseSchema'), 'error');
             return;
         }
 
@@ -1234,15 +1204,15 @@
             const response = await QuickSiteAdmin.apiRequest('editApi', 'POST', params);
 
             if (response.ok) {
-                showToast(response.data?.message || t('apis.toast.endpointSaved'), 'success');
+                showToast(response.data?.message || QSPanelWords.t('apis.toast.endpointSaved'), 'success');
                 closeModal(document.getElementById('modal-endpoint'));
                 loadApis();
             } else {
-                showToast(response.data?.message || t('apis.toast.endpointSaveFailed'), 'error');
+                showToast(response.data?.message || QSPanelWords.t('apis.toast.endpointSaveFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to save endpoint:', error);
-            showToast(t('apis.toast.endpointSaveFailedDetail', { message: error.message }), 'error');
+            showToast(QSPanelWords.t('apis.toast.endpointSaveFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -1255,9 +1225,9 @@
         const api = apisData[apiId];
         const endpointCount = (api?.endpoints || []).length;
         const message = endpointCount > 0
-            ? t(endpointCount !== 1 ? 'apis.confirm.deleteApiEndpointsMany' : 'apis.confirm.deleteApiEndpointsOne', { count: endpointCount })
+            ? QSPanelWords.count('apis.confirm.deleteApiEndpoints', endpointCount)
             : '';
-        return _askDelete(t('apis.confirm.deleteApi', { name: api?.name || apiId }), message,
+        return _askDelete(QSPanelWords.t('apis.confirm.deleteApi', { name: api?.name || apiId }), message,
             () => QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId: apiId }));
     }
 
@@ -1265,7 +1235,7 @@
     function promptDeleteEndpoint(apiId, endpointId) {
         const api = apisData[apiId];
         const endpoint = (api?.endpoints || []).find(ep => ep.id === endpointId);
-        return _askDelete(t('apis.confirm.deleteEndpoint', { name: endpoint?.name || endpointId }), '',
+        return _askDelete(QSPanelWords.t('apis.confirm.deleteEndpoint', { name: endpoint?.name || endpointId }), '',
             () => QuickSiteAdmin.apiRequest('editApi', 'POST', { apiId: apiId, deleteEndpoint: endpointId }));
     }
 
@@ -1278,11 +1248,11 @@
         const done = await QuickSiteUtils.confirm(message, {
             title: title,
             type: 'danger',
-            confirmText: t('apis.confirm.delete'),
+            confirmText: QSPanelWords.t('apis.confirm.delete'),
             action: async () => {
                 const response = await send();
-                if (!response.ok) return { ok: false, message: response.data?.message || t('apis.toast.deleteFailed') };
-                said = response.data?.message || t('apis.toast.deleted');
+                if (!response.ok) return { ok: false, message: response.data?.message || QSPanelWords.t('apis.toast.deleteFailed') };
+                said = response.data?.message || QSPanelWords.t('apis.toast.deleted');
                 await loadApis();
                 return true;
             }
@@ -1299,7 +1269,7 @@
         const endpoint = (api?.endpoints || []).find(ep => ep.id === endpointId);
         
         if (!api || !endpoint) {
-            showToast(t('apis.toast.endpointNotFound'), 'error');
+            showToast(QSPanelWords.t('apis.toast.endpointNotFound'), 'error');
             return;
         }
 
@@ -1317,7 +1287,7 @@
         if (effectiveAuth) {
             requestInfo.appendChild(QSDom.el('br'));
             requestInfo.appendChild(QSDom.el('small', {
-                text: t('apis.authBadgeTitle', { type: effectiveAuth })
+                text: QSPanelWords.t('apis.authBadgeTitle', { type: effectiveAuth })
             }));
         }
 
@@ -1348,7 +1318,7 @@
         QSDom.clear(document.getElementById('test-response-status'));
         document.getElementById('test-response-time').textContent = '';
         _setResponseBody(QSDom.el('span', {
-            text: t('apis.test.noResponse')
+            text: QSPanelWords.t('apis.test.noResponse')
         }));
         _renderDraftOffer(null);
 
@@ -1422,7 +1392,7 @@
 
         QSDom.clear(container);
         container.appendChild(QSDom.el('h4', {
-            class: 'apis-test-section-title', text: t('apis.form.pathParameters')
+            class: 'apis-test-section-title', text: QSPanelWords.t('apis.form.pathParameters')
         }));
         container.appendChild(group);
         container.style.display = '';
@@ -1454,7 +1424,7 @@
         if (!schema || !schema.properties || Object.keys(schema.properties).length === 0) {
             QSDom.clear(container);
             container.appendChild(QSDom.el('p', {
-                class: 'admin-hint', text: t('apis.test.noSchemaParams')
+                class: 'admin-hint', text: QSPanelWords.t('apis.test.noSchemaParams')
             }));
             return;
         }
@@ -1487,7 +1457,7 @@
                     'data-field': fieldName, 'data-type': fieldType
                 });
                 if (!isRequired) {
-                    QSDom.setSelectPlaceholder(select, t('apis.test.selectPlaceholder'));
+                    QSDom.setSelectPlaceholder(select, QSPanelWords.t('apis.test.selectPlaceholder'));
                 }
                 for (const opt of fieldDef.enum) {
                     const option = document.createElement('option');
@@ -1505,7 +1475,7 @@
                 });
                 cb.checked = fieldDef.default === true;
                 wrapper.appendChild(QSDom.el('label', { class: 'admin-checkbox' }, [
-                    cb, QSDom.el('span', { text: t('common.yes') })
+                    cb, QSDom.el('span', { text: QSPanelWords.t('common.yes') })
                 ]));
             } else if (fieldType === 'integer' || fieldType === 'number') {
                 // Number → Number input
@@ -1523,16 +1493,16 @@
                 wrapper.appendChild(QSDom.el('input', {
                     type: 'text', class: 'admin-input admin-input--sm', id: fieldId,
                     'data-field': fieldName, 'data-type': 'array',
-                    placeholder: t('apis.test.arrayPlaceholder')
+                    placeholder: QSPanelWords.t('apis.test.arrayPlaceholder')
                 }));
                 wrapper.appendChild(QSDom.el('p', {
-                    class: 'admin-hint', text: t('apis.test.arrayHint')
+                    class: 'admin-hint', text: QSPanelWords.t('apis.test.arrayHint')
                 }));
             } else {
                 // String → Input if short (maxLength < 255), textarea otherwise
                 const maxLen = fieldDef.maxLength;
                 const placeholder = fieldDef.format
-                    ? t('apis.test.formatPlaceholder', { format: fieldDef.format })
+                    ? QSPanelWords.t('apis.test.formatPlaceholder', { format: fieldDef.format })
                     : '';
                 if (maxLen && maxLen < 255) {
                     wrapper.appendChild(QSDom.el('input', {
@@ -1676,7 +1646,7 @@
         try {
             const key = _authTokensKey();
             if (!key) {
-                showToast(t('apis.toast.tokenSaveFailed'), 'error');
+                showToast(QSPanelWords.t('apis.toast.tokenSaveFailed'), 'error');
                 return;
             }
             const tokens = JSON.parse(localStorage.getItem(key) || '{}');
@@ -1686,9 +1656,9 @@
                 delete tokens[apiId];
             }
             localStorage.setItem(key, JSON.stringify(tokens));
-            showToast(t(token ? 'apis.toast.tokenSaved' : 'apis.toast.tokenCleared'), 'success');
+            showToast(QSPanelWords.t(token ? 'apis.toast.tokenSaved' : 'apis.toast.tokenCleared'), 'success');
         } catch (e) {
-            showToast(t('apis.toast.tokenSaveFailed'), 'error');
+            showToast(QSPanelWords.t('apis.toast.tokenSaveFailed'), 'error');
         }
     }
 
@@ -1717,7 +1687,7 @@
             try {
                 body = JSON.parse(bodyText);
             } catch (err) {
-                showToast(t('apis.toast.invalidBodyJson'), 'error');
+                showToast(QSPanelWords.t('apis.toast.invalidBodyJson'), 'error');
                 return;
             }
         }
@@ -1729,18 +1699,18 @@
             try {
                 queryParams = JSON.parse(queryText);
             } catch (err) {
-                showToast(t('apis.toast.invalidQueryJson'), 'error');
+                showToast(QSPanelWords.t('apis.toast.invalidQueryJson'), 'error');
                 return;
             }
         }
 
-        QSDom.setButtonBusy(btn, t('apis.test.testing'));
+        QSDom.setButtonBusy(btn, QSPanelWords.t('apis.test.testing'));
 
         _renderDraftOffer(null);
         QSDom.clear(document.getElementById('test-response-status'));
-        document.getElementById('test-response-time').textContent = t('apis.test.executing');
+        document.getElementById('test-response-time').textContent = QSPanelWords.t('apis.test.executing');
         _setResponseBody(QSDom.el('span', {
-            text: t('apis.test.waiting')
+            text: QSPanelWords.t('apis.test.waiting')
         }));
 
         // Collect :placeholder values for path substitution
@@ -1765,7 +1735,7 @@
                     ? 'admin-badge--success' 
                     : 'admin-badge--danger';
                 
-                _setResponseStatus(String(statusCode || t('apis.test.noStatus')), statusClass);
+                _setResponseStatus(String(statusCode || QSPanelWords.t('apis.test.noStatus')), statusClass);
                 document.getElementById('test-response-time').textContent =
                     testResult.timing?.duration_ms ? `${testResult.timing.duration_ms}ms` : '';
 
@@ -1782,19 +1752,19 @@
                     _setResponseBody(QSDom.el('pre', { text: text }));
                 } else {
                     _setResponseBody(QSDom.el('span', {
-                        text: t('apis.test.emptyResponse')
+                        text: QSPanelWords.t('apis.test.emptyResponse')
                     }));
                 }
                 _renderDraftOffer(testResult);
             } else {
-                _setResponseStatus(t('apis.test.errorBadge'), 'admin-badge--danger');
+                _setResponseStatus(QSPanelWords.t('apis.test.errorBadge'), 'admin-badge--danger');
                 _setResponseBody(QSDom.el('pre', {
-                    text: response.data?.message || t('apis.test.requestFailed')
+                    text: response.data?.message || QSPanelWords.t('apis.test.requestFailed')
                 }));
             }
         } catch (error) {
             console.error('Test failed:', error);
-            _setResponseStatus(t('apis.test.errorBadge'), 'admin-badge--danger');
+            _setResponseStatus(QSPanelWords.t('apis.test.errorBadge'), 'admin-badge--danger');
             _setResponseBody(QSDom.el('pre', {
                 text: error.message
             }));
@@ -1802,7 +1772,7 @@
             btn.disabled = false;
             QSDom.clear(btn);
             btn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.play, 16));
-            btn.appendChild(document.createTextNode(' ' + t('apis.test.run')));
+            btn.appendChild(document.createTextNode(' ' + QSPanelWords.t('apis.test.run')));
         }
     }
 
@@ -1826,17 +1796,17 @@
         const draft = window.QSApiImport.draftResponseSchema(response.body);
         box.style.display = '';
         if (!draft.schema) {
-            box.appendChild(QSDom.el('p', { class: 'admin-hint', text: t('apis.draft.nothing') }));
+            box.appendChild(QSDom.el('p', { class: 'admin-hint', text: QSPanelWords.t('apis.draft.nothing') }));
             return;
         }
         box.appendChild(QSDom.el('button', {
             type: 'button',
             class: 'admin-btn',
             id: 'btn-use-draft',
-            text: t('apis.draft.offer'),
+            text: QSPanelWords.t('apis.draft.offer'),
             onClick: () => _useDraft(draft)
         }));
-        box.appendChild(QSDom.el('p', { class: 'admin-hint', text: t('apis.draft.offerHint') }));
+        box.appendChild(QSDom.el('p', { class: 'admin-hint', text: QSPanelWords.t('apis.draft.offerHint') }));
     }
 
     /**
@@ -1849,9 +1819,9 @@
         const { apiId, endpointId } = currentTestEndpoint;
         const saved = (apisData[apiId]?.endpoints || []).find(ep => ep.id === endpointId)?.responseSchema;
         if (saved) {
-            const replace = await QuickSiteUtils.confirm(t('apis.draft.replaceQuestion'), {
-                title: t('apis.draft.replaceTitle'),
-                confirmText: t('apis.draft.replaceConfirm')
+            const replace = await QuickSiteUtils.confirm(QSPanelWords.t('apis.draft.replaceQuestion'), {
+                title: QSPanelWords.t('apis.draft.replaceTitle'),
+                confirmText: QSPanelWords.t('apis.draft.replaceConfirm')
             });
             if (!replace) return;
         }
@@ -1864,12 +1834,20 @@
         field.focus();
     }
 
-    /** One line of a draft's notes: what it could not tell, then each path it could not tell it of. */
+    /**
+     * One line of a draft's notes: what it could not tell, then each path it could not tell it of, each in a <code>,
+     * listed as the panel's language lists them (Intl.ListFormat's parts: its separators between the paths).
+     */
     function _renderDraftNote(words, paths) {
         const line = QSDom.el('li', null, [words]);
-        (paths || []).forEach((path, index) => {
-            line.appendChild(document.createTextNode(index === 0 ? ' ' : ', '));
-            line.appendChild(QSDom.el('code', { text: path === '' ? t('apis.draft.top') : path }));
+        if (!paths || paths.length === 0) return line;
+        const shown = paths.map((path) => (path === '' ? QSPanelWords.t('apis.draft.top') : path));
+        let next = 0;
+        line.appendChild(document.createTextNode(' '));
+        new Intl.ListFormat(QSPanelWords.lang, { type: 'unit' }).formatToParts(shown).forEach((part) => {
+            line.appendChild(part.type === 'element'
+                ? QSDom.el('code', { text: shown[next++] })
+                : document.createTextNode(part.value));
         });
         return line;
     }
@@ -1888,67 +1866,38 @@
         const limits = window.QSApiImport.DRAFT_LIMITS;
         const notes = draft.notes;
         const list = QSDom.el('ul');
-        list.appendChild(_renderDraftNote(t('apis.draft.notRequired')));
-        list.appendChild(_renderDraftNote(t('apis.draft.public')));
+        list.appendChild(_renderDraftNote(QSPanelWords.t('apis.draft.notRequired')));
+        list.appendChild(_renderDraftNote(QSPanelWords.t('apis.draft.public')));
         if (draft.root === 'array' || draft.root === 'map') {
-            list.appendChild(_renderDraftNote(t('apis.draft.noFieldsAtTop')));
+            list.appendChild(_renderDraftNote(QSPanelWords.t('apis.draft.noFieldsAtTop')));
         }
         const reasons = [
-            ['empty', t('apis.draft.empty')],
-            ['nullOnly', t('apis.draft.nullOnly')],
-            ['sometimesNull', t('apis.draft.sometimesNull')],
-            ['sometimesAbsent', t('apis.draft.sometimesAbsent')],
-            ['mixed', t('apis.draft.mixed')],
-            ['map', t('apis.draft.map', { fields: limits.fields })],
-            ['unsafe', t('apis.draft.unsafe')],
-            ['sampled', t('apis.draft.sampled', { items: limits.items })],
-            ['deep', t('apis.draft.deep', { depth: limits.depth })],
+            ['empty', QSPanelWords.t('apis.draft.empty')],
+            ['nullOnly', QSPanelWords.t('apis.draft.nullOnly')],
+            ['sometimesNull', QSPanelWords.t('apis.draft.sometimesNull')],
+            ['sometimesAbsent', QSPanelWords.t('apis.draft.sometimesAbsent')],
+            ['mixed', QSPanelWords.t('apis.draft.mixed')],
+            ['map', QSPanelWords.t('apis.draft.map', { fields: limits.fields })],
+            ['unsafe', QSPanelWords.t('apis.draft.unsafe')],
+            ['sampled', QSPanelWords.t('apis.draft.sampled', { items: limits.items })],
+            ['deep', QSPanelWords.t('apis.draft.deep', { depth: limits.depth })],
         ];
         reasons.forEach(([reason, words]) => {
             if (notes[reason] && notes[reason].length) list.appendChild(_renderDraftNote(words, notes[reason]));
         });
-        box.appendChild(QSDom.el('strong', { text: t('apis.draft.title') }));
+        box.appendChild(QSDom.el('strong', { text: QSPanelWords.t('apis.draft.title') }));
         box.appendChild(list);
         box.style.display = '';
     }
 
     /**
-     * A whole-sentence key whose :name markers become real nodes.
-     *
-     * One key per sentence, not one per fragment: a translator needs the whole
-     * sentence to order it correctly, and the markup that carried the link or
-     * the <code> spans is supplied here instead of inside the string. Markers
-     * are matched longest-first so :public cannot eat :publicPath.
-     *
-     * @param {string} key            a translation path
-     * @param {Object} parts          markerName -> Node
-     * @returns {DocumentFragment}
+     * Show one sentence in the import modal's error box: its parts as QSPanelWords.parts() cuts the word, each
+     * {name} part an element (a link, a <code>), so a translator orders the whole sentence.
      */
-    function _renderMarked(key, parts) {
-        const names = Object.keys(parts).sort((a, b) => b.length - a.length);
-        const frag = document.createDocumentFragment();
-        let rest = t(key);
-        while (rest) {
-            let best = null;
-            for (const name of names) {
-                const at = rest.indexOf(':' + name);
-                if (at !== -1 && (best === null || at < best.at)) best = { at, name };
-            }
-            if (!best) break;
-            if (best.at > 0) frag.appendChild(document.createTextNode(rest.slice(0, best.at)));
-            frag.appendChild(parts[best.name].cloneNode(true));
-            rest = rest.slice(best.at + best.name.length + 1);
-        }
-        if (rest) frag.appendChild(document.createTextNode(rest));
-        return frag;
-    }
-
-    /** Show one node in the import modal's error box. */
-    function _setImportError(node) {
+    function _setImportError(parts) {
         const errBox = document.getElementById('import-parse-error');
         if (!errBox) return;
-        QSDom.clear(errBox);
-        errBox.appendChild(node);
+        errBox.replaceChildren(...parts);
         errBox.style.display = '';
     }
 
@@ -1992,8 +1941,8 @@
         document.getElementById('btn-import-back').style.display = isPaste ? 'none' : '';
         document.getElementById('btn-import-confirm').style.display = isPaste ? 'none' : '';
         document.getElementById('import-title').textContent = isPaste
-            ? t('apis.importJson')
-            : t('apis.importModal.previewTitle');
+            ? QSPanelWords.t('apis.importJson')
+            : QSPanelWords.t('apis.importModal.previewTitle');
         // Clear inline error
         const errBox = document.getElementById('import-parse-error');
         if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
@@ -2202,7 +2151,7 @@
 
         if (format === 'openapi-3' && window.QSApiImport
                 && typeof window.QSApiImport.convertOpenApi === 'function') {
-            return window.QSApiImport.convertOpenApi(data, t);
+            return window.QSApiImport.convertOpenApi(data);
         }
 
         return null;
@@ -2243,10 +2192,10 @@
         } catch (e) {
             items = null;
         }
-        if (items === null) return [t('apis.importModal.keysUnchecked')];
+        if (items === null) return [QSPanelWords.t('apis.importModal.keysUnchecked')];
         const declared = new Set(items.map((item) => item.id));
         return sources.filter((source) => !declared.has(source.key))
-            .map((source) => t('apis.importModal.keyUndeclared', source));
+            .map((source) => QSPanelWords.t('apis.importModal.keyUndeclared', source));
     }
 
     /**
@@ -2273,7 +2222,7 @@
             if (p.host === 'self' || p.host === 'third-party') {
                 hostSet[a.baseUrl] = true;
                 if (hostKinds[a.baseUrl] && hostKinds[a.baseUrl] !== p.host) {
-                    flags.push(t('apis.importModal.flagHostBothWays', { host: a.baseUrl }));
+                    flags.push(QSPanelWords.t('apis.importModal.flagHostBothWays', { host: a.baseUrl }));
                 }
                 hostKinds[a.baseUrl] = p.host;
             }
@@ -2283,7 +2232,7 @@
                 const epId = ep.id || ep.name || ep.path;
                 for (const field of Object.keys(f)) {
                     if (labels[f[field]]) mappings++;
-                    else flags.push(t('apis.importModal.flagFieldUnknown', {
+                    else flags.push(QSPanelWords.t('apis.importModal.flagFieldUnknown', {
                         endpoint: apiId + '/' + epId, field: field, label: f[field] }));
                 }
             }
@@ -2304,28 +2253,22 @@
         const totalEndpoints = apiIds.reduce(
             (n, id) => n + ((apis[id].endpoints && apis[id].endpoints.length) || 0), 0);
         const existing = apiIds.filter(id => apisData[id]);
-        const fmtLabel = format === 'ours' ? t('apis.importModal.formatNative')
+        const fmtLabel = format === 'ours' ? QSPanelWords.t('apis.importModal.formatNative')
             : format === 'testapi-filemanager' ? 'test.api file-manager'
             : format === 'openapi-3' ? 'OpenAPI 3.x'
-            : t('apis.importModal.formatUnknown');
+            : QSPanelWords.t('apis.importModal.formatUnknown');
 
         const root = document.createElement('div');
 
-        const line = document.createElement('p');
-        line.appendChild(document.createTextNode(t('apis.importModal.detectedFormat') + ' '));
-        const strong = document.createElement('strong');
-        strong.textContent = fmtLabel;
-        line.appendChild(strong);
-        line.appendChild(document.createTextNode(t('apis.importModal.summaryCreate', {
-            apis: t(apiIds.length === 1 ? 'apis.apiCountOne' : 'apis.apiCountMany',
-                { count: apiIds.length }),
-            endpoints: t(totalEndpoints === 1 ? 'apis.endpointCountOne' : 'apis.endpointCountMany',
-                { count: totalEndpoints })
-        })));
+        // One sentence, its format in bold; the APIs it replaces, when there are some, a second sentence after it.
+        const line = QSDom.el('p', null, QSPanelWords.parts('apis.importModal.summary', {
+            format: QSDom.el('strong', { text: fmtLabel }),
+            apis: QSPanelWords.count('apis.apiCount', apiIds.length),
+            endpoints: QSPanelWords.count('apis.endpointCount', totalEndpoints)
+        }));
         if (existing.length > 0) {
-            line.appendChild(document.createTextNode(t('apis.importModal.summaryReplaces', {
-                count: existing.length, list: existing.join(', ')
-            })));
+            line.appendChild(document.createTextNode(' ' + QSPanelWords.count('apis.importModal.summaryReplaces',
+                existing.length, { list: QSPanelWords.list(existing, 'unit') })));
         }
         root.appendChild(line);
 
@@ -2333,14 +2276,10 @@
         const priv = _computeImportPrivacy(apis);
         if (priv.datums || priv.hosts || priv.mappings || priv.flags.length) {
             const pLine = document.createElement('p');
-            pLine.appendChild(document.createTextNode(t('apis.importModal.privacySummary', {
-                datums: priv.datums,
-                hosts: t(priv.hosts === 1
-                    ? 'apis.importModal.hostCountOne'
-                    : 'apis.importModal.hostCountMany', { count: priv.hosts }),
-                fields: t(priv.mappings === 1
-                    ? 'apis.importModal.fieldCountOne'
-                    : 'apis.importModal.fieldCountMany', { count: priv.mappings })
+            pLine.appendChild(document.createTextNode(QSPanelWords.t('apis.importModal.privacySummary', {
+                datums: QSPanelWords.count('apis.importModal.datumCount', priv.datums),
+                hosts: QSPanelWords.count('apis.importModal.hostCount', priv.hosts),
+                fields: QSPanelWords.count('apis.importModal.fieldCount', priv.mappings)
             })));
             root.appendChild(pLine);
         }
@@ -2389,7 +2328,7 @@
         const apiIds = Object.keys(apis);
         if (apiIds.length === 0) {
             const empty = document.createElement('p');
-            empty.textContent = t('apis.importModal.noApis');
+            empty.textContent = QSPanelWords.t('apis.importModal.noApis');
             host.appendChild(empty);
             return;
         }
@@ -2440,10 +2379,9 @@
         section.appendChild(header);
 
         const total = endpoints.length;
-        const suffix = ' endpoint' + (total === 1 ? '' : 's');
 
         // Single source of truth for the header state: recomputes the
-        // select-all tri-state AND the count badge ("19" vs "15 / 19")
+        // select-all tri-state AND the count badge ("19 endpoints" vs "15 / 19 endpoints")
         // from the current endpoint checkboxes. Called on every toggle.
         function refreshState() {
             const boxes = section.querySelectorAll('input[type="checkbox"][data-endpoint-id]');
@@ -2460,8 +2398,8 @@
                 selectAll.indeterminate = true;
             }
             countBadge.textContent = (checked === total)
-                ? total + suffix
-                : checked + ' / ' + total + suffix;
+                ? QSPanelWords.count('apis.endpointCount', total)
+                : QSPanelWords.count('apis.importModal.endpointsChecked', total, { checked: QSPanelWords.number(checked) });
         }
 
         selectAll.addEventListener('change', () => {
@@ -2475,7 +2413,7 @@
             const note = document.createElement('p');
             note.style.margin = '0';
             note.style.fontSize = 'var(--font-size-sm)';
-            note.textContent = t('apis.importModal.noEndpointsInApi');
+            note.textContent = QSPanelWords.t('apis.importModal.noEndpointsInApi');
             section.appendChild(note);
             refreshState();
             return section;
@@ -2539,15 +2477,15 @@
         authEl.style.fontSize = '0.7em';
         const epAuth = endpoint.auth || 'inherit';
         if (epAuth === 'none') {
-            authEl.textContent = t('apis.importModal.authPublic');
+            authEl.textContent = QSPanelWords.t('apis.importModal.authPublic');
         } else if (epAuth === 'required') {
-            authEl.textContent = t('apis.importModal.authRequired');
-            authEl.title = t('apis.importModal.authMismatch');
+            authEl.textContent = QSPanelWords.t('apis.importModal.authRequired');
+            authEl.title = QSPanelWords.t('apis.importModal.authMismatch');
         } else {
             // inherit
             authEl.textContent = apiAuthType === 'none'
-                ? t('apis.importModal.authInherit')
-                : t('apis.importModal.authInheritFrom', { type: apiAuthType });
+                ? QSPanelWords.t('apis.importModal.authInherit')
+                : QSPanelWords.t('apis.importModal.authInheritFrom', { type: apiAuthType });
         }
         li.appendChild(authEl);
 
@@ -2555,16 +2493,16 @@
             const reqBadge = document.createElement('span');
             reqBadge.className = 'admin-badge admin-badge--info';
             reqBadge.style.fontSize = '0.7em';
-            reqBadge.title = t('apis.importModal.hasRequestSchema');
-            reqBadge.textContent = t('apis.importModal.badgeReq');
+            reqBadge.title = QSPanelWords.t('apis.importModal.hasRequestSchema');
+            reqBadge.textContent = QSPanelWords.t('apis.importModal.badgeReq');
             li.appendChild(reqBadge);
         }
         if (endpoint.responseSchema) {
             const respBadge = document.createElement('span');
             respBadge.className = 'admin-badge admin-badge--info';
             respBadge.style.fontSize = '0.7em';
-            respBadge.title = t('apis.importModal.hasResponseSchema');
-            respBadge.textContent = t('apis.importModal.badgeResp');
+            respBadge.title = QSPanelWords.t('apis.importModal.hasResponseSchema');
+            respBadge.textContent = QSPanelWords.t('apis.importModal.badgeResp');
             li.appendChild(respBadge);
         }
 
@@ -2675,20 +2613,20 @@
         const errBox = document.getElementById('import-parse-error');
         const raw = document.getElementById('import-json').value.trim();
         if (!raw) {
-            errBox.textContent = t('apis.importModal.pasteFirst');
+            errBox.textContent = QSPanelWords.t('apis.importModal.pasteFirst');
             errBox.style.display = '';
             return;
         }
         let data;
         try { data = JSON.parse(raw); }
         catch (err) {
-            errBox.textContent = t('apis.importModal.invalidJson', { message: err.message });
+            errBox.textContent = QSPanelWords.t('apis.importModal.invalidJson', { message: err.message });
             errBox.style.display = '';
             return;
         }
         const fmt = detectImportFormat(data);
         if (fmt === 'swagger-2') {
-            _setImportError(_renderMarked('apis.importModal.swagger2', {
+            _setImportError(QSPanelWords.parts('apis.importModal.swagger2', {
                 link: QSDom.el('a', {
                     href: 'https://converter.swagger.io',
                     target: '_blank', rel: 'noopener', text: 'converter.swagger.io'
@@ -2697,7 +2635,7 @@
             return;
         }
         if (fmt === 'unknown') {
-            _setImportError(_renderMarked('apis.importModal.unknownFormat', {
+            _setImportError(QSPanelWords.parts('apis.importModal.unknownFormat', {
                 shape: QSDom.el('code', { text: '{"apis": {...}}' }),
                 openapi: QSDom.el('code', { text: 'openapi: "3.x.x"' }),
                 publicPath: QSDom.el('code', { text: 'endpoints.public' }),
@@ -2707,7 +2645,7 @@
         }
         const result = convertImportPayload(data, fmt);
         if (!result || !result.converted) {
-            errBox.textContent = t('apis.importModal.converterEmpty');
+            errBox.textContent = QSPanelWords.t('apis.importModal.converterEmpty');
             errBox.style.display = '';
             return;
         }
@@ -2775,7 +2713,7 @@
                 await send('setPrivacyMapping', { endpoint: apiId + '/' + epId, field: field, datum: id });
             }
         }
-        if (refused.length) showToast(t('apis.toast.privacyRefused', { reasons: refused.join(' · ') }), 'warning');
+        if (refused.length) showToast(QSPanelWords.t('apis.toast.privacyRefused', { reasons: refused.join(' · ') }), 'warning');
     }
 
     async function handleImportConfirm() {
@@ -2792,11 +2730,11 @@
             let parsed;
             try { parsed = JSON.parse(previewText); }
             catch (err) {
-                showToast(t('apis.toast.previewInvalid', { message: err.message }), 'error');
+                showToast(QSPanelWords.t('apis.toast.previewInvalid', { message: err.message }), 'error');
                 return;
             }
             if (!parsed || typeof parsed !== 'object' || !parsed.apis || typeof parsed.apis !== 'object') {
-                showToast(t('apis.toast.previewNoApis'), 'error');
+                showToast(QSPanelWords.t('apis.toast.previewNoApis'), 'error');
                 return;
             }
             toImport = parsed;
@@ -2817,13 +2755,13 @@
         const filtered = _filterApisByTreeSelection(toImport);
         const apis = filtered.apis;
         if (Object.keys(apis).length === 0) {
-            showToast(t('apis.toast.nothingSelected'), 'error');
+            showToast(QSPanelWords.t('apis.toast.nothingSelected'), 'error');
             return;
         }
         for (const apiId of Object.keys(apis)) {
             const u = (apis[apiId] && apis[apiId].baseUrl) || '';
             if (!/^https?:\/\//i.test(u)) {
-                showToast(t('apis.toast.baseUrlInvalid', { api: apiId }), 'error');
+                showToast(QSPanelWords.t('apis.toast.baseUrlInvalid', { api: apiId }), 'error');
                 return;
             }
         }
@@ -2831,7 +2769,7 @@
         const btn = document.getElementById('btn-import-confirm');
         btn.disabled = true;
         const origLabel = btn.textContent;
-        btn.textContent = t('apis.importModal.importing');
+        btn.textContent = QSPanelWords.t('apis.importModal.importing');
 
         let imported = 0;
         let errors = 0;
@@ -2863,7 +2801,7 @@
                     }));
                     if (!answer.ok) {
                         errors++;
-                        refusals.push(t('apis.toast.importRefused', { api: apiId, message: answer.data?.message || '' }));
+                        refusals.push(QSPanelWords.t('apis.toast.importRefused', { api: apiId, message: answer.data?.message || '' }));
                         continue;
                     }
                 } else {
@@ -2871,7 +2809,7 @@
                     const addRes = await QuickSiteAdmin.apiRequest('addApi', 'POST', replaced);
                     if (!addRes.ok) {
                         errors++;
-                        refusals.push(t('apis.toast.importRefused', { api: apiId, message: addRes.data?.message || '' }));
+                        refusals.push(QSPanelWords.t('apis.toast.importRefused', { api: apiId, message: addRes.data?.message || '' }));
                         continue;
                     }
                     // Then attach endpoints one by one (validation runs per endpoint): a refused
@@ -2883,7 +2821,7 @@
                         });
                         if (!answer.ok) {
                             errors++;
-                            refusals.push(t('apis.toast.importEndpointRefused', {
+                            refusals.push(QSPanelWords.t('apis.toast.importEndpointRefused', {
                                 api: apiId, endpoint: endpoint.id || endpoint.name || '', message: answer.data?.message || ''
                             }));
                         }
@@ -2904,13 +2842,16 @@
         await loadApis();
 
         if (errors === 0) {
-            showToast(t('apis.toast.importedOk', { count: imported }), 'success');
+            showToast(QSPanelWords.count('apis.toast.importedOk', imported), 'success');
         } else {
-            showToast(t('apis.toast.importedWithErrors', { count: imported, errors: errors }), 'warning');
+            showToast(QSPanelWords.t('apis.toast.importedWithErrors', {
+                apis: QSPanelWords.count('apis.apiCount', imported),
+                errors: QSPanelWords.count('apis.toast.errorCount', errors)
+            }), 'warning');
         }
         refusals.slice(0, MAX_IMPORT_REFUSALS_SHOWN).forEach((refusal) => showToast(refusal, 'error'));
         if (refusals.length > MAX_IMPORT_REFUSALS_SHOWN) {
-            showToast(t('apis.toast.importMoreRefused', { count: refusals.length - MAX_IMPORT_REFUSALS_SHOWN }), 'error');
+            showToast(QSPanelWords.count('apis.toast.importMoreRefused', refusals.length - MAX_IMPORT_REFUSALS_SHOWN), 'error');
         }
     }
 
@@ -2929,7 +2870,7 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        showToast(t('apis.toast.exported'), 'success');
+        showToast(QSPanelWords.t('apis.toast.exported'), 'success');
     }
 
     // =========================================================================
@@ -3049,7 +2990,7 @@
         const statusId = textareaId === 'endpoint-request-schema' ? 'request-schema-status' : 'response-schema-status';
         validateJsonField(textarea, statusId);
         
-        showToast(t('apis.toast.templateInserted'), 'success');
+        showToast(QSPanelWords.t('apis.toast.templateInserted'), 'success');
     }
 
     // =========================================================================
@@ -3074,12 +3015,12 @@
         
         try {
             JSON.parse(value);
-            statusEl.textContent = t('apis.schema.validJson');
+            statusEl.textContent = QSPanelWords.t('apis.schema.validJson');
             statusEl.className = 'admin-schema-editor__status admin-schema-editor__status--valid';
             editorEl?.classList.remove('admin-schema-editor--invalid');
             return true;
         } catch (e) {
-            statusEl.textContent = t('apis.schema.invalidJson');
+            statusEl.textContent = QSPanelWords.t('apis.schema.invalidJson');
             statusEl.className = 'admin-schema-editor__status admin-schema-editor__status--invalid';
             editorEl?.classList.add('admin-schema-editor--invalid');
             return false;
@@ -3104,20 +3045,15 @@
             const statusId = textareaId === 'endpoint-request-schema' ? 'request-schema-status' : 'response-schema-status';
             validateJsonField(textarea, statusId);
             
-            showToast(t('apis.toast.jsonFormatted'), 'success');
+            showToast(QSPanelWords.t('apis.toast.jsonFormatted'), 'success');
         } catch (e) {
-            showToast(t('apis.toast.cannotFormat'), 'error');
+            showToast(QSPanelWords.t('apis.toast.cannotFormat'), 'error');
         }
     }
 
+    /** A toast, the panel's own (QuickSiteAdmin.showToast). */
     function showToast(message, type = 'info') {
-        if (window.Toast) {
-            window.Toast[type]?.(message) || window.Toast.show?.(message, type);
-        } else if (QuickSiteAdmin?.showToast) {
-            QuickSiteAdmin.showToast(message, type);
-        } else {
-            console.log(`[${type.toUpperCase()}] ${message}`);
-        }
+        QuickSiteAdmin.showToast(message, type);
     }
 
 })();

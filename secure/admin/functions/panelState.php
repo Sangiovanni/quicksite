@@ -19,6 +19,9 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+// Every answer here is said in the panel's words (answers.panelState), in the
+// language of the panel that asked (qs_admin_json_boot()).
+require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
 
 if (!function_exists('qs_admin_set_selected_project')) {
     /**
@@ -40,19 +43,19 @@ if (!function_exists('qs_admin_set_selected_project')) {
         $project = trim($project);
         if ($project === '') {
             return ApiResponse::create(400, 'validation.missing_field')
-                ->withMessage('project is required')
-                ->withErrors(['project' => 'Required field']);
+                ->withMessage(__admin('answers.common.projectRequired'))
+                ->withErrors(['project' => __admin('answers.common.requiredField')]);
         }
         // The value becomes a directory selector downstream (path safety).
         if (!is_valid_project_name($project)) {
             return ApiResponse::create(400, 'project.invalid')
-                ->withMessage('Invalid project identifier');
+                ->withMessage(__admin('answers.common.invalidProject'));
         }
 
         $userId = (string)($user['id'] ?? '');
         if ($userId === '') {
             return ApiResponse::create(401, 'auth.required')
-                ->withMessage('Authentication required');
+                ->withMessage(__admin('answers.common.authRequired'));
         }
 
         // Must be a real member (authoritative members.json). Same refusal
@@ -60,7 +63,7 @@ if (!function_exists('qs_admin_set_selected_project')) {
         // member — no membership oracle.
         if (getUserRoleForProject($userId, $project) === null) {
             return ApiResponse::create(403, 'authz.not_a_member')
-                ->withMessage('You are not a member of this project');
+                ->withMessage(__admin('answers.common.notMember'));
         }
 
         // Written through THE users.php writer (qs_users_mutate — flock +
@@ -84,15 +87,15 @@ if (!function_exists('qs_admin_set_selected_project')) {
         });
         if ($userMissing) {
             return ApiResponse::create(404, 'resource.not_found')
-                ->withMessage('User record not found');
+                ->withMessage(__admin('answers.panelState.userNotFound'));
         }
         if ($written !== true) {
             return ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage('Failed to persist selected project');
+                ->withMessage(__admin('answers.panelState.selectionNotSaved'));
         }
 
         return ApiResponse::create(200, 'operation.success')
-            ->withMessage("Now editing project '$project'")
+            ->withMessage(__admin('answers.panelState.nowEditing', ['project' => $project]))
             ->withData([
                 'selected_project' => $project,
                 'role'             => getUserRoleForProject($userId, $project),
@@ -144,31 +147,31 @@ if (!function_exists('qs_admin_set_project_star')) {
         $project = trim($project);
         if ($project === '') {
             return ApiResponse::create(400, 'validation.missing_field')
-                ->withMessage('project is required')
-                ->withErrors(['project' => 'Required field']);
+                ->withMessage(__admin('answers.common.projectRequired'))
+                ->withErrors(['project' => __admin('answers.common.requiredField')]);
         }
         if (!is_bool($starred)) {
             return ApiResponse::create(400, 'validation.invalid_type')
-                ->withMessage('starred must be true or false')
-                ->withErrors(['starred' => 'Must be true or false']);
+                ->withMessage(__admin('answers.panelState.starredNotBoolean'))
+                ->withErrors(['starred' => __admin('answers.panelState.mustBeBoolean')]);
         }
         // The value becomes a directory selector downstream (path safety).
         if (!is_valid_project_name($project)) {
             return ApiResponse::create(400, 'project.invalid')
-                ->withMessage('Invalid project identifier');
+                ->withMessage(__admin('answers.common.invalidProject'));
         }
 
         $userId = (string)($user['id'] ?? '');
         if ($userId === '') {
             return ApiResponse::create(401, 'auth.required')
-                ->withMessage('Authentication required');
+                ->withMessage(__admin('answers.common.authRequired'));
         }
 
         // The same refusal whether the project does not exist or the caller is not
         // a member — no membership oracle.
         if ($starred && getUserRoleForProject($userId, $project) === null) {
             return ApiResponse::create(403, 'authz.not_a_member')
-                ->withMessage('You are not a member of this project');
+                ->withMessage(__admin('answers.common.notMember'));
         }
 
         $userMissing = false;
@@ -197,15 +200,17 @@ if (!function_exists('qs_admin_set_project_star')) {
         });
         if ($userMissing) {
             return ApiResponse::create(404, 'resource.not_found')
-                ->withMessage('User record not found');
+                ->withMessage(__admin('answers.panelState.userNotFound'));
         }
         if ($written !== true) {
             return ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage('Failed to persist the star');
+                ->withMessage(__admin('answers.panelState.starNotSaved'));
         }
 
         return ApiResponse::create(200, 'operation.success')
-            ->withMessage($starred ? "Project '$project' starred" : "Project '$project' unstarred")
+            ->withMessage($starred
+                ? __admin('answers.panelState.starred', ['project' => $project])
+                : __admin('answers.panelState.unstarred', ['project' => $project]))
             ->withData([
                 'project'          => $project,
                 'starred'          => $starred,
@@ -250,14 +255,14 @@ if (!function_exists('qs_admin_set_panel_mode')) {
     function qs_admin_set_panel_mode(array $user, $mode): ApiResponse {
         if (!in_array($mode, QS_PANEL_MODES, true)) {
             return ApiResponse::create(400, 'validation.invalid_value')
-                ->withMessage('mode must be simple or advanced')
-                ->withErrors(['mode' => 'Must be simple or advanced']);
+                ->withMessage(__admin('answers.panelState.modeInvalid'))
+                ->withErrors(['mode' => __admin('answers.panelState.mustBeMode')]);
         }
 
         $userId = (string)($user['id'] ?? '');
         if ($userId === '') {
             return ApiResponse::create(401, 'auth.required')
-                ->withMessage('Authentication required');
+                ->withMessage(__admin('answers.common.authRequired'));
         }
 
         $userMissing = false;
@@ -271,15 +276,15 @@ if (!function_exists('qs_admin_set_panel_mode')) {
         });
         if ($userMissing) {
             return ApiResponse::create(404, 'resource.not_found')
-                ->withMessage('User record not found');
+                ->withMessage(__admin('answers.panelState.userNotFound'));
         }
         if ($written !== true) {
             return ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage('Failed to persist the mode');
+                ->withMessage(__admin('answers.panelState.modeNotSaved'));
         }
 
         return ApiResponse::create(200, 'operation.success')
-            ->withMessage("Panel mode set to '$mode'")
+            ->withMessage(__admin('answers.panelState.modeSet', ['mode' => $mode]))
             ->withData(['panel_mode' => $mode]);
     }
 }

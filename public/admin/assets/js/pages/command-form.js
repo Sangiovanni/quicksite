@@ -8,9 +8,9 @@
  * - QSDom (from js/core/dom.js, loaded in the layout <head>) — el,
  *   setSelectPlaceholder, clear
  * - QuickSiteUtils (from js/core/utils.js) — svgIcon, ICON_PATHS
- * - window.QS_COMMAND_FORM_I18N, emitted by command-form.php: the
- *   commandForm / commands / common translation sub-trees, under the same
- *   dot paths PHP uses. Read it through t() below, never directly.
+ * - QSPanelWords (js/core/panel-words.js): the words command-form.php hands
+ *   (commandForm, each snippet category's preview.snippetCategory<Category>)
+ *   and the layout's commands and common, each read by its key's whole path.
  *
  * DOM is built with createElement + textContent through QSDom and named
  * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
@@ -30,36 +30,6 @@
         if (!container) return;
 
 const COMMAND_NAME = container.dataset.commandName || '';
-
-/**
- * Resolve one admin string by its FULL dot path, from the sub-trees
- * command-form.php emits.
- *
- * A path that resolves to nothing returns THE PATH ITSELF. That is
- * deliberate: a string no word file holds has to be visible on screen and
- * findable by a scan, which a hardcoded English fallback would hide (a word
- * a language lacks arrives in English, laid under it by the server).
- *
- * @param {string} path            e.g. 'commandForm.select.typeFirst'
- * @param {Object} [params]        :name markers to substitute, as PHP's t() does
- * @returns {string}
- */
-function t(path, params) {
-    let node = window.QS_COMMAND_FORM_I18N || {};
-    const parts = String(path).split('.');
-    for (const part of parts) {
-        if (node === null || typeof node !== 'object' || !(part in node)) return path;
-        node = node[part];
-    }
-    if (typeof node !== 'string') return path;
-    let value = node;
-    if (params) {
-        for (const name of Object.keys(params)) {
-            value = value.split(':' + name).join(String(params[name]));
-        }
-    }
-    return value;
-}
 
 /**
  * A one-line hint/blurb paragraph.
@@ -100,45 +70,6 @@ function _renderButton(id, cls, text, title) {
 }
 
 /**
- * Render one translated sentence that carries inline markup.
- *
- * The alternative is splitting a sentence across four keys so that one word
- * can be bold, which is unusable for whoever translates it. Instead the key
- * holds the whole sentence with :name markers, and each marker is replaced
- * by a real node — so the markup survives and the translator still sees a
- * sentence.
- *
- * @param {string} template  a resolved string containing :name markers
- * @param {Object<string,Node|string>} parts  marker name -> node or text
- * @returns {DocumentFragment}
- */
-function _renderRich(template, parts) {
-    const frag = document.createDocumentFragment();
-    const names = Object.keys(parts || {});
-    // Longest marker first, so :confirmValue is not eaten by :confirm.
-    names.sort((a, b) => b.length - a.length);
-    const pattern = names.length
-        ? new RegExp(':(' + names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'g')
-        : null;
-    let cursor = 0;
-    if (pattern) {
-        let match;
-        while ((match = pattern.exec(template)) !== null) {
-            if (match.index > cursor) {
-                frag.appendChild(document.createTextNode(template.slice(cursor, match.index)));
-            }
-            const part = parts[match[1]];
-            frag.appendChild(typeof part === 'string' ? document.createTextNode(part) : part);
-            cursor = match.index + match[0].length;
-        }
-    }
-    if (cursor < template.length) {
-        frag.appendChild(document.createTextNode(template.slice(cursor)));
-    }
-    return frag;
-}
-
-/**
  * The page's own error block, for the two failures that leave no form to fill.
  * @param {string} message
  * @returns {HTMLDivElement}
@@ -159,8 +90,8 @@ function _renderAlertError(message) {
  */
 function _renderNotExecutableNotice(reasonKey) {
     return QSDom.el('div', { class: 'admin-alert admin-alert--warning' }, [
-        QSDom.el('strong', { text: t('commandForm.notExecutable.title') }),
-        _renderHint([t(reasonKey)])
+        QSDom.el('strong', { text: QSPanelWords.t('commandForm.notExecutable.title') }),
+        _renderHint([QSPanelWords.t(reasonKey)])
     ]);
 }
 
@@ -173,14 +104,14 @@ function _renderNotExecutableNotice(reasonKey) {
  */
 function _renderNotPermittedNotice() {
     const role = QuickSiteAdmin.permissions.role;
-    let reason = t('commandForm.notPermitted.noProject');
+    let reason = QSPanelWords.t('commandForm.notPermitted.noProject');
     if (role === 'unknown' || role === 'error') {
-        reason = t('commandForm.notPermitted.unread');
+        reason = QSPanelWords.t('commandForm.notPermitted.unread');
     } else if (role) {
-        reason = t('commandForm.notPermitted.role', { role: role });
+        reason = QSPanelWords.t('commandForm.notPermitted.role', { role: role });
     }
     return QSDom.el('div', { class: 'admin-alert admin-alert--warning', id: 'command-not-permitted' }, [
-        QSDom.el('strong', { text: t('commandForm.notPermitted.title') }),
+        QSDom.el('strong', { text: QSPanelWords.t('commandForm.notPermitted.title') }),
         _renderHint([reason])
     ]);
 }
@@ -246,11 +177,11 @@ function _renderCenteredHint(text, isError) {
 function _renderComponentDataBuilder(fieldsId, subtitleKey, emptyKey) {
     return QSDom.el('div', { class: 'admin-component-data-builder' }, [
         QSDom.el('div', { class: 'admin-component-data-header' }, [
-            QSDom.el('span', { class: 'admin-label', text: t('commandForm.componentData.title') }),
-            QSDom.el('span', { class: 'admin-hint', text: t(subtitleKey) })
+            QSDom.el('span', { class: 'admin-label', text: QSPanelWords.t('commandForm.componentData.title') }),
+            QSDom.el('span', { class: 'admin-hint', text: QSPanelWords.t(subtitleKey) })
         ]),
         QSDom.el('div', { class: 'admin-component-data-fields', id: fieldsId }, [
-            _renderCenteredHint(t(emptyKey))
+            _renderCenteredHint(QSPanelWords.t(emptyKey))
         ])
     ]);
 }
@@ -293,8 +224,8 @@ function _renderComponentDataTable(variables, idPrefix, currentData) {
             class: 'admin-input',
             'data-var-input': varName,
             placeholder: varType === 'textKey'
-                ? t('commandForm.componentData.textKeyPlaceholder')
-                : t('commandForm.componentData.valuePlaceholder', { name: varName })
+                ? QSPanelWords.t('commandForm.componentData.textKeyPlaceholder')
+                : QSPanelWords.t('commandForm.componentData.valuePlaceholder', { name: varName })
         });
         if (currentValue) input.value = currentValue;
 
@@ -305,12 +236,12 @@ function _renderComponentDataTable(variables, idPrefix, currentData) {
                 class: 'admin-select admin-select--textkey',
                 'data-target': inputId
             });
-            QSDom.setSelectPlaceholder(keySelect, t('commandForm.componentData.loadingKeys'));
+            QSDom.setSelectPlaceholder(keySelect, QSPanelWords.t('commandForm.componentData.loadingKeys'));
             inputArea = QSDom.el('div', { class: 'admin-textkey-selector' }, [
                 keySelect,
                 QSDom.el('span', {
                     class: 'admin-hint',
-                    text: t('commandForm.componentData.orEnterManually')
+                    text: QSPanelWords.t('commandForm.componentData.orEnterManually')
                 }),
                 input
             ]);
@@ -356,13 +287,13 @@ async function loadCommandDocumentation() {
         } else {
             const target = document.getElementById('command-params');
             QSDom.clear(target);
-            target.appendChild(_renderAlertError(t('commandForm.errors.docNotFound')));
+            target.appendChild(_renderAlertError(QSPanelWords.t('commandForm.errors.docNotFound')));
         }
     } catch (error) {
         const target = document.getElementById('command-params');
         QSDom.clear(target);
         target.appendChild(_renderAlertError(
-            t('commandForm.errors.docLoadFailed') + ' ' + error.message
+            QSPanelWords.t('commandForm.errors.docLoadFailed', { message: error.message })
         ));
     }
 }
@@ -433,8 +364,11 @@ const ENUM_VALUES = {
         { value: 'onload' }, { value: 'onresize' }, { value: 'onscroll' }
     ],
     // The snippet categories, NOT a copy: command-form.php writes the server's one
-    // list (qs_snippet_categories()) with its translated names.
-    snippetCategory: (window.QS_SNIPPET_CATEGORIES || []).map(c => ({ value: c.value, label: c.label }))
+    // list (qs_snippet_categories()) and hands each one's word, the editor's own.
+    snippetCategory: (window.QS_SNIPPET_CATEGORIES || []).map(value => ({
+        value: value,
+        labelKey: 'preview.snippetCategory' + value.charAt(0).toUpperCase() + value.slice(1)
+    }))
 };
 
 // The sentinel value a pick-or-type field's "type your own" entry carries.
@@ -731,8 +665,8 @@ function _makeSearchable(select, placeholder) {
     // for exactly those two strings rather than minting a pair beside them.
     select._qsPicker = new window.QSSearchableSelect(select, {
         placeholder: placeholder,
-        searchPlaceholder: t('common.search'),
-        emptyText: t('common.noResults')
+        searchPlaceholder: QSPanelWords.t('common.search'),
+        emptyText: QSPanelWords.t('common.noResults')
     });
     _syncPicker(select);
     return select._qsPicker;
@@ -908,7 +842,7 @@ function _initPickOrType(form, param, opts) {
     const backBtn = QSDom.el('button', {
         type: 'button',
         class: 'qs-route-picker__back',
-        title: t('commandForm.select.backToPicker'),
+        title: QSPanelWords.t('commandForm.select.backToPicker'),
         text: '←'
     });
     backBtn.style.display = 'none';
@@ -989,10 +923,10 @@ function _initPickOrType(form, param, opts) {
  */
 async function _initRouteSuggest(form, cfg) {
     const built = _initPickOrType(form, cfg.param, {
-        placeholder: t('commandForm.select.route'),
-        sentinelText: t('commandForm.select.routeCustom'),
-        sentinelHint: t('commandForm.select.routeCustomHint'),
-        inputPlaceholder: t('commandForm.select.routeSuggest')
+        placeholder: QSPanelWords.t('commandForm.select.route'),
+        sentinelText: QSPanelWords.t('commandForm.select.routeCustom'),
+        sentinelHint: QSPanelWords.t('commandForm.select.routeCustomHint'),
+        inputPlaceholder: QSPanelWords.t('commandForm.select.routeSuggest')
     });
     if (!built) return;
     const select = built.select;
@@ -1004,12 +938,12 @@ async function _initRouteSuggest(form, cfg) {
         routes = []; // the sentinel still stands; the field is still usable
     }
     if (Array.isArray(routes) && routes.length) {
-        const group = QSDom.el('optgroup', { label: t('commandForm.select.routeExisting') });
+        const group = QSDom.el('optgroup', { label: QSPanelWords.t('commandForm.select.routeExisting') });
         routes.forEach(r => group.appendChild(QSDom.el('option', { value: r.value, text: r.label || r.value })));
         select.appendChild(group);
     }
     if (cfg.specialValues && cfg.specialValues.length) {
-        const group = QSDom.el('optgroup', { label: t('commandForm.select.routeSpecial') });
+        const group = QSDom.el('optgroup', { label: QSPanelWords.t('commandForm.select.routeSpecial') });
         cfg.specialValues.forEach(v => group.appendChild(QSDom.el('option', { value: v, text: v })));
         select.appendChild(group);
     }
@@ -1026,10 +960,10 @@ async function _initRouteSuggest(form, cfg) {
  */
 function _initCommandPicker(form, cfg) {
     const built = _initPickOrType(form, cfg.param, {
-        placeholder: t('commandForm.select.allCommands'),
-        sentinelText: t('commandForm.select.commandCustom'),
-        sentinelHint: t('commandForm.select.commandCustomHint'),
-        inputPlaceholder: t('commandForm.select.commandCustomPlaceholder')
+        placeholder: QSPanelWords.t('commandForm.select.allCommands'),
+        sentinelText: QSPanelWords.t('commandForm.select.commandCustom'),
+        sentinelHint: QSPanelWords.t('commandForm.select.commandCustomHint'),
+        inputPlaceholder: QSPanelWords.t('commandForm.select.commandCustomPlaceholder')
     });
     if (!built) return;
     (window.QS_COMMAND_GROUPS || []).forEach(group => {
@@ -1057,10 +991,10 @@ async function _initArmSelect(form, cfg) {
     // "omit to retrieve stores for ALL routes". A row whose blank means something
     // else names its own words (setSocialPreview: the whole site).
     const placeholder = cfg.placeholder
-        ? t(cfg.placeholder)
+        ? QSPanelWords.t(cfg.placeholder)
         : cfg.source === 'languages'
-            ? t('commandForm.select.language')
-            : (cfg.allowEmpty ? t('commandForm.select.allRoutes') : t('commandForm.select.route'));
+            ? QSPanelWords.t('commandForm.select.language')
+            : (cfg.allowEmpty ? QSPanelWords.t('commandForm.select.allRoutes') : QSPanelWords.t('commandForm.select.route'));
 
     _makeSearchable(select, placeholder);
     await _populateArm(select, cfg.source || 'routes', [], placeholder);
@@ -1082,9 +1016,9 @@ async function _initMediaPicturePicker(form, cfg) {
     if (!pictures) return;
     const select = _swapForSelect(form, cfg.param);
     if (!select) return;
-    const placeholder = t(cfg.placeholder);
+    const placeholder = QSPanelWords.t(cfg.placeholder);
     _makeSearchable(select, placeholder);
-    _placeholder(select, pictures.length ? placeholder : t('commandForm.empty.noImages'));
+    _placeholder(select, pictures.length ? placeholder : QSPanelWords.t('commandForm.empty.noImages'));
     _appendOptions(select, pictures);
 }
 
@@ -1153,9 +1087,9 @@ function _initEnumSelect(form, cfg) {
         select,
         (ENUM_VALUES[cfg.values] || []).map(v => ({
             value: v.value,
-            label: v.label || (v.labelKey ? t(v.labelKey) : v.value)
+            label: v.labelKey ? QSPanelWords.t(v.labelKey) : v.value
         })),
-        t('commandForm.field.selectPlaceholder'));
+        QSPanelWords.t('commandForm.field.selectPlaceholder'));
 
     if (cfg.defaultValue) select.value = cfg.defaultValue;
 }
@@ -1174,7 +1108,7 @@ function _initTagSelect(form, cfg) {
     const select = _swapForSelect(form, cfg.param);
     if (!select) return;
 
-    QSDom.setSelectPlaceholder(select, t('commandForm.field.selectPlaceholder'));
+    QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.field.selectPlaceholder'));
     (window.QS_TAG_GROUPS || []).forEach(group => {
         select.appendChild(QSDom.el('optgroup', { label: group.label }, (group.tags || []).map(tag => {
             const props = { value: tag.value, text: '<' + tag.value + '>' };
@@ -1182,7 +1116,7 @@ function _initTagSelect(form, cfg) {
             return QSDom.el('option', props);
         })));
     });
-    _makeSearchable(select, t('commandForm.field.selectPlaceholder'));
+    _makeSearchable(select, QSPanelWords.t('commandForm.field.selectPlaceholder'));
 }
 
 /**
@@ -1204,8 +1138,8 @@ async function _initSnippetSelect(form, cfg) {
     const select = _swapForSelect(form, cfg.param);
     if (!select) return;
 
-    _makeSearchable(select, t('commandForm.select.snippet'));
-    _placeholder(select, t('commandForm.select.snippet'));
+    _makeSearchable(select, QSPanelWords.t('commandForm.select.snippet'));
+    _placeholder(select, QSPanelWords.t('commandForm.select.snippet'));
 
     let snippets = [];
     try {
@@ -1222,7 +1156,7 @@ async function _initSnippetSelect(form, cfg) {
             label: s.name ? s.name + ' (' + s.id + ')' : s.id
         }));
 
-    _fillSelect(select, rows, t('commandForm.select.snippet'));
+    _fillSelect(select, rows, QSPanelWords.t('commandForm.select.snippet'));
 }
 
 /**
@@ -1239,16 +1173,16 @@ async function _initSnippetSelect(form, cfg) {
  */
 async function _initRegistryPicker(form, cfg) {
     const storage = cfg.source === 'storageItems';
-    const placeholder = t(storage ? 'commandForm.select.storageItem' : 'commandForm.select.collectedDatum');
+    const placeholder = QSPanelWords.t(storage ? 'commandForm.select.storageItem' : 'commandForm.select.collectedDatum');
 
     let select;
     let group = null;
     if (cfg.freeEntry) {
         const built = _initPickOrType(form, cfg.param, {
             placeholder: placeholder,
-            sentinelText: t('commandForm.select.collectedDatumCustom'),
-            sentinelHint: t('commandForm.select.collectedDatumCustomHint'),
-            inputPlaceholder: t('commandForm.select.collectedDatumPlaceholder')
+            sentinelText: QSPanelWords.t('commandForm.select.collectedDatumCustom'),
+            sentinelHint: QSPanelWords.t('commandForm.select.collectedDatumCustomHint'),
+            inputPlaceholder: QSPanelWords.t('commandForm.select.collectedDatumPlaceholder')
         });
         if (!built) return;
         select = built.select;
@@ -1286,7 +1220,7 @@ async function _initRegistryPicker(form, cfg) {
         if (group) group.remove();
         group = null;
         if (found.length) {
-            group = QSDom.el('optgroup', { label: t('commandForm.select.collectedDatumExisting') }, found.map(r =>
+            group = QSDom.el('optgroup', { label: QSPanelWords.t('commandForm.select.collectedDatumExisting') }, found.map(r =>
                 QSDom.el('option', { value: r.value, text: r.label, 'data-description': r.description })));
             select.appendChild(group);
         }
@@ -1310,10 +1244,9 @@ function initRouteResolverNote() {
     const group = field && field.closest('.admin-form-group');
     if (!group) return;
     const href = QuickSiteAdmin.config.adminBase + '/sitemap';
-    group.appendChild(_renderHint([
-        t('commandForm.setRouteResolver.sitemapNote') + ' ',
-        QSDom.el('a', { href: href, text: t('commandForm.setRouteResolver.sitemapLink') })
-    ]));
+    group.appendChild(_renderHint(QSPanelWords.parts('commandForm.setRouteResolver.sitemapNote', {
+        link: QSDom.el('a', { href: href, text: QSPanelWords.t('commandForm.setRouteResolver.sitemapLink') })
+    })));
 }
 
 /**
@@ -1341,7 +1274,7 @@ async function _initLanguagePicker(form, cfg) {
     const select = _swapForSelect(form, cfg.param);
     if (!select) return;
 
-    const placeholder = t('commandForm.select.language');
+    const placeholder = QSPanelWords.t('commandForm.select.language');
     _makeSearchable(select, placeholder);
 
     const load = async () => {
@@ -1427,19 +1360,19 @@ async function _initApiEndpointPicker(form, cfg) {
     if (!apiSelect && !endpointSelect && !refSelect) return;
 
     const apiPlaceholder = cfg.allowEmpty
-        ? t('commandForm.select.allApis')
-        : t('commandForm.select.api');
+        ? QSPanelWords.t('commandForm.select.allApis')
+        : QSPanelWords.t('commandForm.select.api');
     if (apiSelect) {
         _makeSearchable(apiSelect, apiPlaceholder);
         _placeholder(apiSelect, apiPlaceholder);
     }
     if (endpointSelect) {
-        _makeSearchable(endpointSelect, t('commandForm.select.endpoint'));
-        _placeholder(endpointSelect, t('commandForm.select.endpoint'));
+        _makeSearchable(endpointSelect, QSPanelWords.t('commandForm.select.endpoint'));
+        _placeholder(endpointSelect, QSPanelWords.t('commandForm.select.endpoint'));
     }
     if (refSelect) {
-        _makeSearchable(refSelect, t('commandForm.select.endpointRef'));
-        _placeholder(refSelect, t('commandForm.select.endpointRef'));
+        _makeSearchable(refSelect, QSPanelWords.t('commandForm.select.endpointRef'));
+        _placeholder(refSelect, QSPanelWords.t('commandForm.select.endpointRef'));
     }
 
     let apis = [];
@@ -1471,10 +1404,10 @@ async function _initApiEndpointPicker(form, cfg) {
 
     if (endpointSelect) {
         _fillSelect(endpointSelect, endpointRows(apiSelect ? apiSelect.value : '', false),
-            t('commandForm.select.endpoint'));
+            QSPanelWords.t('commandForm.select.endpoint'));
     }
     if (refSelect) {
-        _fillSelect(refSelect, endpointRows('', true), t('commandForm.select.endpointRef'));
+        _fillSelect(refSelect, endpointRows('', true), QSPanelWords.t('commandForm.select.endpointRef'));
     }
 
     // The api drives the endpoint list, so it belongs ABOVE it. The form
@@ -1492,10 +1425,10 @@ async function _initApiEndpointPicker(form, cfg) {
         apiSelect.addEventListener('change', () => {
             const id = apiSelect.value;
             if (endpointSelect) {
-                _fillSelect(endpointSelect, endpointRows(id, false), t('commandForm.select.endpoint'));
+                _fillSelect(endpointSelect, endpointRows(id, false), QSPanelWords.t('commandForm.select.endpoint'));
             }
             if (refSelect) {
-                _fillSelect(refSelect, endpointRows(id, true), t('commandForm.select.endpointRef'));
+                _fillSelect(refSelect, endpointRows(id, true), QSPanelWords.t('commandForm.select.endpointRef'));
             }
         });
     }
@@ -1542,7 +1475,7 @@ async function _initStructurePicker(form, cfg) {
         // (page / component / menu / footer), the same on every installation —
         // the same category as the position and page-event enums, which stay
         // native too. A search box over four items is chrome, not help.
-        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        await _populateArm(typeSelect, 'structure-types', [], QSPanelWords.t('commandForm.select.structureType'));
     }
 
     let nameSelect = nameInput;
@@ -1553,8 +1486,8 @@ async function _initStructurePicker(form, cfg) {
         });
         if (nameInput.dataset.urlParam !== undefined) nameSelect.dataset.urlParam = '';
         nameInput.replaceWith(nameSelect);
-        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
-        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _makeSearchable(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
         _setDisabled(nameSelect, true);
     }
 
@@ -1567,8 +1500,8 @@ async function _initStructurePicker(form, cfg) {
         .map(param => _swapForSelect(form, param))
         .filter(Boolean);
     nodeSelects.forEach(select => {
-        _makeSearchable(select, t('commandForm.select.typeFirst'));
-        _placeholder(select, t('commandForm.select.typeFirst'));
+        _makeSearchable(select, QSPanelWords.t('commandForm.select.typeFirst'));
+        _placeholder(select, QSPanelWords.t('commandForm.select.typeFirst'));
         _setDisabled(select, true);
     });
 
@@ -1579,17 +1512,17 @@ async function _initStructurePicker(form, cfg) {
     const eventFields = (cfg.eventParams || []).map(spec => {
         if (spec.source === 'available') {
             const built = _initPickOrType(form, spec.param, {
-                placeholder: t('commandForm.select.nodeFirst'),
-                sentinelText: t('commandForm.select.eventCustom'),
-                sentinelHint: t('commandForm.select.eventCustomHint'),
-                inputPlaceholder: t('commandForm.select.eventCustomPlaceholder')
+                placeholder: QSPanelWords.t('commandForm.select.nodeFirst'),
+                sentinelText: QSPanelWords.t('commandForm.select.eventCustom'),
+                sentinelHint: QSPanelWords.t('commandForm.select.eventCustomHint'),
+                inputPlaceholder: QSPanelWords.t('commandForm.select.eventCustomPlaceholder')
             });
             return built ? { spec: spec, select: built.select } : null;
         }
         const select = _swapForSelect(form, spec.param);
         if (!select) return null;
-        _makeSearchable(select, t('commandForm.select.nodeFirst'));
-        _placeholder(select, t('commandForm.select.nodeFirst'));
+        _makeSearchable(select, QSPanelWords.t('commandForm.select.nodeFirst'));
+        _placeholder(select, QSPanelWords.t('commandForm.select.nodeFirst'));
         return { spec: spec, select: select };
     }).filter(Boolean);
     eventFields.forEach(f => _setDisabled(f.select, true));
@@ -1609,14 +1542,14 @@ async function _initStructurePicker(form, cfg) {
 
         if (!type) {
             nodeSelects.forEach(s => {
-                _placeholder(s, t('commandForm.select.typeFirst'));
+                _placeholder(s, QSPanelWords.t('commandForm.select.typeFirst'));
                 _setDisabled(s, true);
             });
             return;
         }
         if ((type === 'page' || type === 'component') && !name) {
             nodeSelects.forEach(s => {
-                _placeholder(s, t('commandForm.select.nameFirst'));
+                _placeholder(s, QSPanelWords.t('commandForm.select.nameFirst'));
                 _setDisabled(s, true);
             });
             return;
@@ -1628,7 +1561,7 @@ async function _initStructurePicker(form, cfg) {
             nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
         } catch (error) {
             nodeSelects.forEach(s => {
-                _placeholder(s, t('commandForm.errors.loadNodes'));
+                _placeholder(s, QSPanelWords.t('commandForm.errors.loadNodes'));
                 _setDisabled(s, true);
             });
             return;
@@ -1637,10 +1570,10 @@ async function _initStructurePicker(form, cfg) {
         const withRoot = rootAllowedFor(type);
         nodeSelects.forEach(select => {
             _setDisabled(select, false);
-            _placeholder(select, t('commandForm.select.targetNode'));
+            _placeholder(select, QSPanelWords.t('commandForm.select.targetNode'));
             if (withRoot) {
                 select.appendChild(QSDom.el('option', {
-                    value: 'root', text: t('commandForm.select.structureRoot')
+                    value: 'root', text: QSPanelWords.t('commandForm.select.structureRoot')
                 }));
             }
             _appendOptions(select, Array.isArray(nodes) ? nodes : []);
@@ -1659,7 +1592,7 @@ async function _initStructurePicker(form, cfg) {
         if (eventFields.length === 0) return;
 
         const park = key => eventFields.forEach(f => {
-            _placeholder(f.select, t(key));
+            _placeholder(f.select, QSPanelWords.t(key));
             _setDisabled(f.select, true);
         });
 
@@ -1699,15 +1632,15 @@ async function _initStructurePicker(form, cfg) {
                     // carries nothing to edit or delete, and saying so is the
                     // only useful answer — the command would refuse anything
                     // this field could offer.
-                    _placeholder(select, t('commandForm.empty.noInteractionsOnNode'));
+                    _placeholder(select, QSPanelWords.t('commandForm.empty.noInteractionsOnNode'));
                     _setDisabled(select, true);
                     return;
                 }
                 _setDisabled(select, false);
-                _placeholder(select, t('commandForm.select.event'));
+                _placeholder(select, QSPanelWords.t('commandForm.select.event'));
                 names.forEach(ev => select.appendChild(QSDom.el('option', {
                     value: ev,
-                    text: t('commandForm.select.eventWithCount',
+                    text: QSPanelWords.t('commandForm.select.eventWithCount',
                             { event: ev, count: (existing[ev] || []).length })
                 })));
                 _syncPicker(select);
@@ -1730,15 +1663,15 @@ async function _initStructurePicker(form, cfg) {
             // a second copy of an engine constant. Anything in it stays
             // reachable through the free-entry escape below.
             _setDisabled(select, false);
-            _placeholder(select, t('commandForm.select.event'));
+            _placeholder(select, QSPanelWords.t('commandForm.select.event'));
             select.appendChild(QSDom.el('option', {
                 value: QS_PICK_CUSTOM,
-                text: t('commandForm.select.eventCustom'),
-                'data-description': t('commandForm.select.eventCustomHint')
+                text: QSPanelWords.t('commandForm.select.eventCustom'),
+                'data-description': QSPanelWords.t('commandForm.select.eventCustomHint')
             }));
-            [['common', tag ? t('commandForm.select.eventsCommonFor', { tag: tag })
-                            : t('commandForm.select.eventsCommon')],
-             ['lessCommon', t('commandForm.select.eventsLessCommon')]
+            [['common', tag ? QSPanelWords.t('commandForm.select.eventsCommonFor', { tag: tag })
+                            : QSPanelWords.t('commandForm.select.eventsCommon')],
+             ['lessCommon', QSPanelWords.t('commandForm.select.eventsLessCommon')]
             ].forEach(pair => {
                 const list = grouped[pair[0]] || [];
                 if (!list.length) return;
@@ -1757,12 +1690,12 @@ async function _initStructurePicker(form, cfg) {
         _showNameField(nameSelect, type === 'page' || type === 'component');
         if (type === 'page') {
             _setDisabled(nameSelect, false);
-            await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
+            await _populateArm(nameSelect, 'pages', [], QSPanelWords.t('commandForm.select.page'));
         } else if (type === 'component') {
             _setDisabled(nameSelect, false);
-            await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
+            await _populateArm(nameSelect, 'components', [], QSPanelWords.t('commandForm.select.component'));
         } else {
-            _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+            _placeholder(nameSelect, QSPanelWords.t('commandForm.select.notRequiredForType'));
             _setDisabled(nameSelect, true);
         }
         // A new type invalidates whatever node was chosen under the old one,
@@ -1811,8 +1744,8 @@ async function _initJsFunctionSelect(form, cfg) {
     const select = _swapForSelect(form, cfg.param);
     if (!select) return;
 
-    _makeSearchable(select, t('commandForm.select.jsFunction'));
-    _placeholder(select, t('commandForm.select.jsFunction'));
+    _makeSearchable(select, QSPanelWords.t('commandForm.select.jsFunction'));
+    _placeholder(select, QSPanelWords.t('commandForm.select.jsFunction'));
 
     let functions = [];
     try {
@@ -1835,7 +1768,7 @@ async function _initJsFunctionSelect(form, cfg) {
         const eventName = eventField ? eventField.value : '';
         const chosen = select.value;
 
-        _placeholder(select, t('commandForm.select.jsFunction'));
+        _placeholder(select, QSPanelWords.t('commandForm.select.jsFunction'));
 
         const matching = eventName
             ? functions.filter(fn => Array.isArray(fn.events) && fn.events.indexOf(eventName) !== -1)
@@ -1844,7 +1777,7 @@ async function _initJsFunctionSelect(form, cfg) {
 
         if (matching.length > 0) {
             const group = QSDom.el('optgroup', {
-                label: t('commandForm.select.verbsForEvent', { event: eventName })
+                label: QSPanelWords.t('commandForm.select.verbsForEvent', { event: eventName })
             });
             matching.forEach(fn => group.appendChild(verbOption(fn)));
             select.appendChild(group);
@@ -1852,8 +1785,8 @@ async function _initJsFunctionSelect(form, cfg) {
         if (rest.length > 0) {
             const group = QSDom.el('optgroup', {
                 label: matching.length > 0
-                    ? t('commandForm.select.verbsOther')
-                    : t('commandForm.select.verbsAll')
+                    ? QSPanelWords.t('commandForm.select.verbsOther')
+                    : QSPanelWords.t('commandForm.select.verbsAll')
             });
             rest.forEach(fn => group.appendChild(verbOption(fn)));
             select.appendChild(group);
@@ -2063,7 +1996,7 @@ async function initEditStructureForm() {
         // (page / component / menu / footer), the same on every installation —
         // the same category as the position and page-event enums, which stay
         // native too. A search box over four items is chrome, not help.
-        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        await _populateArm(typeSelect, 'structure-types', [], QSPanelWords.t('commandForm.select.structureType'));
     }
 
     // Convert name input to select
@@ -2073,8 +2006,8 @@ async function initEditStructureForm() {
         nameSelect.name = 'name';
         nameSelect.className = 'admin-select';
         nameInput.replaceWith(nameSelect);
-        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
-        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _makeSearchable(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
         _setDisabled(nameSelect, true);
     }
 
@@ -2085,7 +2018,7 @@ async function initEditStructureForm() {
         actionSelect.name = 'action';
         actionSelect.className = 'admin-select';
         actionInput.replaceWith(actionSelect);
-        await _populateArm(actionSelect, 'edit-actions', [], t('commandForm.select.action'));
+        await _populateArm(actionSelect, 'edit-actions', [], QSPanelWords.t('commandForm.select.action'));
     }
 
     // Convert nodeId input to select (if exists)
@@ -2095,8 +2028,8 @@ async function initEditStructureForm() {
         nodeIdSelect.name = 'nodeId';
         nodeIdSelect.className = 'admin-select';
         nodeIdInput.replaceWith(nodeIdSelect);
-        _makeSearchable(nodeIdSelect, t('commandForm.select.nodeOptional'));
-        _placeholder(nodeIdSelect, t('commandForm.select.structureFirst'));
+        _makeSearchable(nodeIdSelect, QSPanelWords.t('commandForm.select.nodeOptional'));
+        _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.structureFirst'));
         _setDisabled(nodeIdSelect, true);
     }
     
@@ -2127,13 +2060,13 @@ async function initEditStructureForm() {
         const name = nameSelect?.value;
         
         if (!type) {
-            _placeholder(nodeIdSelect, t('commandForm.select.typeFirst'));
+            _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.typeFirst'));
             _setDisabled(nodeIdSelect, true);
             return;
         }
 
         if ((type === 'page' || type === 'component') && !name) {
-            _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+            _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.nameFirst'));
             _setDisabled(nodeIdSelect, true);
             return;
         }
@@ -2145,7 +2078,7 @@ async function initEditStructureForm() {
 
         try {
             const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
-            _placeholder(nodeIdSelect, t('commandForm.select.nodeOptional'));
+            _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.nodeOptional'));
             _appendOptions(nodeIdSelect, nodes);
 
             // Select the prefilled value if provided
@@ -2156,7 +2089,7 @@ async function initEditStructureForm() {
                 await loadNodeContent();
             }
         } catch (error) {
-            _placeholder(nodeIdSelect, t('commandForm.errors.loadNodes'));
+            _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.errors.loadNodes'));
         }
     }
     
@@ -2180,19 +2113,19 @@ async function initEditStructureForm() {
         apiParams.push(nodeId); // This fetches the specific node
         
         try {
-            structureTextarea.placeholder = t('commandForm.placeholder.loadingNode');
+            structureTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.loadingNode');
             const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, apiParams);
             
             if (result.ok && result.data.data?.node) {
                 // Format the node JSON nicely
                 const nodeJson = JSON.stringify(result.data.data.node, null, 2);
                 structureTextarea.value = nodeJson;
-                structureTextarea.placeholder = t('commandForm.placeholder.nodeLoaded');
-                QuickSiteAdmin.showToast(t('commandForm.toast.nodeLoaded'), 'info');
+                structureTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.nodeLoaded');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.nodeLoaded'), 'info');
             }
         } catch (error) {
             console.error('Failed to load node content:', error);
-            structureTextarea.placeholder = t('commandForm.placeholder.newStructure');
+            structureTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.newStructure');
         }
     }
     
@@ -2203,11 +2136,11 @@ async function initEditStructureForm() {
             _showNameField(nameSelect, type === 'page' || type === 'component');
 
             if (type === 'page') {
-                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], QSPanelWords.t('commandForm.select.page'));
             } else if (type === 'component') {
-                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], QSPanelWords.t('commandForm.select.component'));
             } else {
-                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _placeholder(nameSelect, QSPanelWords.t('commandForm.select.notRequiredForType'));
                 _setDisabled(nameSelect, true);
                 // For menu/footer, load nodes directly
                 await loadNodeOptions();
@@ -2215,7 +2148,7 @@ async function initEditStructureForm() {
 
             // Reset nodeId for page/component (will be populated after name selection)
             if (nodeIdSelect && (type === 'page' || type === 'component')) {
-                _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+                _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.nameFirst'));
                 _setDisabled(nodeIdSelect, true);
             }
             
@@ -2249,10 +2182,10 @@ async function initEditStructureForm() {
             if (structureTextarea) {
                 if (actionSelect.value === 'delete') {
                     structureTextarea.removeAttribute('required');
-                    structureTextarea.placeholder = t('commandForm.placeholder.notRequiredDelete');
+                    structureTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.notRequiredDelete');
                 } else {
                     structureTextarea.setAttribute('required', '');
-                    structureTextarea.placeholder = t('commandForm.placeholder.jsonStructure');
+                    structureTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.jsonStructure');
                 }
             }
         });
@@ -2267,8 +2200,8 @@ async function initEditStructureForm() {
         if (prefillType === 'page' || prefillType === 'component') {
             const endpoint = prefillType === 'page' ? 'pages' : 'components';
             await _populateArm(nameSelect, endpoint, [], prefillType === 'page'
-                ? t('commandForm.select.page')
-                : t('commandForm.select.component'));
+                ? QSPanelWords.t('commandForm.select.page')
+                : QSPanelWords.t('commandForm.select.component'));
             _setDisabled(nameSelect, false);
 
             if (prefillName) {
@@ -2279,7 +2212,7 @@ async function initEditStructureForm() {
             }
         } else {
             // menu/footer
-            _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+            _placeholder(nameSelect, QSPanelWords.t('commandForm.select.notRequiredForType'));
             _setDisabled(nameSelect, true);
             await loadNodeOptions(prefillNodeId);
         }
@@ -2312,7 +2245,7 @@ async function initGetStructureForm() {
             typeSelect.dataset.urlParam = '';
         }
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], QSPanelWords.t('commandForm.select.structureType'));
     }
     
     // Convert name input to select
@@ -2324,7 +2257,7 @@ async function initGetStructureForm() {
         if (nameInput.dataset.urlParam !== undefined) {
             nameSelect.dataset.urlParam = '';
         }
-        QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.typeFirst'));
+        QSDom.setSelectPlaceholder(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
         nameSelect.disabled = true;
         nameInput.replaceWith(nameSelect);
     }
@@ -2339,7 +2272,7 @@ async function initGetStructureForm() {
             optionSelect.dataset.urlParam = '';
         }
         optionInput.replaceWith(optionSelect);
-        _makeSearchable(optionSelect, t('commandForm.getStructure.optionNone'));
+        _makeSearchable(optionSelect, QSPanelWords.t('commandForm.getStructure.optionNone'));
     }
     
     // Set up cascading behavior
@@ -2354,7 +2287,7 @@ async function initGetStructureForm() {
     _placeFieldAfter(typeSelect, nameSelect);
     _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     if (nameSelect && nameSelect.tagName === 'SELECT') {
-        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
+        _makeSearchable(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
     }
     
     const optionSelect = form.querySelector('[name="option"]');
@@ -2371,15 +2304,15 @@ async function initGetStructureForm() {
      */
     async function fillOptions() {
         if (!optionSelect) return;
-        _placeholder(optionSelect, t('commandForm.getStructure.optionNone'));
+        _placeholder(optionSelect, QSPanelWords.t('commandForm.getStructure.optionNone'));
 
         // showIds / summary are the command's own argument values, so they
         // stay literal; only the parenthetical explanation is translated.
-        const keywords = QSDom.el('optgroup', { label: t('commandForm.getStructure.optionKeywords') });
+        const keywords = QSDom.el('optgroup', { label: QSPanelWords.t('commandForm.getStructure.optionKeywords') });
         [['showIds', 'commandForm.getStructure.optionShowIds'],
          ['summary', 'commandForm.getStructure.optionSummary']
         ].forEach(pair => keywords.appendChild(
-            QSDom.el('option', { value: pair[0], text: t(pair[1]) })));
+            QSDom.el('option', { value: pair[0], text: QSPanelWords.t(pair[1]) })));
         optionSelect.appendChild(keywords);
 
         const type = typeSelect ? typeSelect.value : '';
@@ -2401,7 +2334,7 @@ async function initGetStructureForm() {
             _syncPicker(optionSelect);
             return;
         }
-        const group = QSDom.el('optgroup', { label: t('commandForm.getStructure.optionNodes') });
+        const group = QSDom.el('optgroup', { label: QSPanelWords.t('commandForm.getStructure.optionNodes') });
         nodes.forEach(n => group.appendChild(
             QSDom.el('option', { value: n.value, text: n.label || n.value })));
         optionSelect.appendChild(group);
@@ -2417,12 +2350,12 @@ async function initGetStructureForm() {
             _showNameField(nameSelect, type === 'page' || type === 'component');
             
             if (type === 'page') {
-                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], QSPanelWords.t('commandForm.select.page'));
             } else if (type === 'component') {
-                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], QSPanelWords.t('commandForm.select.component'));
             } else {
                 // menu and footer don't need name
-                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _placeholder(nameSelect, QSPanelWords.t('commandForm.select.notRequiredForType'));
                 _setDisabled(nameSelect, true);
             }
             await fillOptions();
@@ -2447,9 +2380,9 @@ async function initAssetSelectForm() {
             class: 'admin-select',
             id: 'asset-category-filter'
         });
-        QSDom.setSelectPlaceholder(categoryFilter, t('commandForm.select.allCategories'));
+        QSDom.setSelectPlaceholder(categoryFilter, QSPanelWords.t('commandForm.select.allCategories'));
         const filterGroup = QSDom.el('div', { class: 'admin-form-group' }, [
-            _renderLabel(t('commandForm.assets.filterByCategory')),
+            _renderLabel(QSPanelWords.t('commandForm.assets.filterByCategory')),
             categoryFilter
         ]);
         filenameInput.closest('.admin-form-group')?.before(filterGroup);
@@ -2469,7 +2402,7 @@ async function initAssetSelectForm() {
         filenameSelect.name = 'filename';
         filenameSelect.className = 'admin-select';
         filenameSelect.required = filenameInput.required;
-        QSDom.setSelectPlaceholder(filenameSelect, t('commandForm.status.loadingFiles'));
+        QSDom.setSelectPlaceholder(filenameSelect, QSPanelWords.t('commandForm.status.loadingFiles'));
         filenameInput.replaceWith(filenameSelect);
         
         // Load all assets initially (no category filter)
@@ -2517,9 +2450,9 @@ async function initAssetSelectForm() {
 async function populateAssetFilenames(selectEl, category) {
     try {
         const args = category ? [category] : [];
-        await QuickSiteAdmin.populateSelect(selectEl, 'assets', args, t('commandForm.select.file'));
+        await QuickSiteAdmin.populateSelect(selectEl, 'assets', args, QSPanelWords.t('commandForm.select.file'));
     } catch (e) {
-        QSDom.setSelectPlaceholder(selectEl, t('commandForm.errors.loadFiles'));
+        QSDom.setSelectPlaceholder(selectEl, QSPanelWords.t('commandForm.errors.loadFiles'));
     }
 }
 
@@ -2552,7 +2485,7 @@ function initEditAssetExtensionHint() {
     // Hint below the input
     const hint = document.createElement('small');
     hint.style.cssText = 'display:block;margin-top:0.25rem;color:var(--admin-text-light);font-size:0.75rem;';
-    hint.textContent = t('commandForm.hint.renameNoExtension');
+    hint.textContent = QSPanelWords.t('commandForm.hint.renameNoExtension');
     wrapper.parentNode.insertBefore(hint, wrapper.nextSibling);
 
     // Update suffix when filename changes
@@ -2570,7 +2503,7 @@ function initEditAssetExtensionHint() {
     updateSuffix();
 
     // Update placeholder based on selection
-    newFilenameInput.setAttribute('placeholder', t('commandForm.placeholder.newName'));
+    newFilenameInput.setAttribute('placeholder', QSPanelWords.t('commandForm.placeholder.newName'));
 }
 
 /**
@@ -2610,19 +2543,19 @@ async function initDeleteAssetForm() {
         id: 'delete-file-list',
         style: 'max-height:320px;overflow-y:auto;border:1px solid var(--admin-border,#4b5563);'
              + 'border-radius:0.375rem;padding:0.25rem 0;'
-    }, [_renderListNotice(t('commandForm.status.loadingFiles'))]);
+    }, [_renderListNotice(QSPanelWords.t('commandForm.status.loadingFiles'))]);
     const countHint = QSDom.el('small', {
         id: 'delete-count-hint',
         style: 'display:block;margin-top:0.25rem;color:var(--admin-text-light);font-size:0.75rem;'
     });
 
     const container = QSDom.el('div', { class: 'admin-form-group' }, [
-        _renderLabel(t('commandForm.deleteAsset.filesToDelete')),
+        _renderLabel(QSPanelWords.t('commandForm.deleteAsset.filesToDelete')),
         QSDom.el('div', { style: 'display:flex;gap:0.5rem;align-items:center;margin-bottom:0.5rem;' }, [
             QSDom.el('label', {
                 style: 'display:flex;align-items:center;gap:0.3rem;font-size:0.8rem;'
                      + 'color:var(--admin-text-muted);white-space:nowrap;cursor:pointer;'
-            }, [selectAllCheckbox, ' ' + t('commandForm.deleteAsset.selectAll')])
+            }, [selectAllCheckbox, ' ' + QSPanelWords.t('commandForm.deleteAsset.selectAll')])
         ]),
         fileListEl,
         countHint
@@ -2632,12 +2565,12 @@ async function initDeleteAssetForm() {
     // Load and render file checkboxes
     async function loadFiles() {
         QSDom.clear(fileListEl);
-        fileListEl.appendChild(_renderListNotice(t('common.loading')));
+        fileListEl.appendChild(_renderListNotice(QSPanelWords.t('common.loading')));
         try {
             const files = await QuickSiteAdmin.fetchHelperData('assets', []);
             QSDom.clear(fileListEl);
             if (!files || files.length === 0) {
-                fileListEl.appendChild(_renderListNotice(t('commandForm.empty.noFiles')));
+                fileListEl.appendChild(_renderListNotice(QSPanelWords.t('commandForm.empty.noFiles')));
                 updateCount();
                 return;
             }
@@ -2646,7 +2579,7 @@ async function initDeleteAssetForm() {
             updateCount();
         } catch (e) {
             QSDom.clear(fileListEl);
-            fileListEl.appendChild(_renderListNotice(t('commandForm.errors.loadFiles'), true));
+            fileListEl.appendChild(_renderListNotice(QSPanelWords.t('commandForm.errors.loadFiles'), true));
         }
     }
 
@@ -2663,12 +2596,8 @@ async function initDeleteAssetForm() {
 
     function updateCount() {
         const checked = getChecked();
-        countHint.textContent = checked.length === 0 ? '' : t(
-            checked.length === 1
-                ? 'commandForm.deleteAsset.selectedOne'
-                : 'commandForm.deleteAsset.selectedMany',
-            { count: checked.length }
-        );
+        countHint.textContent = checked.length === 0 ? ''
+            : QSPanelWords.count('commandForm.deleteAsset.selectedCount', checked.length);
         selectAllCheckbox.checked = fileListEl.querySelectorAll('.delete-file-cb').length > 0 &&
             fileListEl.querySelectorAll('.delete-file-cb:not(:checked)').length === 0;
         if (filenamesField) {
@@ -2705,12 +2634,7 @@ async function initDeleteAssetForm() {
         const originalBtnNodes = Array.from(submitBtn.childNodes);
         QSDom.clear(submitBtn);
         submitBtn.appendChild(QSDom.el('span', { class: 'admin-spinner' }));
-        submitBtn.appendChild(document.createTextNode(' ' + t(
-            checked.length === 1
-                ? 'commandForm.deleteAsset.deletingOne'
-                : 'commandForm.deleteAsset.deletingMany',
-            { count: checked.length }
-        )));
+        submitBtn.appendChild(document.createTextNode(' ' + QSPanelWords.count('commandForm.deleteAsset.deletingCount', checked.length)));
 
         const responseDiv = document.getElementById('command-response');
 
@@ -2734,24 +2658,20 @@ async function initDeleteAssetForm() {
                 updateCount();
 
                 if (failed.length > 0) {
-                    QuickSiteAdmin.showToast(t('commandForm.deleteAsset.deletedPartial', {
-                        deleted: checked.length - failed.length,
-                        total: checked.length,
-                        names: failed.join(', ')
+                    QuickSiteAdmin.showToast(QSPanelWords.count('commandForm.deleteAsset.deletedPartialCount', checked.length, {
+                        deleted: QSPanelWords.number(checked.length - failed.length),
+                        names: QSPanelWords.list(failed, 'unit')
                     }), 'warning');
                 } else {
-                    const msg = t(checked.length === 1
-                        ? 'commandForm.deleteAsset.deletedOne'
-                        : 'commandForm.deleteAsset.deletedMany', { count: checked.length });
-                    QuickSiteAdmin.showToast(msg, 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.count('commandForm.deleteAsset.deletedCount', checked.length), 'success');
                 }
             } else {
                 QuickSiteAdmin.showToast(
-                    result.data?.message || t('commandForm.deleteAsset.deleteFailed'), 'error');
+                    result.data?.message || QSPanelWords.t('commandForm.deleteAsset.deleteFailed'), 'error');
             }
         } catch (error) {
             QuickSiteAdmin.displayResponse(responseDiv, { ok: false, status: 0, data: { error: error.message } });
-            QuickSiteAdmin.showToast(t('commandForm.toast.deleteFailed') + ' ' + error.message, 'error');
+            QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.deleteFailed', { message: error.message }), 'error');
         }
 
         QSDom.clear(submitBtn);
@@ -2783,7 +2703,7 @@ async function initListAssetsForm() {
         categoryInput.replaceWith(categorySelect);
         
         // Add "All categories" option first, then populate with categories
-        QSDom.setSelectPlaceholder(categorySelect, t('commandForm.select.allCategories'));
+        QSDom.setSelectPlaceholder(categorySelect, QSPanelWords.t('commandForm.select.allCategories'));
         try {
             const categories = await QuickSiteAdmin.fetchHelperData('asset-categories', []);
             categories.forEach(cat => {
@@ -2822,7 +2742,7 @@ async function initUploadAssetForm() {
     // Show allowed extensions hint below file input
     if (fileInput && allExtensions.length) {
         const hint = document.createElement('small');
-        hint.textContent = t('commandForm.uploadAsset.allowedExtensions', { list: allExtensions.join(', ') });
+        hint.textContent = QSPanelWords.t('commandForm.uploadAsset.allowedExtensions', { list: QSPanelWords.list(allExtensions, 'unit') });
         const group = fileInput.closest('.admin-form-group');
         if (group) group.appendChild(hint);
     }
@@ -2834,7 +2754,7 @@ async function initUploadAssetForm() {
         const urlGroup = urlInput.closest('.admin-form-group');
         if (urlGroup) {
             const divider = QSDom.el('div', { class: 'admin-url-upload__divider' }, [
-                QSDom.el('span', { text: t('commandForm.uploadAsset.or') })
+                QSDom.el('span', { text: QSPanelWords.t('commandForm.uploadAsset.or') })
             ]);
             fileGroup.after(divider);
             divider.after(urlGroup);
@@ -2866,18 +2786,16 @@ async function initUploadAssetForm() {
     // Add link to the Media page for multi-file uploads
     const pageHeader = document.querySelector('.admin-page-header');
     if (pageHeader) {
-        const tip = _renderHint([
-            _renderRich(t('commandForm.uploadAsset.multiFileTip'), {
-                // The Media page is routed 'media', NOT 'assets' — a directory
-                // named 'assets' would shadow it, and public/admin/assets/ is a
-                // real one. See AdminRouter::$validPages.
-                link: QSDom.el('a', {
-                    class: 'admin-link',
-                    href: (window.QUICKSITE_CONFIG?.adminBase || '/admin') + '/media',
-                    text: t('commandForm.uploadAsset.assetManagement')
-                })
+        const tip = _renderHint(QSPanelWords.parts('commandForm.uploadAsset.multiFileTip', {
+            // The Media page is routed 'media', NOT 'assets' — a directory
+            // named 'assets' would shadow it, and public/admin/assets/ is a
+            // real one. See AdminRouter::$validPages.
+            link: QSDom.el('a', {
+                class: 'admin-link',
+                href: (window.QUICKSITE_CONFIG?.adminBase || '/admin') + '/media',
+                text: QSPanelWords.t('commandForm.uploadAsset.assetManagement')
             })
-        ], 'admin-form-hint');
+        }), 'admin-form-hint');
         tip.style.marginTop = 'var(--space-sm)';
         pageHeader.appendChild(tip);
     }
@@ -2899,11 +2817,11 @@ async function initEditFaviconForm() {
         imageNameInput.replaceWith(imageSelect);
         
         // Load images from assets/images
-        QSDom.setSelectPlaceholder(imageSelect, t('commandForm.status.loadingImages'));
+        QSDom.setSelectPlaceholder(imageSelect, QSPanelWords.t('commandForm.status.loadingImages'));
         
         try {
             const images = await QuickSiteAdmin.fetchHelperData('assets', ['images']);
-            QSDom.setSelectPlaceholder(imageSelect, t('commandForm.select.faviconImage'));
+            QSDom.setSelectPlaceholder(imageSelect, QSPanelWords.t('commandForm.select.faviconImage'));
             
             // Filter for PNG images (favicon requires PNG)
             images.forEach(img => {
@@ -2918,15 +2836,15 @@ async function initEditFaviconForm() {
             });
             
             if (images.length === 0) {
-                QSDom.setSelectPlaceholder(imageSelect, t('commandForm.empty.noImages'));
+                QSDom.setSelectPlaceholder(imageSelect, QSPanelWords.t('commandForm.empty.noImages'));
             }
         } catch (error) {
-            QSDom.setSelectPlaceholder(imageSelect, t('commandForm.errors.loadImages'));
+            QSDom.setSelectPlaceholder(imageSelect, QSPanelWords.t('commandForm.errors.loadImages'));
         }
     }
     
     // Add hint about PNG requirement
-    const hint = _renderHint([t('commandForm.editFavicon.pngOnlyHint')]);
+    const hint = _renderHint([QSPanelWords.t('commandForm.editFavicon.pngOnlyHint')]);
     const formGroup = form.querySelector('[name="imageName"]')?.parentNode;
     if (formGroup) {
         formGroup.appendChild(hint);
@@ -2949,7 +2867,7 @@ async function initEditTitleForm() {
         routeSelect.className = 'admin-select';
         routeSelect.required = routeInput.required;
         routeInput.replaceWith(routeSelect);
-        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], t('commandForm.select.route'));
+        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], QSPanelWords.t('commandForm.select.route'));
     }
     
     // Convert lang input to select
@@ -2959,7 +2877,7 @@ async function initEditTitleForm() {
         langSelect.className = 'admin-select';
         langSelect.required = langInput.required;
         langInput.replaceWith(langSelect);
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], QSPanelWords.t('commandForm.select.language'));
     }
     
     // Function to load current title
@@ -2979,12 +2897,12 @@ async function initEditTitleForm() {
             if (result && result.title !== undefined) {
                 titleInput.value = result.title;
                 titleInput.placeholder = result.title
-                    ? t('commandForm.placeholder.currentTitle', { title: result.title })
-                    : t('commandForm.placeholder.noTitleSet');
+                    ? QSPanelWords.t('commandForm.placeholder.currentTitle', { title: result.title })
+                    : QSPanelWords.t('commandForm.placeholder.noTitleSet');
             }
         } catch (error) {
             console.error('Error loading current title:', error);
-            titleInput.placeholder = t('commandForm.placeholder.newTitle');
+            titleInput.placeholder = QSPanelWords.t('commandForm.placeholder.newTitle');
         }
     };
     
@@ -3034,12 +2952,10 @@ async function initClearHistoryForm() {
 
     // Add hint. `confirm` is the command's own parameter name, so it stays
     // literal inside the <code> — only the sentence around it is translated.
-    const hint = _renderHint([
-        _renderRich(t('commandForm.clearHistory.hint'), {
-            before: QSDom.el('strong', { text: t('commandForm.clearHistory.hintBefore') }),
-            confirm: QSDom.el('code', { text: 'confirm' })
-        })
-    ]);
+    const hint = _renderHint(QSPanelWords.parts('commandForm.clearHistory.hint', {
+        before: QSDom.el('strong', { text: QSPanelWords.t('commandForm.clearHistory.hintBefore') }),
+        confirm: QSDom.el('code', { text: 'confirm' })
+    }));
     const formGroup = form.querySelector('[name="before"]')?.parentNode;
     if (formGroup && !formGroup.querySelector('.admin-hint')) {
         formGroup.appendChild(hint);
@@ -3055,37 +2971,37 @@ async function initEditStylesForm() {
     
     if (contentTextarea) {
         // Add loading indicator
-        contentTextarea.placeholder = t('commandForm.placeholder.loadingStyles');
+        contentTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.loadingStyles');
         contentTextarea.disabled = true;
         
         // Add helper buttons above textarea
         const loadBtn = _renderButton('load-styles-btn',
             'admin-btn',
-            t('commandForm.editStyles.reload'));
+            QSPanelWords.t('commandForm.editStyles.reload'));
         const formatBtn = _renderButton('format-css-btn',
             'admin-btn admin-btn--outline',
-            t('commandForm.editStyles.formatCss'));
+            QSPanelWords.t('commandForm.editStyles.formatCss'));
         const helperDiv = QSDom.el('div', {}, [
             QSDom.el('div', {
                 style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); flex-wrap: wrap;'
             }, [loadBtn, formatBtn]),
-            _renderHint([t('commandForm.editStyles.replaceWarning')])
+            _renderHint([QSPanelWords.t('commandForm.editStyles.replaceWarning')])
         ]);
         contentTextarea.parentNode.insertBefore(helperDiv, contentTextarea);
 
         // Function to load current styles
         async function loadCurrentStyles() {
             contentTextarea.disabled = true;
-            contentTextarea.placeholder = t('common.loading');
+            contentTextarea.placeholder = QSPanelWords.t('common.loading');
             
             try {
                 const data = await QuickSiteAdmin.fetchHelperData('current-styles', []);
                 // Normalize line endings for textarea display
                 contentTextarea.value = data.content ? data.content.replace(/\r\n/g, '\n') : '';
-                contentTextarea.placeholder = t('commandForm.placeholder.cssContent');
+                contentTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.cssContent');
             } catch (error) {
-                contentTextarea.placeholder = t('commandForm.placeholder.stylesFailed');
-                QuickSiteAdmin.showToast(t('commandForm.toast.stylesFailed'), 'error');
+                contentTextarea.placeholder = QSPanelWords.t('commandForm.placeholder.stylesFailed');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.stylesFailed'), 'error');
             }
             
             contentTextarea.disabled = false;
@@ -3097,7 +3013,7 @@ async function initEditStylesForm() {
         // Reload button
         loadBtn.addEventListener('click', async () => {
             await loadCurrentStyles();
-            QuickSiteAdmin.showToast(t('commandForm.toast.stylesReloaded'), 'success');
+            QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.stylesReloaded'), 'success');
         });
         
         // Basic CSS formatting (just normalizes whitespace)
@@ -3112,7 +3028,7 @@ async function initEditStylesForm() {
                 .replace(/  }/g, '}')
                 .trim();
             contentTextarea.value = css;
-            QuickSiteAdmin.showToast(t('commandForm.toast.cssFormatted'), 'success');
+            QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.cssFormatted'), 'success');
         });
         
         // Make textarea taller for CSS editing
@@ -3133,22 +3049,22 @@ async function initSetRootVariablesForm() {
         const varSelector = QSDom.el('select', {
             id: 'var-selector', class: 'admin-select', style: 'flex: 1;', size: '6'
         });
-        QSDom.setSelectPlaceholder(varSelector, t('commandForm.setRootVariables.loadingVariables'),
+        QSDom.setSelectPlaceholder(varSelector, QSPanelWords.t('commandForm.setRootVariables.loadingVariables'),
             { disabled: true });
         const varValueInput = QSDom.el('input', {
             type: 'text', id: 'var-value-input', class: 'admin-input',
-            placeholder: t('commandForm.setRootVariables.newValue'), style: 'width: 180px;'
+            placeholder: QSPanelWords.t('commandForm.setRootVariables.newValue'), style: 'width: 180px;'
         });
         const currentValueSpan = QSDom.el('span', {
             id: 'var-current-value', style: 'font-style: italic;', text: '-'
         });
         const addBtn = _renderButton('add-var-btn', 'admin-btn',
-            t('commandForm.setRootVariables.addUpdate'));
+            QSPanelWords.t('commandForm.setRootVariables.addUpdate'));
         const clearBtn = _renderButton('clear-vars-btn', 'admin-btn admin-btn--outline',
-            t('common.clearAll'));
+            QSPanelWords.t('common.clearAll'));
 
         const helperDiv = QSDom.el('div', { class: 'admin-variable-selector' }, [
-            _renderLabel(t('commandForm.setRootVariables.title')),
+            _renderLabel(QSPanelWords.t('commandForm.setRootVariables.title')),
             QSDom.el('div', {
                 style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [
@@ -3158,12 +3074,12 @@ async function initSetRootVariablesForm() {
                 }, [
                     varValueInput,
                     QSDom.el('p', { class: 'admin-hint', style: 'margin: 0;' },
-                        [t('common.current') + ' ', currentValueSpan]),
+                        QSPanelWords.parts('commandForm.setRootVariables.currentValue', { value: currentValueSpan })),
                     addBtn,
                     clearBtn
                 ])
             ]),
-            _renderHint([t('commandForm.setRootVariables.hint')])
+            _renderHint([QSPanelWords.t('commandForm.setRootVariables.hint')])
         ]);
         variablesTextarea.parentNode.insertBefore(helperDiv, variablesTextarea);
 
@@ -3172,13 +3088,13 @@ async function initSetRootVariablesForm() {
         
         // Load variables
         async function loadVariables() {
-            QSDom.setSelectPlaceholder(varSelector, t('common.loading'), { disabled: true });
+            QSDom.setSelectPlaceholder(varSelector, QSPanelWords.t('common.loading'), { disabled: true });
             try {
                 variablesData = await QuickSiteAdmin.fetchHelperData('root-variables', []);
                 QSDom.clear(varSelector);
                 
                 if (variablesData.length === 0) {
-                    QSDom.setSelectPlaceholder(varSelector, t('commandForm.empty.noVariables'), { disabled: true });
+                    QSDom.setSelectPlaceholder(varSelector, QSPanelWords.t('commandForm.empty.noVariables'), { disabled: true });
                     return;
                 }
                 
@@ -3190,7 +3106,7 @@ async function initSetRootVariablesForm() {
                     varSelector.appendChild(option);
                 });
             } catch (error) {
-                QSDom.setSelectPlaceholder(varSelector, t('commandForm.errors.loadVariables'), { disabled: true });
+                QSDom.setSelectPlaceholder(varSelector, QSPanelWords.t('commandForm.errors.loadVariables'), { disabled: true });
             }
         }
         
@@ -3214,11 +3130,11 @@ async function initSetRootVariablesForm() {
             const varValue = varValueInput.value.trim();
             
             if (!varName) {
-                QuickSiteAdmin.showToast(t('commandForm.toast.selectVariable'), 'warning');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.selectVariable'), 'warning');
                 return;
             }
             if (!varValue) {
-                QuickSiteAdmin.showToast(t('commandForm.toast.enterValue'), 'warning');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.enterValue'), 'warning');
                 return;
             }
             
@@ -3240,7 +3156,7 @@ async function initSetRootVariablesForm() {
             varValueInput.value = '';
             currentValueSpan.textContent = '-';
             
-            QuickSiteAdmin.showToast(t('commandForm.toast.addedVariable', { name: varName }), 'success');
+            QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.addedVariable', { name: varName }), 'success');
         });
         
         // Clear button
@@ -3283,14 +3199,14 @@ async function initStyleRuleForm() {
         const ruleSelector = QSDom.el('select', {
             id: 'rule-selector', class: 'admin-select', style: 'flex: 1;', size: '8'
         });
-        QSDom.setSelectPlaceholder(ruleSelector, t('commandForm.styleRule.loadingSelectors'),
+        QSDom.setSelectPlaceholder(ruleSelector, QSPanelWords.t('commandForm.styleRule.loadingSelectors'),
             { disabled: true });
         const helperDiv = QSDom.el('div', {}, [
-            _renderLabel(t('commandForm.styleRule.title')),
+            _renderLabel(QSPanelWords.t('commandForm.styleRule.title')),
             QSDom.el('div', {
                 style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [ruleSelector]),
-            _renderHint([t(stylesInput ? 'commandForm.styleRule.hintSet' : 'commandForm.styleRule.hint')])
+            _renderHint([QSPanelWords.t(stylesInput ? 'commandForm.styleRule.hintSet' : 'commandForm.styleRule.hint')])
         ]);
         selectorInput.parentNode.parentNode.insertBefore(helperDiv, selectorInput.parentNode);
         
@@ -3299,7 +3215,7 @@ async function initStyleRuleForm() {
         
         // Load selectors
         async function loadSelectors() {
-            QSDom.setSelectPlaceholder(ruleSelector, t('common.loading'), { disabled: true });
+            QSDom.setSelectPlaceholder(ruleSelector, QSPanelWords.t('common.loading'), { disabled: true });
             try {
                 const data = await QuickSiteAdmin.fetchHelperData('style-rules', []);
                 QSDom.clear(ruleSelector);
@@ -3329,10 +3245,10 @@ async function initStyleRuleForm() {
                 });
                 
                 if (ruleSelector.options.length === 0) {
-                    QSDom.setSelectPlaceholder(ruleSelector, t('commandForm.empty.noCssRules'), { disabled: true });
+                    QSDom.setSelectPlaceholder(ruleSelector, QSPanelWords.t('commandForm.empty.noCssRules'), { disabled: true });
                 }
             } catch (error) {
-                QSDom.setSelectPlaceholder(ruleSelector, t('commandForm.errors.loadSelectors'), { disabled: true });
+                QSDom.setSelectPlaceholder(ruleSelector, QSPanelWords.t('commandForm.errors.loadSelectors'), { disabled: true });
             }
         }
         
@@ -3353,7 +3269,7 @@ async function initStyleRuleForm() {
             }
             if (request !== declarationsRequest) return;
             if (!(res && res.ok && res.data && res.data.data)) {
-                QuickSiteAdmin.showToast(t('commandForm.styleRule.loadFailed'), 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.styleRule.loadFailed'), 'error');
                 return;
             }
             stylesInput.value = String(res.data.data.styles || '')
@@ -3416,8 +3332,8 @@ async function initKeyframeSelectForm() {
         // Add empty option for "all keyframes" on getKeyframes
         const isGetCommand = COMMAND_NAME === 'getKeyframes';
         const placeholder = isGetCommand
-            ? t('commandForm.select.allKeyframes')
-            : t('commandForm.select.keyframe');
+            ? QSPanelWords.t('commandForm.select.allKeyframes')
+            : QSPanelWords.t('commandForm.select.keyframe');
 
         QSDom.setSelectPlaceholder(nameSelect, placeholder);
 
@@ -3470,17 +3386,17 @@ async function initSetKeyframesForm() {
         const kfNameSelector = QSDom.el('select', {
             id: 'kf-name-selector', class: 'admin-select', style: 'margin-bottom: var(--space-xs);'
         });
-        QSDom.setSelectPlaceholder(kfNameSelector, t('commandForm.select.existingOrNew'));
+        QSDom.setSelectPlaceholder(kfNameSelector, QSPanelWords.t('commandForm.select.existingOrNew'));
         const kfNameInput = QSDom.el('input', {
             type: 'text', id: 'kf-name-input', class: 'admin-input',
-            placeholder: t('commandForm.setKeyframes.newNamePlaceholder')
+            placeholder: QSPanelWords.t('commandForm.setKeyframes.newNamePlaceholder')
         });
         const kfCurrentFrames = QSDom.el('div', {
             id: 'kf-current-frames', class: 'admin-hint',
             style: 'background: var(--admin-bg-secondary); padding: var(--space-sm); '
                  + 'border-radius: var(--radius-sm); min-height: 60px; font-family: monospace; '
                  + 'font-size: 12px; overflow: auto; max-height: 100px;',
-            text: t('commandForm.setKeyframes.noAnimationSelected')
+            text: QSPanelWords.t('commandForm.setKeyframes.noAnimationSelected')
         });
         // from / to / 0% … are CSS keyframe selectors — the command's own values,
         // not labels, so only "Custom…" is translated.
@@ -3493,16 +3409,16 @@ async function initSetKeyframesForm() {
             { value: '50%', label: '50%' },
             { value: '75%', label: '75%' },
             { value: '100%', label: '100%' },
-            { value: 'custom', label: t('common.custom') }
+            { value: 'custom', label: QSPanelWords.t('common.custom') }
         ]);
         const kfFrameKeyCustom = QSDom.el('input', {
             type: 'text', id: 'kf-frame-key-custom', class: 'admin-input',
-            placeholder: t('commandForm.setKeyframes.customKeyPlaceholder'),
+            placeholder: QSPanelWords.t('commandForm.setKeyframes.customKeyPlaceholder'),
             style: 'margin-top: var(--space-xs); display: none;'
         });
         const kfFrameValue = QSDom.el('input', {
             type: 'text', id: 'kf-frame-value', class: 'admin-input',
-            placeholder: t('commandForm.setKeyframes.framePropsPlaceholder')
+            placeholder: QSPanelWords.t('commandForm.setKeyframes.framePropsPlaceholder')
         });
         // A shortcut into the value box, built like the frame-key select above:
         // the common animatable properties, then Custom last.
@@ -3522,36 +3438,36 @@ async function initSetKeyframesForm() {
             id: 'kf-frame-property', class: 'admin-select',
             style: 'margin-bottom: var(--space-xs);'
         });
-        QSDom.setSelectPlaceholder(kfFrameProperty, t('commandForm.setKeyframes.insertProperty'));
+        QSDom.setSelectPlaceholder(kfFrameProperty, QSPanelWords.t('commandForm.setKeyframes.insertProperty'));
         QuickSiteAdmin.appendOptionsToSelect(kfFrameProperty, [
             ...KEYFRAME_PROPERTIES.map(prop => ({ value: prop, label: prop })),
-            { value: 'custom', label: t('common.custom') }
+            { value: 'custom', label: QSPanelWords.t('common.custom') }
         ]);
         const kfAddFrameBtn = _renderButton('kf-add-frame-btn', 'admin-btn',
-            t('commandForm.setKeyframes.addFrame'));
+            QSPanelWords.t('commandForm.setKeyframes.addFrame'));
         const kfApplyNameBtn = _renderButton('kf-apply-name-btn',
             'admin-btn admin-btn--outline',
-            t('commandForm.setKeyframes.applyName'));
+            QSPanelWords.t('commandForm.setKeyframes.applyName'));
         const kfClearBtn = _renderButton('kf-clear-btn',
             'admin-btn admin-btn--outline',
-            t('commandForm.setKeyframes.clearFrames'));
+            QSPanelWords.t('commandForm.setKeyframes.clearFrames'));
         const kfLoadExistingBtn = _renderButton('kf-load-existing-btn',
             'admin-btn admin-btn--outline',
-            t('commandForm.setKeyframes.loadExisting'));
+            QSPanelWords.t('commandForm.setKeyframes.loadExisting'));
 
         const helperDiv = QSDom.el('div', {}, [
-            _renderLabel(t('commandForm.setKeyframes.title')),
+            _renderLabel(QSPanelWords.t('commandForm.setKeyframes.title')),
             QSDom.el('div', {
                 style: 'display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); '
                      + 'margin-bottom: var(--space-sm);'
             }, [
                 QSDom.el('div', null, [
-                    _renderLabel(t('commandForm.setKeyframes.animationName'), 'admin-label'),
+                    _renderLabel(QSPanelWords.t('commandForm.setKeyframes.animationName'), 'admin-label'),
                     kfNameSelector,
                     kfNameInput
                 ]),
                 QSDom.el('div', null, [
-                    _renderLabel(t('commandForm.setKeyframes.currentFrames'), 'admin-label'),
+                    _renderLabel(QSPanelWords.t('commandForm.setKeyframes.currentFrames'), 'admin-label'),
                     kfCurrentFrames
                 ])
             ]),
@@ -3559,7 +3475,7 @@ async function initSetKeyframesForm() {
                 style: 'border: 1px solid var(--admin-border); border-radius: var(--radius-sm); '
                      + 'padding: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [
-                _renderLabel(t('commandForm.setKeyframes.addFrame'), 'admin-label'),
+                _renderLabel(QSPanelWords.t('commandForm.setKeyframes.addFrame'), 'admin-label'),
                 QSDom.el('div', {
                     style: 'display: flex; gap: var(--space-sm); align-items: flex-start;'
                 }, [
@@ -3571,7 +3487,7 @@ async function initSetKeyframesForm() {
             QSDom.el('div', {
                 style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [kfApplyNameBtn, kfClearBtn, kfLoadExistingBtn]),
-            _renderHint([t('commandForm.setKeyframes.hint')])
+            _renderHint([QSPanelWords.t('commandForm.setKeyframes.hint')])
         ]);
         nameInput.parentNode.parentNode.insertBefore(helperDiv, nameInput.parentNode);
 
@@ -3579,7 +3495,7 @@ async function initSetKeyframesForm() {
         async function loadKeyframes() {
             try {
                 const keyframes = await QuickSiteAdmin.fetchHelperData('keyframes', []);
-                QSDom.setSelectPlaceholder(kfNameSelector, t('commandForm.select.existingOrNew'));
+                QSDom.setSelectPlaceholder(kfNameSelector, QSPanelWords.t('commandForm.select.existingOrNew'));
                 existingKeyframes = {};
                 
                 keyframes.forEach(kf => {
@@ -3636,7 +3552,7 @@ async function initSetKeyframesForm() {
         /** Replace the frames panel with a single line of text. */
         function _showFramesNotice(key) {
             QSDom.clear(kfCurrentFrames);
-            kfCurrentFrames.appendChild(document.createTextNode(t(key)));
+            kfCurrentFrames.appendChild(document.createTextNode(QSPanelWords.t(key)));
         }
 
         // When selecting existing keyframe, show its frames
@@ -3673,11 +3589,11 @@ async function initSetKeyframesForm() {
             const frameValue = kfFrameValue.value.trim();
             
             if (!frameKey) {
-                QuickSiteAdmin.showToast(t('commandForm.toast.selectFrameKey'), 'warning');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.selectFrameKey'), 'warning');
                 return;
             }
             if (!frameValue) {
-                QuickSiteAdmin.showToast(t('commandForm.toast.enterCssProps'), 'warning');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.enterCssProps'), 'warning');
                 return;
             }
             
@@ -3698,7 +3614,7 @@ async function initSetKeyframesForm() {
             // Clear value input
             kfFrameValue.value = '';
             
-            QuickSiteAdmin.showToast(t('commandForm.toast.addedFrame', { key: frameKey }), 'success');
+            QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.addedFrame', { key: frameKey }), 'success');
         });
         
         // Apply name button
@@ -3706,16 +3622,16 @@ async function initSetKeyframesForm() {
             const name = kfNameInput.value || kfNameSelector.value;
             if (name) {
                 nameInput.value = name;
-                QuickSiteAdmin.showToast(t('commandForm.toast.nameSet', { name: name }), 'success');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.nameSet', { name: name }), 'success');
             } else {
-                QuickSiteAdmin.showToast(t('commandForm.toast.selectAnimationName'), 'warning');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.selectAnimationName'), 'warning');
             }
         });
         
         // Clear frames button
         kfClearBtn.addEventListener('click', () => {
             framesTextarea.value = '';
-            QuickSiteAdmin.showToast(t('commandForm.toast.framesCleared'), 'success');
+            QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.framesCleared'), 'success');
         });
         
         // Load existing frames into textarea
@@ -3724,9 +3640,9 @@ async function initSetKeyframesForm() {
             if (name && existingKeyframes[name]) {
                 framesTextarea.value = JSON.stringify(existingKeyframes[name], null, 2);
                 nameInput.value = name;
-                QuickSiteAdmin.showToast(t('commandForm.toast.framesLoaded', { name: name }), 'success');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.framesLoaded', { name: name }), 'success');
             } else {
-                QuickSiteAdmin.showToast(t('commandForm.toast.selectExistingAnimation'), 'warning');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.selectExistingAnimation'), 'warning');
             }
         });
         
@@ -3762,12 +3678,12 @@ async function initRouteSelectForm() {
         
         routeInput.replaceWith(routeSelect);
         
-        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], t('commandForm.select.route'));
+        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], QSPanelWords.t('commandForm.select.route'));
 
         // Refresh route list after successful delete
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'deleteRoute') {
-                await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], t('commandForm.select.route'));
+                await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], QSPanelWords.t('commandForm.select.route'));
                 routeSelect.selectedIndex = 0;
             }
         });
@@ -3796,15 +3712,15 @@ async function initAddRouteParentSelect() {
         // Add "None (root level)" as first option
         const noneOption = document.createElement('option');
         noneOption.value = '';
-        noneOption.textContent = t('commandForm.select.noneRoot');
+        noneOption.textContent = QSPanelWords.t('commandForm.select.noneRoot');
         parentSelect.appendChild(noneOption);
         
-        await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], t('commandForm.select.noneRoot'));
+        await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], QSPanelWords.t('commandForm.select.noneRoot'));
 
         // Refresh route list after successful add
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'addRoute') {
-                await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], t('commandForm.select.noneRoot'));
+                await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], QSPanelWords.t('commandForm.select.noneRoot'));
             }
         });
     }
@@ -3828,7 +3744,7 @@ async function initFindComponentUsagesForm() {
         }
         
         componentInput.replaceWith(componentSelect);
-        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], t('commandForm.select.component'));
+        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], QSPanelWords.t('commandForm.select.component'));
     }
 }
 
@@ -3845,12 +3761,12 @@ async function initRenameComponentForm() {
         oldNameSelect.className = 'admin-select';
         oldNameSelect.required = oldNameInput.required;
         oldNameInput.replaceWith(oldNameSelect);
-        await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], t('commandForm.select.componentRename'));
+        await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], QSPanelWords.t('commandForm.select.componentRename'));
 
         // Refresh component list after successful rename
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'renameComponent') {
-                await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], t('commandForm.select.componentRename'));
+                await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], QSPanelWords.t('commandForm.select.componentRename'));
                 oldNameSelect.selectedIndex = 0;
             }
         });
@@ -3870,12 +3786,12 @@ async function initDuplicateComponentForm() {
         sourceSelect.className = 'admin-select';
         sourceSelect.required = sourceInput.required;
         sourceInput.replaceWith(sourceSelect);
-        await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], t('commandForm.select.componentDuplicate'));
+        await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], QSPanelWords.t('commandForm.select.componentDuplicate'));
 
         // Refresh component list after successful duplicate
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'duplicateComponent') {
-                await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], t('commandForm.select.componentDuplicate'));
+                await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], QSPanelWords.t('commandForm.select.componentDuplicate'));
                 sourceSelect.selectedIndex = 0;
             }
         });
@@ -3900,7 +3816,7 @@ async function initAddComponentToNodeForm() {
         // (page / component / menu / footer), the same on every installation —
         // the same category as the position and page-event enums, which stay
         // native too. A search box over four items is chrome, not help.
-        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        await _populateArm(typeSelect, 'structure-types', [], QSPanelWords.t('commandForm.select.structureType'));
     }
 
     // Convert name input to select
@@ -3910,8 +3826,8 @@ async function initAddComponentToNodeForm() {
         nameSelect.name = 'name';
         nameSelect.className = 'admin-select';
         nameInput.replaceWith(nameSelect);
-        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
-        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _makeSearchable(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
         _setDisabled(nameSelect, true);
     }
 
@@ -3923,8 +3839,8 @@ async function initAddComponentToNodeForm() {
         targetNodeIdSelect.className = 'admin-select';
         targetNodeIdSelect.required = targetNodeIdInput.required;
         targetNodeIdInput.replaceWith(targetNodeIdSelect);
-        _makeSearchable(targetNodeIdSelect, t('commandForm.select.targetNode'));
-        _placeholder(targetNodeIdSelect, t('commandForm.select.structureFirst'));
+        _makeSearchable(targetNodeIdSelect, QSPanelWords.t('commandForm.select.targetNode'));
+        _placeholder(targetNodeIdSelect, QSPanelWords.t('commandForm.select.structureFirst'));
         _setDisabled(targetNodeIdSelect, true);
     }
 
@@ -3934,11 +3850,11 @@ async function initAddComponentToNodeForm() {
         const positionSelect = document.createElement('select');
         positionSelect.name = 'position';
         positionSelect.className = 'admin-select';
-        QSDom.setSelectPlaceholder(positionSelect, t('commandForm.addComponent.selectPosition'));
+        QSDom.setSelectPlaceholder(positionSelect, QSPanelWords.t('commandForm.addComponent.selectPosition'));
         QuickSiteAdmin.appendOptionsToSelect(positionSelect, [
-            { value: 'inside', label: t('commandForm.addComponent.positionInside') },
-            { value: 'before', label: t('commandForm.addComponent.positionBefore') },
-            { value: 'after', label: t('commandForm.addComponent.positionAfter') }
+            { value: 'inside', label: QSPanelWords.t('commandForm.addComponent.positionInside') },
+            { value: 'before', label: QSPanelWords.t('commandForm.addComponent.positionBefore') },
+            { value: 'after', label: QSPanelWords.t('commandForm.addComponent.positionAfter') }
         ]);
         positionInput.replaceWith(positionSelect);
     }
@@ -3951,8 +3867,8 @@ async function initAddComponentToNodeForm() {
         componentSelect.className = 'admin-select';
         componentSelect.required = componentInput.required;
         componentInput.replaceWith(componentSelect);
-        _makeSearchable(componentSelect, t('commandForm.select.componentAdd'));
-        await _populateArm(componentSelect, 'components', [], t('commandForm.select.componentAdd'));
+        _makeSearchable(componentSelect, QSPanelWords.t('commandForm.select.componentAdd'));
+        await _populateArm(componentSelect, 'components', [], QSPanelWords.t('commandForm.select.componentAdd'));
     }
 
     // Find or create data field container
@@ -3988,13 +3904,13 @@ async function initAddComponentToNodeForm() {
         const name = nameSelect?.value;
         
         if (!type) {
-            _placeholder(targetNodeIdSelect, t('commandForm.select.typeFirst'));
+            _placeholder(targetNodeIdSelect, QSPanelWords.t('commandForm.select.typeFirst'));
             _setDisabled(targetNodeIdSelect, true);
             return;
         }
         
         if ((type === 'page' || type === 'component') && !name) {
-            _placeholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
+            _placeholder(targetNodeIdSelect, QSPanelWords.t('commandForm.select.nameFirst'));
             _setDisabled(targetNodeIdSelect, true);
             return;
         }
@@ -4005,15 +3921,15 @@ async function initAddComponentToNodeForm() {
         
         try {
             const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
-            _placeholder(targetNodeIdSelect, t('commandForm.select.targetNode'));
+            _placeholder(targetNodeIdSelect, QSPanelWords.t('commandForm.select.targetNode'));
             // addComponentToNode accepts the literal "root" to splice at the top
             // of the structure, the same as addNode and addComplexElement.
             targetNodeIdSelect.appendChild(QSDom.el('option', {
-                value: 'root', text: t('commandForm.select.structureRoot')
+                value: 'root', text: QSPanelWords.t('commandForm.select.structureRoot')
             }));
             _appendOptions(targetNodeIdSelect, nodes);
         } catch (error) {
-            _placeholder(targetNodeIdSelect, t('commandForm.errors.loadNodes'));
+            _placeholder(targetNodeIdSelect, QSPanelWords.t('commandForm.errors.loadNodes'));
         }
     }
     
@@ -4021,7 +3937,7 @@ async function initAddComponentToNodeForm() {
     async function buildDataFields(componentName) {
         const fieldsContainer = document.getElementById('component-data-fields');
         if (!fieldsContainer || !componentName) {
-            _showCenteredHint(fieldsContainer, t('commandForm.addComponent.dataEmpty'));
+            _showCenteredHint(fieldsContainer, QSPanelWords.t('commandForm.addComponent.dataEmpty'));
             return;
         }
 
@@ -4030,7 +3946,7 @@ async function initAddComponentToNodeForm() {
             const variables = componentData.variables || [];
 
             if (variables.length === 0) {
-                _showCenteredHint(fieldsContainer, t('commandForm.componentData.noVariables'));
+                _showCenteredHint(fieldsContainer, QSPanelWords.t('commandForm.componentData.noVariables'));
                 return;
             }
 
@@ -4048,7 +3964,7 @@ async function initAddComponentToNodeForm() {
 
         } catch (error) {
             console.error('Failed to load component variables:', error);
-            _showCenteredHint(fieldsContainer, t('commandForm.componentData.loadFailed'), true);
+            _showCenteredHint(fieldsContainer, QSPanelWords.t('commandForm.componentData.loadFailed'), true);
         }
     }
     
@@ -4064,7 +3980,7 @@ async function initAddComponentToNodeForm() {
             
             selects.forEach(select => {
                 const targetId = select.dataset.target;
-                QSDom.setSelectPlaceholder(select, t('commandForm.select.translationKey'));
+                QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.select.translationKey'));
                 
                 keys.forEach(key => {
                     const option = document.createElement('option');
@@ -4085,7 +4001,7 @@ async function initAddComponentToNodeForm() {
         } catch (error) {
             console.error('Failed to load translation keys:', error);
             selects.forEach(select => {
-                QSDom.setSelectPlaceholder(select, t('commandForm.errors.loadKeys'));
+                QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.errors.loadKeys'));
             });
         }
     }
@@ -4118,17 +4034,17 @@ async function initAddComponentToNodeForm() {
             _showNameField(nameSelect, type === 'page' || type === 'component');
             
             if (type === 'page') {
-                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], QSPanelWords.t('commandForm.select.page'));
             } else if (type === 'component') {
-                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], QSPanelWords.t('commandForm.select.component'));
             } else {
-                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _placeholder(nameSelect, QSPanelWords.t('commandForm.select.notRequiredForType'));
                 _setDisabled(nameSelect, true);
                 await loadNodeOptions();
             }
             
             if (targetNodeIdSelect && (type === 'page' || type === 'component')) {
-                _placeholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
+                _placeholder(targetNodeIdSelect, QSPanelWords.t('commandForm.select.nameFirst'));
                 _setDisabled(targetNodeIdSelect, true);
             }
         });
@@ -4162,7 +4078,7 @@ async function initEditComponentToNodeForm() {
         // (page / component / menu / footer), the same on every installation —
         // the same category as the position and page-event enums, which stay
         // native too. A search box over four items is chrome, not help.
-        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        await _populateArm(typeSelect, 'structure-types', [], QSPanelWords.t('commandForm.select.structureType'));
     }
     
     // Convert name input to select
@@ -4172,8 +4088,8 @@ async function initEditComponentToNodeForm() {
         nameSelect.name = 'name';
         nameSelect.className = 'admin-select';
         nameInput.replaceWith(nameSelect);
-        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
-        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _makeSearchable(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, QSPanelWords.t('commandForm.select.typeFirst'));
         _setDisabled(nameSelect, true);
     }
     
@@ -4185,8 +4101,8 @@ async function initEditComponentToNodeForm() {
         nodeIdSelect.className = 'admin-select';
         nodeIdSelect.required = nodeIdInput.required;
         nodeIdInput.replaceWith(nodeIdSelect);
-        _makeSearchable(nodeIdSelect, t('commandForm.select.componentNode'));
-        _placeholder(nodeIdSelect, t('commandForm.select.structureFirst'));
+        _makeSearchable(nodeIdSelect, QSPanelWords.t('commandForm.select.componentNode'));
+        _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.structureFirst'));
         _setDisabled(nodeIdSelect, true);
     }
     
@@ -4224,14 +4140,14 @@ async function initEditComponentToNodeForm() {
         const name = nameSelect?.value;
         
         if (!type) {
-            _placeholder(nodeIdSelect, t('commandForm.select.typeFirst'));
+            _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.typeFirst'));
             _setDisabled(nodeIdSelect, true);
             componentNodesData = [];
             return;
         }
         
         if ((type === 'page' || type === 'component') && !name) {
-            _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+            _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.nameFirst'));
             _setDisabled(nodeIdSelect, true);
             componentNodesData = [];
             return;
@@ -4246,19 +4162,19 @@ async function initEditComponentToNodeForm() {
             componentNodesData = nodes.filter(n => n.label && n.label.includes('[component:'));
             
             if (componentNodesData.length === 0) {
-                _placeholder(nodeIdSelect, t('commandForm.empty.noComponentNodes'));
+                _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.empty.noComponentNodes'));
             } else {
-                _placeholder(nodeIdSelect, t('commandForm.select.componentNode'));
+                _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.componentNode'));
                 _appendOptions(nodeIdSelect, componentNodesData);
             }
         } catch (error) {
-            _placeholder(nodeIdSelect, t('commandForm.errors.loadNodes'));
+            _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.errors.loadNodes'));
             componentNodesData = [];
         }
         
         // Clear data fields
         _showCenteredHint(document.getElementById('edit-component-data-fields'),
-            t('commandForm.editComponent.dataEmpty'));
+            QSPanelWords.t('commandForm.editComponent.dataEmpty'));
     }
     
     // Extract component name from node label (e.g., "div [component:hero]" -> "hero")
@@ -4274,7 +4190,7 @@ async function initEditComponentToNodeForm() {
     async function buildDataFields(componentName, currentData = {}) {
         const fieldsContainer = document.getElementById('edit-component-data-fields');
         if (!fieldsContainer || !componentName) {
-            _showCenteredHint(fieldsContainer, t('commandForm.editComponent.dataEmpty'));
+            _showCenteredHint(fieldsContainer, QSPanelWords.t('commandForm.editComponent.dataEmpty'));
             return;
         }
 
@@ -4283,7 +4199,7 @@ async function initEditComponentToNodeForm() {
             const variables = componentData.variables || [];
 
             if (variables.length === 0) {
-                _showCenteredHint(fieldsContainer, t('commandForm.componentData.noVariables'));
+                _showCenteredHint(fieldsContainer, QSPanelWords.t('commandForm.componentData.noVariables'));
                 return;
             }
 
@@ -4301,7 +4217,7 @@ async function initEditComponentToNodeForm() {
 
         } catch (error) {
             console.error('Failed to load component variables:', error);
-            _showCenteredHint(fieldsContainer, t('commandForm.componentData.loadFailed'), true);
+            _showCenteredHint(fieldsContainer, QSPanelWords.t('commandForm.componentData.loadFailed'), true);
         }
     }
     
@@ -4317,7 +4233,7 @@ async function initEditComponentToNodeForm() {
                 const input = document.getElementById(targetId);
                 const currentValue = input?.value || '';
                 
-                QSDom.setSelectPlaceholder(select, t('commandForm.select.translationKey'));
+                QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.select.translationKey'));
                 
                 keys.forEach(key => {
                     const option = document.createElement('option');
@@ -4339,7 +4255,7 @@ async function initEditComponentToNodeForm() {
         } catch (error) {
             console.error('Failed to load translation keys:', error);
             selects.forEach(select => {
-                QSDom.setSelectPlaceholder(select, t('commandForm.errors.loadKeys'));
+                QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.errors.loadKeys'));
             });
         }
     }
@@ -4413,17 +4329,17 @@ async function initEditComponentToNodeForm() {
             _showNameField(nameSelect, type === 'page' || type === 'component');
             
             if (type === 'page') {
-                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], QSPanelWords.t('commandForm.select.page'));
             } else if (type === 'component') {
-                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], QSPanelWords.t('commandForm.select.component'));
             } else {
-                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _placeholder(nameSelect, QSPanelWords.t('commandForm.select.notRequiredForType'));
                 _setDisabled(nameSelect, true);
                 await loadComponentNodes();
             }
             
             if (nodeIdSelect && (type === 'page' || type === 'component')) {
-                _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+                _placeholder(nodeIdSelect, QSPanelWords.t('commandForm.select.nameFirst'));
                 _setDisabled(nodeIdSelect, true);
             }
         });
@@ -4463,7 +4379,7 @@ async function initLanguageSelectForm() {
         
         langInput.replaceWith(langSelect);
         
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], QSPanelWords.t('commandForm.select.language'));
 
         // No refresh-after-success listener: every command that reaches this form
         // is read-only, so the language list cannot go stale under it. The one
@@ -4491,7 +4407,7 @@ async function initCreateAliasForm() {
         
         typeInput.replaceWith(typeSelect);
         
-        await QuickSiteAdmin.populateSelect(typeSelect, 'alias-types', [], t('commandForm.select.aliasType'));
+        await QuickSiteAdmin.populateSelect(typeSelect, 'alias-types', [], QSPanelWords.t('commandForm.select.aliasType'));
     }
     
     // Convert target input to select with routes
@@ -4510,7 +4426,7 @@ async function initCreateAliasForm() {
         
         // Fetch routes and format with leading slash
         const routesData = await QuickSiteAdmin.fetchHelperData('routes', []);
-        QSDom.setSelectPlaceholder(targetSelect, t('commandForm.select.targetRoute'));
+        QSDom.setSelectPlaceholder(targetSelect, QSPanelWords.t('commandForm.select.targetRoute'));
         routesData.forEach(route => {
             const option = document.createElement('option');
             option.value = '/' + route.value; // Add leading slash for target
@@ -4539,13 +4455,13 @@ async function initDeleteAliasForm() {
         
         aliasInput.replaceWith(aliasSelect);
         
-        await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], t('commandForm.select.aliasDelete'));
+        await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], QSPanelWords.t('commandForm.select.aliasDelete'));
         
         // Listen for successful deletion to refresh the select
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'deleteAlias') {
                 // Refresh the select after successful deletion
-                await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], t('commandForm.select.aliasDelete'));
+                await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], QSPanelWords.t('commandForm.select.aliasDelete'));
                 // Reset to default option
                 aliasSelect.selectedIndex = 0;
             }
@@ -4574,14 +4490,14 @@ async function initSetTranslationKeysForm() {
         
         langInput.replaceWith(langSelect);
         
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], QSPanelWords.t('commandForm.select.language'));
         
         // Add key selector helper above the translations textarea
         if (translationsTextarea) {
             const keySelector = QSDom.el('select', {
                 id: 'key-selector', class: 'admin-select', style: 'flex: 1;', size: '8'
             });
-            QSDom.setSelectPlaceholder(keySelector, t('commandForm.select.languageFirst'),
+            QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.select.languageFirst'),
                 { disabled: true });
             // A textarea, not a single-line input: a translation value can be a
             // paragraph, and the author needs to see what they are editing. It is
@@ -4590,16 +4506,16 @@ async function initSetTranslationKeysForm() {
             // this layout had when the current value was printed as a hint.
             const valueInput = QSDom.el('textarea', {
                 id: 'value-input', class: 'admin-textarea', rows: '3',
-                placeholder: t('commandForm.setTranslationKeys.valuePlaceholder'),
+                placeholder: QSPanelWords.t('commandForm.setTranslationKeys.valuePlaceholder'),
                 style: 'resize: vertical;'
             });
             const addBtn = _renderButton('add-translation-btn', 'admin-btn',
-                t('commandForm.setTranslationKeys.addTranslation'));
+                QSPanelWords.t('commandForm.setTranslationKeys.addTranslation'));
             const clearBtn = _renderButton('clear-translations-btn', 'admin-btn admin-btn--outline',
-                t('common.clearAll'), t('commandForm.setTranslationKeys.clearAllTitle'));
+                QSPanelWords.t('common.clearAll'), QSPanelWords.t('commandForm.setTranslationKeys.clearAllTitle'));
 
             const helperDiv = QSDom.el('div', {}, [
-                _renderLabel(t('commandForm.setTranslationKeys.title')),
+                _renderLabel(QSPanelWords.t('commandForm.setTranslationKeys.title')),
                 QSDom.el('div', {
                     style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
                 }, [
@@ -4611,7 +4527,7 @@ async function initSetTranslationKeysForm() {
                              + 'width: 220px; flex: none;'
                     }, [valueInput, addBtn, clearBtn])
                 ]),
-                _renderHint([t('commandForm.setTranslationKeys.legend')])
+                _renderHint([QSPanelWords.t('commandForm.setTranslationKeys.legend')])
             ]);
             translationsTextarea.parentNode.insertBefore(helperDiv, translationsTextarea);
 
@@ -4630,7 +4546,7 @@ async function initSetTranslationKeysForm() {
                         // Add unset keys first (most important - needs translation)
                         if (data.unset && data.unset.length > 0) {
                             const unsetGroup = document.createElement('optgroup');
-                            unsetGroup.label = t('commandForm.keyGroup.unset', { count: data.unset.length });
+                            unsetGroup.label = QSPanelWords.t('commandForm.keyGroup.unset', { count: data.unset.length });
                             data.unset.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -4644,7 +4560,7 @@ async function initSetTranslationKeysForm() {
                         // Add used keys
                         if (data.used && data.used.length > 0) {
                             const usedGroup = document.createElement('optgroup');
-                            usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
+                            usedGroup.label = QSPanelWords.t('commandForm.keyGroup.used', { count: data.used.length });
                             data.used.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -4657,7 +4573,7 @@ async function initSetTranslationKeysForm() {
                         // Add unused keys
                         if (data.unused && data.unused.length > 0) {
                             const unusedGroup = document.createElement('optgroup');
-                            unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
+                            unusedGroup.label = QSPanelWords.t('commandForm.keyGroup.unused', { count: data.unused.length });
                             data.unused.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -4671,10 +4587,10 @@ async function initSetTranslationKeysForm() {
                         const fullData = await QuickSiteAdmin.fetchHelperData('translation-full', [lang]);
                         currentTranslations = fullData || {};
                     } catch (error) {
-                        QSDom.setSelectPlaceholder(keySelector, t('commandForm.errors.loadKeys'), { disabled: true });
+                        QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.errors.loadKeys'), { disabled: true });
                     }
                 } else {
-                    QSDom.setSelectPlaceholder(keySelector, t('commandForm.select.languageFirst'), { disabled: true });
+                    QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.select.languageFirst'), { disabled: true });
                     currentTranslations = {};
                 }
                 valueInput.value = '';
@@ -4700,11 +4616,11 @@ async function initSetTranslationKeysForm() {
                 const value = valueInput.value;
                 
                 if (!key) {
-                    QuickSiteAdmin.showToast(t('commandForm.toast.selectKey'), 'warning');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.selectKey'), 'warning');
                     return;
                 }
                 if (!value) {
-                    QuickSiteAdmin.showToast(t('commandForm.toast.enterValue'), 'warning');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.enterValue'), 'warning');
                     return;
                 }
                 
@@ -4725,7 +4641,7 @@ async function initSetTranslationKeysForm() {
                 // Clear inputs
                 valueInput.value = '';
                 
-                QuickSiteAdmin.showToast(t('commandForm.toast.addedKey', { key: key }), 'success');
+                QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.addedKey', { key: key }), 'success');
             });
             
             // Clear button
@@ -4745,7 +4661,7 @@ async function initSetTranslationKeysForm() {
                     // Add unset keys first
                     if (data.unset && data.unset.length > 0) {
                         const unsetGroup = document.createElement('optgroup');
-                        unsetGroup.label = t('commandForm.keyGroup.unset', { count: data.unset.length });
+                        unsetGroup.label = QSPanelWords.t('commandForm.keyGroup.unset', { count: data.unset.length });
                         data.unset.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -4759,7 +4675,7 @@ async function initSetTranslationKeysForm() {
                     // Add used keys
                     if (data.used && data.used.length > 0) {
                         const usedGroup = document.createElement('optgroup');
-                        usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
+                        usedGroup.label = QSPanelWords.t('commandForm.keyGroup.used', { count: data.used.length });
                         data.used.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -4772,7 +4688,7 @@ async function initSetTranslationKeysForm() {
                     // Add unused keys
                     if (data.unused && data.unused.length > 0) {
                         const unusedGroup = document.createElement('optgroup');
-                        unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
+                        unusedGroup.label = QSPanelWords.t('commandForm.keyGroup.unused', { count: data.unused.length });
                         data.unused.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -4850,7 +4766,7 @@ async function initDeleteTranslationKeysForm() {
         
         langInput.replaceWith(langSelect);
         
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], QSPanelWords.t('commandForm.select.language'));
         
         // Add key selector helper above the keys textarea
         if (keysTextarea) {
@@ -4858,19 +4774,19 @@ async function initDeleteTranslationKeysForm() {
                 id: 'key-selector', class: 'admin-select', style: 'flex: 1;',
                 multiple: 'multiple', size: '8'
             });
-            QSDom.setSelectPlaceholder(keySelector, t('commandForm.select.languageFirst'),
+            QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.select.languageFirst'),
                 { disabled: true });
             const addSelectedBtn = _renderButton('add-selected-btn', 'admin-btn',
-                t('commandForm.deleteTranslationKeys.addSelected'));
+                QSPanelWords.t('commandForm.deleteTranslationKeys.addSelected'));
             const addAllUnusedBtn = _renderButton('add-all-unused-btn', 'admin-btn admin-btn--outline',
-                t('commandForm.deleteTranslationKeys.addAllUnused'),
-                t('commandForm.deleteTranslationKeys.addAllUnusedTitle'));
+                QSPanelWords.t('commandForm.deleteTranslationKeys.addAllUnused'),
+                QSPanelWords.t('commandForm.deleteTranslationKeys.addAllUnusedTitle'));
             const clearKeysBtn = _renderButton('clear-keys-btn', 'admin-btn admin-btn--outline',
-                t('commandForm.deleteTranslationKeys.clearList'),
-                t('commandForm.deleteTranslationKeys.clearListTitle'));
+                QSPanelWords.t('commandForm.deleteTranslationKeys.clearList'),
+                QSPanelWords.t('commandForm.deleteTranslationKeys.clearListTitle'));
 
             const helperDiv = QSDom.el('div', {}, [
-                _renderLabel(t('commandForm.deleteTranslationKeys.title')),
+                _renderLabel(QSPanelWords.t('commandForm.deleteTranslationKeys.title')),
                 QSDom.el('div', {
                     style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
                 }, [
@@ -4879,7 +4795,7 @@ async function initDeleteTranslationKeysForm() {
                         style: 'display: flex; flex-direction: column; gap: var(--space-xs);'
                     }, [addSelectedBtn, addAllUnusedBtn, clearKeysBtn])
                 ]),
-                _renderHint([t('commandForm.deleteTranslationKeys.hint')])
+                _renderHint([QSPanelWords.t('commandForm.deleteTranslationKeys.hint')])
             ]);
             keysTextarea.parentNode.insertBefore(helperDiv, keysTextarea);
 
@@ -4891,7 +4807,7 @@ async function initDeleteTranslationKeysForm() {
                 const lang = langSelect.value;
                 if (lang) {
                     // Fetch grouped keys (used/unused)
-                    QSDom.setSelectPlaceholder(keySelector, t('common.loading'), { disabled: true });
+                    QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('common.loading'), { disabled: true });
                     try {
                         const data = await QuickSiteAdmin.fetchHelperData('translation-keys-grouped', [lang]);
                         QSDom.clear(keySelector);
@@ -4902,7 +4818,7 @@ async function initDeleteTranslationKeysForm() {
                         // Add Used keys optgroup
                         if (data.used && data.used.length > 0) {
                             const usedGroup = document.createElement('optgroup');
-                            usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
+                            usedGroup.label = QSPanelWords.t('commandForm.keyGroup.used', { count: data.used.length });
                             data.used.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -4915,7 +4831,7 @@ async function initDeleteTranslationKeysForm() {
                         // Add Unused keys optgroup
                         if (data.unused && data.unused.length > 0) {
                             const unusedGroup = document.createElement('optgroup');
-                            unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
+                            unusedGroup.label = QSPanelWords.t('commandForm.keyGroup.unused', { count: data.unused.length });
                             data.unused.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -4926,13 +4842,13 @@ async function initDeleteTranslationKeysForm() {
                         }
                         
                         if (!data.used?.length && !data.unused?.length) {
-                            QSDom.setSelectPlaceholder(keySelector, t('commandForm.empty.noKeys'), { disabled: true });
+                            QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.empty.noKeys'), { disabled: true });
                         }
                     } catch (error) {
-                        QSDom.setSelectPlaceholder(keySelector, t('commandForm.errors.loadKeys'), { disabled: true });
+                        QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.errors.loadKeys'), { disabled: true });
                     }
                 } else {
-                    QSDom.setSelectPlaceholder(keySelector, t('commandForm.select.languageFirst'), { disabled: true });
+                    QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.select.languageFirst'), { disabled: true });
                     unusedKeys = [];
                 }
             });
@@ -4963,7 +4879,7 @@ async function initDeleteTranslationKeysForm() {
             // Add all unused keys button handler
             addAllUnusedBtn.addEventListener('click', () => {
                 if (unusedKeys.length === 0) {
-                    QuickSiteAdmin.showToast(t('commandForm.toast.noUnusedKeys'), 'warning');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('commandForm.toast.noUnusedKeys'), 'warning');
                     return;
                 }
                 
@@ -4983,7 +4899,7 @@ async function initDeleteTranslationKeysForm() {
                 });
                 
                 keysTextarea.value = JSON.stringify(currentKeys, null, 2);
-                QuickSiteAdmin.showToast(t('commandForm.toast.addedUnusedKeys', { count: unusedKeys.length }), 'success');
+                QuickSiteAdmin.showToast(QSPanelWords.count('commandForm.toast.addedUnusedKeysCount', unusedKeys.length), 'success');
             });
             
             // Clear keys button handler
@@ -4996,7 +4912,7 @@ async function initDeleteTranslationKeysForm() {
                 const lang = langSelect.value;
                 if (!lang) return;
                 
-                QSDom.setSelectPlaceholder(keySelector, t('commandForm.status.refreshing'), { disabled: true });
+                QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.status.refreshing'), { disabled: true });
                 try {
                     const data = await QuickSiteAdmin.fetchHelperData('translation-keys-grouped', [lang]);
                     QSDom.clear(keySelector);
@@ -5007,7 +4923,7 @@ async function initDeleteTranslationKeysForm() {
                     // Add Used keys optgroup
                     if (data.used && data.used.length > 0) {
                         const usedGroup = document.createElement('optgroup');
-                        usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
+                        usedGroup.label = QSPanelWords.t('commandForm.keyGroup.used', { count: data.used.length });
                         data.used.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -5020,7 +4936,7 @@ async function initDeleteTranslationKeysForm() {
                     // Add Unused keys optgroup
                     if (data.unused && data.unused.length > 0) {
                         const unusedGroup = document.createElement('optgroup');
-                        unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
+                        unusedGroup.label = QSPanelWords.t('commandForm.keyGroup.unused', { count: data.unused.length });
                         data.unused.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -5031,10 +4947,10 @@ async function initDeleteTranslationKeysForm() {
                     }
                     
                     if (!data.used?.length && !data.unused?.length) {
-                        QSDom.setSelectPlaceholder(keySelector, t('commandForm.empty.noKeys'), { disabled: true });
+                        QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.empty.noKeys'), { disabled: true });
                     }
                 } catch (error) {
-                    QSDom.setSelectPlaceholder(keySelector, t('commandForm.errors.refreshKeys'), { disabled: true });
+                    QSDom.setSelectPlaceholder(keySelector, QSPanelWords.t('commandForm.errors.refreshKeys'), { disabled: true });
                 }
             }
             
@@ -5048,18 +4964,6 @@ async function initDeleteTranslationKeysForm() {
             });
         }
     }
-}
-
-/**
- * Format file size for display
- */
-function formatFileSize(bytes) {
-    const bytesLabel = t('commandForm.fileSize.bytes');
-    if (bytes === 0) return '0 ' + bytesLabel;
-    const k = 1024;
-    const sizes = [bytesLabel, 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 function renderCommandForm(doc) {
@@ -5116,7 +5020,7 @@ function renderCommandForm(doc) {
         form.dataset.notExecutable = '1';
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.title = t(notExecutableKey);
+            submitBtn.title = QSPanelWords.t(notExecutableKey);
         }
     } else {
         delete form.dataset.notExecutable;
@@ -5139,7 +5043,7 @@ function renderCommandForm(doc) {
     if (paramKeys.length === 0) {
         paramsContainer.appendChild(
             QSDom.el('div', { class: 'admin-empty', style: 'padding: var(--space-md);' }, [
-                QSDom.el('p', { text: t('commands.noParameters') })
+                QSDom.el('p', { text: QSPanelWords.t('commands.noParameters') })
             ]));
         return;
     }
@@ -5153,7 +5057,7 @@ function renderCommandForm(doc) {
 
     if (required.length > 0) {
         paramsContainer.appendChild(QSDom.el('h4', {
-            class: 'admin-form-section-title', text: t('commands.requiredParams')
+            class: 'admin-form-section-title', text: QSPanelWords.t('commands.requiredParams')
         }));
         required.forEach(key => {
             paramsContainer.appendChild(renderFormField(key, params[key], true));
@@ -5164,7 +5068,7 @@ function renderCommandForm(doc) {
         paramsContainer.appendChild(QSDom.el('h4', {
             class: 'admin-form-section-title',
             style: 'margin-top: var(--space-lg);',
-            text: t('commands.conditionalParams')
+            text: QSPanelWords.t('commands.conditionalParams')
         }));
         conditional.forEach(key => {
             paramsContainer.appendChild(renderFormField(key, params[key], false));
@@ -5175,7 +5079,7 @@ function renderCommandForm(doc) {
         paramsContainer.appendChild(QSDom.el('h4', {
             class: 'admin-form-section-title',
             style: 'margin-top: var(--space-lg);',
-            text: t('commands.optionalParams')
+            text: QSPanelWords.t('commands.optionalParams')
         }));
         optional.forEach(key => {
             paramsContainer.appendChild(renderFormField(key, params[key], false));
@@ -5217,7 +5121,7 @@ function renderFormField(rawName, param, required) {
         }
     }
     const displayName = isUrlParam
-        ? name + ' ' + t('commandForm.field.urlSegment')
+        ? QSPanelWords.t('commandForm.field.urlSegment', { name: name })
         : name;
 
     const inputId = 'param-' + name;
@@ -5281,17 +5185,17 @@ function renderFormField(rawName, param, required) {
 
         const selectors = [
             QSDom.el('div', { class: 'admin-form-group admin-form-group--inline' }, [
-                _renderLabel(t('commandForm.field.date'), 'admin-label'),
+                _renderLabel(QSPanelWords.t('commandForm.field.date'), 'admin-label'),
                 QSDom.el('input', dateProps)
             ])
         ];
         if (includeTime) {
             selectors.push(QSDom.el('div', { class: 'admin-form-group admin-form-group--inline' }, [
-                _renderLabel(t('commandForm.field.hour'), 'admin-label'),
+                _renderLabel(QSPanelWords.t('commandForm.field.hour'), 'admin-label'),
                 _renderTwoDigitSelect(inputId + '-hour', 'data-datetime-hour', 24)
             ]));
             selectors.push(QSDom.el('div', { class: 'admin-form-group admin-form-group--inline' }, [
-                _renderLabel(t('commandForm.field.minute'), 'admin-label'),
+                _renderLabel(QSPanelWords.t('commandForm.field.minute'), 'admin-label'),
                 _renderTwoDigitSelect(inputId + '-min', 'data-datetime-min', 60)
             ]));
         }
@@ -5301,7 +5205,7 @@ function renderFormField(rawName, param, required) {
                 onchange: () => _fillFromPicker(inputId, includeTime)
             }, selectors),
             QSDom.el('div', { class: 'admin-form-group', style: 'margin-top: var(--space-sm);' }, [
-                _renderLabel(t('commandForm.field.orEnterManually'), 'admin-label'),
+                _renderLabel(QSPanelWords.t('commandForm.field.orEnterManually'), 'admin-label'),
                 QSDom.el('input', _fieldProps({
                     type: 'text', class: 'admin-input', placeholder: String(defaultExample)
                 }))
@@ -5322,8 +5226,8 @@ function renderFormField(rawName, param, required) {
         // ui_type 'password' in help.php).
         const toggle = QSDom.el('button', {
             type: 'button',
-            'aria-label': t('commandForm.field.showPassword'),
-            title: t('commandForm.field.showPassword'),
+            'aria-label': QSPanelWords.t('commandForm.field.showPassword'),
+            title: QSPanelWords.t('commandForm.field.showPassword'),
             'data-password-toggle': inputId,
             style: 'position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%); '
                  + 'background: none; border: none; padding: 0.25rem; cursor: pointer; '
@@ -5367,7 +5271,7 @@ function renderFormField(rawName, param, required) {
                     if (isUrlParam) props['data-url-param'] = '';
                     return props;
                 })());
-                QSDom.setSelectPlaceholder(select, t('commandForm.field.selectPlaceholder'));
+                QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.field.selectPlaceholder'));
                 QuickSiteAdmin.appendOptionsToSelect(select, [
                     { value: 'true', label: 'true' },
                     { value: 'false', label: 'false' }
@@ -5406,7 +5310,7 @@ function renderFormField(rawName, param, required) {
                 // and a required one asks for a choice.
                 if (Array.isArray(param.enum) && param.enum.length) {
                     const select = QSDom.el('select', _fieldProps({ class: 'admin-select' }));
-                    QSDom.setSelectPlaceholder(select, t('commandForm.field.selectPlaceholder'));
+                    QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.field.selectPlaceholder'));
                     QuickSiteAdmin.appendOptionsToSelect(select, param.enum.map(v => ({ value: String(v), label: String(v) })));
                     inputArea = select;
                     break;
@@ -5417,7 +5321,7 @@ function renderFormField(rawName, param, required) {
                     const options = validation.split(',')[0]?.split('|').map(o => o.trim()) || [];
                     if (options.length > 1) {
                         const select = QSDom.el('select', _fieldProps({ class: 'admin-select' }));
-                        QSDom.setSelectPlaceholder(select, t('commandForm.field.selectPlaceholder'));
+                        QSDom.setSelectPlaceholder(select, QSPanelWords.t('commandForm.field.selectPlaceholder'));
                         QuickSiteAdmin.appendOptionsToSelect(select,
                             options.map(opt => ({ value: opt, label: opt })));
                         inputArea = select;
@@ -5466,7 +5370,7 @@ function renderFormField(rawName, param, required) {
 
     if (offersAlternatives) {
         group.appendChild(_renderHint([
-            QSDom.el('strong', { text: t('commandForm.field.examplesLabel') }),
+            QSDom.el('strong', { text: QSPanelWords.t('commandForm.field.examplesLabel') }),
             ' ' + param.example
         ]));
     }
@@ -5474,14 +5378,14 @@ function renderFormField(rawName, param, required) {
     // What the command uses when the field is left empty, as help.php documents it.
     if (param.default !== undefined) {
         group.appendChild(_renderHint([
-            QSDom.el('strong', { text: t('commandForm.field.defaultLabel') }),
+            QSDom.el('strong', { text: QSPanelWords.t('commandForm.field.defaultLabel') }),
             ' ' + _formatDefault(param.default)
         ]));
     }
 
     if (validation) {
         group.appendChild(_renderHint([
-            QSDom.el('strong', { text: t('commandForm.field.validationLabel') }),
+            QSDom.el('strong', { text: QSPanelWords.t('commandForm.field.validationLabel') }),
             ' ' + validation
         ]));
     }
@@ -5532,7 +5436,7 @@ document.addEventListener('click', function (e) {
     const eyeOff = btn.querySelector('[data-eye-off]');
     if (eye) eye.style.display = reveal ? 'none' : '';
     if (eyeOff) eyeOff.style.display = reveal ? '' : 'none';
-    const label = t(reveal ? 'commandForm.field.hidePassword' : 'commandForm.field.showPassword');
+    const label = QSPanelWords.t(reveal ? 'commandForm.field.hidePassword' : 'commandForm.field.showPassword');
     btn.setAttribute('aria-label', label);
     btn.setAttribute('title', label);
     input.focus();
@@ -5560,7 +5464,7 @@ function renderCommandDocs(doc) {
 
     // Notes
     if (doc.notes) {
-        sections.push(_renderDocSection(t('commands.notes'),
+        sections.push(_renderDocSection(QSPanelWords.t('commands.notes'),
             QSDom.el('p', { text: doc.notes })));
     }
 
@@ -5569,13 +5473,13 @@ function renderCommandDocs(doc) {
         .filter(key => key.startsWith('example') && typeof doc[key] === 'string')
         .map(key => doc[key]);
     if (examples.length > 0) {
-        sections.push(_renderDocSection(t('commands.example'),
+        sections.push(_renderDocSection(QSPanelWords.t('commands.example'),
             QSDom.el('div', null, examples.map(text => _renderCodeBlock(text)))));
     }
 
     // Success Response
     if (doc.success_response) {
-        sections.push(_renderDocSection(t('commands.successResponse'),
+        sections.push(_renderDocSection(QSPanelWords.t('commands.successResponse'),
             _renderCodeBlock(JSON.stringify(doc.success_response, null, 2))));
     }
 
@@ -5588,12 +5492,12 @@ function renderCommandDocs(doc) {
                 ': ' + message
             ]));
         });
-        sections.push(_renderDocSection(t('commands.errorResponses'), list));
+        sections.push(_renderDocSection(QSPanelWords.t('commands.errorResponses'), list));
     }
 
     QSDom.clear(container);
     if (sections.length === 0) {
-        container.appendChild(QSDom.el('p', { text: t('commandForm.noDocumentation') }));
+        container.appendChild(QSDom.el('p', { text: QSPanelWords.t('commandForm.noDocumentation') }));
         return;
     }
     sections.forEach(section => container.appendChild(section));

@@ -132,6 +132,7 @@ if (!is_array($qsSite)
     || !is_string($qsSite['space'] ?? '')
     || !is_int($qsSite['version'] ?? null) || $qsSite['version'] < 1
     || !array_key_exists('icon', $qsSite) || !($qsSite['icon'] === null || is_string($qsSite['icon']))
+    || !is_array($qsSite['words'] ?? null)
 ) {
     qs_site_fail('qs-site.php is missing or malformed', $qsSiteConfigFile);
 }
@@ -141,6 +142,14 @@ if (!is_array($qsSite)
 // makes no check of its own. Page.php reads both.
 define('QS_BUILD_VERSION', $qsSite['version']);
 define('QS_BUILD_ICON', $qsSite['icon']);
+
+// QuickSite's own words for the site's visitor, one set per language of the site,
+// resolved when it was built: the build carries no word file. Each page's handoff
+// (the toasts, the theme switch's labels) and the 404 page below read them through
+// qs_visitor_words(), the fatal page directly (errorHygiene.php). Defined here,
+// before the fatal handler is registered, so a request that dies later still has
+// its words.
+define('QS_BUILD_WORDS', $qsSite['words']);
 
 // ---------------------------------------------------------------------------
 // 2. Where everything is
@@ -330,7 +339,11 @@ if ($templateFile === null || !is_file($templateFile)) {
     if (is_file($notFound)) {
         require $notFound;
     } else {
-        echo '<h1>404 — Page Not Found</h1>';
+        // QuickSite's own word, in the request's language: the address's, else the
+        // site's default. A set the build did not write leaves the status alone.
+        require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+        $qsNotFoundWord = qs_visitor_words(qs_resolve_project_language($trimParameters->lang()))['notFound'] ?? null;
+        echo '<h1>' . htmlspecialchars(is_string($qsNotFoundWord) && $qsNotFoundWord !== '' ? $qsNotFoundWord : '404', ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</h1>';
     }
     exit;
 }

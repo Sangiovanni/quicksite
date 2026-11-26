@@ -67,6 +67,9 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+// Every answer here is said in the panel's words (answers.contacts), in the
+// language of the panel that asked (qs_admin_json_boot()).
+require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
 
 /**
  * How many people one account may keep.
@@ -166,13 +169,13 @@ function qs_contacts_list(): ApiResponse {
     $user = getCurrentUser();
     if ($user === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
 
     $contacts = qs_contacts_normalise($user['contacts'] ?? null);
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage(count($contacts) === 1 ? '1 contact' : count($contacts) . ' contacts')
+        ->withMessage(__admin('answers.contacts.listed'))
         ->withData([
             'contacts' => $contacts,
             'count'    => count($contacts),
@@ -197,32 +200,32 @@ function qs_contacts_add(array $params): ApiResponse {
     $user = getCurrentUser();
     if ($user === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
     $me = (string)($user['id'] ?? '');
 
     $targetId = trim((string)($params['user_id'] ?? ''));
     if ($targetId === '') {
         return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('user_id is required')
-            ->withErrors(['user_id' => 'Required field']);
+            ->withMessage(__admin('answers.contacts.userIdRequired'))
+            ->withErrors(['user_id' => __admin('answers.common.requiredField')]);
     }
     if (!qs_contact_id_is_well_formed($targetId)) {
         return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('user_id is not a user identifier')
-            ->withErrors(['user_id' => 'Malformed identifier']);
+            ->withMessage(__admin('answers.contacts.userIdMalformed'))
+            ->withErrors(['user_id' => __admin('answers.contacts.malformedIdentifier')]);
     }
     if ($targetId === $me) {
         return ApiResponse::create(400, 'validation.invalid_value')
-            ->withMessage('You are not one of your own contacts')
-            ->withErrors(['user_id' => 'Refers to the caller']);
+            ->withMessage(__admin('answers.contacts.notOwnContact'))
+            ->withErrors(['user_id' => __admin('answers.contacts.refersToCaller')]);
     }
 
     $name = qs_contact_clean_name($params['name'] ?? null);
     if ($name === null) {
         return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('name is required')
-            ->withErrors(['name' => 'Required field']);
+            ->withMessage(__admin('answers.common.nameRequired'))
+            ->withErrors(['name' => __admin('answers.common.requiredField')]);
     }
 
     $full = false;
@@ -252,16 +255,16 @@ function qs_contacts_add(array $params): ApiResponse {
 
     if ($full) {
         return ApiResponse::create(409, 'contacts.full')
-            ->withMessage('Your contact list is full')
+            ->withMessage(__admin('answers.contacts.listFull'))
             ->withData(['max' => QS_CONTACTS_MAX]);
     }
     if ($written !== true) {
         return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to save the contact');
+            ->withMessage(__admin('answers.contacts.saveFailed'));
     }
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Contact saved')
+        ->withMessage(__admin('answers.contacts.saved'))
         ->withData([
             'user_id' => $targetId,
             'name'    => $name,
@@ -283,20 +286,20 @@ function qs_contacts_remove(array $params): ApiResponse {
     $user = getCurrentUser();
     if ($user === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
     $me = (string)($user['id'] ?? '');
 
     $targetId = trim((string)($params['user_id'] ?? ''));
     if ($targetId === '') {
         return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('user_id is required')
-            ->withErrors(['user_id' => 'Required field']);
+            ->withMessage(__admin('answers.contacts.userIdRequired'))
+            ->withErrors(['user_id' => __admin('answers.common.requiredField')]);
     }
     if (!qs_contact_id_is_well_formed($targetId)) {
         return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('user_id is not a user identifier')
-            ->withErrors(['user_id' => 'Malformed identifier']);
+            ->withMessage(__admin('answers.contacts.userIdMalformed'))
+            ->withErrors(['user_id' => __admin('answers.contacts.malformedIdentifier')]);
     }
 
     // Separated from the callback's return value so that "there was nothing to
@@ -320,11 +323,11 @@ function qs_contacts_remove(array $params): ApiResponse {
 
     if ($written !== true && !$nothingToDo) {
         return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to update your contacts');
+            ->withMessage(__admin('answers.contacts.updateFailed'));
     }
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Contact removed')
+        ->withMessage(__admin('answers.contacts.removed'))
         ->withData([
             'user_id' => $targetId,
             'removed' => true,

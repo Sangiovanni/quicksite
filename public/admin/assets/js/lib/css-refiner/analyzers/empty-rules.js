@@ -26,12 +26,12 @@
             if (node.type === NODE.NODE_RULE || node.type === NODE.NODE_FONTFACE) {
                 if (isEmptyRule(node)) {
                     var selector = node.selectorText || '@font-face';
-                    var ctx = mediaContext ? ' (' + mediaContext + ')' : '';
                     suggestions.push({
                         id:          U.generateId('empty'),
                         type:        NODE.TOOL_EMPTY_RULES,
-                        description: t('tools.emptyRules.found', { selector: selector }) + ctx,
-                        meta:        t('tools.emptyRules.action'),
+                        description: mediaContext
+                            ? t('tools.emptyRules.foundInMedia', { selector: selector, media: mediaContext })
+                            : t('tools.emptyRules.found', { selector: selector }),
                         enabled:     true,
                         edits: [{
                             start:       node.startIdx,
@@ -54,7 +54,6 @@
                         id:          U.generateId('empty'),
                         type:        NODE.TOOL_EMPTY_RULES,
                         description: t('tools.emptyRules.emptyMedia', { condition: node.condition || '?' }),
-                        meta:        t('tools.emptyRules.action'),
                         enabled:     true,
                         edits: [{
                             start:       node.startIdx,

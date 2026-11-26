@@ -4,9 +4,10 @@
  *
  * A rendered page ends with a run of `<script>` tags: the route schema, the
  * storage namespace, the consent map, the library itself, the theme wiring, the
- * API config, the enum tables, this page's count-sentence strings, this route's
- * state stores, and what the server-side resolver already fetched. Together they
- * are the contract between PHP and the browser runtime.
+ * API config, the enum tables, this page's count-sentence strings, QuickSite's
+ * own words for its visitor, this route's state stores, and what the server-side
+ * resolver already fetched. Together they are the contract between PHP and the
+ * browser runtime.
  *
  * WHY THIS FILE EXISTS. That contract had TWO writers that did not agree.
  * PageManagement (the live `/p/<projectId>/` render) emitted seven blocks;
@@ -283,7 +284,8 @@ if (!function_exists('qs_runtime_handoff')) {
      *                                'found' => bool]; null when there is none
      *   lang:               string  the language this page composed its site
      *                               addresses with (processUrl()), as that render
-     *                               path holds it
+     *                               path holds it; QuickSite's own words for the
+     *                               visitor (6c) are written in it
      *   languages:          array   qs_project_languages(): the project's codes,
      *                               [] when it is in one language
      *   themeEnabled:       bool
@@ -400,6 +402,26 @@ if (!function_exists('qs_runtime_handoff')) {
         $countStrings = is_array($ctx['countStrings'] ?? null) ? $ctx['countStrings'] : [];
         if (!empty($countStrings)) {
             $out .= '<script>window.QS_COUNT_STRINGS=' . qs_inline_script_json($countStrings) . ';</script>';
+        }
+
+        // 6c. QuickSite's own words for this page's visitor, in THIS page's
+        //     language, like the sentences above: the toasts qs.js shows after a
+        //     call, and, when step 5 wired the theme switch, its two labels, which
+        //     that wiring reads. The words the runtime shows, and no other: a
+        //     page's other QuickSite words are written into its HTML. The language
+        //     is the one this page composed its addresses with, the project's
+        //     default on a site in one language (whose addresses name none).
+        $wordsLang = (string) ($ctx['lang'] ?? '');
+        if (function_exists('qs_resolve_project_language')) {
+            $wordsLang = qs_resolve_project_language($wordsLang !== '' ? $wordsLang : null);
+        }
+        $shownGroups = ['toast' => true];
+        if (!empty($ctx['themeEnabled']) && !empty($ctx['themeToggleEnabled'])) {
+            $shownGroups['themeSwitch'] = true;
+        }
+        $visitorWords = array_intersect_key(qs_visitor_words($wordsLang), $shownGroups);
+        if ($visitorWords !== []) {
+            $out .= '<script>window.QS_VISITOR_WORDS=' . qs_inline_script_json($visitorWords) . ';</script>';
         }
 
         // 7. This route's state stores.
@@ -530,22 +552,60 @@ if (!function_exists('qs_theme_storage_key')) {
     }
 }
 
+if (!function_exists('qs_visitor_words')) {
+    /**
+     * QuickSite's own words for a site's visitor, in $lang: the `visitor` tree of
+     * the word files (<secure>/src/translations/<lang>.json, read through
+     * qs_starting_words_tree(): the language's own file, its base language's,
+     * else English), each {{name}} marker left for whoever shows the word to fill.
+     *
+     * A build carries no word file and no reader of one: it carries these words
+     * resolved, one set per language of its site, in its parameters (qs-site.php,
+     * which its front controller defines as QS_BUILD_WORDS), and a built page
+     * reads its language's set. [] when neither holds the language.
+     *
+     * Read by the handoff above (the words the runtime shows, per page), by a
+     * build's front controller for the 404 page of a site that has none, and by
+     * the build, which writes the sets. A site's fatal page reads QS_BUILD_WORDS
+     * itself (errorHygiene.php): it can be written before this file is loaded.
+     */
+    function qs_visitor_words(string $lang): array
+    {
+        if (defined('QS_BUILD_WORDS')) {
+            $sets = QS_BUILD_WORDS;
+            return is_array($sets[$lang] ?? null) ? $sets[$lang] : [];
+        }
+        if (!defined('SECURE_FOLDER_PATH') || !is_file(SECURE_FOLDER_PATH . '/src/functions/startingTexts.php')) {
+            return [];
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php';
+        return qs_starting_words_tree($lang, 'visitor');
+    }
+}
+
 if (!function_exists('qs_theme_toggle_script')) {
     /**
      * The `[data-theme-toggle]` wiring: set the icon and label on load and on
      * click, and persist the choice under this project's own key
      * (qs_theme_storage_key()).
+     *
+     * The label names the mode a press switches to, in QuickSite's word for it in
+     * the page's language: read from the page's own words (window.QS_VISITOR_WORDS,
+     * which the handoff writes after this script) each time the label is set, so
+     * on load and at every press. A page that carries no such word keeps the
+     * label it shows.
      */
     function qs_theme_toggle_script(string $projectKey): string
     {
         $js  = '(function(){';
         $js .= 'var key=' . qs_inline_script_json(qs_theme_storage_key($projectKey)) . ';';
         $js .= 'function apply(t){document.documentElement.setAttribute("data-theme",t);try{localStorage.setItem(key,t);}catch(e){}}';
-        $js .= 'function sync(t){document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
+        $js .= 'function word(n){var w=window.QS_VISITOR_WORDS&&window.QS_VISITOR_WORDS.themeSwitch;var v=w?w[n]:null;return typeof v==="string"&&v!==""?v:null;}';
+        $js .= 'function sync(t){var label=word(t==="dark"?"light":"dark");document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
         $js .= 'var icon=b.querySelector(".theme-switch-icon");';
         $js .= 'var lbl=b.querySelector(".theme-switch-label");';
         $js .= 'if(icon)icon.textContent=t==="dark"?"☀️":"🌙";';
-        $js .= 'if(lbl)lbl.textContent=t==="dark"?"Light mode":"Dark mode";';
+        $js .= 'if(lbl&&label!==null)lbl.textContent=label;';
         $js .= 'b.setAttribute("aria-pressed",t==="dark"?"true":"false");';
         $js .= '});}';
         $js .= 'document.addEventListener("DOMContentLoaded",function(){';

@@ -94,7 +94,7 @@
                     link.classList.remove('admin-hidden-permission');
                     link.classList.add('admin-disabled-permission');
                     link.removeAttribute('aria-hidden');
-                    link.title = QuickSiteAdmin.t('commands.notPermittedHint');
+                    link.title = QSPanelWords.t('commands.notPermittedHint');
                     link.style.display = '';
                 }
             });

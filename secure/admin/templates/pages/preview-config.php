@@ -24,6 +24,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 // qs_inline_script_json(), the encoder for a value in an inline script.
 require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_project_default_language
+require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php'; // qs_starting_word_by_language
 if (!isset($editConfig)) {
     $editConfig = defined('CONFIG') ? CONFIG : [];
 }
@@ -134,9 +135,10 @@ if (!empty($__previewRouteResolvers)) {
 // the project marker itself.
 $__previewProject  = $router->getCurrentProject();
 ?>
-<!-- The editor's words (QSPanelWords), before its scripts: its own sections, and the Social previews and Translations
-     pages' sections, whose words its description field and Translation tool share; common and nav come from the layout -->
-<?= __adminWords(['preview', 'complexWizard', 'socialPreviews', 'translations']) ?>
+<!-- The editor's words (QSPanelWords), before its scripts: its own sections, the Social previews and Translations
+     pages' sections, whose words its description field and Translation tool share, and the AI library's messages
+     (aiConnections.call: the Workflows runner sends through it); common and nav come from the layout -->
+<?= __adminWords(['preview', 'complexWizard', 'socialPreviews', 'translations', 'aiConnections.call']) ?>
 <!-- Preview Configuration (needed before preview.js) -->
 <script>
 window.PreviewConfig = {
@@ -193,6 +195,8 @@ window.PreviewConfig = {
     themeModeEnabled: <?= qs_inline_script_json($editConfig['THEME_MODE_ENABLED'] ?? false) ?>,
     themeDefault: <?= qs_inline_script_json($editConfig['THEME_DEFAULT'] ?? 'light') ?>,
     themeUserToggle: <?= qs_inline_script_json($editConfig['THEME_USER_TOGGLE_ENABLED'] ?? false) ?>,
+    // A new component's starter text, QuickSite's word in each of the site's languages and English ({{name}}: its name)
+    componentStarter: <?= qs_inline_script_json(qs_starting_word_by_language('component.starter', qs_project_language_codes($editConfig))) ?>,
 };
 </script>
 

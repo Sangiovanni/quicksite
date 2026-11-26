@@ -3,12 +3,14 @@
  * Admin Dashboard Page
  * 
  * Main admin panel landing page after login.
- * Shows site stats, site map, and recent commands.
+ * Shows site stats and the site map.
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
+<?php // The words dashboard.js reads, each part at its own path (QSPanelWords); `common` and `nav` come with the layout. ?>
+<?= __adminWords(['dashboard.projects', 'dashboard.storage', 'dashboard.sitemap']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/dashboard.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard-memberships.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/dashboard-memberships.js') ?>"></script>
 
@@ -20,9 +22,9 @@ $baseUrl = rtrim(BASE_URL, '/');
             <rect x="14" y="14" width="7" height="7"/>
             <rect x="3" y="14" width="7" height="7"/>
         </svg>
-        <?= __admin('dashboard.title') ?>
+        <?= adminEscape(__admin('dashboard.title')) ?>
     </h1>
-    <p class="admin-page-header__subtitle"><?= __admin('dashboard.subtitle') ?></p>
+    <p class="admin-page-header__subtitle"><?= adminEscape(__admin('dashboard.subtitle')) ?></p>
 </div>
 
 <?php
@@ -34,7 +36,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 // wrong once.
 if (isset($_GET['noproject'])): ?>
 <div class="admin-alert admin-alert--info" style="margin-bottom: var(--space-md);">
-    <?= __admin('dashboard.noProject.notice', 'The visual editor needs a project to work on, and you are not a member of any project yet. Create one below, or ask a project owner to invite you.') ?>
+    <?= adminEscape(__admin('dashboard.noProject.notice')) ?>
 </div>
 <?php endif; ?>
 
@@ -45,7 +47,7 @@ if (isset($_GET['noproject'])): ?>
 // account which pages exist is the thing a permission gate is there to avoid.
 if (isset($_GET['denied'])): ?>
 <div class="admin-alert admin-alert--warning" style="margin-bottom: var(--space-md);">
-    <?= __admin('dashboard.denied.notice', 'You do not have permission to open that page with your role on this project.') ?>
+    <?= adminEscape(__admin('dashboard.denied.notice')) ?>
 </div>
 <?php endif; ?>
 
@@ -57,7 +59,7 @@ if (isset($_GET['denied'])): ?>
     <div class="dashboard-current__info" id="current-project-info">
         <div class="admin-loading">
             <span class="admin-spinner"></span>
-            <span><?= __admin('common.loading') ?></span>
+            <span><?= adminEscape(__admin('common.loading')) ?></span>
         </div>
     </div>
     <div class="dashboard-current__actions">
@@ -70,16 +72,16 @@ if (isset($_GET['denied'])): ?>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
             </svg>
-            <?= __admin('dashboard.projects.create') ?>
+            <?= adminEscape(__admin('dashboard.projects.create')) ?>
         </button>
         
         <!-- Clone Project -->
-        <button type="button" id="btn-clone-project" data-requires-command="cloneProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.cloneTooltip') ?>">
+        <button type="button" id="btn-clone-project" data-requires-command="cloneProject" class="admin-btn admin-btn--ghost" title="<?= adminAttr(__admin('dashboard.projects.cloneTooltip')) ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
-            <?= __admin('dashboard.projects.clone') ?>
+            <?= adminEscape(__admin('dashboard.projects.clone')) ?>
         </button>
 
         <!-- Rename Project: renameProject is owner-only. -->
@@ -90,42 +92,42 @@ if (isset($_GET['denied'])): ?>
         <div class="dashboard-current__divider" data-requires-command="backupProject"></div>
         
         <!-- Backup Project -->
-        <button type="button" id="btn-backup-project" data-requires-command="backupProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.backupTooltip') ?>">
+        <button type="button" id="btn-backup-project" data-requires-command="backupProject" class="admin-btn admin-btn--ghost" title="<?= adminAttr(__admin('dashboard.projects.backupTooltip')) ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                 <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
             </svg>
-            <?= __admin('dashboard.projects.backup') ?>
+            <?= adminEscape(__admin('dashboard.projects.backup')) ?>
         </button>
         
         <!-- Restore Backup -->
-        <button type="button" id="btn-restore-backup" data-requires-command="restoreBackup" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.restoreTooltip') ?>">
+        <button type="button" id="btn-restore-backup" data-requires-command="restoreBackup" class="admin-btn admin-btn--ghost" title="<?= adminAttr(__admin('dashboard.projects.restoreTooltip')) ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                 <path d="M3 3v5h5"/>
             </svg>
-            <?= __admin('dashboard.projects.restore') ?>
+            <?= adminEscape(__admin('dashboard.projects.restore')) ?>
         </button>
         
         <!-- Export/Import Group -->
         <div class="dashboard-current__divider" data-requires-command="backupProject"></div>
         
         <!-- Export Project -->
-        <button type="button" id="btn-export-project" data-requires-command="exportProject" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.exportTooltip') ?>">
+        <button type="button" id="btn-export-project" data-requires-command="exportProject" class="admin-btn admin-btn--ghost" title="<?= adminAttr(__admin('dashboard.projects.exportTooltip')) ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            <?= __admin('dashboard.projects.export') ?>
+            <?= adminEscape(__admin('dashboard.projects.export')) ?>
         </button>
         
         <!-- Import Project -->
-        <button type="button" id="btn-import-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.importTooltip') ?>">
+        <button type="button" id="btn-import-project" class="admin-btn admin-btn--ghost" title="<?= adminAttr(__admin('dashboard.projects.importTooltip')) ?>">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <?= __admin('dashboard.projects.import') ?>
+            <?= adminEscape(__admin('dashboard.projects.import')) ?>
         </button>
     </div>
 </div>
@@ -138,7 +140,7 @@ if (isset($_GET['denied'])): ?>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                     <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
                 </svg>
-                <?= __admin('dashboard.storage.ownerTitle', 'My total space') ?>
+                <?= adminEscape(__admin('dashboard.storage.ownerTitle')) ?>
                 <span class="owner-space__count" id="owner-space-count"></span>
             </h3>
             <span class="storage-overview__total" id="owner-space-total">--</span>
@@ -155,35 +157,35 @@ if (isset($_GET['denied'])): ?>
         <div class="storage-overview__legend">
             <div class="storage-overview__legend-item">
                 <span class="storage-overview__legend-color storage-overview__legend-color--projects"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.content', 'Content') ?></span>
+                <span class="storage-overview__legend-label"><?= adminEscape(__admin('dashboard.storage.content')) ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-content">--</span>
             </div>
             <div class="storage-overview__legend-item">
                 <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.backups') ?></span>
+                <span class="storage-overview__legend-label"><?= adminEscape(__admin('dashboard.storage.backups')) ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-backups">--</span>
             </div>
             <div class="storage-overview__legend-item">
                 <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.builds') ?></span>
+                <span class="storage-overview__legend-label"><?= adminEscape(__admin('dashboard.storage.builds')) ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-builds">--</span>
             </div>
             <div class="storage-overview__legend-item">
                 <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
+                <span class="storage-overview__legend-label"><?= adminEscape(__admin('dashboard.storage.exports')) ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-exports">--</span>
             </div>
             <!-- Personal snippets live outside every project; they count in this total. -->
             <div class="storage-overview__legend-item">
                 <span class="storage-overview__legend-color storage-overview__legend-color--snippets"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.personalSnippets') ?></span>
+                <span class="storage-overview__legend-label"><?= adminEscape(__admin('dashboard.storage.personalSnippets')) ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-snippets">--</span>
             </div>
             <!-- What is LEFT of this account's quota. Hidden on an install with no
                  quota.php (the default), where there is no ceiling to have room in. -->
             <div class="storage-overview__legend-item" id="owner-space-legend-free" style="display: none;">
                 <span class="storage-overview__legend-color storage-overview__legend-color--free"></span>
-                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.free', 'Free space') ?></span>
+                <span class="storage-overview__legend-label"><?= adminEscape(__admin('dashboard.storage.free')) ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-free">--</span>
             </div>
         </div>
@@ -196,8 +198,8 @@ if (isset($_GET['denied'])): ?>
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <div>
-                <strong><?= __admin('dashboard.storage.overTitle') ?></strong>
-                <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;"><?= __admin('dashboard.storage.overBody') ?></p>
+                <strong><?= adminEscape(__admin('dashboard.storage.overTitle')) ?></strong>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;"><?= adminEscape(__admin('dashboard.storage.overBody')) ?></p>
             </div>
         </div>
 
@@ -206,8 +208,8 @@ if (isset($_GET['denied'])): ?>
              show only when there are more than five. -->
         <div class="owner-space__search" id="owner-space-search-wrap" hidden>
             <input type="search" id="owner-space-search" class="admin-input" autocomplete="off"
-                   placeholder="<?= adminEscape(__admin('dashboard.storage.searchProjects')) ?>"
-                   aria-label="<?= adminEscape(__admin('dashboard.storage.searchProjectsLabel')) ?>">
+                   placeholder="<?= adminAttr(__admin('dashboard.storage.searchProjects')) ?>"
+                   aria-label="<?= adminAttr(__admin('dashboard.storage.searchProjectsLabel')) ?>">
         </div>
         <div class="owner-space__projects" id="owner-space-projects"></div>
         <p class="owner-space__no-match" id="owner-space-no-match" hidden></p>
@@ -220,7 +222,7 @@ if (isset($_GET['denied'])): ?>
                     <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
                     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
                 </svg>
-                <?= __admin('dashboard.storage.refresh', 'Refresh') ?>
+                <?= adminEscape(__admin('dashboard.storage.refresh')) ?>
             </button>
         </div>
         <!-- Manage Space: the edited project's build, exports and backups, with your own
@@ -231,7 +233,7 @@ if (isset($_GET['denied'])): ?>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                 </svg>
-                <?= __admin('dashboard.storage.manageSpace', 'Manage Space') ?>
+                <?= adminEscape(__admin('dashboard.storage.manageSpace')) ?>
                 <svg class="manage-space__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
@@ -241,13 +243,13 @@ if (isset($_GET['denied'])): ?>
                     <div class="manage-space__section-header">
                         <span class="manage-space__section-title">
                             <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
-                            <?= __admin('dashboard.storage.builds', 'Builds') ?>
+                            <?= adminEscape(__admin('dashboard.storage.builds')) ?>
                             <!-- The full builds page: make one, download it, and see
                                  whether the next one will still fit. Gated on the same
                                  read the page itself is gated on, so a caller who
                                  cannot open it is not offered the link. -->
                             <a href="<?= $router->url('builds') ?>" class="manage-space__section-link"
-                               data-requires-command="getBuild"><?= __admin('dashboard.storage.buildsPage', 'Open builds page') ?> &rarr;</a>
+                               data-requires-command="getBuild"><?= adminEscape(__admin('dashboard.storage.buildsPage')) ?> &rarr;</a>
                         </span>
                         <span class="manage-space__section-count" id="manage-builds-count">--</span>
                     </div>
@@ -259,7 +261,7 @@ if (isset($_GET['denied'])): ?>
                     <div class="manage-space__section-header">
                         <span class="manage-space__section-title">
                             <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
-                            <?= __admin('dashboard.storage.exports', 'Exports') ?>
+                            <?= adminEscape(__admin('dashboard.storage.exports')) ?>
                         </span>
                         <span class="manage-space__section-count" id="manage-exports-count">--</span>
                     </div>
@@ -269,7 +271,7 @@ if (isset($_GET['denied'])): ?>
                     <div class="manage-space__section-header">
                         <span class="manage-space__section-title">
                             <span class="storage-overview__legend-color storage-overview__legend-color--backups"></span>
-                            <?= __admin('dashboard.storage.backups', 'Backups') ?>
+                            <?= adminEscape(__admin('dashboard.storage.backups')) ?>
                             <span class="manage-space__project-label" id="manage-backups-project"></span>
                         </span>
                         <span class="manage-space__section-count" id="manage-backups-count">--</span>
@@ -287,35 +289,35 @@ if (isset($_GET['denied'])): ?>
      every authenticated user; a 0-membership account sees zeros + the links. -->
 <section class="admin-section" id="dashboard-memberships">
     <div class="admin-section__header">
-        <h2 class="admin-section__title"><?= __admin('dashboard.memberships.title', 'Memberships') ?></h2>
+        <h2 class="admin-section__title"><?= adminEscape(__admin('dashboard.memberships.title')) ?></h2>
         <div class="dashboard-memberships__links">
-            <a href="<?= $router->url('memberships') ?>" class="admin-btn admin-btn--ghost"><?= __admin('nav.myMemberships', 'My memberships') ?></a>
-            <a href="<?= $router->url('members') ?>" class="admin-btn admin-btn--ghost" data-requires-command="proposeMember"><?= __admin('nav.projectMembers', 'Project members') ?></a>
+            <a href="<?= $router->url('memberships') ?>" class="admin-btn admin-btn--ghost"><?= adminEscape(__admin('nav.memberships')) ?></a>
+            <a href="<?= $router->url('members') ?>" class="admin-btn admin-btn--ghost" data-requires-command="proposeMember"><?= adminEscape(__admin('nav.projectMembers')) ?></a>
         </div>
     </div>
     <div class="admin-figures">
         <div class="admin-figure">
-            <span class="admin-figure__label"><?= __admin('dashboard.memberships.projects', 'My projects') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.memberships.projects')) ?></span>
             <span class="admin-figure__value" id="dash-mem-projects">-</span>
         </div>
         <div class="admin-figure">
-            <span class="admin-figure__label"><?= __admin('dashboard.memberships.owned', 'Owned') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.memberships.owned')) ?></span>
             <span class="admin-figure__value" id="dash-mem-owned">-</span>
         </div>
         <div class="admin-figure" id="dash-mem-invitations-stat">
-            <span class="admin-figure__label"><?= __admin('dashboard.memberships.invitations', 'Invitations awaiting you') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.memberships.invitations')) ?></span>
             <span class="admin-figure__value" id="dash-mem-invitations">-</span>
         </div>
         <div class="admin-figure">
-            <span class="admin-figure__label"><?= __admin('dashboard.memberships.requests', 'Join requests you sent') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.memberships.requests')) ?></span>
             <span class="admin-figure__value" id="dash-mem-requests">-</span>
         </div>
         <div class="admin-figure" id="dash-mem-notices-stat">
-            <span class="admin-figure__label"><?= __admin('dashboard.memberships.notices', 'Notices to dismiss') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.memberships.notices')) ?></span>
             <span class="admin-figure__value" id="dash-mem-notices">-</span>
         </div>
         <div class="admin-figure" id="dash-mem-queue-stat">
-            <span class="admin-figure__label"><?= __admin('dashboard.memberships.queue', 'Awaiting your validation') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.memberships.queue')) ?></span>
             <span class="admin-figure__value" id="dash-mem-queue">-</span>
         </div>
     </div>
@@ -329,14 +331,14 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.restoreTitle') ?></h3>
+            <h3 class="admin-modal__title"><?= adminEscape(__admin('dashboard.projects.restoreTitle')) ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div id="backup-list-container">
                 <div class="admin-loading">
                     <span class="admin-spinner"></span>
-                    <span><?= __admin('common.loading') ?></span>
+                    <span><?= adminEscape(__admin('common.loading')) ?></span>
                 </div>
             </div>
         </div>
@@ -348,24 +350,24 @@ if (isset($_GET['denied'])): ?>
 -->
 <template id="dashboard-restore-body">
     <div class="dashboard-restore">
-        <p><?= __admin('dashboard.projects.restoreFrom') ?>: <strong id="restore-backup-name"></strong></p>
+        <p><?= adminEscape(__admin('dashboard.projects.restoreFrom')) ?>: <strong id="restore-backup-name"></strong></p>
         <div class="admin-alert admin-alert--warning">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
             <div>
-                <strong><?= __admin('dashboard.projects.restoreWarningTitle') ?></strong>
+                <strong><?= adminEscape(__admin('dashboard.projects.restoreWarningTitle')) ?></strong>
                 <p id="restore-warning-text" class="dashboard-restore__warning"></p>
             </div>
         </div>
         <label class="admin-checkbox-group dashboard-restore__choice">
             <input type="checkbox" id="restore-create-backup" class="admin-checkbox">
-            <span class="admin-checkbox-label"><?= __admin('dashboard.projects.createBackupBeforeRestore') ?></span>
+            <span class="admin-checkbox-label"><?= adminEscape(__admin('dashboard.projects.createBackupBeforeRestore')) ?></span>
         </label>
         <label class="admin-checkbox-group dashboard-restore__choice">
             <input type="checkbox" id="restore-delete-backup" class="admin-checkbox">
-            <span class="admin-checkbox-label"><?= __admin('dashboard.projects.deleteBackupAfterRestore') ?></span>
+            <span class="admin-checkbox-label"><?= adminEscape(__admin('dashboard.projects.deleteBackupAfterRestore')) ?></span>
         </label>
     </div>
 </template>
@@ -375,70 +377,66 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.createTitle') ?></h3>
+            <h3 class="admin-modal__title"><?= adminEscape(__admin('dashboard.projects.createTitle')) ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div class="admin-form-group">
-                <label class="admin-label" for="create-project-name"><?= __admin('dashboard.projects.nameLabel') ?></label>
+                <label class="admin-label" for="create-project-name"><?= adminEscape(__admin('dashboard.projects.nameLabel')) ?></label>
                 <input type="text" id="create-project-name" class="admin-input" maxlength="60" autocomplete="off" />
-                <small class="admin-hint"><?= __admin('dashboard.projects.nameHelp') ?></small>
+                <small class="admin-hint"><?= adminEscape(__admin('dashboard.projects.nameHelp')) ?></small>
             </div>
             <div class="admin-form-group">
-                <label class="admin-label" for="create-project-language"><?= __admin('dashboard.projects.languageLabel') ?></label>
-                <select id="create-project-language" class="admin-select"
-                        data-placeholder="<?= htmlspecialchars(__admin('dashboard.projects.languagePlaceholder'), ENT_QUOTES) ?>"
-                        data-search-placeholder="<?= htmlspecialchars(__admin('common.search'), ENT_QUOTES) ?>"
-                        data-empty-text="<?= htmlspecialchars(__admin('common.noResults'), ENT_QUOTES) ?>"></select>
-                <small class="admin-hint"><?= __admin('dashboard.projects.languageHelp') ?></small>
+                <label class="admin-label" for="create-project-language"><?= adminEscape(__admin('dashboard.projects.languageLabel')) ?></label>
+                <select id="create-project-language" class="admin-select"></select>
+                <small class="admin-hint"><?= adminEscape(__admin('dashboard.projects.languageHelp')) ?></small>
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="create-project-activate" checked />
-                    <span><?= __admin('dashboard.projects.activateAfterCreate') ?></span>
+                    <span><?= adminEscape(__admin('dashboard.projects.activateAfterCreate')) ?></span>
                 </label>
             </div>
         </div>
         <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
-            <button type="button" id="btn-confirm-create" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.createBtn') ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= adminEscape(__admin('common.cancel')) ?></button>
+            <button type="button" id="btn-confirm-create" class="admin-btn admin-btn--primary"><?= adminEscape(__admin('dashboard.projects.createBtn')) ?></button>
         </div>
     </div>
 </div>
 
 <!-- Clone Project Modal -->
-<div id="modal-clone-project" class="admin-modal" style="display: none;"
-     data-oauth-keys-text="<?= htmlspecialchars(__admin('dashboard.projects.cloneOAuthKeys'), ENT_QUOTES) ?>">
+<div id="modal-clone-project" class="admin-modal" style="display: none;">
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.cloneTitle') ?></h3>
+            <h3 class="admin-modal__title"><?= adminEscape(__admin('dashboard.projects.cloneTitle')) ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);">
-                <?= __admin('dashboard.projects.cloneFrom') ?>: <strong id="clone-source-name"></strong>
+                <?= adminEscape(__admin('dashboard.projects.cloneFrom')) ?>: <strong id="clone-source-name"></strong>
             </p>
             <div class="admin-form-group">
-                <label class="admin-label" for="clone-project-name"><?= __admin('dashboard.projects.cloneNameLabel') ?></label>
+                <label class="admin-label" for="clone-project-name"><?= adminEscape(__admin('dashboard.projects.cloneNameLabel')) ?></label>
                 <input type="text" id="clone-project-name" class="admin-input" maxlength="60" autocomplete="off" />
-                <small class="admin-hint"><?= __admin('dashboard.projects.cloneNameHelp') ?></small>
+                <small class="admin-hint"><?= adminEscape(__admin('dashboard.projects.cloneNameHelp')) ?></small>
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="clone-project-activate" checked />
-                    <span><?= __admin('dashboard.projects.activateAfterClone') ?></span>
+                    <span><?= adminEscape(__admin('dashboard.projects.activateAfterClone')) ?></span>
                 </label>
             </div>
         </div>
         <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= adminEscape(__admin('common.cancel')) ?></button>
             <button type="button" id="btn-confirm-clone" class="admin-btn admin-btn--primary">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
-                <?= __admin('dashboard.projects.cloneBtn') ?>
+                <?= adminEscape(__admin('dashboard.projects.cloneBtn')) ?>
             </button>
         </div>
     </div>
@@ -450,12 +448,12 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.exportTitle') ?></h3>
+            <h3 class="admin-modal__title"><?= adminEscape(__admin('dashboard.projects.exportTitle')) ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <div class="admin-form-group">
-                <?= __admin('dashboard.projects.exportFrom') ?>: <strong id="export-source-name"></strong>
+                <?= adminEscape(__admin('dashboard.projects.exportFrom')) ?>: <strong id="export-source-name"></strong>
             </div>
             <div class="admin-alert admin-alert--warning">
                 <label class="admin-checkbox">
@@ -464,20 +462,20 @@ if (isset($_GET['denied'])): ?>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
                             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/>
                         </svg>
-                        <?= __admin('dashboard.projects.exportSecretsLabel') ?>
+                        <?= adminEscape(__admin('dashboard.projects.exportSecretsLabel')) ?>
                     </strong>
                 </label>
-                <p class="admin-hint"><?= __admin('dashboard.projects.exportSecretsHint') ?></p>
+                <p class="admin-hint"><?= adminEscape(__admin('dashboard.projects.exportSecretsHint')) ?></p>
             </div>
         </div>
         <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= adminEscape(__admin('common.cancel')) ?></button>
             <button type="button" id="btn-confirm-export" class="admin-btn admin-btn--primary">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                <?= __admin('dashboard.projects.export') ?>
+                <?= adminEscape(__admin('dashboard.projects.export')) ?>
             </button>
         </div>
     </div>
@@ -490,28 +488,28 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.importTitle') ?></h3>
+            <h3 class="admin-modal__title"><?= adminEscape(__admin('dashboard.projects.importTitle')) ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);">
-                <?= __admin('dashboard.projects.importFrom') ?>: <strong id="import-file-name"></strong>
+                <?= adminEscape(__admin('dashboard.projects.importFrom')) ?>: <strong id="import-file-name"></strong>
             </p>
             <div class="admin-form-group">
-                <label class="admin-label" for="import-project-name"><?= __admin('dashboard.projects.nameLabel') ?></label>
+                <label class="admin-label" for="import-project-name"><?= adminEscape(__admin('dashboard.projects.nameLabel')) ?></label>
                 <input type="text" id="import-project-name" class="admin-input" maxlength="60" autocomplete="off" />
-                <small class="admin-hint"><?= __admin('dashboard.projects.importNameHelp') ?></small>
+                <small class="admin-hint"><?= adminEscape(__admin('dashboard.projects.importNameHelp')) ?></small>
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="import-project-activate" checked />
-                    <span><?= __admin('dashboard.projects.activateAfterImport') ?></span>
+                    <span><?= adminEscape(__admin('dashboard.projects.activateAfterImport')) ?></span>
                 </label>
             </div>
         </div>
         <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
-            <button type="button" id="btn-confirm-import" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.importBtn') ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= adminEscape(__admin('common.cancel')) ?></button>
+            <button type="button" id="btn-confirm-import" class="admin-btn admin-btn--primary"><?= adminEscape(__admin('dashboard.projects.importBtn')) ?></button>
         </div>
     </div>
 </div>
@@ -522,42 +520,42 @@ if (isset($_GET['denied'])): ?>
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.renameTitle') ?></h3>
+            <h3 class="admin-modal__title"><?= adminEscape(__admin('dashboard.projects.renameTitle')) ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);"><strong id="rename-project-current"></strong></p>
             <div class="admin-form-group">
-                <label class="admin-label" for="rename-project-name"><?= __admin('dashboard.projects.renameNameLabel') ?></label>
+                <label class="admin-label" for="rename-project-name"><?= adminEscape(__admin('dashboard.projects.renameNameLabel')) ?></label>
                 <input type="text" id="rename-project-name" class="admin-input" maxlength="60" autocomplete="off" />
-                <small class="admin-hint" id="rename-project-help"><?= __admin('dashboard.projects.renameHelp') ?></small>
+                <small class="admin-hint" id="rename-project-help"><?= adminEscape(__admin('dashboard.projects.renameHelp')) ?></small>
             </div>
         </div>
         <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
-            <button type="button" id="btn-confirm-rename" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.renameBtn') ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= adminEscape(__admin('common.cancel')) ?></button>
+            <button type="button" id="btn-confirm-rename" class="admin-btn admin-btn--primary"><?= adminEscape(__admin('dashboard.projects.renameBtn')) ?></button>
         </div>
     </div>
 </div>
 
 <!-- Quick Stats (loaded via AJAX) -->
 <section class="admin-section">
-    <h2 class="admin-section__title"><?= __admin('dashboard.stats.title') ?></h2>
+    <h2 class="admin-section__title"><?= adminEscape(__admin('dashboard.stats.title')) ?></h2>
     <div class="admin-figures" id="admin-stats">
         <div class="admin-figure">
-            <span class="admin-figure__label"><?= __admin('dashboard.stats.routes') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.stats.routes')) ?></span>
             <span class="admin-figure__value" id="stat-routes">-</span>
         </div>
         <div class="admin-figure">
-            <span class="admin-figure__label"><?= __admin('dashboard.stats.pages') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.stats.pages')) ?></span>
             <span class="admin-figure__value" id="stat-pages">-</span>
         </div>
         <div class="admin-figure">
-            <span class="admin-figure__label"><?= __admin('dashboard.stats.components') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.stats.components')) ?></span>
             <span class="admin-figure__value" id="stat-components">-</span>
         </div>
         <div class="admin-figure">
-            <span class="admin-figure__label"><?= __admin('dashboard.stats.languages') ?></span>
+            <span class="admin-figure__label"><?= adminEscape(__admin('dashboard.stats.languages')) ?></span>
             <span class="admin-figure__value" id="stat-languages">-</span>
         </div>
     </div>
@@ -565,33 +563,12 @@ if (isset($_GET['denied'])): ?>
 
 <!-- Site Map -->
 <section class="admin-section" data-requires-command="getSiteMap">
-    <h2 class="admin-section__title"><?= __admin('dashboard.sitemap.title') ?></h2>
+    <h2 class="admin-section__title"><?= adminEscape(__admin('dashboard.sitemap.title')) ?></h2>
     <div class="admin-card">
         <div class="admin-card__body" id="sitemap-container">
             <div class="admin-loading">
                 <span class="admin-spinner"></span>
-                <span><?= __admin('common.loading') ?></span>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Recent Command History -->
-<section class="admin-section" data-requires-command="getCommandHistory">
-    <div class="admin-section__header">
-        <h2 class="admin-section__title"><?= __admin('dashboard.recentCommands') ?></h2>
-        <a href="<?= $router->url('history') ?>" class="admin-btn admin-btn--ghost">
-            <?= __admin('dashboard.viewAllHistory') ?>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <polyline points="9 18 15 12 9 6"/>
-            </svg>
-        </a>
-    </div>
-    <div class="admin-card">
-        <div class="admin-card__body" id="recent-commands">
-            <div class="admin-loading">
-                <span class="admin-spinner"></span>
-                <span><?= __admin('common.loading') ?></span>
+                <span><?= adminEscape(__admin('common.loading')) ?></span>
             </div>
         </div>
     </div>

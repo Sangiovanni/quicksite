@@ -6,19 +6,14 @@
  * the account you sign in with is not project development, so it lives here and
  * is served by /admin/self.
  *
- * These were `changePassword`, `deleteMyAccount`, `getMySpaceUsage` and
- * `getMyPermissions`. The logic is unchanged: every authorization each one
- * performed as a command it performs here, in the same order. What the
- * /management dispatcher used to contribute was authentication plus a
- * hasPermission() call that, for a global category with access 'any', resolves
- * to "is this caller authenticated" and nothing more — which is exactly what
- * qs_admin_json_boot() establishes before any of these run.
+ * Four operations: changing the password, deleting the account, and reading the
+ * account's space usage and its permissions. The check before they run is that
+ * the caller is authenticated, which qs_admin_json_boot() establishes; every
+ * other check is inside the function body.
  *
- * The two credential operations keep their own defences, and those were never
- * the dispatcher's: the login backoff (qs_login_throttle_*) and the
- * current-password re-check both live in the function body, so they travel with
- * it. A stolen session token still cannot change a password or delete an
- * account on its own.
+ * The two credential operations carry their own defences, in the function body:
+ * the login backoff (qs_login_throttle_*) and the current-password re-check, so a
+ * stolen session token cannot change a password or delete an account on its own.
  *
  * Must be required AFTER init.php — it depends on SECURE_FOLDER_PATH.
  */
@@ -28,6 +23,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 // Account self-service is served from /admin/self and never touches the command
 // dispatcher, so nothing else would record these acts. See securityLog.php.
 require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
+// Every answer here is said in the panel's words (answers.account), in the
+// language of the panel that asked (qs_admin_json_boot()).
+require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
 
 /**
  * Change the authenticated caller's password.
@@ -50,14 +48,14 @@ function qs_account_change_password(array $params): ApiResponse {
     $new = (string)($params['new_password'] ?? '');
     if ($current === '' || $new === '') {
         return ApiResponse::create(400, 'validation.required')
-            ->withMessage('current_password and new_password are required')
+            ->withMessage(__admin('answers.account.passwordFieldsRequired'))
             ->withData(['required' => ['current_password', 'new_password']]);
     }
 
     $auth = getCurrentAuth();
     if ($auth === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
     $user = $auth['user'];
     $userId = $auth['userId'];
@@ -65,14 +63,14 @@ function qs_account_change_password(array $params): ApiResponse {
     $hash = $user['password_hash'] ?? null;
     if (!is_string($hash) || $hash === '') {
         return ApiResponse::create(400, 'auth.externally_managed')
-            ->withMessage('This account has no local password (externally managed)');
+            ->withMessage(__admin('answers.account.externallyManaged'));
     }
 
     $minLength = qs_registration_config()['min_password_length'];
     if (mb_strlen($new) < $minLength) {
         return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('New password is too short')
-            ->withErrors(['new_password' => 'Minimum length: ' . $minLength])
+            ->withMessage(__admin('answers.account.passwordTooShort'))
+            ->withErrors(['new_password' => __admin('answers.account.minimumLength', ['length' => $minLength])])
             ->withData(['min_length' => $minLength]);
     }
 
@@ -83,13 +81,13 @@ function qs_account_change_password(array $params): ApiResponse {
     $wait = qs_login_throttle_admit($throttleKey, $starts);
     if ($wait > 0) {
         return ApiResponse::create(429, 'auth.throttled')
-            ->withMessage('Too many failed attempts — try again later')
+            ->withMessage(__admin('answers.account.tooManyAttempts'))
             ->withData(['retry_after' => $wait]);
     }
 
     if (!password_verify($current, $hash)) {
         $refusal = ApiResponse::create(401, 'auth.invalid_credentials')
-            ->withMessage('Current password is incorrect');
+            ->withMessage(__admin('answers.account.currentPasswordWrong'));
         return $starts > 0 ? $refusal->withData(['retry_after' => $starts]) : $refusal;
     }
     qs_login_throttle_clear($throttleKey);
@@ -104,7 +102,7 @@ function qs_account_change_password(array $params): ApiResponse {
     });
     if ($written !== true) {
         return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Could not persist the new password');
+            ->withMessage(__admin('answers.account.passwordNotSaved'));
     }
 
     // Containment: bump the generation so every session of this user stops
@@ -114,14 +112,14 @@ function qs_account_change_password(array $params): ApiResponse {
         // The password IS changed; only the containment step failed. Say so
         // rather than reporting a clean success the user would misread.
         return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Password changed, but your other sessions could not be ended — sign out everywhere to be sure');
+            ->withMessage(__admin('answers.account.sessionsNotEnded'));
     }
     qs_session_restamp($generation);
 
     qs_security_log(QS_SEC_PASSWORD_CHANGED, ['other_sessions_ended' => true], $userId);
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Password changed')
+        ->withMessage(__admin('answers.account.passwordChanged'))
         ->withData(['other_sessions_ended' => true]);
 }
 
@@ -169,27 +167,27 @@ function qs_account_delete(array $params): ApiResponse {
 
     $missing = [];
     if ($current === '') {
-        $missing['current_password'] = 'Required field';
+        $missing['current_password'] = __admin('answers.common.requiredField');
     }
     if ($typed === '') {
-        $missing['username'] = 'Required field';
+        $missing['username'] = __admin('answers.common.requiredField');
     }
     if ($missing !== []) {
         return ApiResponse::create(400, 'validation.required')
-            ->withMessage('current_password and username are required')
+            ->withMessage(__admin('answers.account.deleteFieldsRequired'))
             ->withErrors($missing);
     }
     if (!$confirm) {
         return ApiResponse::create(400, 'validation.confirmation_required')
-            ->withMessage('Account deletion must be confirmed')
-            ->withErrors(['confirm' => 'Set confirm=true to proceed'])
-            ->withData(['warning' => 'This permanently deletes your account, ends every session, and removes you from every project you belong to. It cannot be undone.']);
+            ->withMessage(__admin('answers.account.deletionNotConfirmed'))
+            ->withErrors(['confirm' => __admin('answers.account.setConfirm')])
+            ->withData(['warning' => __admin('answers.account.deletionWarning')]);
     }
 
     $auth = getCurrentAuth();
     if ($auth === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
     $user   = $auth['user'];
     $userId = (string)$auth['userId'];
@@ -200,7 +198,7 @@ function qs_account_delete(array $params): ApiResponse {
     $hash = $user['password_hash'] ?? null;
     if (!is_string($hash) || $hash === '') {
         return ApiResponse::create(400, 'auth.externally_managed')
-            ->withMessage('This account has no local password (externally managed)');
+            ->withMessage(__admin('answers.account.externallyManaged'));
     }
 
     // Same brute-force backoff as login / the password change, keyed the same way:
@@ -211,7 +209,7 @@ function qs_account_delete(array $params): ApiResponse {
     $wait = qs_login_throttle_admit($throttleKey, $starts);
     if ($wait > 0) {
         return ApiResponse::create(429, 'auth.throttled')
-            ->withMessage('Too many failed attempts — try again later')
+            ->withMessage(__admin('answers.account.tooManyAttempts'))
             ->withData(['retry_after' => $wait]);
     }
     // Both halves are evaluated before either decides, and answered as one (see
@@ -222,7 +220,7 @@ function qs_account_delete(array $params): ApiResponse {
     $usernameOk = $stored !== '' && hash_equals($stored, $typed);
     if (!$passwordOk || !$usernameOk) {
         $refusal = ApiResponse::create(401, 'auth.invalid_credentials')
-            ->withMessage('The current password or the username is incorrect');
+            ->withMessage(__admin('answers.account.credentialsWrong'));
         return $starts > 0 ? $refusal->withData(['retry_after' => $starts]) : $refusal;
     }
     qs_login_throttle_clear($throttleKey);
@@ -251,10 +249,10 @@ function qs_account_delete(array $params): ApiResponse {
     // survivable. The caller owns these, so naming them leaks nothing.
     if (!empty($owned)) {
         return ApiResponse::create(409, 'account.sole_owner')
-            ->withMessage('You still own ' . count($owned) . ' project(s). Transfer ownership or delete them first, then delete your account.')
+            ->withMessage(__adminCount('answers.account.stillOwner', count($owned)))
             ->withData([
                 'owned_projects' => $owned,
-                'hint'           => 'Use transferOwnership to hand a project to another member, or deleteProject to destroy it.',
+                'hint'           => __admin('answers.account.stillOwnerHint'),
             ]);
     }
 
@@ -295,7 +293,7 @@ function qs_account_delete(array $params): ApiResponse {
             }
             error_log("account delete: cascade aborted on '{$projectId}' for '{$userId}' — {$failure}");
             return ApiResponse::create(500, 'members.integrity')
-                ->withMessage('Could not detach your membership from a project — your account was NOT deleted. Nothing was changed.')
+                ->withMessage(__admin('answers.account.detachFailed'))
                 ->withData(['project' => $projectId, 'reason' => $failure]);
         }
         if ($removedMember) { $memberships++; }
@@ -322,7 +320,7 @@ function qs_account_delete(array $params): ApiResponse {
     });
     if ($deleted !== true) {
         return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Could not delete the account record. Your project memberships were already removed — retry, or contact the operator.');
+            ->withMessage(__admin('answers.account.recordNotDeleted'));
     }
 
     // Every session of this account is already dead: the record is gone, so no
@@ -340,7 +338,7 @@ function qs_account_delete(array $params): ApiResponse {
     qs_session_destroy();
 
     return ApiResponse::create(200, 'resource.deleted')
-        ->withMessage('Your account has been permanently deleted')
+        ->withMessage(__admin('answers.account.deleted'))
         ->withData([
             'deleted'              => true,
             'memberships_removed'  => $memberships,
@@ -442,7 +440,7 @@ function qs_account_space_usage(array $params): ApiResponse {
     $quotaFree  = $quotaLimit > 0 ? max(0, $quotaLimit - $grand) : 0;
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Owner space usage retrieved successfully')
+        ->withMessage(__admin('answers.account.spaceUsageRetrieved'))
         ->withData([
             'total' => [
                 'size'           => $grand,
@@ -497,9 +495,9 @@ function qs_account_permissions(array $user): ApiResponse {
     $permissions = getTokenPermissions($user);
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Permissions retrieved successfully')
+        ->withMessage(__admin('answers.account.permissionsRetrieved'))
         ->withData([
-            'token_name'    => $user['name'] ?? 'Unknown',
+            'token_name'    => $user['name'] ?? __admin('nav.unknownUser'),
             'role'          => $permissions['role'],
             'commands'      => $permissions['commands'],
             'command_count' => count($permissions['commands']),

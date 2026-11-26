@@ -27,33 +27,13 @@
 
     var RETENTION_PRESETS = ['session', '1d', '7d', '30d', '90d', '1y', 'persistent'];
 
-    // The words of this page's dialogs and error toasts: window.QS_STORAGE_I18N, the `storage` translations
-    // storage.php writes verbatim. t(path, params) substitutes `:name` markers and returns the
-    // path itself when nothing resolves, so an untranslated string shows on screen.
-    function t(path, params) {
-        var node = window.QS_STORAGE_I18N || {};
-        var parts = String(path).split('.');
-        for (var i = 0; i < parts.length; i++) {
-            if (node === null || typeof node !== 'object' || !(parts[i] in node)) return path;
-            node = node[parts[i]];
-        }
-        if (typeof node !== 'string') return path;
-        Object.keys(params || {}).forEach(function (name) {
-            node = node.split(':' + name).join(String(params[name]));
-        });
-        return node;
-    }
+    // The page's words are the `storage` section of the panel's words, which storage.php hands: each is read
+    // by its key's whole path through QSPanelWords (core/panel-words.js).
 
-    // A word only `en.json` holds so far, with its English beside it: t() answers a key it cannot
-    // resolve with the key itself.
-    function _word(path, fallback) {
-        var word = t(path);
-        return word === path ? fallback : word;
-    }
-
-    /** A failure the user must see: the panel's error toast. */
-    function showError(text) {
-        QuickSiteUtils.showToast(text, 'error');
+    /** Items listed in the panel's language, as a plain enumeration ("a, b, c" in English). */
+    /** A storage category's word (its id is one of the engine's four, STORAGE_CATEGORIES). */
+    function _categoryWord(id) {
+        return QSPanelWords.t('storage.categories.' + id);
     }
     var SAMESITE_OPTIONS = ['Lax', 'Strict', 'None'];
 
@@ -81,7 +61,8 @@
     function api(cmd, method, body) {
         var adminApi = window.QuickSiteAdmin;
         if (!adminApi || typeof adminApi.apiRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            // Its message is shown: the dialog's error line, the scan panel's error.
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return adminApi.apiRequest(cmd, method, body);
     }
@@ -175,38 +156,40 @@
 
     /** The prefix chip in front of the key input in the add/edit modal: never stored (core/utils.js). */
     function _renderKeyPrefixChip() {
-        return QuickSiteUtils.renderStorageKeyPrefixChip('Added automatically. Every project on this host shares one '
-                 + 'browser-storage origin, so qs.js prefixes each key with the '
-                 + 'project id. You do not type this part, and the registry does '
-                 + 'not store it.');
+        return QuickSiteUtils.renderStorageKeyPrefixChip(QSPanelWords.t('storage.keyDialog.prefixTitle'));
     }
 
-    /** The key field's hint, which changes with the scope. */
+    /**
+     * The key field's hint, which changes with the scope: what the key is (typed, or found by the scan), whether
+     * qs.js prefixes it (localStorage and sessionStorage) or not (a cookie), and that its value is never stored.
+     */
     function _keyHintText(isDeclare, prefixed) {
-        var base = isDeclare
-            ? 'Found in the build by the scan — declaring it adds it to the registry.'
-            : 'The storage key as written in code. No spaces.';
-        var prefixNote = prefixed
-            ? ' The greyed prefix is added by qs.js and is what you will find in devtools; you type only the part after it, and only that part is stored here.'
-            : ' Cookies are not prefixed — a cookie is written under exactly this name.';
-        return base + prefixNote + ' The value is provided by the visitor at runtime — never stored here.';
+        if (isDeclare) {
+            return prefixed ? QSPanelWords.t('storage.keyDialog.keyHint.declarePrefixed')
+                : QSPanelWords.t('storage.keyDialog.keyHint.declareCookie');
+        }
+        return prefixed ? QSPanelWords.t('storage.keyDialog.keyHint.prefixed')
+            : QSPanelWords.t('storage.keyDialog.keyHint.cookie');
     }
 
-    /** "stored as qsp_<project>_<id>" line, or null when it does not apply. */
+    /**
+     * "stored as qsp_<project>_<id>" line, or null when it does not apply: one word holding the key's <code>, its
+     * text drawn as the line's label, the flex gap between them.
+     */
     function _renderPhysicalKey(item) {
         var physical = _physicalKey(item);
         if (physical === null) return null;
-        var line = QSDom.el('div', { class: 'storage-card__physical' });
-        line.appendChild(QSDom.el('span', {
-            class: 'storage-card__physical-label', text: 'stored as',
-        }));
-        line.appendChild(QSDom.el('code', {
+        var key = QSDom.el('code', {
             class: 'storage-card__physical-key',
             text: physical,
-            title: 'Every project on this host shares one browser-storage origin, '
-                 + 'so qs.js prefixes each key with the project id. This is the name '
-                 + 'you will find in the browser’s developer tools.',
-        }));
+            title: QSPanelWords.t('storage.card.storedAsTitle'),
+        });
+        var line = QSDom.el('div', { class: 'storage-card__physical' });
+        QSPanelWords.parts('storage.card.storedAs', { key: key }).forEach(function (part) {
+            if (typeof part !== 'string') { line.appendChild(part); return; }
+            var text = part.trim();
+            if (text) line.appendChild(QSDom.el('span', { class: 'storage-card__physical-label', text: text }));
+        });
         return line;
     }
 
@@ -214,9 +197,9 @@
     function _renderDescription(item) {
         var desc = storedDescription(item.id, state.lang);
         var text = desc
-            || (desc === null ? t('storage.languages.unread', { language: langName(state.lang) })
-                : multilingual() ? t('storage.languages.noDescriptionIn', { language: langName(state.lang) })
-                : t('storage.languages.noDescription'));
+            || (desc === null ? QSPanelWords.t('storage.languages.unread', { language: langName(state.lang) })
+                : multilingual() ? QSPanelWords.t('storage.languages.noDescriptionIn', { language: langName(state.lang) })
+                : QSPanelWords.t('storage.languages.noDescription'));
         return QSDom.el('div', {
             class: 'storage-card__summary' + (desc ? '' : ' storage-card__summary--none'),
             text: text,
@@ -231,14 +214,14 @@
         var pills = QSDom.el('div', { class: 'storage-card__pills' });
         pills.appendChild(QSDom.el('span', { class: 'storage-card__id', text: item.id }));
         pills.appendChild(_renderPill(item.scope || '—', 'scope'));
-        pills.appendChild(_renderPill(item.category || '—', 'cat-' + (item.category || 'functional')));
+        pills.appendChild(_renderPill(item.category ? _categoryWord(item.category) : '—', 'cat-' + (item.category || 'functional')));
         if (item.consentRequired) {
-            pills.appendChild(_renderPill('needs consent', 'consent'));
+            pills.appendChild(_renderPill(QSPanelWords.t('storage.card.needsConsent'), 'consent'));
         } else {
-            pills.appendChild(_renderPill('no consent', 'essential'));
+            pills.appendChild(_renderPill(QSPanelWords.t('storage.card.noConsent'), 'essential'));
         }
         if (item.retention) {
-            pills.appendChild(_renderPill('keeps: ' + item.retention, 'retention'));
+            pills.appendChild(_renderPill(QSPanelWords.t('storage.card.keeps', { retention: item.retention }), 'retention'));
         }
         main.appendChild(pills);
 
@@ -249,9 +232,9 @@
         row.appendChild(main);
 
         var actions = QSDom.el('div', { class: 'storage-card__actions' });
-        actions.appendChild(QSControls.edit(t('storage.actions.edit', { id: item.id }),
+        actions.appendChild(QSControls.edit(QSPanelWords.t('storage.actions.edit', { id: item.id }),
             function () { openEditModal(item); }, { command: 'editStorageItem', focusKey: 'edit:' + item.id }));
-        actions.appendChild(QSControls.bin(t('storage.actions.delete', { id: item.id }),
+        actions.appendChild(QSControls.bin(QSPanelWords.t('storage.actions.delete', { id: item.id }),
             function () { openDeleteConfirm(item); }, { command: 'deleteStorageItem', focusKey: 'delete:' + item.id }));
         row.appendChild(actions);
 
@@ -271,7 +254,9 @@
             bar.appendChild(QSDom.el('button', {
                 class: cls, type: 'button',
                 onclick: function () { state.filter = key; renderList(); },
-                text: (key === 'all' ? 'All' : key) + ' · ' + count,
+                text: key === 'all'
+                    ? QSPanelWords.count('storage.filter.all', count)
+                    : QSPanelWords.count('storage.filter.scope', count, { scope: key }),
             }));
         });
         return bar;
@@ -286,8 +271,8 @@
         return QSDom.el('div', {
             class: 'storage-list__empty',
             text: filter === 'all'
-                ? 'No storage keys declared yet. Click "Add storage key" to declare one.'
-                : 'No storage keys with scope "' + filter + '".',
+                ? QSPanelWords.t('storage.list.empty')
+                : QSPanelWords.t('storage.list.emptyScope', { scope: filter }),
         });
     }
 
@@ -379,7 +364,7 @@
         if (!host) return;
         if (!multilingual()) { host.hidden = true; host.textContent = ''; return; }
         host.hidden = false;
-        host.textContent = t('storage.languages.hint');
+        host.textContent = QSPanelWords.t('storage.languages.hint');
     }
 
     /** The top selector: the language the cards show, the item dialog's picker in step with it. */
@@ -388,7 +373,7 @@
         if (!host) return;
         host.textContent = '';
         if (!multilingual()) return; // one language: nothing to choose
-        host.appendChild(QSDom.el('label', { class: 'storage-desc-lang-bar__label', for: 'storage-shown-language', text: t('storage.languages.shownIn') }));
+        host.appendChild(QSDom.el('label', { class: 'storage-desc-lang-bar__label', for: 'storage-shown-language', text: QSPanelWords.t('storage.languages.shownIn') }));
         var sel = _renderLanguageSelect(state.lang);
         sel.id = 'storage-shown-language';
         sel.classList.add('storage-desc-lang-bar__select');
@@ -439,10 +424,11 @@
         shown.close();
     }
 
-    function _renderSelect(options, selected) {
+    /** A select of values; each option shows its value, or the word wordOf(value) gives (a category's). */
+    function _renderSelect(options, selected, wordOf) {
         var sel = QSDom.el('select', { class: 'admin-input' });
         options.forEach(function (opt) {
-            var o = QSDom.el('option', { value: opt, text: opt });
+            var o = QSDom.el('option', { value: opt, text: wordOf ? wordOf(opt) : opt });
             if (opt === selected) o.selected = true;
             sel.appendChild(o);
         });
@@ -454,7 +440,9 @@
         // Declare-from-scan: the key name is fixed by usage, only used when the
         // scope couldn't be inferred (one-click declare needs a scope).
         var isDeclare = (!isEdit && prefill && prefill.id);
-        var titleText = isEdit ? 'Edit "' + item.id + '"' : (isDeclare ? 'Declare "' + prefill.id + '"' : 'Add storage key');
+        var titleText = isEdit ? QSPanelWords.t('storage.keyDialog.titleEdit', { id: item.id })
+            : (isDeclare ? QSPanelWords.t('storage.keyDialog.titleDeclare', { id: prefill.id })
+                : QSPanelWords.t('storage.keyDialog.titleAdd'));
         var dialog = _renderModalShell(titleText);
 
         // id — shown behind the non-editable prefix chip, so the author reads
@@ -462,18 +450,18 @@
         // devtools later.
         var idInput = QSDom.el('input', {
             type: 'text', class: 'admin-input storage-keyfield__input', autocomplete: 'off',
-            placeholder: 'key name, e.g. cartSession',
+            placeholder: QSPanelWords.t('storage.keyDialog.keyPlaceholder'),
             value: isEdit ? item.id : (isDeclare ? prefill.id : ''),
         });
         if (isDeclare) idInput.readOnly = true;
         var keyPrefixChip = _renderKeyPrefixChip();
         var keyField = QSDom.el('div', { class: 'storage-keyfield' }, [keyPrefixChip, idInput]);
         var keyHint = _renderHint('');
-        dialog.appendChild(_renderGroup(_renderLabel('Key name', true), keyField, keyHint));
+        dialog.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.keyName'), true), keyField, keyHint));
 
         // scope
         var scopeSelect = _renderSelect(state.scopes, isEdit ? item.scope : ((isDeclare && prefill.scope) ? prefill.scope : 'localStorage'));
-        dialog.appendChild(_renderGroup(_renderLabel('Scope', true), scopeSelect));
+        dialog.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.scope'), true), scopeSelect));
 
         // The chip follows the SCOPE: qs.js prefixes localStorage and
         // sessionStorage, and does not write cookies at all. Showing
@@ -488,18 +476,20 @@
         syncKeyPrefix();
 
         // category
-        var categorySelect = _renderSelect(state.categories, isEdit ? item.category : 'functional');
-        dialog.appendChild(_renderGroup(_renderLabel('Category', true), categorySelect,
-            _renderHint('Drives consent: "essential" needs no consent; the others do.')));
+        var categorySelect = _renderSelect(state.categories, isEdit ? item.category : 'functional', _categoryWord);
+        dialog.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.category'), true), categorySelect,
+            _renderHint(QSPanelWords.t('storage.keyDialog.categoryHint'))));
 
         // retention (preset + custom)
         var retentionPresetVal = isEdit && item.retention && RETENTION_PRESETS.indexOf(item.retention) === -1 ? '__custom__' : (isEdit ? (item.retention || 'session') : 'session');
         var retentionSelect = _renderSelect(RETENTION_PRESETS.concat(['__custom__']), retentionPresetVal);
         // relabel the custom option
-        Array.prototype.forEach.call(retentionSelect.options, function (o) { if (o.value === '__custom__') o.textContent = 'Custom…'; });
+        Array.prototype.forEach.call(retentionSelect.options, function (o) {
+            if (o.value === '__custom__') o.textContent = QSPanelWords.t('storage.keyDialog.retentionCustom');
+        });
         var retentionCustom = QSDom.el('input', {
             type: 'text', class: 'admin-input storage-retention-custom',
-            placeholder: 'e.g. 6 months, 13 months, until-logout',
+            placeholder: QSPanelWords.t('storage.keyDialog.retentionPlaceholder'),
             value: (retentionPresetVal === '__custom__') ? (item.retention || '') : '',
         });
         retentionCustom.style.display = (retentionPresetVal === '__custom__') ? '' : 'none';
@@ -507,8 +497,8 @@
             retentionCustom.style.display = (retentionSelect.value === '__custom__') ? '' : 'none';
         });
         var retentionWrap = QSDom.el('div', { class: 'storage-retention' }, [retentionSelect, retentionCustom]);
-        dialog.appendChild(_renderGroup(_renderLabel('Retention'), retentionWrap,
-            _renderHint('How long the key lives — disclosed on the cookie/privacy page.')));
+        dialog.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.retention')), retentionWrap,
+            _renderHint(QSPanelWords.t('storage.keyDialog.retentionHint'))));
 
         // description — each language's own word (translate/, keyed; edits are live). One language shows at a
         // time, the page's; what was typed in another is kept until Save, which writes the languages edited.
@@ -517,17 +507,17 @@
 
         // cookie-only conditional fields
         var cookieWrap = QSDom.el('div', { class: 'storage-cookie-fields' });
-        var domainInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'auto (or .example.com)', value: (isEdit && item.domain) || '' });
+        var domainInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: QSPanelWords.t('storage.keyDialog.cookieDomainPlaceholder'), value: (isEdit && item.domain) || '' });
         var pathInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: '/', value: (isEdit && item.path) || '' });
         var sameSiteSelect = _renderSelect(SAMESITE_OPTIONS, (isEdit && item.sameSite) || 'Lax');
         var secureLabel = QSDom.el('label', { class: 'storage-cookie-secure' });
         var secureCb = QSDom.el('input', { type: 'checkbox' });
         if (isEdit && item.secure) secureCb.checked = true;
         secureLabel.appendChild(secureCb);
-        secureLabel.appendChild(document.createTextNode(' Secure (HTTPS only)'));
-        cookieWrap.appendChild(_renderGroup(_renderLabel('Cookie domain'), domainInput));
-        cookieWrap.appendChild(_renderGroup(_renderLabel('Cookie path'), pathInput));
-        cookieWrap.appendChild(_renderGroup(_renderLabel('SameSite'), sameSiteSelect));
+        secureLabel.appendChild(document.createTextNode(' ' + QSPanelWords.t('storage.keyDialog.cookieSecure')));
+        cookieWrap.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.cookieDomain')), domainInput));
+        cookieWrap.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.cookiePath')), pathInput));
+        cookieWrap.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.cookieSameSite')), sameSiteSelect));
         cookieWrap.appendChild(_renderGroup(null, secureLabel));
         function syncCookieFields() {
             cookieWrap.style.display = (scopeSelect.value === 'cookie') ? '' : 'none';
@@ -542,16 +532,19 @@
 
         // Actions
         var actionsRow = QSDom.el('div', { class: 'storage-modal-actions' });
-        actionsRow.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save changes' : 'Add storage key' });
+        actionsRow.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: QSPanelWords.t('common.cancel'), onclick: closeModal }));
+        var saveBtn = QSDom.el('button', {
+            class: 'admin-btn admin-btn--primary', type: 'button',
+            text: isEdit ? QSPanelWords.t('storage.keyDialog.save') : QSPanelWords.t('storage.keyDialog.add'),
+        });
         actionsRow.appendChild(saveBtn);
         dialog.appendChild(actionsRow);
 
         saveBtn.addEventListener('click', async function () {
             errBox.clear();
             var id = idInput.value.trim();
-            if (id === '') { errBox.show('Key name is required.'); return; }
-            if (/\s/.test(id)) { errBox.show('Key name cannot contain spaces.'); return; }
+            if (id === '') { errBox.show(QSPanelWords.t('storage.keyDialog.keyRequired')); return; }
+            if (/\s/.test(id)) { errBox.show(QSPanelWords.t('storage.keyDialog.keyNoSpaces')); return; }
 
             var body = {
                 id: id,
@@ -580,7 +573,7 @@
             try {
                 var r = await api(isEdit ? 'editStorageItem' : 'addStorageItem', 'POST', body);
                 if (!r || !r.ok) {
-                    errBox.show(_serverWords(r, 'Save failed'));
+                    errBox.show(_serverWords(r, QSPanelWords.t('common.saveFailed')));
                     saveBtn.disabled = false;
                     return;
                 }
@@ -591,7 +584,7 @@
                 if (renamed) renamed.focus();
                 if (scan.data) await runScan();
             } catch (e) {
-                errBox.show((e && e.message) || 'Network error');
+                errBox.show((e && e.message) || QSPanelWords.t('storage.errors.network'));
                 saveBtn.disabled = false;
             }
         });
@@ -629,7 +622,7 @@
         var stored = function (code) { return id === null ? '' : storedDescription(id, code); };
         var input = QSDom.el('input', {
             type: 'text', class: 'admin-input storage-desc-row__input', autocomplete: 'off', id: inputId,
-            placeholder: 'What this key is used for',
+            placeholder: QSPanelWords.t('storage.languages.descriptionPlaceholder'),
         });
         var hint = _renderHint('');
         function showLanguage(code) {
@@ -638,16 +631,17 @@
             input.disabled = word === null && !Object.prototype.hasOwnProperty.call(drafts, code);
             input.value = Object.prototype.hasOwnProperty.call(drafts, code) ? drafts[code] : (word || '');
             hint.textContent = word === null
-                ? t('storage.languages.unread', { language: langName(code) })
-                : t(multilingual() ? 'storage.languages.descriptionHint' : 'storage.languages.descriptionHintOne');
+                ? QSPanelWords.t('storage.languages.unread', { language: langName(code) })
+                : multilingual() ? QSPanelWords.t('storage.languages.descriptionHint')
+                    : QSPanelWords.t('storage.languages.descriptionHintOne');
         }
         input.addEventListener('input', function () { drafts[shown] = input.value; });
         var row = QSDom.el('div', { class: 'storage-desc-row' });
         if (multilingual() && window.QuickSiteAdmin && window.QuickSiteAdmin.canRun(command)) {
             var picker = _mark(_renderLanguageSelect(shown), command);
             picker.classList.add('storage-desc-row__lang');
-            picker.setAttribute('aria-label', t('storage.languages.descriptionLanguage'));
-            picker.title = t('storage.languages.descriptionLanguage');
+            picker.setAttribute('aria-label', QSPanelWords.t('storage.languages.descriptionLanguage'));
+            picker.title = QSPanelWords.t('storage.languages.descriptionLanguage');
             picker.addEventListener('change', function () {
                 showLanguage(picker.value);
                 setLanguage(picker.value);
@@ -655,7 +649,7 @@
             row.appendChild(picker);
         }
         row.appendChild(input);
-        var label = _renderLabel(t('storage.languages.descriptionLabel'));
+        var label = _renderLabel(QSPanelWords.t('storage.languages.descriptionLabel'));
         label.setAttribute('for', inputId);
         showLanguage(shown);
         return {
@@ -689,13 +683,13 @@
      * so the focus goes to the next key's bin.
      */
     async function openDeleteConfirm(item) {
-        var deleted = await QuickSiteUtils.confirm(t('storage.dialogs.deleteKeyText'), {
-            title: t('storage.dialogs.deleteKey', { id: item.id }),
+        var deleted = await QuickSiteUtils.confirm(QSPanelWords.t('storage.dialogs.deleteKeyText'), {
+            title: QSPanelWords.t('storage.dialogs.deleteKey', { id: item.id }),
             type: 'danger',
-            confirmText: t('storage.dialogs.delete'),
+            confirmText: QSPanelWords.t('storage.dialogs.delete'),
             action: async function () {
                 var r = await api('deleteStorageItem', 'POST', { id: item.id });
-                if (!r || !r.ok) return { ok: false, message: _serverWords(r, t('storage.dialogs.deleteFailed')) };
+                if (!r || !r.ok) return { ok: false, message: _serverWords(r, QSPanelWords.t('storage.dialogs.deleteFailed')) };
                 await refresh();
                 return true;
             },
@@ -729,13 +723,13 @@
         head.appendChild(QSDom.el('span', { class: 'storage-card__id', text: row.id }));
         var scope = row.inferredScope || row.scope;
         if (scope) head.appendChild(_renderPill(scope, 'scope'));
-        if (row.category) head.appendChild(_renderPill(row.category, 'cat-' + row.category));
+        if (row.category) head.appendChild(_renderPill(_categoryWord(row.category), 'cat-' + row.category));
         mainCol.appendChild(head);
 
         var refs = QSDom.el('div', { class: 'storage-scan-row__refs' });
-        var w = _renderRefChips('writes', row.writers);
-        var c = _renderRefChips('clears', row.clearers);
-        var rd = _renderRefChips('reads', row.readers);
+        var w = _renderRefChips(QSPanelWords.t('storage.scan.writes'), row.writers);
+        var c = _renderRefChips(QSPanelWords.t('storage.scan.clears'), row.clearers);
+        var rd = _renderRefChips(QSPanelWords.t('storage.scan.reads'), row.readers);
         if (w) refs.appendChild(w);
         if (c) refs.appendChild(c);
         if (rd) refs.appendChild(rd);
@@ -746,7 +740,7 @@
             var act = QSDom.el('div', { class: 'storage-scan-row__action' });
             var btn = _mark(QSDom.el('button', {
                 class: 'admin-btn admin-btn--primary',
-                type: 'button', text: 'Declare', 'data-focus-key': 'declare:' + row.id,
+                type: 'button', text: QSPanelWords.t('storage.scan.declare'), 'data-focus-key': 'declare:' + row.id,
             }), 'addStorageItem');
             btn.addEventListener('click', function () { declareIncomplete(row, btn); });
             act.appendChild(btn);
@@ -755,9 +749,10 @@
         return r;
     }
 
-    function _renderScanSecHead(title, count, subtitle) {
+    /** A bucket's head: its title (a counted word, the bucket's size in it) and what the bucket means. */
+    function _renderScanSecHead(title, subtitle) {
         var head = QSDom.el('div', { class: 'storage-scan-sec__head' });
-        head.appendChild(QSDom.el('h3', { class: 'storage-scan-sec__title', text: title + ' (' + count + ')' }));
+        head.appendChild(QSDom.el('h3', { class: 'storage-scan-sec__title', text: title }));
         if (subtitle) head.appendChild(QSDom.el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
         return head;
     }
@@ -765,10 +760,10 @@
     // Incomplete = used-but-undeclared (the GDPR gap). Most prominent; always open.
     function _renderIncompleteSection(list) {
         var sec = QSDom.el('section', { class: 'storage-scan-sec storage-scan-sec--incomplete' });
-        sec.appendChild(_renderScanSecHead('Undeclared keys', list.length,
-            'Used in the build but not in the registry — the GDPR gap. Declare each to add it.'));
+        sec.appendChild(_renderScanSecHead(QSPanelWords.count('storage.scan.undeclared', list.length),
+            QSPanelWords.t('storage.scan.undeclaredHint')));
         if (!list.length) {
-            sec.appendChild(QSDom.el('div', { class: 'storage-scan__ok-note', text: 'All used keys are declared. ✓' }));
+            sec.appendChild(QSDom.el('div', { class: 'storage-scan__ok-note', text: QSPanelWords.t('storage.scan.allDeclared') }));
         } else {
             list.forEach(function (row) { sec.appendChild(_renderScanRow(row, { declare: true })); });
         }
@@ -779,19 +774,19 @@
     // likely-leftover flag. No Declare.
     function _renderDanglingSection(list) {
         var sec = QSDom.el('section', { class: 'storage-scan-sec' });
-        sec.appendChild(_renderScanSecHead('Dangling reads', list.length,
-            'Read by a binding but never written anywhere — likely a leftover after the writer was deleted. Review these.'));
+        sec.appendChild(_renderScanSecHead(QSPanelWords.count('storage.scan.dangling', list.length),
+            QSPanelWords.t('storage.scan.danglingHint')));
         list.forEach(function (row) { sec.appendChild(_renderScanRow(row, null)); });
         return sec;
     }
 
-    // OK / Orphan — collapsible, ignorable-by-default sections.
+    // OK / Orphan — collapsible, ignorable-by-default sections. `title` is the bucket's counted word.
     function _renderCollapsibleSection(key, title, list, subtitle) {
         var sec = QSDom.el('section', { class: 'storage-scan-sec storage-scan-sec--' + key });
         var toggle = QSDom.el('button', { class: 'storage-scan-sec__toggle', type: 'button' });
         var open = !!scan.expanded[key];
         toggle.appendChild(QSDom.el('span', { class: 'storage-scan-sec__chevron', text: open ? '▾' : '▸' }));
-        toggle.appendChild(QSDom.el('span', { text: title + ' (' + list.length + ')' }));
+        toggle.appendChild(QSDom.el('span', { text: title }));
         toggle.addEventListener('click', function () {
             scan.expanded[key] = !scan.expanded[key];
             renderScanPanel();
@@ -800,7 +795,7 @@
         if (open) {
             if (subtitle) sec.appendChild(QSDom.el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
             if (!list.length) {
-                sec.appendChild(QSDom.el('div', { class: 'storage-scan__empty-note', text: 'None.' }));
+                sec.appendChild(QSDom.el('div', { class: 'storage-scan__empty-note', text: QSPanelWords.t('storage.scan.none') }));
             } else {
                 list.forEach(function (row) { sec.appendChild(_renderScanRow(row, null)); });
             }
@@ -810,8 +805,8 @@
 
     function _renderScanHeader() {
         var h = QSDom.el('div', { class: 'storage-scan__header' });
-        h.appendChild(QSDom.el('h2', { class: 'storage-scan__title', text: 'Scan results' }));
-        h.appendChild(QSControls.close(t('storage.scan.dismiss'), dismissScan));
+        h.appendChild(QSDom.el('h2', { class: 'storage-scan__title', text: QSPanelWords.t('storage.scan.title') }));
+        h.appendChild(QSControls.close(QSPanelWords.t('storage.scan.dismiss'), dismissScan));
         return h;
     }
 
@@ -841,7 +836,7 @@
         root.appendChild(_renderScanHeader());
 
         if (scan.loading) {
-            root.appendChild(QSDom.el('div', { class: 'storage-scan__loading', text: 'Scanning the build…' }));
+            root.appendChild(QSDom.el('div', { class: 'storage-scan__loading', text: QSPanelWords.t('storage.scan.scanning') }));
             return;
         }
         if (scan.error) {
@@ -854,10 +849,12 @@
         if ((b.dangling_read || []).length) {
             root.appendChild(_renderDanglingSection(b.dangling_read));
         }
-        root.appendChild(_renderCollapsibleSection('ok', 'OK', b.ok || [],
-            'Declared and written in the build — nothing to do.'));
-        root.appendChild(_renderCollapsibleSection('orphan', 'Orphans', b.orphan || [],
-            'Declared but not referenced in the build. Safe to keep — may be parked.'));
+        var ok = b.ok || [];
+        var orphans = b.orphan || [];
+        root.appendChild(_renderCollapsibleSection('ok', QSPanelWords.count('storage.scan.ok', ok.length), ok,
+            QSPanelWords.t('storage.scan.okHint')));
+        root.appendChild(_renderCollapsibleSection('orphan', QSPanelWords.count('storage.scan.orphans', orphans.length), orphans,
+            QSPanelWords.t('storage.scan.orphansHint')));
         _filterControls(root);
     }
 
@@ -867,13 +864,18 @@
         renderScanPanel();
         try {
             var r = await api('scanStorageUsage', 'POST');
-            var payload = (r && r.data && (r.data.data || r.data)) || {};
-            scan.data = (payload && payload.buckets)
-                ? payload
-                : { buckets: { ok: [], incomplete: [], dangling_read: [], orphan: [] }, counts: {} };
+            if (!r || !r.ok) {
+                // A refused scan says so: it never reads as a scan that found every key declared.
+                scan.error = _serverWords(r, QSPanelWords.t('storage.scan.failed'));
+            } else {
+                var payload = (r.data && (r.data.data || r.data)) || {};
+                scan.data = (payload && payload.buckets)
+                    ? payload
+                    : { buckets: { ok: [], incomplete: [], dangling_read: [], orphan: [] }, counts: {} };
+            }
         } catch (e) {
             console.warn('[storage] scan failed:', e);
-            scan.error = (e && e.message) || 'Scan failed';
+            scan.error = (e && e.message) || QSPanelWords.t('storage.scan.failed');
         } finally {
             scan.loading = false;
         }
@@ -888,7 +890,7 @@
             _openModal('add', null, { id: row.id });
             return;
         }
-        if (btn) { btn.disabled = true; btn.textContent = 'Declaring…'; }
+        if (btn) { btn.disabled = true; btn.textContent = QSPanelWords.t('storage.scan.declaring'); }
         try {
             var r = await api('addStorageItem', 'POST', {
                 id: row.id,
@@ -898,8 +900,8 @@
             if (!r || !r.ok) {
                 if (btn) {
                     btn.disabled = false;
-                    btn.textContent = 'Declare';
-                    var msg = (r && r.data && r.data.message) || 'Declare failed';
+                    btn.textContent = QSPanelWords.t('storage.scan.declare');
+                    var msg = (r && r.data && r.data.message) || QSPanelWords.t('storage.scan.declareFailed');
                     var err = QSDom.el('span', { class: 'storage-scan-row__err', text: msg });
                     if (btn.parentNode) btn.parentNode.appendChild(err);
                 }
@@ -909,7 +911,7 @@
             await runScan();
         } catch (e) {
             console.warn('[storage] declare failed:', e);
-            if (btn) { btn.disabled = false; btn.textContent = 'Declare'; }
+            if (btn) { btn.disabled = false; btn.textContent = QSPanelWords.t('storage.scan.declare'); }
         }
     }
 
@@ -927,13 +929,13 @@
     }
 
     async function openGenerateConsentModal() {
-        var dialog = _renderModalShell('Consent layer');
+        var dialog = _renderModalShell(QSPanelWords.t('storage.consent.title'));
         // All body content lives in one container we can clear + rebuild as the
         // state changes (after Generate / Update / Delete), so the modal always
         // reflects the real status (e.g. locks the route once a page exists).
         var content = QSDom.el('div', {});
         dialog.appendChild(content);
-        content.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Loading…' }));
+        content.appendChild(QSDom.el('p', { class: 'admin-hint', text: QSPanelWords.t('storage.consent.loading') }));
         _showModal(dialog);
         await _refreshConsentContent(content, '');
     }
@@ -962,11 +964,11 @@
      */
     function _renderEssentialBannerOffer(box) {
         var offer = QSDom.el('div', { class: 'admin-alert admin-alert--warning storage-consent-offer' });
-        offer.appendChild(QSDom.el('p', { text: _word('storage.consent.essentialOnly', 'Only essential keys are declared, so there is nothing to ask a visitor and no banner shows. The consent rule stays on, and a banner appears by itself once a functional, analytics or marketing key is declared.') }));
-        offer.appendChild(QSDom.el('p', { text: _word('storage.consent.essentialOnlyLimit', 'No banner does not mean nothing to disclose: third-party embeds and scripts you wrote yourself are not in the registry, and a banner never gated them. That is a reason to keep a cookie-policy page.') }));
+        offer.appendChild(QSDom.el('p', { text: QSPanelWords.t('storage.consent.essentialOnly') }));
+        offer.appendChild(QSDom.el('p', { text: QSPanelWords.t('storage.consent.essentialOnlyLimit') }));
         var label = QSDom.el('label', { class: 'storage-consent-check' });
         label.appendChild(box);
-        label.appendChild(document.createTextNode(' ' + _word('storage.consent.essentialBanner', 'Create a banner anyway (it is not mandatory)')));
+        label.appendChild(document.createTextNode(' ' + QSPanelWords.t('storage.consent.essentialBanner')));
         offer.appendChild(label);
         return offer;
     }
@@ -980,12 +982,12 @@
             ? String(status.policyRoute).replace(/^\/+/, '') : '';
 
         var cats = _declaredNonEssentialCategories();
-        content.appendChild(_renderHint(t('storage.consent.generateHint')));
+        content.appendChild(_renderHint(QSPanelWords.t('storage.consent.generateHint')));
         var essentialBannerBox = null;
         if (cats.length) {
             content.appendChild(QSDom.el('p', {
                 class: 'admin-hint',
-                text: 'Popup toggle rows: ' + cats.join(', ') + ' (Essential is always-on, locked).',
+                text: QSPanelWords.t('storage.consent.popupRows', { categories: QSPanelWords.list(cats.map(_categoryWord), 'unit') }),
             }));
         } else {
             essentialBannerBox = QSDom.el('input', { type: 'checkbox' });
@@ -998,32 +1000,34 @@
         var routeInput = null;
         if (hasPage) {
             var fixed = QSDom.el('div', { class: 'storage-consent-policy' });
-            fixed.appendChild(QSDom.el('span', { class: 'admin-label', text: 'Cookie-policy page' }));
+            fixed.appendChild(QSDom.el('span', { class: 'admin-label', text: QSPanelWords.t('storage.consent.policyPage') }));
             fixed.appendChild(QSDom.el('code', { class: 'storage-consent-policy__route', text: status.policyRoute }));
             content.appendChild(_renderGroup(null, fixed,
-                _renderHint('Update refreshes this page from the registry. To move it to another route, delete it and generate again.')));
+                _renderHint(QSPanelWords.t('storage.consent.policyPageHint'))));
         } else {
             routeInput = QSDom.el('input', {
                 type: 'text', class: 'admin-input', autocomplete: 'off',
-                placeholder: 'e.g. cookies (leave blank to skip the policy page)',
+                placeholder: QSPanelWords.t('storage.consent.routePlaceholder'),
                 value: staleRoute,
             });
-            content.appendChild(_renderGroup(_renderLabel('Cookie-policy page route'), routeInput,
+            content.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.consent.route')), routeInput,
                 _renderHint(staleRoute
-                    ? 'The previous route "' + staleRoute + '" no longer exists — generate to recreate it, or type a different one.'
-                    : t('storage.consent.routeHint'))));
+                    ? QSPanelWords.t('storage.consent.staleRoute', { route: staleRoute })
+                    : QSPanelWords.t('storage.consent.routeHint'))));
         }
 
-        // Asking every visitor again (the stored version bumped) is offered once the layer is on and
-        // the site asks its visitors anything; a change to a category's keys asks again for that
-        // category by itself.
+        // The banner shows once the layer is on and the site asks its visitors anything.
+        var bannerShows = !!(status && status.enabled && status.asks !== false);
+
+        // Asking every visitor again (the stored version bumped) is offered while the banner shows; a
+        // change to a category's keys asks again for that category by itself.
         var askAgainCb = null;
-        if (status && status.enabled && status.asks !== false) {
+        if (bannerShows) {
             askAgainCb = QSDom.el('input', { type: 'checkbox' });
             var askAgainLabel = QSDom.el('label', { class: 'storage-consent-check' });
             askAgainLabel.appendChild(askAgainCb);
-            askAgainLabel.appendChild(document.createTextNode(' ' + t('storage.consent.askAgain')));
-            content.appendChild(_renderGroup(null, askAgainLabel, _renderHint(t('storage.consent.askAgainHint'))));
+            askAgainLabel.appendChild(document.createTextNode(' ' + QSPanelWords.t('storage.consent.askAgain')));
+            content.appendChild(_renderGroup(null, askAgainLabel, _renderHint(QSPanelWords.t('storage.consent.askAgainHint'))));
         }
 
         var resultBox = QSDom.el('div', { class: 'storage-modal-actions__error' });
@@ -1037,31 +1041,37 @@
         var actions = QSDom.el('div', { class: 'storage-modal-actions' });
 
         if (hasPage) {
-            var delBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--danger', type: 'button', text: 'Delete page' }), 'deleteCookiePolicy');
+            var delBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--danger', type: 'button', text: QSPanelWords.t('storage.consent.deletePage') }), 'deleteCookiePolicy');
             delBtn.addEventListener('click', async function () {
-                if (!(await QuickSiteUtils.confirm(t('storage.dialogs.deletePage', { route: status.policyRoute }), {
-                    type: 'danger', confirmText: t('storage.dialogs.delete'),
+                if (!(await QuickSiteUtils.confirm(QSPanelWords.t('storage.dialogs.deletePage', { route: status.policyRoute }), {
+                    type: 'danger', confirmText: QSPanelWords.t('storage.dialogs.delete'),
                 }))) return;
                 delBtn.disabled = true; errBox.hidden = true;
                 try {
                     var dr = await api('deleteCookiePolicy', 'POST', {});
                     if (!dr || !dr.ok) {
                         errBox.hidden = false;
-                        errBox.textContent = (dr && dr.data && dr.data.message) || 'Delete failed';
+                        errBox.textContent = (dr && dr.data && dr.data.message) || QSPanelWords.t('storage.consent.deletePageFailed');
                         delBtn.disabled = false;
                         return;
                     }
-                    await _refreshConsentContent(content, 'Cookie-policy page deleted. The banner no longer links to it.');
+                    // The command takes the page's link out of the banner: said only where a banner shows.
+                    await _refreshConsentContent(content, bannerShows
+                        ? QSPanelWords.t('storage.consent.pageDeleted')
+                        : QSPanelWords.t('storage.consent.pageDeletedNoBanner'));
                 } catch (e) {
                     errBox.hidden = false;
-                    errBox.textContent = (e && e.message) || 'Network error';
+                    errBox.textContent = (e && e.message) || QSPanelWords.t('storage.errors.network');
                     delBtn.disabled = false;
                 }
             });
             actions.appendChild(delBtn);
         }
 
-        var genBtn = _mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: hasPage ? 'Update' : 'Generate' }), 'generateConsentLayer,generateCookiePolicy');
+        var genBtn = _mark(QSDom.el('button', {
+            class: 'admin-btn admin-btn--primary', type: 'button',
+            text: hasPage ? QSPanelWords.t('storage.consent.update') : QSPanelWords.t('storage.consent.generate'),
+        }), 'generateConsentLayer,generateCookiePolicy');
         actions.appendChild(genBtn);
         content.appendChild(actions);
         _filterControls(content);
@@ -1089,31 +1099,36 @@
             // 1. Policy page FIRST — it owns consent.json.policyRoute, so the
             //    route is only wired up when a page is actually created. If the
             //    user cancels an overwrite, nothing points at that route.
-            var policyMsg = '';
+            var policyMsg = '';   // the policy page's outcome, one sentence
             var toastType = 'success';
             if (policyRoute) {
                 var pr = await api('generateCookiePolicy', 'POST', opts.isUpdate ? { route: policyRoute, overwrite: true } : { route: policyRoute });
                 var pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
                 if (pr && !pr.ok && pd.needsConfirm) {
-                    if (await QuickSiteUtils.confirm(t('storage.dialogs.overwritePage', { route: policyRoute }), {
-                        type: 'danger', confirmText: t('storage.dialogs.overwrite'),
+                    if (await QuickSiteUtils.confirm(QSPanelWords.t('storage.dialogs.overwritePage', { route: policyRoute }), {
+                        type: 'danger', confirmText: QSPanelWords.t('storage.dialogs.overwrite'),
                     })) {
                         pr = await api('generateCookiePolicy', 'POST', { route: policyRoute, overwrite: true });
                         pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
                     } else {
                         pr = null;
-                        policyMsg = ' (Cookie-policy page skipped — route exists, not overwritten.)';
+                        policyMsg = QSPanelWords.t('storage.consent.pageSkipped');
                         toastType = 'warning';
                     }
                 }
                 if (pr && pr.ok) {
-                    policyMsg = ' Cookie-policy page ' + (pd.overwritten ? 'updated' : 'created') + ' at ' + (pd.route || ('/' + policyRoute)) + '.';
+                    var pageRoute = pd.route || ('/' + policyRoute);
+                    policyMsg = pd.overwritten
+                        ? QSPanelWords.t('storage.consent.pageUpdated', { route: pageRoute })
+                        : QSPanelWords.t('storage.consent.pageCreated', { route: pageRoute });
                 } else if (pr) {
-                    policyMsg = ' (Cookie-policy page failed: ' + ((pr.data && pr.data.message) || 'error') + '.)';
+                    policyMsg = QSPanelWords.t('storage.consent.pageFailed', {
+                        reason: (pr.data && pr.data.message) || QSPanelWords.t('common.unknownError'),
+                    });
                     toastType = 'warning';
                 }
             } else {
-                policyMsg = ' ' + t('storage.consent.noPage');
+                policyMsg = QSPanelWords.t('storage.consent.noPage');
                 toastType = 'warning';
             }
 
@@ -1125,27 +1140,31 @@
             var r = await api('generateConsentLayer', 'POST', layerBody);
             if (!r || !r.ok) {
                 errBox.hidden = false;
-                errBox.textContent = (r && r.data && r.data.message) || 'Generation failed';
+                errBox.textContent = (r && r.data && r.data.message) || QSPanelWords.t('storage.consent.generateFailed');
                 genBtn.disabled = false;
                 return;
             }
             var d = (r.data && (r.data.data || r.data)) || {};
             var langs = d.languagesSeeded ? Object.keys(d.languagesSeeded) : [];
 
-            var msg = 'Consent layer ' + (opts.isUpdate ? 'updated' : 'generated and enabled') + '.' +
-                (langs.length ? ' Seeded copy: ' + langs.join(', ') + '.' : '') +
-                (d.askedAgain ? ' ' + t('storage.consent.askedAgain') : '') +
-                policyMsg + ' ' +
-                (d.asks === false
-                    ? _word('storage.consent.noBanner', 'No banner was created: only essential keys are declared, so there is nothing to ask a visitor. A banner appears by itself once a functional, analytics or marketing key is declared.')
-                    : 'Preview a page to see the banner.');
+            // The outcome, one word per sentence that applies, the sentences in a row.
+            var sentences = [opts.isUpdate
+                ? QSPanelWords.t('storage.consent.layerUpdated')
+                : QSPanelWords.t('storage.consent.layerGenerated')];
+            if (langs.length) sentences.push(QSPanelWords.t('storage.consent.seeded', { languages: QSPanelWords.list(langs, 'unit') }));
+            if (d.askedAgain) sentences.push(QSPanelWords.t('storage.consent.askedAgain'));
+            sentences.push(policyMsg);
+            sentences.push(d.asks === false
+                ? QSPanelWords.t('storage.consent.noBanner')
+                : QSPanelWords.t('storage.consent.previewBanner'));
+            var msg = sentences.join(' ');
             QuickSiteUtils.showToast(msg, toastType);
             // Re-render from fresh status — flips to the locked route + Update/
             // Delete once a page exists, so a re-generate can't change the route.
             await _refreshConsentContent(opts.content, msg);
         } catch (e) {
             errBox.hidden = false;
-            errBox.textContent = (e && e.message) || 'Network error';
+            errBox.textContent = (e && e.message) || QSPanelWords.t('storage.errors.network');
             genBtn.disabled = false;
         }
     }

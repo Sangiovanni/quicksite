@@ -11,14 +11,15 @@
  * role gate (AdminRouter::PAGE_PERMISSIONS => getCommandHistory, which the
  * `history` category grants to admin and owner only).
  *
- * The old /admin/command?tab=history URL redirects here, so the dashboard link
- * and any bookmark keep working.
+ * /admin/command?tab=history redirects here, so a link or a bookmark to it
+ * reaches this page.
  *
  * Static structure lives here; everything dynamic is built by history.js with
  * createElement.
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
+require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php'; // qs_inline_script_json()
 ?>
 
 <div class="admin-page-header">
@@ -28,9 +29,9 @@ $baseUrl = rtrim(BASE_URL, '/');
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
             </svg>
-            <?= __admin('history.title') ?>
+            <?= adminEscape(__admin('history.title')) ?>
         </h1>
-        <p class="admin-page-header__subtitle"><?= __admin('history.subtitle') ?></p>
+        <p class="admin-page-header__subtitle"><?= adminEscape(__admin('history.subtitle')) ?></p>
     </div>
 </div>
 
@@ -40,66 +41,11 @@ $baseUrl = rtrim(BASE_URL, '/');
 // role — but the clear control is gated again in the markup, and the command
 // enforces it a third time server-side.
 window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
-window.QUICKSITE_CONFIG.commandUrl = '<?= $router->url('command') ?>';
+window.QUICKSITE_CONFIG.commandUrl = <?= qs_inline_script_json($router->url('command')) ?>;
 window.QUICKSITE_CONFIG.consoleEnabled = <?= $router->isConsoleEnabled() ? 'true' : 'false' ?>;
-
-// The strings history.js builds in JS. The layout emits only a small subset of
-// the translation tree into QUICKSITE_CONFIG (common, dashboard, …) and never
-// carried `history`, so every JS-side label on this page silently fell back to
-// its English literal — including for a French panel. Emitted per-page here,
-// the same way builds.php emits QS_BUILDS_I18N.
-window.QS_HISTORY_I18N = <?= json_encode([
-    'common' => [
-        'loading' => __admin('common.loading'),
-    ],
-    'history' => [
-        'noHistory'         => __admin('history.noHistory'),
-        'noHistoryFiltered' => __admin('history.noHistoryFiltered'),
-        'exportEmpty'       => __admin('history.exportEmpty'),
-        'columns' => [
-            'timestamp' => __admin('history.columns.timestamp'),
-            'command'   => __admin('history.columns.command'),
-            'method'    => __admin('history.columns.method'),
-            'user'      => __admin('history.columns.user'),
-            'status'    => __admin('history.columns.status'),
-            'duration'  => __admin('history.columns.duration'),
-            'details'   => __admin('history.columns.details'),
-        ],
-        'detail' => [
-            'id'          => __admin('history.detail.id'),
-            'timestamp'   => __admin('history.detail.timestamp'),
-            'command'     => __admin('history.detail.command'),
-            'method'      => __admin('history.detail.method'),
-            'duration'    => __admin('history.detail.duration'),
-            'publisher'   => __admin('history.detail.publisher'),
-            'userId'      => __admin('history.detail.userId'),
-            'params'      => __admin('history.detail.params'),
-            'requestBody' => __admin('history.detail.requestBody'),
-            'response'    => __admin('history.detail.response'),
-        ],
-        'filters' => [
-            'success' => __admin('history.filters.success'),
-            'error'   => __admin('history.filters.error'),
-        ],
-        'errors' => [
-            'loadFailed' => __admin('history.errors.loadFailed'),
-        ],
-        'clear' => [
-            'pickDate'        => __admin('history.clear.pickDate'),
-            'nothing'         => __admin('history.clear.nothing'),
-            'noDays'          => __admin('history.clear.noDays'),
-            'storedDays'      => __admin('history.clear.storedDays'),
-            'dayGranularHint' => __admin('history.clear.dayGranularHint'),
-            'done'            => __admin('history.clear.done'),
-            'title'           => __admin('history.clear.title'),
-            'confirmButton'   => __admin('history.clear.confirmButton'),
-            'preview'         => __admin('history.clear.preview'),
-            'previewFailed'   => __admin('history.clear.previewFailed'),
-            'failed'          => __admin('history.clear.failed'),
-        ],
-    ],
-], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
+<?php // The words history.js reads, each part at its own path (QSPanelWords); `common` comes with the layout. ?>
+<?= __adminWords(['history.noHistory', 'history.noHistoryFiltered', 'history.exportEmpty', 'history.durationMs', 'history.errors', 'history.filters.success', 'history.filters.error', 'history.columns', 'history.detail', 'history.clear', 'history.pagination']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/history.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/history.js') ?>"></script>
 
 <!-- Filters -->
@@ -107,7 +53,7 @@ window.QS_HISTORY_I18N = <?= json_encode([
     <div class="admin-card__body">
         <div class="admin-filter-row">
             <div class="admin-filter-group">
-                <label class="admin-label" for="filter-date"><?= __admin('history.filters.date') ?></label>
+                <label class="admin-label" for="filter-date"><?= adminEscape(__admin('history.filters.date')) ?></label>
                 <div style="display: flex; gap: var(--space-xs); align-items: center;">
                     <input type="date" id="filter-date" class="admin-input" style="flex: 1;">
                     <button type="button" class="admin-btn admin-btn--ghost" id="clear-date-filter"
@@ -121,16 +67,16 @@ window.QS_HISTORY_I18N = <?= json_encode([
             </div>
 
             <div class="admin-filter-group">
-                <label class="admin-label" for="filter-command"><?= __admin('history.filters.command') ?></label>
-                <input type="text" id="filter-command" class="admin-input" placeholder="e.g., getStructure, edit, delete...">
+                <label class="admin-label" for="filter-command"><?= adminEscape(__admin('history.filters.command')) ?></label>
+                <input type="text" id="filter-command" class="admin-input" placeholder="<?= adminAttr(__admin('history.filters.commandPlaceholder')) ?>">
             </div>
 
             <div class="admin-filter-group">
-                <label class="admin-label" for="filter-status"><?= __admin('history.filters.status') ?></label>
+                <label class="admin-label" for="filter-status"><?= adminEscape(__admin('history.filters.status')) ?></label>
                 <select id="filter-status" class="admin-select">
-                    <option value=""><?= __admin('history.filters.all') ?></option>
-                    <option value="success"><?= __admin('history.filters.success') ?></option>
-                    <option value="error"><?= __admin('history.filters.error') ?></option>
+                    <option value=""><?= adminEscape(__admin('history.filters.all')) ?></option>
+                    <option value="success"><?= adminEscape(__admin('history.filters.success')) ?></option>
+                    <option value="error"><?= adminEscape(__admin('history.filters.error')) ?></option>
                 </select>
             </div>
 
@@ -140,10 +86,10 @@ window.QS_HISTORY_I18N = <?= json_encode([
                         <circle cx="11" cy="11" r="8"/>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </svg>
-                    <?= __admin('common.search') ?>
+                    <?= adminEscape(__admin('common.search')) ?>
                 </button>
                 <button type="button" class="admin-btn admin-btn--outline" id="history-reset">
-                    <?= __admin('common.reset') ?>
+                    <?= adminEscape(__admin('common.reset')) ?>
                 </button>
             </div>
         </div>
@@ -158,7 +104,7 @@ window.QS_HISTORY_I18N = <?= json_encode([
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
             </svg>
-            <?= __admin('history.title') ?>
+            <?= adminEscape(__admin('history.title')) ?>
         </h2>
         <div>
             <button type="button" class="admin-btn admin-btn--ghost" id="history-export">
@@ -167,18 +113,18 @@ window.QS_HISTORY_I18N = <?= json_encode([
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                <?= __admin('history.exportCsv', 'Export CSV') ?>
+                <?= adminEscape(__admin('history.exportCsv')) ?>
             </button>
             <button type="button" class="admin-btn admin-btn--danger"
                     id="history-clear" data-requires-command="clearCommandHistory">
-                <?= __admin('history.clearHistory') ?>
+                <?= adminEscape(__admin('history.clearHistory')) ?>
             </button>
         </div>
     </div>
     <div class="admin-card__body" id="history-content">
         <div class="admin-loading">
             <span class="admin-spinner"></span>
-            <span><?= __admin('common.loading') ?></span>
+            <span><?= adminEscape(__admin('common.loading')) ?></span>
         </div>
     </div>
 </div>
@@ -189,11 +135,11 @@ window.QS_HISTORY_I18N = <?= json_encode([
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <polyline points="15 18 9 12 15 6"/>
         </svg>
-        <?= __admin('common.previous') ?>
+        <?= adminEscape(__admin('common.previous')) ?>
     </button>
     <span class="admin-pagination__info" id="page-info"></span>
     <button class="admin-btn admin-btn--outline" id="next-page">
-        <?= __admin('common.next') ?>
+        <?= adminEscape(__admin('common.next')) ?>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <polyline points="9 18 15 12 9 6"/>
         </svg>
@@ -205,7 +151,7 @@ window.QS_HISTORY_I18N = <?= json_encode([
     <div class="admin-modal__backdrop" data-action="close-detail"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title"><?= __admin('history.columns.details') ?></h3>
+            <h3 class="admin-modal__title"><?= adminEscape(__admin('history.columns.details')) ?></h3>
             <button type="button" class="admin-modal__close" data-action="close-detail" data-qs-icon="close"
                     aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
         </div>
@@ -228,12 +174,12 @@ window.QS_HISTORY_I18N = <?= json_encode([
 -->
 <template id="history-clear-body">
     <div class="history-clear">
-        <p><?= __admin('history.clear.intro', 'Deletes stored command history for this project. This cannot be undone.') ?></p>
+        <p><?= adminEscape(__admin('history.clear.intro')) ?></p>
 
         <div class="admin-filter-group">
-            <label class="admin-label" for="clear-before"><?= __admin('history.clear.beforeLabel', 'Delete whole days before') ?></label>
+            <label class="admin-label" for="clear-before"><?= adminEscape(__admin('history.clear.beforeLabel')) ?></label>
             <input type="date" id="clear-before" class="admin-input">
-            <small><?= __admin('history.clear.beforeHint', 'History is stored one file per day and is deleted a whole day at a time. Days from this date onwards are kept, so today is never deleted.') ?></small>
+            <small><?= adminEscape(__admin('history.clear.beforeHint')) ?></small>
         </div>
 
         <div id="clear-preview" class="admin-alert admin-alert--info"></div>

@@ -139,7 +139,7 @@ why a step never names a project itself.
 
 Have `steps` array, no `promptTemplate`. Steps are predefined API commands with parameter placeholders.
 
-**Example:** `fresh-start.json` — deletes all routes, assets, languages, components, then resets styles. Each step is a concrete command with `forEach` loops over live data. Its reset of the texts keeps the words the consent layer and the storage and privacy registries own and, when it keeps the assets (*Keep Assets*, the default), the words of their `alt` keys too: Media's group `alt` and the site templates' group `photos`. Its last step turns the theme mode off, as the switch and the dark colours went with the components and the stylesheet: a run that wants dark mode (a site template's with its dark mode, Create Website's with *Include dark mode*) sets it on again after.
+**Example:** `fresh-start.json` — deletes all routes, assets, languages, components, then resets styles. Each step is a concrete command with `forEach` loops over live data. Its reset of the texts keeps the words the consent layer and the storage and privacy registries own and, when it keeps the assets (*Keep Assets*, the default), the words of their `alt` keys too: Media's group `alt` and the site templates' group `photos`. Its last step turns the theme mode off, as the switch and the dark colours went with the components and the stylesheet: a run that wants dark mode (a site template's with its dark mode, Create Website's with *Include dark mode*) sets it on again after. The site's name, the home and 404 pages' tab titles and the 404 page's heading and message it writes are QuickSite's starting words, in each of the site's languages (*Known Patterns & Gotchas*, 11).
 
 **Use case:** Deterministic operations that don't need AI creativity.
 
@@ -1091,3 +1091,15 @@ It is a **shape** check and nothing more. It does not confirm that a command you
 named exists, that a `dataRequirements` id you referenced is the one your template
 reads, or that a partial you wrote resolves to a file. Those surface when you run
 the workflow — see *Adding a workflow*.
+
+### 11. Starting words (`{{startingWord:<key>}}`)
+A step's parameter may hold `{{startingWord:<key>}}`: QuickSite's own word `<key>`
+from its word files (`<secure>/src/translations/<lang>.json`), in the step's
+language. That is the step's own `language` parameter as its other placeholders
+resolved it (a loop's `{{$value}}`, a fetched default language), and the project's
+default language when the step names none or names `default`. A language with no
+word file of its own takes its base language's word, else English. The word's
+`{{name}}` markers are left as written, and a key no word file holds stays as
+written, where the result shows it. *Fresh Start* writes a site's name, its tab
+titles and its 404 page's words this way, and *Theme Switch Button* the switch's
+name and first label, each in every language of the site.

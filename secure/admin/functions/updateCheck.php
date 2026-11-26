@@ -4,8 +4,7 @@
  *
  * NOT A COMMAND. It reports on THE INSTALLATION, not on any project, and the
  * command surface is a CLI for developing a project (by design), so it has no
- * place in `secure/management/command/` (it used to be the `checkForUpdates`
- * command). The panel reaches it as the `update-check` arm of
+ * place in `secure/management/command/`. The panel reaches it as the `update-check` arm of
  * `public/admin/api/index.php`.
  *
  * DISCOVERY, NOT ACTION. Nothing here applies anything. Applying an update
@@ -15,8 +14,7 @@
  *
  * WHO SEES the resulting notice is decided in layout.php from
  * secure/management/config/operator.php. That is a DISPLAY preference and
- * grants nothing: this endpoint answers any authenticated caller, exactly as
- * `checkForUpdates` always did. Gating it on the operator list would turn a
+ * grants nothing: this endpoint answers any authenticated caller. Gating it on the operator list would turn a
  * display preference into an authorization tier, which is the one thing that
  * file's design forbids.
  */
@@ -139,28 +137,24 @@ if (!function_exists('qs_update_check')) {
      * Compare the installed VERSION against the latest published release.
      *
      * ⚠ The version read is qs_local_version() — THE shared reader in
-     * utilsManagement.php — and no longer a private copy. The command file this
-     * code came from deliberately kept its own updates_getLocalVersion() because
-     * sharing would have dragged utilsManagement's ~1000 lines (and
-     * JsonToHtmlRenderer, PageManagement, TagRegistry, Translator and
-     * TrimParameters behind it) into a command that otherwise loaded one class.
-     * That trade does not exist here: the admin JSON endpoint already requires
-     * utilsManagement on every request, so the dependency is paid and a second
-     * reader of the same file is pure duplication. The two only ever differed by
-     * the leading-v strip below, which belongs at the point of comparison anyway
-     * — the build stamp must NOT have it.
+     * utilsManagement.php, which the admin JSON endpoint already requires on
+     * every request, so a reader of its own here would be pure duplication. The
+     * leading v is stripped below, at the point of comparison: the build stamp
+     * must NOT have it.
      *
      * @return array{status:int,success:bool,error:?string,data:array}
      */
     function qs_update_check(): array {
         require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+        // The refusal is said in the panel's words, in the language of the panel that asked.
+        require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
 
         $raw = qs_local_version();
         if ($raw === null) {
             return [
                 'status'  => 500,
                 'success' => false,
-                'error'   => 'Could not read VERSION file. Make sure a VERSION file exists at the installation root.',
+                'error'   => __admin('answers.update.versionUnreadable'),
                 'data'    => [],
             ];
         }

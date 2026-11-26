@@ -113,11 +113,11 @@
 
         // Per-category, because they genuinely differ — a single "max 5 MB"
         // would be wrong for four of the five things a user can drop here.
-        if (uploadLimits && uploadLimits.effective_human) {
-            const sizes = Object.entries(uploadLimits.effective_human)
-                .map(([cat, human]) => `${cat} ${human}`)
+        if (uploadLimits && uploadLimits.effective) {
+            const sizes = Object.entries(uploadLimits.effective)
+                .map(([cat, bytes]) => QSPanelWords.t('media.maxSizeOf', { category: categoryWord(cat), size: QuickSiteUtils.formatSize(bytes) }))
                 .join(' · ');
-            if (sizes) parts.push(t('media.maxSize', { sizes: sizes }));
+            if (sizes) parts.push(QSPanelWords.t('media.maxSize', { sizes: sizes }));
         }
 
         hint.textContent = parts.join('  |  ');
@@ -152,7 +152,7 @@
         const list = await QSSiteWords.read();
         if (!list || QSSiteWords.readFailed() || list.codes.length === 0) {
             words = {};
-            wordsError = QSSiteWords.readError() || t('media.failed');
+            wordsError = QSSiteWords.readError() || QSPanelWords.t('media.failed');
             return;
         }
         projectLangs = list.codes.slice();
@@ -253,11 +253,14 @@
         }
     }
 
-    function formatSize(bytes) {
-        if (!bytes || bytes === 0) return '—';
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / 1048576).toFixed(1) + ' MB';
+    /** A file's size in the panel's words (QuickSiteUtils.formatSize), or a dash for a file whose size is not known. */
+    function sizeWord(bytes) {
+        return bytes ? QuickSiteUtils.formatSize(bytes) : '—';
+    }
+
+    /** A category's name in words: media.category.images, .font, .audio or .videos, the four Media sorts files in. */
+    function categoryWord(category) {
+        return QSPanelWords.t('media.category.' + category);
     }
 
     function getAssetUrl(asset) {
@@ -271,47 +274,19 @@
         return base + '/assets/' + asset.category + '/' + encodeURIComponent(asset.filename);
     }
 
-    /**
-     * Resolve one admin string by its FULL dot path, from the sub-trees
-     * media.php emits. A path that resolves to nothing returns THE PATH
-     * ITSELF, so an unset string is visible on screen.
-     *
-     * @param {string} path      e.g. 'media.infoCategory'
-     * @param {Object} [params]  :name markers, as PHP's t() does
-     * @returns {string}
-     */
-    function t(path, params) {
-        let node = window.QS_MEDIA_I18N || {};
-        for (const part of String(path).split('.')) {
-            if (node === null || typeof node !== 'object' || !(part in node)) return path;
-            node = node[part];
-        }
-        if (typeof node !== 'string') return path;
-        let value = node;
-        if (params) {
-            for (const name of Object.keys(params)) {
-                value = value.split(':' + name).join(String(params[name]));
-            }
-        }
-        return value;
-    }
-
-    /**
-     * One "<strong>Label:</strong> value" line of the edit area's info block.
-     * @returns {HTMLElement} one <p>
-     */
+    /** The edit area's status line: one message, in one colour. */
     function _setStatus(el, message, color) {
         QSDom.clear(el);
         el.appendChild(QSDom.el('span', { style: 'color:' + color, text: message }));
     }
 
     /**
-     * One "<strong>Label:</strong> value" line of the edit area's info block.
+     * One "<strong>Label:</strong> value" line of the edit area's info block: the label is a word that holds its colon.
      * @returns {HTMLElement} one <p>
      */
-    function _renderInfoLine(labelKey, value) {
+    function _renderInfoLine(label, value) {
         return QSDom.el('p', null, [
-            QSDom.el('strong', { text: t(labelKey) }),
+            QSDom.el('strong', { text: label }),
             ' ' + value
         ]);
     }
@@ -379,7 +354,7 @@
 
             if (value) {
                 if (/^data:/i.test(value)) {
-                    QuickSiteAdmin.showToast(t('media.dataUriUnsupported'), 'warning');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('media.dataUriUnsupported'), 'warning');
                 } else if (hasValidExtension(value)) {
                     addToQueue('url', null, value);
                     e.target.value = '';
@@ -405,7 +380,7 @@
                 e.preventDefault();
                 const value = e.target.value.trim();
                 if (value && /^data:/i.test(value)) {
-                    QuickSiteAdmin.showToast(t('media.dataUriUnsupported'), 'warning');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('media.dataUriUnsupported'), 'warning');
                 } else if (value && hasValidExtension(value)) {
                     addToQueue('url', null, value);
                     e.target.value = '';
@@ -457,7 +432,7 @@
         const name = type === 'file' ? file.name : extractFilename(url);
         const category = detectCategory(name);
         if (!category) {
-            QuickSiteAdmin.showToast(t('media.unsupportedType', { name: name }), 'warning');
+            QuickSiteAdmin.showToast(QSPanelWords.t('media.unsupportedType', { name: name }), 'warning');
             return;
         }
         // Refuse an over-sized file HERE, where we can name it, rather
@@ -472,9 +447,9 @@
             const max = limitForCategory(category);
             if (max !== null && file.size > max) {
                 QuickSiteAdmin.showToast(
-                    t('media.overLimit', {
-                        name: name, size: formatSize(file.size),
-                        category: category, max: formatSize(max)
+                    QSPanelWords.t('media.overLimit', {
+                        name: name, size: QuickSiteUtils.formatSize(file.size),
+                        category: categoryWord(category), max: QuickSiteUtils.formatSize(max)
                     }),
                     'warning'
                 );
@@ -524,7 +499,7 @@
      * Returns ONE Element.
      */
     function _renderQueueRemoveButton(item, index) {
-        return QSControls.removeRow(t('media.removeNamed', { name: item.name }), null, {
+        return QSControls.removeRow(QSPanelWords.t('media.removeNamed', { name: item.name }), null, {
             focusKey: 'queue-remove:' + item.type + ':' + item.name,
             attrs: { 'data-remove': String(index) }
         });
@@ -553,14 +528,14 @@
         row.className = 'asset-queue__row';
         row.appendChild(_renderQueueCell('asset-queue__icon', getFileIcon(item.category)));
         row.appendChild(_renderQueueCell('asset-queue__name', item.name));
-        row.appendChild(_renderQueueCell('asset-queue__size', item.size ? formatSize(item.size) : 'URL'));
-        row.appendChild(_renderQueueCell('asset-queue__category', item.category));
+        row.appendChild(_renderQueueCell('asset-queue__size', item.size ? QuickSiteUtils.formatSize(item.size) : 'URL'));
+        row.appendChild(_renderQueueCell('asset-queue__category', categoryWord(item.category)));
         row.appendChild(_renderQueueRemoveButton(item, index));
         li.appendChild(row);
 
         const meta = document.createElement('div');
         meta.className = 'asset-queue__meta';
-        meta.appendChild(_renderQueueMetaInput('description', t('media.descriptionPlaceholder'), item.description, index));
+        meta.appendChild(_renderQueueMetaInput('description', QSPanelWords.t('media.descriptionPlaceholder'), item.description, index));
         li.appendChild(meta);
 
         return li;
@@ -578,8 +553,7 @@
         }
 
         container.style.display = '';
-        countEl.textContent = t(uploadQueue.length !== 1
-            ? 'media.queueReadyMany' : 'media.queueReadyOne', { count: uploadQueue.length });
+        countEl.textContent = QSPanelWords.count('media.queueReady', uploadQueue.length);
         btn.disabled = false;
 
         // A row taken out under the focus gives it to the × that took its place.
@@ -637,7 +611,7 @@
         const btn = document.getElementById('asset-upload-btn');
         const progressDiv = document.getElementById('asset-upload-progress');
         btn.disabled = true;
-        btn.textContent = t('media.uploading');
+        btn.textContent = QSPanelWords.t('media.uploading');
         progressDiv.style.display = '';
         progressDiv.replaceChildren();
 
@@ -652,7 +626,7 @@
             line.appendChild(QSDom.el('span', { text: item.name }));
             line.appendChild(QSDom.el('span', {
                 class: 'asset-upload-progress__status',
-                text: t('media.uploadingProgress', { current: i + 1, total: total })
+                text: QSPanelWords.t('media.uploadingProgress', { current: i + 1, total: total })
             }));
             progressDiv.appendChild(line);
             const statusEl = line.querySelector('.asset-upload-progress__status');
@@ -675,8 +649,8 @@
                     statusEl.replaceChildren(_renderUploadStatus('→ ' + item.category + '/ ✓', 'success'));
                 } else {
                     failCount++;
-                    statusEl.replaceChildren(_renderUploadStatus(t('media.uploadItemFailed', {
-                        message: result.data?.message || t('media.failed') }), 'error'));
+                    statusEl.replaceChildren(_renderUploadStatus(QSPanelWords.t('media.uploadItemFailed', {
+                        message: result.data?.message || QSPanelWords.t('media.failed') }), 'error'));
                 }
             } catch (error) {
                 failCount++;
@@ -686,18 +660,20 @@
 
         // Summary toast
         if (failCount === 0) {
-            QuickSiteAdmin.showToast(t(successCount !== 1
-                ? 'media.uploadedMany' : 'media.uploadedOne', { count: successCount }), 'success');
+            QuickSiteAdmin.showToast(QSPanelWords.count('media.uploaded', successCount), 'success');
         } else if (successCount === 0) {
-            QuickSiteAdmin.showToast(t('media.allUploadsFailed', { count: failCount }), 'error');
+            QuickSiteAdmin.showToast(QSPanelWords.count('media.allUploadsFailed', failCount), 'error');
         } else {
-            QuickSiteAdmin.showToast(t('media.uploadedPartial', { ok: successCount, failed: failCount }), 'warning');
+            QuickSiteAdmin.showToast(QSPanelWords.t('media.uploadedPartial', {
+                ok: QSPanelWords.count('media.uploadedCount', successCount),
+                failed: QSPanelWords.count('media.failedCount', failCount)
+            }), 'warning');
         }
 
         // Clear queue and refresh browser
         uploadQueue = [];
         renderQueue();
-        btn.textContent = t('media.uploadAll');
+        btn.textContent = QSPanelWords.t('media.uploadAll');
         btn.disabled = true;
         await loadAssets();
     }
@@ -759,11 +735,11 @@
                 empty.style.display = '';
                 if (emptyText) {
                     if (searchQuery) {
-                        emptyText.textContent = t('media.noMatch', { query: searchQuery });
+                        emptyText.textContent = QSPanelWords.t('media.noMatch', { query: searchQuery });
                     } else if (activeCategory !== 'all') {
-                        emptyText.textContent = t('media.noneInCategory', { category: activeCategory });
+                        emptyText.textContent = QSPanelWords.t('media.noneInCategory', { category: categoryWord(activeCategory) });
                     } else {
-                        emptyText.textContent = t('media.noneYet');
+                        emptyText.textContent = QSPanelWords.t('media.noneYet');
                     }
                 }
             }
@@ -819,7 +795,7 @@
         const label = document.createElement('label');
         label.className = 'asset-card__favicon';
         const isCurrent = currentFavicon === asset.filename;
-        label.title = t(isCurrent ? 'media.faviconCurrent' : 'media.faviconUse');
+        label.title = QSPanelWords.t(isCurrent ? 'media.faviconCurrent' : 'media.faviconUse');
         label.classList.toggle('asset-card__favicon--active', isCurrent);
 
         const input = document.createElement('input');
@@ -828,7 +804,7 @@
         input.className = 'asset-card__favicon-input';
         input.checked = isCurrent;
         input.dataset.favicon = asset.filename;
-        input.setAttribute('aria-label', t('media.faviconUseAria', { name: asset.filename }));
+        input.setAttribute('aria-label', QSPanelWords.t('media.faviconUseAria', { name: asset.filename }));
         label.appendChild(input);
 
         const glyph = document.createElement('span');
@@ -878,8 +854,8 @@
                 view.type = 'button';
                 view.className = 'asset-card__view';
                 view.dataset.view = asset.filename;
-                view.title = t('media.view', { name: asset.filename });
-                view.setAttribute('aria-label', t('media.view', { name: asset.filename }));
+                view.title = QSPanelWords.t('media.view', { name: asset.filename });
+                view.setAttribute('aria-label', QSPanelWords.t('media.view', { name: asset.filename }));
                 view.appendChild(img);
                 return view;
             }
@@ -887,14 +863,14 @@
                 const span = document.createElement('span');
                 span.className = 'asset-font-preview';
                 span.style.fontFamily = `'qs-font-${asset.filename}'`;
-                span.textContent = t('media.fontSpecimen');
+                span.textContent = QSPanelWords.t('media.fontSpecimen');
                 return span;
             }
             case 'audio': {
                 const wrap = document.createElement('div');
                 wrap.className = 'asset-audio-player';
                 wrap.dataset.audioSrc = url;
-                wrap.appendChild(_renderCardButton('asset-audio-player__btn', 'playAudio', asset.filename, t('media.play'), '▶'));
+                wrap.appendChild(_renderCardButton('asset-audio-player__btn', 'playAudio', asset.filename, QSPanelWords.t('media.play'), '▶'));
                 const bar = document.createElement('div');
                 bar.className = 'asset-audio-player__bar';
                 const progress = document.createElement('div');
@@ -918,7 +894,7 @@
                 video.preload = 'metadata';
                 video.muted = true;
                 wrap.appendChild(video);
-                wrap.appendChild(_renderCardButton('asset-video-overlay', 'playVideo', asset.filename, t('media.play'), '▶'));
+                wrap.appendChild(_renderCardButton('asset-video-overlay', 'playVideo', asset.filename, QSPanelWords.t('media.play'), '▶'));
                 return wrap;
             }
             default: {
@@ -942,7 +918,7 @@
         wrap.appendChild(text);
 
         if (!selectMode && can('editAsset')) {
-            wrap.appendChild(QSControls.edit(t('media.rename', { name: asset.filename }), null, {
+            wrap.appendChild(QSControls.edit(QSPanelWords.t('media.rename', { name: asset.filename }), null, {
                 focusKey: 'rename:' + asset.filename, attrs: { 'data-rename': asset.filename }
             }));
         }
@@ -956,12 +932,12 @@
 
         const size = document.createElement('span');
         size.className = 'asset-card__size';
-        size.textContent = formatSize(asset.size);
+        size.textContent = sizeWord(asset.size);
         if (activeCategory === 'all') {
             size.appendChild(document.createTextNode(' · '));
             const cat = document.createElement('span');
             cat.className = 'asset-card__category';
-            cat.textContent = asset.category;
+            cat.textContent = categoryWord(asset.category);
             size.appendChild(cat);
         }
         wrap.appendChild(size);
@@ -970,11 +946,11 @@
             const actions = document.createElement('div');
             actions.className = 'asset-card__actions';
             // The pencil opens the details for every role; what the details let a role change is its own.
-            actions.appendChild(QSControls.edit(t('media.editDetails', { name: asset.filename }), null, {
+            actions.appendChild(QSControls.edit(QSPanelWords.t('media.editDetails', { name: asset.filename }), null, {
                 focusKey: 'edit:' + asset.filename, attrs: { 'data-edit': asset.filename }
             }));
             if (can('deleteAsset')) {
-                actions.appendChild(QSControls.bin(t('media.deleteNamed', { name: asset.filename }), null, {
+                actions.appendChild(QSControls.bin(QSPanelWords.t('media.deleteNamed', { name: asset.filename }), null, {
                     focusKey: 'delete:' + asset.filename, attrs: { 'data-delete': asset.filename }
                 }));
             }
@@ -995,8 +971,8 @@
         const badge = document.createElement('span');
         badge.className = 'asset-card__badge';
         badge.textContent = projectLangs.length > 1
-            ? t('media.altMissing', { langs: missing.map(l => l.toUpperCase()).join(', ') })
-            : t('media.altMissingOne');
+            ? QSPanelWords.t('media.altMissing', { langs: QSPanelWords.list(missing.map(l => l.toUpperCase()), 'unit') })
+            : QSPanelWords.t('media.altMissingOne');
         return badge;
     }
 
@@ -1023,7 +999,7 @@
                 thumb.appendChild(_renderCardButton(
                     'asset-card__star' + (asset.starred ? ' asset-card__star--active' : ''),
                     'star', asset.filename,
-                    t(asset.starred ? 'media.unstar' : 'media.star'),
+                    QSPanelWords.t(asset.starred ? 'media.unstar' : 'media.star'),
                     asset.starred ? '⭐' : '☆'));
             }
             const favicon = _renderFaviconControl(asset);
@@ -1333,14 +1309,14 @@
                     newFilename: newFilename
                 });
                 if (result.ok) {
-                    QuickSiteAdmin.showToast(t('media.renamed', { name: newFilename }), 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('media.renamed', { name: newFilename }), 'success');
                     await loadAssets();
                 } else {
-                    QuickSiteAdmin.showToast(result.data?.message || t('media.renameFailed'), 'error');
+                    QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('media.renameFailed'), 'error');
                     cleanup();
                 }
             } catch (error) {
-                QuickSiteAdmin.showToast(t('media.renameFailedDetail', { message: error.message }), 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('media.renameFailedDetail', { message: error.message }), 'error');
                 cleanup();
             }
         };
@@ -1403,13 +1379,13 @@
             select.hidden = true;
             input.value = '';
             input.disabled = true;
-            if (hint) hint.textContent = t('media.altUnreadable', { message: wordsError });
+            if (hint) hint.textContent = QSPanelWords.t('media.altUnreadable', { message: wordsError });
             return;
         }
         input.disabled = false;
         select.replaceChildren(...projectLangs.map(code => QSDom.el('option', { value: code, text: langLabel(code) })));
         select.hidden = projectLangs.length < 2;
-        if (hint) hint.textContent = t(projectLangs.length < 2 ? 'media.altHintOne' : 'media.altHint');
+        if (hint) hint.textContent = QSPanelWords.t(projectLangs.length < 2 ? 'media.altHintOne' : 'media.altHint');
         showAltLanguage(projectLangs.indexOf(lang) !== -1 ? lang : defaultLang);
     }
 
@@ -1425,7 +1401,7 @@
         const descInput = document.getElementById('asset-edit-description');
         const status = document.getElementById('asset-edit-status');
 
-        title.textContent = t('media.editTitle', { name: asset.filename });
+        title.textContent = QSPanelWords.t('media.editTitle', { name: asset.filename });
         prepareAltEditor(asset, keepLang || defaultLang);
         descInput.value = asset.description || '';
         status.textContent = '';
@@ -1444,7 +1420,7 @@
             case 'font': {
                 injectFontFace(asset);
                 const specimen = QSDom.el('span', {
-                    class: 'asset-edit-area__font', text: t('media.fontSpecimen')
+                    class: 'asset-edit-area__font', text: QSPanelWords.t('media.fontSpecimen')
                 });
                 specimen.style.fontFamily = "'qs-font-" + asset.filename + "'";
                 preview.appendChild(specimen);
@@ -1469,11 +1445,11 @@
         // Info
         const dims = (asset.width && asset.height) ? ` · ${asset.width}×${asset.height}` : '';
         QSDom.clear(info);
-        info.appendChild(_renderInfoLine('media.infoCategory', asset.category));
-        info.appendChild(_renderInfoLine('media.infoSize',
-            formatSize(asset.size) + dims + (asset.mime_type ? ' · ' + asset.mime_type : '')));
+        info.appendChild(_renderInfoLine(QSPanelWords.t('media.infoCategory'), categoryWord(asset.category)));
+        info.appendChild(_renderInfoLine(QSPanelWords.t('media.infoSize'),
+            sizeWord(asset.size) + dims + (asset.mime_type ? ' · ' + asset.mime_type : '')));
         if (asset.modified) {
-            info.appendChild(_renderInfoLine('media.infoModified', asset.modified));
+            info.appendChild(_renderInfoLine(QSPanelWords.t('media.infoModified'), asset.modified));
         }
 
         area.style.display = '';
@@ -1511,7 +1487,7 @@
             description: { from: asset.description || '', to: descInput.value }
         };
         saveBtn.disabled = true;
-        _setStatus(status, t('common.saving'), 'var(--admin-text-muted)');
+        _setStatus(status, QSPanelWords.t('common.saving'), 'var(--admin-text-muted)');
         try {
             let p = QSMediaAlt.plan(base);
             if (p.needsKey) {
@@ -1520,36 +1496,36 @@
                 const files = fresh && !QSSiteWords.readFailed() ? Object.values(fresh.words) : null;
                 const key = files ? QSMediaAlt.freeKey(asset.filename, files) : null;
                 if (!key) {
-                    _setStatus(status, t('media.altUnreadable', { message: QSSiteWords.readError() || t('media.failed') }), 'var(--admin-error)');
+                    _setStatus(status, QSPanelWords.t('media.altUnreadable', { message: QSSiteWords.readError() || QSPanelWords.t('media.failed') }), 'var(--admin-error)');
                     return;
                 }
                 p = QSMediaAlt.plan(Object.assign({}, base, { newKey: key }));
             }
             if (p.steps.length === 0) {
-                _setStatus(status, t('media.noChanges'), 'var(--admin-text-muted)');
+                _setStatus(status, QSPanelWords.t('media.noChanges'), 'var(--admin-text-muted)');
                 return;
             }
             const out = await QSMediaAlt.run(p.steps, (command, body) => QuickSiteAdmin.apiRequest(command, 'POST', body));
             if (!out.ok) {
-                const message = (out.response && out.response.data && out.response.data.message) || t('media.failed');
+                const message = (out.response && out.response.data && out.response.data.message) || QSPanelWords.t('media.failed');
                 let said = out.failed && out.failed.lang
-                    ? t('media.altRefused', { lang: langLabel(out.failed.lang), message: message })
+                    ? QSPanelWords.t('media.altRefused', { lang: langLabel(out.failed.lang), message: message })
                     : message;
                 if (out.notTakenBack.length) {
-                    said += ' ' + t('media.altNotTakenBack', {
-                        key: p.key || '', langs: out.notTakenBack.map(s => s.lang).filter(Boolean).join(', ')
+                    said += ' ' + QSPanelWords.t('media.altNotTakenBack', {
+                        key: p.key || '', langs: QSPanelWords.list(out.notTakenBack.map(s => s.lang).filter(Boolean), 'unit')
                     });
                 }
                 _setStatus(status, said, 'var(--admin-error)');
                 return;
             }
-            QuickSiteAdmin.showToast(t('media.updated', { name: asset.filename }), 'success');
+            QuickSiteAdmin.showToast(QSPanelWords.t('media.updated', { name: asset.filename }), 'success');
             const lang = altLang;
             await loadAssets();
             // Keep the edit area open with the saved data, on the language it showed
             const refreshed = flatAssets.find(a => a.filename === asset.filename);
             if (refreshed) openEditArea(refreshed.filename, lang);
-            _setStatus(status, t('media.saved'), 'var(--admin-success)');
+            _setStatus(status, QSPanelWords.t('media.saved'), 'var(--admin-success)');
         } catch (error) {
             _setStatus(status, error.message, 'var(--admin-error)');
         } finally {
@@ -1570,25 +1546,25 @@
      * the dialog closes, so the focus goes to the next card's bin.
      */
     async function deleteSingle(filename) {
-        await QuickSiteUtils.confirm(t('media.cannotUndo'), {
-            title: t('media.confirmDeleteOne', { name: filename }),
+        await QuickSiteUtils.confirm(QSPanelWords.t('media.cannotUndo'), {
+            title: QSPanelWords.t('media.confirmDeleteOne', { name: filename }),
             type: 'danger',
-            confirmText: t('common.delete'),
+            confirmText: QSPanelWords.t('common.delete'),
             action: async () => {
                 let result;
                 try {
                     result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filename });
                 } catch (error) {
-                    return { ok: false, message: t('media.deleteFailedDetail', { message: error.message }) };
+                    return { ok: false, message: QSPanelWords.t('media.deleteFailedDetail', { message: error.message }) };
                 }
                 const listNotSaved = deletedButListNotSaved(result);
                 if (!result.ok && !listNotSaved) {
-                    return { ok: false, message: result.data?.message || t('media.deleteFailed') };
+                    return { ok: false, message: result.data?.message || QSPanelWords.t('media.deleteFailed') };
                 }
                 if (listNotSaved) {
-                    QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
+                    QuickSiteAdmin.showToast(result.data.message || QSPanelWords.t('media.deleteFailed'), 'error');
                 } else {
-                    QuickSiteAdmin.showToast(t('media.deleted', { name: filename }), 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('media.deleted', { name: filename }), 'success');
                 }
                 if (editingAsset?.filename === filename) closeEditArea();
                 await loadAssets();
@@ -1608,7 +1584,7 @@
         if (newStarred) {
             const starredCount = flatAssets.filter(a => a.starred).length;
             if (starredCount >= 15) {
-                QuickSiteAdmin.showToast(t('media.starLimit'), 'warning');
+                QuickSiteAdmin.showToast(QSPanelWords.t('media.starLimit'), 'warning');
                 return;
             }
         }
@@ -1622,10 +1598,10 @@
                 asset.starred = newStarred;
                 renderGrid();
             } else {
-                QuickSiteAdmin.showToast(result.data?.message || t('media.starFailed'), 'error');
+                QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('media.starFailed'), 'error');
             }
         } catch (error) {
-            QuickSiteAdmin.showToast(t('media.starFailedDetail', { message: error.message }), 'error');
+            QuickSiteAdmin.showToast(QSPanelWords.t('media.starFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -1658,16 +1634,16 @@
             });
             if (result.ok) {
                 QuickSiteAdmin.showToast(
-                    clearing ? t('media.faviconCleared') : t('media.faviconSet', { name: filename }), 'success');
+                    clearing ? QSPanelWords.t('media.faviconCleared') : QSPanelWords.t('media.faviconSet', { name: filename }), 'success');
             } else {
                 currentFavicon = previous;
                 renderGrid();
-                QuickSiteAdmin.showToast(result.data?.message || t('media.faviconFailed'), 'error');
+                QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('media.faviconFailed'), 'error');
             }
         } catch (error) {
             currentFavicon = previous;
             renderGrid();
-            QuickSiteAdmin.showToast(t('media.faviconFailedDetail', { message: error.message }), 'error');
+            QuickSiteAdmin.showToast(QSPanelWords.t('media.faviconFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -1682,7 +1658,7 @@
         selectedFiles.clear();
         const btn = document.getElementById('asset-select-mode');
         if (btn) {
-            btn.textContent = t(selectMode ? 'media.selectOn' : 'media.selectOff');
+            btn.textContent = QSPanelWords.t(selectMode ? 'media.selectOn' : 'media.selectOff');
             btn.classList.toggle('asset-tabs__select--active', selectMode);
         }
         updateBatchBar();
@@ -1699,13 +1675,13 @@
         if (selectMode) {
             bar.style.display = '';
             count.textContent = selectedFiles.size > 0
-                ? t('media.selectedCount', { count: selectedFiles.size })
-                : t('media.noneSelected');
+                ? QSPanelWords.count('media.selectedCount', selectedFiles.size)
+                : QSPanelWords.t('media.noneSelected');
             if (deleteBtn) deleteBtn.disabled = selectedFiles.size === 0;
             // Toggle button label
             const visibleAssets = getFilteredAssets();
             const allSelected = visibleAssets.length > 0 && visibleAssets.every(a => selectedFiles.has(a.filename));
-            if (selectAllBtn) selectAllBtn.textContent = t(allSelected ? 'media.deselectAll' : 'media.selectAll');
+            if (selectAllBtn) selectAllBtn.textContent = QSPanelWords.t(allSelected ? 'media.deselectAll' : 'media.selectAll');
         } else {
             bar.style.display = 'none';
         }
@@ -1732,35 +1708,32 @@
     async function deleteSelected() {
         if (selectedFiles.size === 0) return;
         const filenames = Array.from(selectedFiles);
-        await QuickSiteUtils.confirm(t('media.cannotUndo'), {
-            title: t(filenames.length !== 1 ? 'media.deleteManyTitleMany' : 'media.deleteManyTitleOne', { count: filenames.length }),
+        await QuickSiteUtils.confirm(QSPanelWords.t('media.cannotUndo'), {
+            title: QSPanelWords.count('media.deleteManyTitle', filenames.length),
             type: 'danger',
-            confirmText: t('common.delete'),
+            confirmText: QSPanelWords.t('common.delete'),
             returnFocus: () => document.getElementById('asset-select-mode'),
             action: async () => {
                 let result;
                 try {
                     result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filenames });
                 } catch (error) {
-                    return { ok: false, message: t('media.deleteFailedDetail', { message: error.message }) };
+                    return { ok: false, message: QSPanelWords.t('media.deleteFailedDetail', { message: error.message }) };
                 }
                 const listNotSaved = deletedButListNotSaved(result);
                 if (!result.ok && !listNotSaved) {
-                    return { ok: false, message: result.data?.message || t('media.deleteFailed') };
+                    return { ok: false, message: result.data?.message || QSPanelWords.t('media.deleteFailed') };
                 }
                 const failed = result.data?.data?.failed || [];
                 if (listNotSaved) {
-                    QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
+                    QuickSiteAdmin.showToast(result.data.message || QSPanelWords.t('media.deleteFailed'), 'error');
                 } else if (failed.length > 0) {
-                    QuickSiteAdmin.showToast(t('media.deletedPartial', {
-                        deleted: filenames.length - failed.length,
-                        total: filenames.length,
-                        names: failed.map(f => f.filename).join(', ')
+                    QuickSiteAdmin.showToast(QSPanelWords.count('media.deletedPartial', filenames.length, {
+                        deleted: QSPanelWords.number(filenames.length - failed.length),
+                        names: QSPanelWords.list(failed.map(f => f.filename), 'unit')
                     }), 'warning');
                 } else {
-                    QuickSiteAdmin.showToast(t(filenames.length !== 1
-                        ? 'media.deletedManyMany'
-                        : 'media.deletedManyOne', { count: filenames.length }), 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.count('media.deletedMany', filenames.length), 'success');
                 }
                 selectedFiles.clear();
                 toggleSelectMode();

@@ -9,6 +9,7 @@
     window.CSSRefiner = window.CSSRefiner || {};
 
     var t    = CSSRefiner.t;
+    var tc   = CSSRefiner.count;
     var U    = CSSRefiner.Utils;
     var NODE = CSSRefiner.CONST;
 
@@ -72,9 +73,8 @@
             suggestions.push({
                 id:          U.generateId('dup-sel'),
                 type:        NODE.TOOL_DUPLICATES,
-                description: t('tools.duplicates.sameSelector', {
-                    selector: group[0].selectorText,
-                    count:    group.length
+                description: tc('tools.duplicates.sameSelector', group.length, {
+                    selector: group[0].selectorText
                 }),
                 enabled:     true,
                 edits:       edits,
@@ -105,11 +105,8 @@
 
             /* skip if they already share the same selector (handled above) */
             var selSet = {};
-            var allSame = true;
             for (var g = 0; g < group.length; g++) {
-                var key = group[g].selectorText.trim().toLowerCase();
-                if (selSet[key]) { allSame = false; }
-                selSet[key] = true;
+                selSet[group[g].selectorText.trim().toLowerCase()] = true;
             }
             if (Object.keys(selSet).length === 1) { continue; }
 

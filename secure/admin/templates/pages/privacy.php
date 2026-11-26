@@ -15,10 +15,8 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
-<script>
-// The words of the page's dialogs and error toasts (`privacy` in the panel's translations).
-window.QS_PRIVACY_I18N = <?= qs_inline_script_json(['privacy' => AdminTranslation::getInstance()->getRaw('privacy') ?: new stdClass()]) ?>;
-</script>
+<!-- The page's words (QSPanelWords), before its script: its own section; common and nav come from the layout -->
+<?= __adminWords(['privacy']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/privacy.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/privacy.js') ?>"></script>
 
 <div class="admin-page-header">
@@ -26,14 +24,14 @@ window.QS_PRIVACY_I18N = <?= qs_inline_script_json(['privacy' => AdminTranslatio
         <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
         </svg>
-        Privacy helper
+        <?= adminEscape(__admin('privacy.title')) ?>
     </h1>
-    <p class="admin-page-header__subtitle">What this site sends out — built from your API registry (third-party data sharing) + sign-in providers. Map each field the site sends to a "data collected" entry to cover your privacy policy.</p>
+    <p class="admin-page-header__subtitle"><?= adminEscape(__admin('privacy.subtitle')) ?></p>
 </div>
 
 <!-- What a language's words are and where they show (multilingual projects only): privacy.js writes it. -->
 <p id="privacy-desclang-hint" class="admin-hint privacy-desclang-hint" hidden></p>
 
-<div id="privacy-root" class="privacy-root" role="region" aria-label="Privacy helper">
-    <div style="padding: 24px; color: var(--admin-text-muted, #555);">Loading privacy status…</div>
+<div id="privacy-root" class="privacy-root" role="region" aria-label="<?= adminAttr(__admin('privacy.title')) ?>">
+    <div style="padding: 24px; color: var(--admin-text-muted, #555);"><?= adminEscape(__admin('privacy.loading')) ?></div>
 </div>

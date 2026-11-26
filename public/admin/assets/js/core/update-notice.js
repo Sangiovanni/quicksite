@@ -63,9 +63,9 @@
         try { window.localStorage.setItem(key, value); } catch (e) { /* nothing to do */ }
     }
 
-    var strings = (cfg.translations && cfg.translations.updateNotice) || {};
-    function t(key, fallback) {
-        return typeof strings[key] === 'string' && strings[key] !== '' ? strings[key] : fallback;
+    /** A word of the `updateNotice` section, which layout.php hands on an operator's pages. */
+    function t(key, params) {
+        return QSPanelWords.t('updateNotice.' + key, params);
     }
 
     /**
@@ -78,28 +78,20 @@
     function _renderNotice(latest, current, url) {
         var D = window.QSDom;
 
-        // Composed from text nodes rather than one interpolated string, so a
-        // version value can never be read as markup wherever it came from.
+        // One sentence, its versions drawn as <code> elements (QSPanelWords.parts()), so a version value can never be
+        // read as markup wherever it came from. The running version is only in hand right after a live check. The
+        // throttled re-show has the new version and not the old one, and an empty <code> would read as a bug — so
+        // that sentence leaves the running version out.
+        var versions = { latest: D.el('code', { text: latest }) };
+        if (current !== '') versions.current = D.el('code', { text: current });
         var text = D.el('span', {}, [
-            D.el('strong', { text: t('label', 'QuickSite update:') }),
+            D.el('strong', { text: t('label') }),
             ' ',
-            D.el('span', { text: t('available', 'version') + ' ' }),
-            D.el('code', { text: latest })
+            D.el('span', {}, QSPanelWords.parts(current !== '' ? 'updateNotice.availableWithCurrent' : 'updateNotice.availableOnly', versions)),
+            ' '
         ]);
-
-        // The running version is only in hand right after a live check. The
-        // throttled re-show has the new version and not the old one, and an
-        // empty <code> would read as a bug — so the clause is dropped instead
-        // of being filled with a placeholder.
-        if (current !== '') {
-            text.appendChild(D.el('span', { text: ' ' + t('youHave', 'is available — you have') + ' ' }));
-            text.appendChild(D.el('code', { text: current }));
-            text.appendChild(document.createTextNode('. '));
-        } else {
-            text.appendChild(D.el('span', { text: ' ' + t('availableSuffix', 'is available.') + ' ' }));
-        }
         text.appendChild(D.el('span', {
-            text: t('howTo', 'Update on the server with git pull, then reload this page.')
+            text: t('howTo')
         }));
 
         if (url) {
@@ -109,14 +101,14 @@
                 href: url,
                 target: '_blank',
                 rel: 'noopener noreferrer',
-                text: t('releaseNotes', 'Release notes')
+                text: t('releaseNotes')
             }));
         }
 
         var dismiss = D.el('button', {
             type: 'button',
             'class': 'admin-security-warning__dismiss',
-            'aria-label': t('dismiss', 'Dismiss'),
+            'aria-label': t('dismiss'),
             onclick: function () {
                 // The VERSION is remembered, not a boolean — the next release
                 // has a different value and shows the notice again.

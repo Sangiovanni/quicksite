@@ -197,23 +197,25 @@ window.QuickSiteUtils = (function() {
     }
 
     /**
-     * One string from the `common` sub-tree layout.php mirrors into
-     * QUICKSITE_CONFIG, for the panel-wide chrome built in this file.
-     *
-     * A name that resolves to nothing returns the FULL dot path. A string no
-     * word file holds (a word a language lacks arrives in English, laid under
-     * it by the server) has to be visible on screen and findable by a scan,
-     * which an English fallback here would hide.
+     * A word of the `common` section (layout.php hands it on every page), for the panel-wide chrome built in this file:
+     * QSPanelWords.t('common.' + name), so a word nothing hands shows its path.
      *
      * @param {string} name  a leaf of `common`, e.g. 'cancel'
      * @returns {string}
      */
     function tCommon(name) {
-        const value = (window.QUICKSITE_CONFIG
-            && window.QUICKSITE_CONFIG.translations
-            && window.QUICKSITE_CONFIG.translations.common
-            || {})[name];
-        return typeof value === 'string' && value !== '' ? value : 'common.' + name;
+        return QSPanelWords.t('common.' + name);
+    }
+
+    /**
+     * A role's name in the panel's language: a built-in role's word (`roles.<id>`, which layout.php hands on every page),
+     * and a role an operator adds to roles.php its id, as no word names it. The PHP twin is __adminRole().
+     *
+     * @param {string} id  the role's id, e.g. 'owner'
+     * @returns {string}
+     */
+    function roleName(id) {
+        return QSPanelWords.has('roles.' + id) ? QSPanelWords.t('roles.' + id) : String(id);
     }
 
     /**
@@ -648,10 +650,10 @@ window.QuickSiteUtils = (function() {
      * Works in both HTTPS (modern API) and HTTP (legacy fallback)
      * 
      * @param {string} text - Text to copy
-     * @param {string} [successMessage='Copied!'] - Success toast message
+     * @param {string} successMessage - Success toast message (the caller's word)
      * @returns {Promise<boolean>} True if successful
      */
-    async function copyToClipboard(text, successMessage = 'Copied!') {
+    async function copyToClipboard(text, successMessage) {
         let copied = false;
         
         // Try modern clipboard API first (requires HTTPS or localhost)
@@ -759,6 +761,9 @@ window.QuickSiteUtils = (function() {
         
         // The panel-wide words layout.php ships (the searchable select reads its own here)
         tCommon,
+
+        // A role's name: a built-in role's word, an added role's id
+        roleName,
 
         // A storage key's fixed prefix: its text and its chip
         storageKeyPrefix,

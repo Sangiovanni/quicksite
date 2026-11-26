@@ -9,17 +9,14 @@
 // ============================================================================
 // Per-request project scoping
 // ============================================================================
-// This helper executes management commands IN-PROCESS. It used to inherit
-// init.php's GLOBAL served-project context, so every project-scoped arm read the
-// SERVED project's data no matter which project the caller was editing — and it
-// ran them with NO authorization at all (the resolved $tokenInfo was never used).
-//
-// It now mirrors the management dispatcher exactly (public/management/index.php):
-// peel the project from the URL marker '/admin/api/p/<projectId>/<action>', then
-// authorize the arm's underlying command(s) against THAT project before binding it
+// This helper executes management commands IN-PROCESS, so it scopes and authorizes
+// each request exactly as the management dispatcher does (public/management/index.php):
+// it peels the project from the URL marker '/admin/api/p/<projectId>/<action>', then
+// authorizes the arm's underlying command(s) against THAT project before binding it
 // via qs_load_project_context() — which binds PROJECT_PATH *and* PUBLIC_CONTENT_PATH
-// together, so the assets / styles / builds arms self-scope. Same discipline,
-// same no-oracle 403.
+// together, so the assets / styles / builds arms self-scope. Without it an arm would
+// read init.php's served project whatever project the caller edits, with no
+// authorization at all. Same discipline, same no-oracle 403.
 $__qsApiProject = null;
 {
     $__segs = array_values(array_filter(
@@ -38,7 +35,6 @@ $__qsApiProject = null;
 }
 
 require_once __DIR__ . '/../../init.php';
-require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
 
 // Fatal handling, the JSON headers, and the auth gate — shared with the panel's
 // other JSON endpoint (/admin/state) so the two cannot drift apart. Without the
@@ -134,12 +130,12 @@ if (isset(QS_API_ARM_COMMANDS[$action])) {
     // A project-scoped arm MUST target a project.
     if ($__qsApiProject === null) {
         http_response_code(400);
-        echo json_encode(['error' => 'This action is project-scoped. Target a project with /admin/api/p/<projectId>/' . $action]);
+        echo json_encode(['error' => __admin('answers.api.projectScoped', ['action' => $action])]);
         exit;
     }
     if (!is_valid_project_name($__qsApiProject)) {
         http_response_code(400);
-        echo json_encode(['error' => 'Invalid project identifier']);
+        echo json_encode(['error' => __admin('answers.common.invalidProject')]);
         exit;
     }
     // Membership + role, against the project's AUTHORITATIVE members.json. A
@@ -149,7 +145,7 @@ if (isset(QS_API_ARM_COMMANDS[$action])) {
     foreach (QS_API_ARM_COMMANDS[$action] as $__cmd) {
         if (!hasPermission($tokenInfo, $__cmd, $__qsApiProject)) {
             http_response_code(403);
-            echo json_encode(['error' => 'Forbidden']);
+            echo json_encode(['error' => __admin('answers.api.forbidden')]);
             exit;
         }
     }
@@ -168,10 +164,10 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'data' => [
-                ['value' => 'page', 'label' => 'Page'],
-                ['value' => 'menu', 'label' => 'Menu'],
-                ['value' => 'footer', 'label' => 'Footer'],
-                ['value' => 'component', 'label' => 'Component']
+                ['value' => 'page', 'label' => __admin('commandForm.apiOptions.structureTypes.page')],
+                ['value' => 'menu', 'label' => __admin('commandForm.apiOptions.structureTypes.menu')],
+                ['value' => 'footer', 'label' => __admin('commandForm.apiOptions.structureTypes.footer')],
+                ['value' => 'component', 'label' => __admin('commandForm.apiOptions.structureTypes.component')]
             ]
         ]);
         break;
@@ -199,7 +195,7 @@ switch ($action) {
                     }
                 }
                 if (!$has404) {
-                    $pages[] = ['value' => '404', 'label' => '404 (Error Page)'];
+                    $pages[] = ['value' => '404', 'label' => __admin('commandForm.apiOptions.errorPage')];
                 }
             }
             
@@ -226,7 +222,7 @@ switch ($action) {
         // Return variables for a specific component
         $componentName = $params[0] ?? '';
         if (!$componentName) {
-            echo json_encode(['success' => false, 'error' => 'Component name required']);
+            echo json_encode(['success' => false, 'error' => __admin('answers.api.componentNameRequired')]);
             break;
         }
         
@@ -251,7 +247,7 @@ switch ($action) {
                     ]
                 ]);
             } else {
-                echo json_encode(['success' => false, 'error' => 'Component not found']);
+                echo json_encode(['success' => false, 'error' => __admin('answers.api.componentNotFound')]);
             }
         } else {
             echo json_encode(['success' => false, 'error' => $result['error']]);
@@ -316,7 +312,7 @@ switch ($action) {
                 // Use filename for value (what deleteAsset expects), full path for label
                 $files[] = [
                     'value' => $file['filename'], 
-                    'label' => $file['filename'] . ' (' . qs_format_size((int)($file['size'] ?? 0)) . ')'
+                    'label' => __admin('commandForm.apiOptions.assetFile', ['name' => $file['filename'], 'size' => __adminSize((int)($file['size'] ?? 0))])
                 ];
             }
             echo json_encode(['success' => true, 'data' => $files]);
@@ -326,10 +322,17 @@ switch ($action) {
         break;
         
     case 'asset-categories':
-        // Return asset categories from config (single source of truth)
+        // Return asset categories from config (single source of truth), the shipped ones in
+        // the panel's words. A category an operator adds to the config (its header says how)
+        // has no word here and shows as its id, which is data.
         $categories = require SECURE_FOLDER_PATH . '/management/config/assetCategories.php';
-        $labels = ['images' => 'Images', 'font' => 'Fonts', 'audio' => 'Audio', 'videos' => 'Videos'];
-        $data = array_map(fn($cat) => ['value' => $cat, 'label' => $labels[$cat] ?? ucfirst($cat)], $categories);
+        $categoryWords = [
+            'images' => 'commandForm.apiOptions.assetCategories.images',
+            'font'   => 'commandForm.apiOptions.assetCategories.font',
+            'audio'  => 'commandForm.apiOptions.assetCategories.audio',
+            'videos' => 'commandForm.apiOptions.assetCategories.videos',
+        ];
+        $data = array_map(fn($cat) => ['value' => $cat, 'label' => isset($categoryWords[$cat]) ? __admin($categoryWords[$cat]) : $cat], $categories);
         echo json_encode(['success' => true, 'data' => $data]);
         break;
 
@@ -379,7 +382,7 @@ switch ($action) {
         // Reports only; applying an update is `git pull` on the server and has no
         // HTTP surface anywhere.
         //
-        // Answers any authenticated caller, exactly as `checkForUpdates` did.
+        // Answers any authenticated caller.
         // WHO SEES the resulting banner is decided in layout.php from
         // operator.php, and that list is a display preference that grants
         // nothing — gating this on it would make it an authorization tier.
@@ -422,8 +425,8 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'data' => [
-                ['value' => 'redirect', 'label' => 'Redirect (301)'],
-                ['value' => 'internal', 'label' => 'Internal (Rewrite)']
+                ['value' => 'redirect', 'label' => __admin('commandForm.apiOptions.aliasTypes.redirect')],
+                ['value' => 'internal', 'label' => __admin('commandForm.apiOptions.aliasTypes.internal')]
             ]
         ]);
         break;
@@ -460,7 +463,7 @@ switch ($action) {
         $route = $params !== [] ? implode('/', $params) : null;
         
         if (!$route || !$lang) {
-            echo json_encode(['success' => false, 'error' => 'Route and language parameters required']);
+            echo json_encode(['success' => false, 'error' => __admin('answers.api.routeAndLanguageRequired')]);
             break;
         }
         
@@ -553,10 +556,10 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'data' => [
-                ['value' => 'update', 'label' => 'Update (Replace node content)'],
-                ['value' => 'delete', 'label' => 'Delete (Remove node)'],
-                ['value' => 'insertBefore', 'label' => 'Insert Before (Add sibling before)'],
-                ['value' => 'insertAfter', 'label' => 'Insert After (Add sibling after)']
+                ['value' => 'update', 'label' => __admin('commandForm.apiOptions.editActions.update')],
+                ['value' => 'delete', 'label' => __admin('commandForm.apiOptions.editActions.delete')],
+                ['value' => 'insertBefore', 'label' => __admin('commandForm.apiOptions.editActions.insertBefore')],
+                ['value' => 'insertAfter', 'label' => __admin('commandForm.apiOptions.editActions.insertAfter')]
             ]
         ]);
         break;
@@ -567,14 +570,14 @@ switch ($action) {
         $name = $params[1] ?? null;
         
         if (!$type) {
-            echo json_encode(['success' => false, 'error' => 'Type parameter required']);
+            echo json_encode(['success' => false, 'error' => __admin('answers.api.typeRequired')]);
             break;
         }
         
         // Build endpoint based on type
         if ($type === 'page' || $type === 'component') {
             if (!$name) {
-                echo json_encode(['success' => false, 'error' => 'Name parameter required for ' . $type]);
+                echo json_encode(['success' => false, 'error' => __admin('answers.api.nameRequiredFor', ['type' => $type])]);
                 break;
             }
             $endpoint = "getStructure/{$type}/{$name}/showIds";
@@ -640,7 +643,7 @@ switch ($action) {
                 $frameCount = count($frames);
                 $list[] = [
                     'value' => $name,
-                    'label' => $name . ' (' . $frameCount . ' frames)',
+                    'label' => __adminCount('commandForm.apiOptions.keyframe', $frameCount, ['name' => $name]),
                     'frames' => $frames
                 ];
             }
@@ -672,7 +675,7 @@ switch ($action) {
                 }
                 $options[] = [
                     'type' => 'optgroup',
-                    'label' => 'Global Selectors (' . count($grouped['global']) . ')',
+                    'label' => __admin('commandForm.apiOptions.globalSelectors', ['count' => count($grouped['global'])]),
                     'options' => $globalOptions
                 ];
             }
@@ -711,7 +714,7 @@ switch ($action) {
         // Get raw spec JSON (for debugging/editing)
         if (empty($params[0])) {
             http_response_code(400);
-            echo json_encode(['error' => 'Missing spec ID']);
+            echo json_encode(['error' => __admin('answers.api.specIdMissing')]);
             break;
         }
         
@@ -722,7 +725,7 @@ switch ($action) {
         
         if (!$spec) {
             http_response_code(404);
-            echo json_encode(['error' => 'Spec not found: ' . $params[0]]);
+            echo json_encode(['error' => __admin('answers.api.specNotFound', ['id' => $params[0]])]);
             break;
         }
         
@@ -761,16 +764,11 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => $response]);
         break;
     
-    // NOTE: there is deliberately no 'ai-spec-preview' arm. Such an arm accepts a
-    // CALLER-AUTHORED spec in the request body and runs its dataRequirements;
+    // NOTE: there is deliberately no 'ai-spec-preview' arm. Such an arm would accept a
+    // CALLER-AUTHORED spec in the request body and run its dataRequirements;
     // validateWorkflow() only checks shape, so a spec could name any
-    // CommandRunner-allowlisted command. The one this file had was broken for
-    // every input (it called WorkflowManager::renderTemplateString(), a method
-    // that does not exist — an Error, which the catch(Exception) here would not
-    // even catch), and that missing method was the ONLY thing preventing
-    // unauthorized execution. It is gone rather than repaired so the next
-    // developer implementing that method cannot silently reopen the hole; the
-    // custom-workflow feature is absent for the same reason. No client calls it.
+    // CommandRunner-allowlisted command and run it unauthorized. A custom-workflow
+    // feature is absent for the same reason.
 
     case 'workflow-generate-steps':
         // A workflow's run, phase by phase: its pre-workflows, itself, its post-workflows
@@ -785,30 +783,30 @@ switch ($action) {
         // is never taken from the request: every phase is resolved here.
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
-            echo json_encode(['error' => 'Method not allowed']);
+            echo json_encode(['error' => __admin('answers.api.methodNotAllowed')]);
             break;
         }
 
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input) || !is_string($input['workflowId'] ?? null)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Missing workflowId']);
+            echo json_encode(['error' => __admin('answers.api.workflowIdMissing')]);
             break;
         }
         $userParams = is_array($input['params'] ?? null) ? $input['params'] : [];
         if (array_key_exists('phase', $input) && !is_int($input['phase'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'phase must be a number']);
+            echo json_encode(['error' => __admin('answers.api.phaseNotNumber')]);
             break;
         }
         if (array_key_exists('answer', $input) && !is_array($input['answer'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'answer must be a list of commands']);
+            echo json_encode(['error' => __admin('answers.api.answerNotList')]);
             break;
         }
         if (array_key_exists('key', $input) && !is_string($input['key'])) {
             http_response_code(400);
-            echo json_encode(['error' => 'key must be a string']);
+            echo json_encode(['error' => __admin('answers.api.keyNotString')]);
             break;
         }
 
@@ -819,7 +817,7 @@ switch ($action) {
         $workflow = $manager->loadWorkflow($input['workflowId']);
         if (!$workflow) {
             http_response_code(404);
-            echo json_encode(['error' => 'Workflow not found']);
+            echo json_encode(['error' => __admin('answers.api.workflowNotFound')]);
             break;
         }
 
@@ -838,32 +836,32 @@ switch ($action) {
             $phase = $manager->resolvePhase($workflow, $userParams, $input['phase'], $options);
             if (isset($phase['planChanged'])) {
                 http_response_code(409);
-                echo json_encode(['error' => "The run's plan changed", 'planChanged' => true]);
+                echo json_encode(['error' => __admin('answers.api.planChanged'), 'planChanged' => true]);
                 break;
             }
             if ($phase === null) {
                 http_response_code(404);
-                echo json_encode(['error' => 'No such phase']);
+                echo json_encode(['error' => __admin('answers.api.noSuchPhase')]);
                 break;
             }
             // An AI phase's spec is checked when its prompt is asked for: an invalid one is refused
             // whole rather than rendered half.
             if (isset($phase['validationErrors'])) {
                 http_response_code(500);
-                echo json_encode(['error' => 'Invalid spec', 'validationErrors' => $phase['validationErrors']]);
+                echo json_encode(['error' => __admin('answers.api.invalidSpec'), 'validationErrors' => $phase['validationErrors']]);
                 break;
             }
             echo json_encode(['success' => true, 'data' => ['phase' => $phase]]);
         } catch (\Throwable $e) {
             error_log('[workflow-generate-steps] ' . $input['workflowId'] . ': ' . $e->getMessage());
             http_response_code(500);
-            echo json_encode(['error' => 'The workflow could not be resolved']);
+            echo json_encode(['error' => __admin('answers.api.workflowUnresolved')]);
         }
         break;
 
 default:
         http_response_code(404);
-        echo json_encode(['error' => 'Unknown action: ' . $action]);
+        echo json_encode(['error' => __admin('answers.api.unknownAction', ['action' => $action])]);
 }
 
 // No local byte formatter: qs_format_size() in utilsManagement.php is the
@@ -893,7 +891,7 @@ function makeInternalApiCall(string $endpoint): array {
     }
     
     if (!in_array($command, ROUTES_MANAGEMENT)) {
-        return ['success' => false, 'error' => "Command not found: {$command}"];
+        return ['success' => false, 'error' => __admin('answers.api.commandNotFound', ['command' => $command])];
     }
     
     // Load command file with COMMAND_INTERNAL_CALL to prevent auto-execution
@@ -903,14 +901,14 @@ function makeInternalApiCall(string $endpoint): array {
     
     $commandFile = SECURE_FOLDER_PATH . '/management/command/' . $command . '.php';
     if (!file_exists($commandFile)) {
-        return ['success' => false, 'error' => "Command file not found: {$command}"];
+        return ['success' => false, 'error' => __admin('answers.api.commandFileNotFound', ['command' => $command])];
     }
     
     require_once $commandFile;
     
     $functionName = '__command_' . $command;
     if (!function_exists($functionName)) {
-        return ['success' => false, 'error' => "Command function not found: {$functionName}"];
+        return ['success' => false, 'error' => __admin('answers.api.commandFunctionNotFound', ['function' => $functionName])];
     }
     
     try {
@@ -929,7 +927,7 @@ function makeInternalApiCall(string $endpoint): array {
         return [
             'success' => false,
             'status'  => $status,
-            'error'   => $response->toArray()['message'] ?? 'Command error'
+            'error'   => $response->toArray()['message']
         ];
     } catch (\Throwable $e) {
         // This relay is the one path-leak site that does NOT
@@ -940,42 +938,6 @@ function makeInternalApiCall(string $endpoint): array {
         // message in development, generic in production, real detail to the log.
         return ['success' => false, 'error' => qs_safe_error_message($e, 'admin-api:' . $command)];
     }
-}
-
-/**
- * Extract node IDs from a structure recursively
- */
-function extractNodeIds(array $structure, string $prefix = ''): array {
-    $nodes = [];
-    
-    foreach ($structure as $index => $node) {
-        $nodeId = $node['id'] ?? $index;
-        $nodeLabel = $node['element'] ?? $node['type'] ?? 'node';
-        
-        if (isset($node['attributes']['id'])) {
-            $nodeLabel .= '#' . $node['attributes']['id'];
-        } elseif (isset($node['attributes']['class'])) {
-            $classes = is_array($node['attributes']['class']) 
-                ? implode('.', $node['attributes']['class'])
-                : $node['attributes']['class'];
-            $nodeLabel .= '.' . str_replace(' ', '.', $classes);
-        }
-        
-        $displayPath = $prefix ? $prefix . ' > ' . $nodeLabel : $nodeLabel;
-        
-        $nodes[] = [
-            'value' => (string)$nodeId,
-            'label' => $displayPath . ' (id: ' . $nodeId . ')'
-        ];
-        
-        // Recurse into children
-        if (!empty($node['children'])) {
-            $childNodes = extractNodeIds($node['children'], $displayPath);
-            $nodes = array_merge($nodes, $childNodes);
-        }
-    }
-    
-    return $nodes;
 }
 
 /**
@@ -1037,7 +999,7 @@ function buildHierarchicalNodeOptions(array $structure, string $prefix = '', int
         }
         
         // Build descriptive info
-        $tag = $node['tag'] ?? 'node';
+        $tag = $node['tag'] ?? __admin('commandForm.apiOptions.node');
         $info = $tag;
         
         if (isset($node['params']['class'])) {

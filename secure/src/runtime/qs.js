@@ -755,6 +755,31 @@
         }, duration);
     };
 
+    /**
+     * One of QuickSite's own words for the visitor, in the page's language, its
+     * {{name}} parts filled from `params` in one pass.
+     *
+     * The server writes them per page in the runtime handoff
+     * (window.QS_VISITOR_WORDS, `{ toast: {...}, themeSwitch: {...} }`), read here
+     * when a word is shown: the handoff writes the block after this file. A page
+     * that carries no such word gets '' and shows no default text, since a text
+     * QuickSite shows a visitor is in the page's language or not shown.
+     *
+     * @param {string} group   'toast'
+     * @param {string} name    the word's name in its group
+     * @param {object} [params] values for its {{name}} parts
+     * @returns {string}
+     */
+    function _qsVisitorWord(group, name, params) {
+        const words = window.QS_VISITOR_WORDS;
+        const set = words && typeof words === 'object' ? words[group] : null;
+        const word = set && typeof set === 'object' ? set[name] : null;
+        if (typeof word !== 'string' || word === '') return '';
+        return word.replace(/\{\{(\w+)\}\}/g, function (m, key) {
+            return params && Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : m;
+        });
+    }
+
     // =========================================================================
     // FETCH / API CALLS
     // =========================================================================
@@ -977,7 +1002,11 @@
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('HTTP ' + response.status);
+                    // The status rides the error, so the error toast says it in
+                    // the page's words; the message stays the console's.
+                    const failed = new Error('HTTP ' + response.status);
+                    failed.status = response.status;
+                    throw failed;
                 }
                 return response.json().catch(() => ({}));
             })
@@ -999,10 +1028,11 @@
 
                 // Toast: `toastSuccessKey` (translated server-side at
                 // compile time via TRANSLATABLE_KEYWORD_ARGS in
-                // JsonToHtmlRenderer) overrides the default 'Success'
-                // text. `silent` opts out entirely.
+                // JsonToHtmlRenderer) overrides QuickSite's own word for a
+                // success, in the page's language. `silent` opts out entirely.
                 if (!opts.silent) {
-                    QS.toast(opts.toastSuccessKey || 'Success', 'success');
+                    const done = opts.toastSuccessKey || _qsVisitorWord('toast', 'success');
+                    if (done) QS.toast(done, 'success');
                 }
 
                 // Notify any listener (e.g. cross-page count, post-fetch chains).
@@ -1016,10 +1046,17 @@
             })
             .catch(error => {
                 // Error toast — same precedence as success but using
-                // toastErrorKey: explicit translated key → network
-                // error message → generic fallback. `silent` opts out.
+                // toastErrorKey: explicit translated key → an error status in
+                // QuickSite's words (HTTP <status>, in the page's language) →
+                // QuickSite's word for a failed request, for an error with no
+                // status (a network failure: never the browser's own English;
+                // the error itself reaches qs:fetch:error). `silent` opts out.
                 if (!opts.silent) {
-                    QS.toast(opts.toastErrorKey || error.message || 'Request failed', 'error');
+                    const failure = opts.toastErrorKey
+                        || (error && typeof error.status === 'number'
+                            ? _qsVisitorWord('toast', 'httpStatus', { status: error.status })
+                            : _qsVisitorWord('toast', 'requestFailed'));
+                    if (failure) QS.toast(failure, 'error');
                 }
 
                 document.dispatchEvent(new CustomEvent('qs:fetch:error', {
@@ -2117,6 +2154,9 @@
             // through binding.fieldMap, with optional per-field enum
             // resolution against window.QS_ENUMS, then applied to the
             // cloned template via the existing data-bind mechanism).
+            // Every element the container selector matches is filled, as in
+            // list mode: the first through the selector, every further match
+            // from its own template, read from its own first child.
             if (binding.renderMode === 'componentList') {
                 const container = binding.container;
                 if (!container) {
@@ -2127,7 +2167,12 @@
                     console.warn('[QS] componentList: field did not resolve to an array:', field, value);
                     return;
                 }
+                // Read before the first is filled, so nothing its rows add is taken for a block.
+                const matches = Array.prototype.slice.call(getElements(container));
                 renderComponentList(container, value, binding.fieldMap || {}, binding.emptyText);
+                for (let i = 1; i < matches.length; i++) {
+                    renderComponentList(matches[i], value, binding.fieldMap || {}, binding.emptyText);
+                }
                 return;
             }
 
@@ -2375,13 +2420,15 @@
      * we just compute the per-item mapped object before calling the
      * existing populateTemplate.
      *
-     * @param {string} containerSelector - CSS selector for the container
+     * @param {string|Element} containerSelector - CSS selector for the container (its
+     *        first match), or the container element itself
      * @param {Array}  items              - API items array
      * @param {object} fieldMap           - var → { from, enum? } map
      * @param {string} [emptyText]        - Message shown when items is empty
      */
     function renderComponentList(containerSelector, items, fieldMap, emptyText) {
-        const container = document.querySelector(containerSelector);
+        const byElement = containerSelector instanceof Element;
+        const container = byElement ? containerSelector : document.querySelector(containerSelector);
         if (!container) {
             console.warn('[QS] renderComponentList: container not found:', containerSelector);
             return;
@@ -2390,35 +2437,39 @@
         if (!Array.isArray(items)) items = [items];
 
         // Reuse renderList's template cache: same container, same
-        // template-discovery rules. The cache key is the selector, so
-        // a container is either a 'list' template or a 'componentList'
-        // template — switching modes for the same container would
-        // require clearing _listTemplates[containerSelector] first.
-        if (!_listTemplates[containerSelector]) {
+        // template-discovery rules. The cache key is the selector (or, for
+        // a container passed as an element, the element), so a container
+        // is either a 'list' template or a 'componentList' template —
+        // switching modes for the same container would require clearing
+        // its cached template first.
+        let template = byElement ? _listTemplatesByElement.get(container) : _listTemplates[containerSelector];
+        if (!template) {
             const tplEl = container.querySelector('[data-list-template]') || container.firstElementChild;
             if (!tplEl) {
                 console.warn('[QS] renderComponentList: no template element found in', containerSelector);
                 return;
             }
-            const cached = tplEl.cloneNode(true);
-            cached.removeAttribute('data-list-template');
+            template = tplEl.cloneNode(true);
+            template.removeAttribute('data-list-template');
             // The hidden template usually carries `style="display:none"`
             // so it doesn't show before fetch. Drop that inline style on
             // the clone — rendered items must be visible. If the author
             // composed more styles into the inline style, only `display:
             // none` is removed; the rest stays.
-            if (cached.style && cached.style.display === 'none') {
-                cached.style.removeProperty('display');
+            if (template.style && template.style.display === 'none') {
+                template.style.removeProperty('display');
                 // If style attribute is now empty, drop it entirely
                 // so the rendered HTML stays clean.
-                if (cached.getAttribute('style') === '') {
-                    cached.removeAttribute('style');
+                if (template.getAttribute('style') === '') {
+                    template.removeAttribute('style');
                 }
             }
-            _listTemplates[containerSelector] = cached;
+            if (byElement) {
+                _listTemplatesByElement.set(container, template);
+            } else {
+                _listTemplates[containerSelector] = template;
+            }
         }
-
-        const template = _listTemplates[containerSelector];
 
         // Clear container
         container.replaceChildren();

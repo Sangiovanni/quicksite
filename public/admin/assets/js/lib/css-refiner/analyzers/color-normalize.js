@@ -175,7 +175,6 @@
             if (colorTokens.length === 0) { continue; }
 
             var edits = [];
-            var changes = [];
 
             for (var c = 0; c < colorTokens.length; c++) {
                 var token = colorTokens[c];
@@ -189,7 +188,6 @@
                     end:         colonPos + token.end,
                     replacement: converted
                 });
-                changes.push(token.original + ' → ' + converted);
             }
 
             if (edits.length === 0) { continue; }
@@ -197,7 +195,6 @@
             /* Advance searchStart */
             searchStart = colonPos + val.length;
 
-            var ctx = mediaContext ? ' (' + mediaContext + ')' : '';
             var newVal = val;
             /* Build the preview of the converted value */
             for (var e = colorTokens.length - 1; e >= 0; e--) {
@@ -211,11 +208,9 @@
             suggestions.push({
                 id:          U.generateId('colnorm'),
                 type:        NODE.TOOL_COLOR_NORMALIZE,
-                description: t('tools.colorNormalize.found', {
-                    selector: selector,
-                    property: prop
-                }) + ctx,
-                meta:        changes.join('\n'),
+                description: mediaContext
+                    ? t('tools.colorNormalize.foundInMedia', { selector: selector, property: prop, media: mediaContext })
+                    : t('tools.colorNormalize.found', { selector: selector, property: prop }),
                 enabled:     true,
                 edits:       edits,
                 diff: {

@@ -37,7 +37,7 @@
     <div class="sitemap-resolver-list-modal__content">
         <div class="sitemap-resolver-list-modal__header">
             <h3>
-                <?= __admin('sitemapPage.resolverListTitle', 'Resolvers for') ?>
+                <?= adminEscape(__admin('sitemapPage.resolverListTitle')) ?>
                 <code id="sitemap-resolver-list-route" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
                 <span class="sitemap-resolver-list__count" id="sitemap-resolver-list-count"></span>
             </h3>
@@ -46,7 +46,7 @@
 
         <div class="sitemap-resolver-list-modal__body">
             <p style="margin: 0 0 var(--space-md); color: var(--admin-text);">
-                <?= __admin('sitemapPage.resolverListHint', 'Each resolver fires in parallel server-side before the page renders. Drag rows to reorder (affects render-time order + namespaced-by-index addressing like <code>$r0</code> / <code>$r1</code>). A resolver\'s pencil opens its detailed config; its bin removes it.') ?>
+                <?= adminEscapeCode(__admin('sitemapPage.resolverListHint')) ?>
             </p>
 
             <!-- Row container — populated dynamically by the list-view JS.
@@ -59,7 +59,7 @@
                  resolver" button below still works in this state — it's
                  how the author creates the first resolver. -->
             <p id="sitemap-resolver-list-empty" class="sitemap-resolver-list__empty" style="display: none;">
-                <?= __admin('sitemapPage.resolverListEmpty', 'No resolvers configured for this route yet. Click "+ Add resolver" below to create the first one.') ?>
+                <?= adminEscape(__admin('sitemapPage.resolverListEmpty')) ?>
             </p>
 
             <button type="button" class="sitemap-resolver-list__add admin-btn admin-btn--ghost" id="sitemap-resolver-list-add">
@@ -67,7 +67,7 @@
                     <line x1="12" y1="5" x2="12" y2="19"/>
                     <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
-                <?= __admin('sitemapPage.resolverListAdd', 'Add resolver') ?>
+                <?= adminEscape(__admin('sitemapPage.resolverListAdd')) ?>
             </button>
 
             <p class="admin-hint" id="sitemap-resolver-list-status" style="margin: var(--space-sm) 0 0; min-height: 1.2em;"></p>

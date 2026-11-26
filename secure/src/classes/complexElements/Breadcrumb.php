@@ -2,12 +2,13 @@
 /**
  * BreadcrumbBuilder
  *
- * Emits a semantic breadcrumb — <nav aria-label="Breadcrumb"> wrapping
- * an <ol> of N <li>. Every item except the LAST renders as an anchor;
- * the last item renders as plain text with `aria-current="page"` to
- * indicate the current location:
+ * Emits a semantic breadcrumb — a <nav> named by the translation key
+ * breadcrumb.label (its aria-label, which a screen reader reads, in the
+ * page's language) wrapping an <ol> of N <li>. Every item except the LAST
+ * renders as an anchor; the last item renders as plain text with
+ * `aria-current="page"` to indicate the current location:
  *
- *   <nav aria-label="Breadcrumb">
+ *   <nav aria-label="breadcrumb.label">
  *     <ol class="breadcrumb">
  *       <li><a href="/"><textKey/></a></li>
  *       <li><a href="/docs"><textKey/></a></li>
@@ -29,6 +30,9 @@
 require_once __DIR__ . '/../ComplexElementBuilder.php';
 
 class BreadcrumbBuilder extends ComplexElementBuilder {
+    /** The translation key that names every breadcrumb of a site (its aria-label). */
+    private const LABEL_KEY = 'breadcrumb.label';
+
     public function kind(): string {
         return 'breadcrumb';
     }
@@ -88,7 +92,7 @@ class BreadcrumbBuilder extends ComplexElementBuilder {
 
         return [
             'tag'    => 'nav',
-            'params' => ['aria-label' => 'Breadcrumb'],
+            'params' => ['aria-label' => self::LABEL_KEY],
             'children' => [
                 [
                     'tag'    => 'ol',
@@ -97,5 +101,14 @@ class BreadcrumbBuilder extends ComplexElementBuilder {
                 ]
             ]
         ];
+    }
+
+    /**
+     * The name's starting text, where its key has none: the word
+     * visitor.aria.breadcrumb of <secure>/src/translations/<lang>.json, in each
+     * translation file's language.
+     */
+    public function startingTexts(array $config): array {
+        return [['key' => self::LABEL_KEY, 'word' => 'visitor.aria.breadcrumb']];
     }
 }

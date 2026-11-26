@@ -22,7 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php'; // qs_inl
 
 <script>
 window.QS_BUILDS_CONFIG = {
-    project: <?= json_encode($router->getCurrentProject()) ?>,
+    project: <?= qs_inline_script_json($router->getCurrentProject()) ?>,
     // How the page names the project: "Name #id" (projectIdentity.php). A name is
     // free text, so it goes through the inline-script encoder.
     projectLabel: <?= qs_inline_script_json(qs_project_label((string)$router->getCurrentProject())) ?>,
@@ -32,79 +32,11 @@ window.QS_BUILDS_CONFIG = {
     // once a build would eat more than this fraction of what is available.
     spaceWarnFraction: 0.5,
     // Where a build's OAuth warning sends the reader to enter the missing build keys.
-    oauthPageUrl: <?= json_encode($router->url('oauth-providers')) ?>,
+    oauthPageUrl: <?= qs_inline_script_json($router->url('oauth-providers')) ?>,
 };
-window.QS_BUILDS_I18N = <?= json_encode([
-    'loading'          => __admin('common.loading'),
-    'error'            => __admin('common.error'),
-    'cancel'           => __admin('common.cancel'),
-    'close'            => __admin('common.close', 'Close'),
-    'none'             => __admin('builds.none', 'This project has no build yet.'),
-    'noneHint'         => __admin('builds.noneHint', 'A build compiles the project into a standalone site you can download and put on a server.'),
-    'buildBtn'         => __admin('builds.buildBtn', 'Build now'),
-    'building'         => __admin('builds.building', 'Building… this can take a while on a large project.'),
-    'builtMsg'         => __admin('builds.builtMsg', 'Build completed'),
-    'downloadBtn'      => __admin('builds.downloadBtn', 'Download'),
-    'downloading'      => __admin('builds.downloading', 'Preparing the archive…'),
-    'downloadFailed'   => __admin('builds.downloadFailed', 'Download failed'),
-    'deleteBtn'        => __admin('builds.deleteBtn', 'Delete'),
-    'deletedMsg'       => __admin('builds.deletedMsg', 'Build deleted'),
-    'deleteFailed'     => __admin('builds.deleteFailed', 'Delete failed'),
-    'deleteTitle'      => __admin('builds.deleteTitle', 'Delete this build?'),
-    'deleteBody'       => __admin('builds.deleteBody', 'This is the only copy. Nothing else on the server keeps it, and deleting cannot be undone.'),
-    'deleteWhy'        => __admin('builds.deleteWhy', 'Deleting is also how you make room for the next one — a project holds one build at a time.'),
-    'deleteDownloadFirst' => __admin('builds.deleteDownloadFirst', 'Download it first'),
-    'deleteDownloaded' => __admin('builds.deleteDownloaded', 'Downloaded — the archive is in your browser\'s downloads.'),
-    'oneAtATime'       => __admin('builds.oneAtATime', 'One build at a time'),
-    'oneAtATimeBody'   => __admin('builds.oneAtATimeBody', 'This project already has a build, so a new one is refused rather than silently replacing it. Download this build if you want to keep a copy, then delete it and build again.'),
-    'incomplete'       => __admin('builds.incomplete', 'incomplete'),
-    'incompleteBody'   => __admin('builds.incompleteBody', 'This build did not finish, so it carries no manifest and cannot be downloaded. Delete it and build again.'),
-    'fieldCreated'     => __admin('builds.fieldCreated', 'Created'),
-    'fieldSize'        => __admin('builds.fieldSize', 'Size'),
-    'fieldFiles'       => __admin('builds.fieldFiles', 'Files'),
-    'fieldPages'       => __admin('builds.fieldPages', 'Pages'),
-    'fieldLanguages'   => __admin('builds.fieldLanguages', 'Languages'),
-    'fieldSiteName'    => __admin('builds.fieldSiteName', 'Site identity'),
-    'fieldPublic'      => __admin('builds.fieldPublic', 'Public folder'),
-    'fieldSecure'      => __admin('builds.fieldSecure', 'Secure folder'),
-    'fieldSpace'       => __admin('builds.fieldSpace', 'URL space'),
-    'spaceRoot'        => __admin('builds.spaceRoot', '(served from the root)'),
-    'oauthWarn'        => __admin('builds.oauthWarn', 'This build carries OAuth client secrets. Treat the archive as a credential, not just a website.'),
-    'secretsRoleOnly'  => __admin('builds.secretsRoleOnly'),
-    'oauthMissingTitle'  => __admin('builds.oauthMissingTitle'),
-    'oauthMissingBody'   => __admin('builds.oauthMissingBody'),
-    'oauthLeftOutBody'   => __admin('builds.oauthLeftOutBody'),
-    'secretsLabel'       => __admin('builds.secretsLabel'),
-    'secretsHint'        => __admin('builds.secretsHint'),
-    'oauthNotOffered'    => __admin('builds.oauthNotOffered'),
-    'oauthAddressNoKeys' => __admin('builds.oauthAddressNoKeys'),
-    'oauthKeysLink'      => __admin('builds.oauthKeysLink'),
-    'serverHint'       => __admin('builds.serverHint', 'To put this build on a server, download it and follow README.txt inside the archive: where each folder goes, what Apache and nginx need, and how to test the result.'),
-    'noControls'       => __admin('builds.noControls', 'Your role on this project can view builds but not create, download or delete them. Ask a project admin if you need one.'),
-    'spaceTitle'       => __admin('builds.spaceTitle', 'Space'),
-    'spaceProject'     => __admin('builds.spaceProject', 'This project uses'),
-    'spaceOfWhich'     => __admin('builds.spaceOfWhich', 'of which the build is'),
-    'spaceFree'        => __admin('builds.spaceFree', 'Left in your quota'),
-    'spaceNoQuota'     => __admin('builds.spaceNoQuota', 'No storage quota is configured on this installation, so there is no ceiling to run into.'),
-    'spaceNotOwner'    => __admin('builds.spaceNotOwner', 'The quota that applies here belongs to the project\'s owner, not to you, so there is no figure to show.'),
-    'spaceWarnTitle'   => __admin('builds.spaceWarnTitle', 'A build may not fit for much longer'),
-    'spaceWarnBody'    => __admin('builds.spaceWarnBody', 'A build is roughly the size of the project\'s content — about {need} today — and you have {free} of quota available for it. Past half, growth starts to squeeze out the build itself. Free some space, or ask for a larger quota, before it does.'),
-    'refresh'          => __admin('builds.refresh', 'Re-measure'),
-    // --- Build options ------------------------------------------------------
-    'optTitle' => __admin('builds.optTitle', 'Folder names and URL space'),
-    'optPublicLabel' => __admin('builds.optPublicLabel', 'Public folder name'),
-    'optPublicHint' => __admin('builds.optPublicHint', 'The deployed site\'s document root. Change it only when the server you are deploying to forces a name — some hosts insist on htdocs or public_html.'),
-    'optSecureLabel' => __admin('builds.optSecureLabel', 'Secure folder name'),
-    'optSecureHint' => __admin('builds.optSecureHint', 'The sibling folder holding the engine and your pages. It must sit OUTSIDE the document root wherever you deploy; renaming it is obscurity, not protection.'),
-    'optSpaceLabel' => __admin('builds.optSpaceLabel', 'URL space'),
-    'optSpaceHint' => __admin('builds.optSpaceHint', 'Serve the site from a subdirectory instead of the domain root: shop makes it answer at /shop/. Leave empty for the root.'),
-    'optPreview' => __admin('builds.optPreview', 'The build will contain'),
-    'optSpaceServes' => __admin('builds.optSpaceServes', 'the site itself — it answers at /{space}/, and a bare / is NOT this site'),
-    'deployDocRoot'    => __admin('builds.deployDocRoot', 'the document root'),
-    'deployOutside'    => __admin('builds.deployOutside', 'must stay OUTSIDE the document root'),
-    'optUnlock' => __admin('builds.optUnlock', 'I want to change this'),
-]) ?>;
 </script>
+<?php // The words builds.js reads, at their own path (QSPanelWords); `common` comes with the layout. ?>
+<?= __adminWords(['builds']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/builds.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/builds.js') ?>"></script>
 
 <div class="admin-page-header">
@@ -114,28 +46,28 @@ window.QS_BUILDS_I18N = <?= json_encode([
             <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
             <line x1="12" y1="22.08" x2="12" y2="12"/>
         </svg>
-        <?= __admin('builds.title', 'Builds') ?>
+        <?= adminEscape(__admin('builds.title')) ?>
     </h1>
-    <p class="admin-page-header__subtitle"><?= __admin('builds.subtitle', 'Compile this project into a standalone site, download it, and clear it away when you are done. One build at a time.') ?></p>
+    <p class="admin-page-header__subtitle"><?= adminEscape(__admin('builds.subtitle')) ?></p>
 </div>
 
 <section class="admin-section">
     <h2 class="admin-section__title">
-        <?= __admin('builds.sectionTitle', 'This project\'s build') ?>
+        <?= adminEscape(__admin('builds.sectionTitle')) ?>
         <span class="builds-project-chip" id="builds-project-chip"></span>
     </h2>
     <div class="admin-card">
         <div class="admin-card__body" id="builds-body">
-            <div class="admin-loading"><span class="admin-spinner"></span><span><?= __admin('common.loading') ?></span></div>
+            <div class="admin-loading"><span class="admin-spinner"></span><span><?= adminEscape(__admin('common.loading')) ?></span></div>
         </div>
     </div>
 </section>
 
 <section class="admin-section" id="builds-space-section">
-    <h2 class="admin-section__title"><?= __admin('builds.spaceTitle', 'Space') ?></h2>
+    <h2 class="admin-section__title"><?= adminEscape(__admin('builds.spaceTitle')) ?></h2>
     <div class="admin-card">
         <div class="admin-card__body" id="builds-space">
-            <div class="admin-loading"><span class="admin-spinner"></span><span><?= __admin('common.loading') ?></span></div>
+            <div class="admin-loading"><span class="admin-spinner"></span><span><?= adminEscape(__admin('common.loading')) ?></span></div>
         </div>
     </div>
 </section>

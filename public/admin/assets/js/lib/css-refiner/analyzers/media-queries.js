@@ -8,6 +8,7 @@
     window.CSSRefiner = window.CSSRefiner || {};
 
     var t    = CSSRefiner.t;
+    var tc   = CSSRefiner.count;
     var U    = CSSRefiner.Utils;
     var NODE = CSSRefiner.CONST;
 
@@ -69,19 +70,12 @@
             /* replace first with merged content */
             edits.push({ start: first.startIdx, end: first.endIdx, replacement: mergedRaw });
 
-            var totalRules = 0;
-            for (var c = 0; c < group.length; c++) {
-                totalRules += group[c].rules ? group[c].rules.length : 0;
-            }
-
             suggestions.push({
                 id:          U.generateId('mq-dup'),
                 type:        NODE.TOOL_MEDIA_QUERIES,
-                description: t('tools.mediaQueries.exactDuplicate', {
-                    count:     group.length,
+                description: tc('tools.mediaQueries.exactDuplicate', group.length, {
                     condition: first.condition
                 }),
-                meta:        t('tools.mediaQueries.rulesInside', { count: totalRules }),
                 enabled:     true,
                 edits:       edits,
                 diff: {
@@ -165,7 +159,6 @@
                     condB: b.condition,
                     diff:  diff + b.bp.unit
                 }),
-                meta:           t('tools.mediaQueries.suggestedBreakpoint', { value: suggested }),
                 suggestedValue: suggested,
                 enabled:        false,                   /* default off — user opt-in */
                 edits:          edits,

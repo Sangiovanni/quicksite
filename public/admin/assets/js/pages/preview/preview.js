@@ -2546,7 +2546,7 @@
                     type: 'component',
                     name: trimmed,
                     structure: { tag: 'div', children: [
-                        { textKey: '__RAW__' + trimmed + ' component' }
+                        { textKey: '__RAW__' + (PreviewConfig.componentStarter[getCurrentLang()] || PreviewConfig.componentStarter.en).replace(/\{\{name\}\}/g, () => trimmed) }
                     ] }
                 });
                 

@@ -12,13 +12,13 @@
  *
  * Built with QSDom.el + named _render* helpers (one Element each) per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing.
- * Static structure lives in templates/pages/memberships.php.
+ * Static structure lives in templates/pages/memberships.php, which hands the
+ * words this file reads (QSPanelWords, each by its key's whole path).
  */
 (function () {
     'use strict';
 
     var CFG = window.QS_MEMBERSHIPS_CONFIG || {};
-    var T = window.QS_MEMBERSHIPS_I18N || {};
     var el = window.QSDom.el;
     var svgIcon = window.QSDom.svgIcon;
     var clearNode = window.QSDom.clear;
@@ -30,7 +30,7 @@
     function api(cmd, method, body) {
         var admin = window.QuickSiteAdmin;
         if (!admin || typeof admin.apiRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return admin.apiRequest(cmd, method, body);
     }
@@ -42,7 +42,7 @@
     function account(route, method, body) {
         var admin = window.QuickSiteAdmin;
         if (!admin || typeof admin.accountRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return admin.accountRequest(route, method, body);
     }
@@ -51,7 +51,7 @@
     function selectProject(project) {
         var admin = window.QuickSiteAdmin;
         if (!admin || typeof admin.setSelectedProject !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return admin.setSelectedProject(project);
     }
@@ -62,8 +62,9 @@
         }
     }
 
-    function serverMessage(res, fallback) {
-        return (res && res.data && (res.data.message || res.data.error)) || fallback || T.error || 'Error';
+    /** The server's own words for a refusal, else `word` (a panel word the caller names), else the panel's Error. */
+    function serverMessage(res, word) {
+        return (res && res.data && (res.data.message || res.data.error)) || word || QSPanelWords.t('common.error');
     }
 
     function notifyMembershipChange() {
@@ -75,7 +76,7 @@
     // ============================================================
 
     function _renderRoleChip(role) {
-        return el('span', { class: 'members-role-chip members-role-chip--' + String(role || ''), text: String(role || '?') });
+        return el('span', { class: 'members-role-chip members-role-chip--' + String(role || ''), text: role ? QuickSiteUtils.roleName(role) : '?' });
     }
 
     function _renderNote(noteText) {
@@ -112,6 +113,23 @@
     }
 
     /**
+     * A word that holds elements (a role chip), as a row's chips line draws it: the word cut at its {name} parts
+     * (QSPanelWords.parts), each piece of its text in a subtle span of its own, each element as it is.
+     * @returns {Array<HTMLElement>}
+     */
+    function _renderSubtleParts(path, params) {
+        var out = [];
+        QSPanelWords.parts(path, params).forEach(function (part) {
+            if (typeof part !== 'string') {
+                out.push(part);
+            } else if (part.trim() !== '') {
+                out.push(el('span', { class: 'members-row__subtle', text: part.trim() }));
+            }
+        });
+        return out;
+    }
+
+    /**
      * The zero-membership empty state.
      *
      * Three ways out of an account that belongs to nothing: accept an
@@ -126,12 +144,12 @@
      * @returns {HTMLElement} ONE .admin-empty
      */
     function _renderProjectsEmpty() {
-        var children = [el('p', { text: T.projectsEmpty || 'No projects.' })];
+        var children = [el('p', { text: QSPanelWords.t('memberships.myProjects.empty') })];
         if (CFG.createUrl) {
             children.push(el('a', {
                 class: 'admin-btn admin-btn--primary members-empty__cta',
                 href: CFG.createUrl,
-                text: T.projectsEmptyCreate || 'memberships.myProjects.createCta'
+                text: QSPanelWords.t('memberships.myProjects.createCta')
             }));
         }
         return el('div', { class: 'admin-empty members-empty' }, children);
@@ -201,13 +219,13 @@
         ]);
         var chips = el('span', { class: 'members-row__chips' }, [
             _renderRoleChip(p.my_role),
-            isOwned ? el('span', { class: 'members-chip members-chip--owned', text: T.ownedChip || 'OWNED' }) : null,
-            isEditing ? el('span', { class: 'members-chip members-chip--editing', text: T.editingChip || 'editing' }) : null,
+            isOwned ? el('span', { class: 'members-chip members-chip--owned', text: QSPanelWords.t('memberships.myProjects.ownedChip') }) : null,
+            isEditing ? el('span', { class: 'members-chip members-chip--editing', text: QSPanelWords.t('memberships.myProjects.editingChip') }) : null,
         ]);
 
         var actions = [];
         if (!isEditing) {
-            actions.push(QSControls.edit(T.editBtn || 'Edit this project', function (e) {
+            actions.push(QSControls.edit(QSPanelWords.t('memberships.myProjects.editBtn'), function (e) {
                 onEditProject(p.project, e.currentTarget);
             }, { focusKey: 'project-edit:' + p.project }));
         }
@@ -216,12 +234,12 @@
         // panel-wide permission set answers for the EDITED project only, so it
         // would gate every row by the wrong project's role.
         if ((CFG.buildRoles || []).indexOf(p.my_role) !== -1) {
-            actions.push(_renderActionBtn(T.buildsBtn || 'Builds', ICON_BUILD, 'ghost', function () {
+            actions.push(_renderActionBtn(QSPanelWords.t('memberships.myProjects.buildsBtn'), ICON_BUILD, 'ghost', function () {
                 onOpenBuilds(p.project, isEditing, this);
             }));
         }
         if (!isOwned) {
-            actions.push(_renderActionBtn(T.leaveBtn || 'Leave', ICON_OUT, 'danger', function () {
+            actions.push(_renderActionBtn(QSPanelWords.t('memberships.myProjects.leaveBtn'), ICON_OUT, 'danger', function () {
                 onLeaveProject(p.project, p.name);
             }));
         }
@@ -289,13 +307,13 @@
 
     function onLeaveProject(project, name) {
         ask(
-            T.leaveTitle || 'Leave project',
-            [el('p', { text: (T.leaveConfirm || 'Leave {project}?').replace('{project}', projectLabel(project, name)) })],
-            T.leaveBtn || 'Leave', true,
+            QSPanelWords.t('memberships.myProjects.leaveTitle'),
+            [el('p', { text: QSPanelWords.t('memberships.myProjects.leaveConfirm', { project: projectLabel(project, name) }) })],
+            QSPanelWords.t('memberships.myProjects.leaveBtn'), true,
             async function () {
                 var res = await account('leave-project', 'POST', { project: project });
                 if (!res || !res.ok) return answered(res);
-                toast(T.leftMsg || 'You left the project', 'success');
+                toast(QSPanelWords.t('memberships.myProjects.leftMsg'), 'success');
                 // Leaving changes the caller's SERVER-computed permission set
                 // (nav links, PAGE_PERMISSIONS, the project picker) — a soft
                 // refreshAll() leaves stale tabs that only correct themselves on
@@ -316,20 +334,18 @@
             el('span', { class: 'members-row__title' }, [
                 el('strong', { text: projectLabel(inv.project, inv.project_name) }),
             ]),
-            el('span', { class: 'members-row__chips' }, [
-                el('span', { class: 'members-row__subtle', text: (T.offeredRole || 'offered role') + ': ' }),
-                _renderRoleChip(inv.role),
-            ]),
+            el('span', { class: 'members-row__chips' },
+                _renderSubtleParts('memberships.inbox.offeredRole', { role: _renderRoleChip(inv.role) })),
             _renderMeta([
-                inv.invited_by ? (T.invitedBy || 'Invited by') + ' ' + (inv.invited_by.name || inv.invited_by.user_id) : null,
-                inv.sponsored_by ? (T.proposedBy || 'proposed by') + ' ' + (inv.sponsored_by.name || inv.sponsored_by.user_id) : null,
+                inv.invited_by ? QSPanelWords.t('memberships.inbox.invitedBy', { name: inv.invited_by.name || inv.invited_by.user_id }) : null,
+                inv.sponsored_by ? QSPanelWords.t('memberships.inbox.proposedBy', { name: inv.sponsored_by.name || inv.sponsored_by.user_id }) : null,
                 inv.at || null,
             ]),
         ];
         if (inv.note) main.push(_renderNote(inv.note));
         return _renderRow(main, [
-            _renderActionBtn(T.accept || 'Accept', ICON_CHECK, 'primary', function () { onAccept(inv); }),
-            _renderActionBtn(T.decline || 'Decline', null, 'danger', function () { onDecline(inv); }),
+            _renderActionBtn(QSPanelWords.t('memberships.inbox.accept'), ICON_CHECK, 'primary', function () { onAccept(inv); }),
+            _renderActionBtn(QSPanelWords.t('memberships.inbox.decline'), null, 'danger', function () { onDecline(inv); }),
         ]);
     }
 
@@ -338,7 +354,7 @@
         clearNode(root);
         setCount('memberships-inbox-count', invitations.length);
         if (!invitations.length) {
-            root.appendChild(_renderEmpty(T.inboxEmpty || 'No pending invitations.'));
+            root.appendChild(_renderEmpty(QSPanelWords.t('memberships.inbox.empty')));
             return;
         }
         invitations.forEach(function (inv) { root.appendChild(_renderInviteRow(inv)); });
@@ -367,7 +383,7 @@
      */
     function openAcceptedProject(inv) {
         function stayHere() {
-            toast(T.acceptedMsg || 'Invitation accepted', 'success');
+            toast(QSPanelWords.t('memberships.inbox.acceptedMsg'), 'success');
             refreshAll();
             notifyMembershipChange();
         }
@@ -376,23 +392,23 @@
                 stayHere();
                 return;
             }
-            var words = T.acceptedOpenedMsg || T.acceptedMsg || 'Invitation accepted';
-            window.QuickSiteAdmin.setPendingMessage(words.replace('{project}', projectLabel(inv.project, inv.project_name)), 'success');
+            window.QuickSiteAdmin.setPendingMessage(QSPanelWords.t('memberships.inbox.acceptedOpenedMsg',
+                { project: projectLabel(inv.project, inv.project_name) }), 'success');
             window.location.href = window.location.pathname + '?t=' + Date.now();
         }, stayHere);
     }
 
     function onDecline(inv) {
         ask(
-            T.declineTitle,
-            [el('p', { text: projectLabel(inv.project, inv.project_name) + ' — ' + String(inv.role || '') })],
-            T.decline || 'Decline', true,
+            QSPanelWords.t('memberships.inbox.declineTitle'),
+            [el('p', { text: projectLabel(inv.project, inv.project_name) + ' — ' + (inv.role ? QuickSiteUtils.roleName(inv.role) : '') })],
+            QSPanelWords.t('memberships.inbox.decline'), true,
             async function () {
                 var res = await account('decline-invitation', 'POST', { project: inv.project });
                 await refreshAll();
                 notifyMembershipChange();
                 if (!res || !res.ok) return answered(res);
-                toast(T.declinedMsg || 'Invitation declined', 'success');
+                toast(QSPanelWords.t('memberships.inbox.declinedMsg'), 'success');
                 return true;
             }
         );
@@ -408,11 +424,11 @@
             _renderMeta([req.at || null]),
         ];
         if (req.note) main.push(_renderNote(req.note));
-        var label = String(T.withdrawRequestOf).split('{project}').join(projectLabel(req.project, req.project_name));
+        var named = { project: projectLabel(req.project, req.project_name) };
         return _renderRow(main, [
-            QSControls.bin(label, function () {
-                onWithdraw(req.project, null, T.withdrawnMsg,
-                    String(T.withdrawRequestTitle).split('{project}').join(projectLabel(req.project, req.project_name)));
+            QSControls.bin(QSPanelWords.t('memberships.requests.withdrawOf', named), function () {
+                onWithdraw(req.project, null, QSPanelWords.t('memberships.requests.withdrawnMsg'),
+                    QSPanelWords.t('memberships.requests.withdrawTitle', named));
             }, { focusKey: 'request-withdraw:' + req.project }),
         ]);
     }
@@ -422,7 +438,7 @@
         clearNode(root);
         setCount('memberships-requests-count', requests.length);
         if (!requests.length) {
-            root.appendChild(_renderEmpty(T.requestsEmpty || 'No pending join requests.'));
+            root.appendChild(_renderEmpty(QSPanelWords.t('memberships.requests.empty')));
             return;
         }
         requests.forEach(function (r) { root.appendChild(_renderRequestRow(r)); });
@@ -432,12 +448,13 @@
     function onWithdraw(project, userId, doneMsg, question) {
         var body = { project: project };
         if (userId) body.user_id = userId;
-        return ask(question, [el('p', { text: T.withdrawText })], T.withdraw || 'Withdraw', true, async function () {
+        return ask(question, [el('p', { text: QSPanelWords.t('memberships.requests.withdrawText') })],
+            QSPanelWords.t('memberships.requests.withdraw'), true, async function () {
             var res = await account('withdraw-request', 'POST', body);
             await refreshAll();
             notifyMembershipChange();
             if (!res || !res.ok) return answered(res);
-            toast(doneMsg || T.withdrawnMsg || 'Withdrawn', 'success');
+            toast(doneMsg, 'success');
             return true;
         });
     }
@@ -447,13 +464,13 @@
     // ============================================================
 
     function _renderProposalRow(pr) {
-        var statusText = pr.status === 'awaiting_answer'
-            ? (T.awaitingAnswer || 'invitation sent — awaiting their answer')
-            : (T.pendingValidation || 'awaiting validation');
+        var statusText = QSPanelWords.t(pr.status === 'awaiting_answer'
+            ? 'memberships.proposals.awaitingAnswer'
+            : 'memberships.proposals.pendingValidation');
         var main = [
             el('span', { class: 'members-row__title' }, [
                 el('strong', { text: (pr.user && (pr.user.name || pr.user.user_id)) || '?' }),
-                el('span', { class: 'members-row__subtle', text: ' ' + (T.proposalFor || 'for') + ' ' + projectLabel(pr.project, pr.project_name) }),
+                el('span', { class: 'members-row__subtle', text: QSPanelWords.t('memberships.proposals.for', { project: projectLabel(pr.project, pr.project_name) }) }),
             ]),
             el('span', { class: 'members-row__chips' }, [
                 _renderRoleChip(pr.role),
@@ -464,12 +481,10 @@
         if (pr.note) main.push(_renderNote(pr.note));
         var actions = [];
         if (pr.status === 'pending_validation') {
-            var who = (pr.user && (pr.user.name || pr.user.user_id)) || '?';
-            var label = String(T.withdrawProposalOf).split('{name}').join(who)
-                .split('{project}').join(projectLabel(pr.project, pr.project_name));
-            actions.push(QSControls.bin(label, function () {
-                onWithdraw(pr.project, pr.user ? pr.user.user_id : null, T.proposalWithdrawnMsg,
-                    String(T.withdrawProposalTitle).split('{name}').join(who).split('{project}').join(projectLabel(pr.project, pr.project_name)));
+            var named = { name: (pr.user && (pr.user.name || pr.user.user_id)) || '?', project: projectLabel(pr.project, pr.project_name) };
+            actions.push(QSControls.bin(QSPanelWords.t('memberships.proposals.withdrawOf', named), function () {
+                onWithdraw(pr.project, pr.user ? pr.user.user_id : null, QSPanelWords.t('memberships.proposals.withdrawnMsg'),
+                    QSPanelWords.t('memberships.proposals.withdrawTitle', named));
             }, { focusKey: 'proposal-withdraw:' + pr.project + '/' + (pr.user ? pr.user.user_id : '') }));
         }
         return _renderRow(main, actions);
@@ -480,7 +495,7 @@
         clearNode(root);
         setCount('memberships-proposals-count', proposals.length);
         if (!proposals.length) {
-            root.appendChild(_renderEmpty(T.proposalsEmpty || 'No outgoing proposals.'));
+            root.appendChild(_renderEmpty(QSPanelWords.t('memberships.proposals.empty')));
             return;
         }
         proposals.forEach(function (p) { root.appendChild(_renderProposalRow(p)); });
@@ -494,25 +509,23 @@
     // the one that is good news; dismissing it, or `role_changed` (someone else changed your
     // role), leaves the membership as it is. A project can hold both at once: one row each.
     var NOTICE_LABEL_KEYS = {
-        refused: 'statusRefused',
-        removed: 'statusRemoved',
-        deleted: 'statusDeleted',
-        approved: 'statusApproved',
-        role_changed: 'statusRoleChanged',
+        refused: 'memberships.notices.statusRefused',
+        removed: 'memberships.notices.statusRemoved',
+        deleted: 'memberships.notices.statusDeleted',
+        approved: 'memberships.notices.statusApproved',
+        role_changed: 'memberships.notices.statusRoleChanged',
     };
 
-    /** A role notice's two roles: "from <old> to <new>". @returns {HTMLElement} */
+    /** A role notice's two roles: "from <old> to <new>", one word with the two chips in it. @returns {HTMLElement} */
     function _renderRoleChange(n) {
-        return el('span', { class: 'members-row__chips' }, [
-            el('span', { class: 'members-row__subtle', text: T.roleFrom || 'from' }),
-            _renderRoleChip(n.from),
-            el('span', { class: 'members-row__subtle', text: T.roleTo || 'to' }),
-            _renderRoleChip(n.to),
-        ]);
+        return el('span', { class: 'members-row__chips' },
+            _renderSubtleParts('memberships.notices.roleChange', { from: _renderRoleChip(n.from), to: _renderRoleChip(n.to) }));
     }
 
     function _renderNoticeRow(n) {
-        var statusLabel = T[NOTICE_LABEL_KEYS[n.status] || 'statusDeleted'];
+        // A status the table does not name shows a deleted project's words.
+        var statusKey = NOTICE_LABEL_KEYS[n.status] || 'memberships.notices.statusDeleted';
+        var statusLabel = QSPanelWords.t(statusKey);
         var main = [
             el('span', { class: 'members-row__title' }, [
                 el('span', { class: 'members-chip members-chip--' + n.status, text: statusLabel }),
@@ -521,15 +534,15 @@
         ];
         if (n.status === 'role_changed') main.push(_renderRoleChange(n));
         main.push(_renderMeta([
-            n.by ? (T.changedBy || 'Changed by') + ' ' + (n.by.name || n.by.user_id) : null,
+            n.by ? QSPanelWords.t('memberships.notices.changedBy', { name: n.by.name || n.by.user_id }) : null,
             n.at || null,
         ]));
         if (n.note) {
-            main.push(el('span', { class: 'members-row__subtle', text: (T.reason || 'Reason') + ':' }));
+            main.push(el('span', { class: 'members-row__subtle', text: QSPanelWords.t('memberships.notices.reason') }));
             main.push(_renderNote(n.note));
         }
         return _renderRow(main, [
-            _renderActionBtn(T.dismiss || 'Dismiss', ICON_CHECK, 'ghost', function () { onDismiss(n.project, n.status); }),
+            _renderActionBtn(QSPanelWords.t('memberships.notices.dismiss'), ICON_CHECK, 'ghost', function () { onDismiss(n.project, n.status); }),
         ]);
     }
 
@@ -538,7 +551,7 @@
         clearNode(root);
         setCount('memberships-notices-count', notices.length);
         if (!notices.length) {
-            root.appendChild(_renderEmpty(T.noticesEmpty || 'No notices.'));
+            root.appendChild(_renderEmpty(QSPanelWords.t('memberships.notices.empty')));
             return;
         }
         notices.forEach(function (n) { root.appendChild(_renderNoticeRow(n)); });
@@ -548,7 +561,7 @@
     function onDismiss(project, notice) {
         account('dismiss-notice', 'POST', { project: project, notice: notice }).then(function (res) {
             if (res && res.ok) {
-                toast(T.dismissedMsg || 'Notice dismissed', 'success');
+                toast(QSPanelWords.t('memberships.notices.dismissedMsg'), 'success');
             } else {
                 toast(serverMessage(res), 'error');
             }
@@ -561,12 +574,13 @@
     // Request to join
     // ============================================================
 
+    // A refusal the page says in its own words, by the code the server answers.
     var REQUEST_ERROR_KEYS = {
-        'join.unavailable': 'errUnavailable',
-        'member.already_exists': 'errAlreadyMember',
-        'invitation.already_pending': 'errAlreadyInvited',
-        'request.already_pending': 'errAlreadyRequested',
-        'request.notice_pending': 'errNoticePending',
+        'join.unavailable': 'memberships.request.errUnavailable',
+        'member.already_exists': 'memberships.request.errAlreadyMember',
+        'invitation.already_pending': 'memberships.request.errAlreadyInvited',
+        'request.already_pending': 'memberships.request.errAlreadyRequested',
+        'request.notice_pending': 'memberships.request.errNoticePending',
     };
 
     function onSendJoinRequest() {
@@ -578,13 +592,13 @@
         var project = projectInput.value.trim().replace(/^#\s*/, '');
         var note = noteInput.value.trim();
         if (!project) { projectInput.focus(); return; }
-        if (!note) { toast(T.noteRequired || 'The note is required.', 'warning'); noteInput.focus(); return; }
+        if (!note) { toast(QSPanelWords.t('memberships.request.noteRequired'), 'warning'); noteInput.focus(); return; }
 
         btn.disabled = true;
         account('request-to-join', 'POST', { project: project, note: note }).then(function (res) {
             btn.disabled = false;
             if (res && res.ok) {
-                toast(T.requestSentMsg || 'Join request sent', 'success');
+                toast(QSPanelWords.t('memberships.request.sentMsg'), 'success');
                 projectInput.value = '';
                 noteInput.value = '';
                 refreshAll();
@@ -593,7 +607,7 @@
             }
             var code = res && res.data && res.data.code;
             var key = code && REQUEST_ERROR_KEYS[code];
-            toast((key && T[key]) || serverMessage(res), 'warning');
+            toast(key ? QSPanelWords.t(key) : serverMessage(res), 'warning');
         });
     }
 

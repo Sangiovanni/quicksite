@@ -14,18 +14,15 @@
     let sitemapData = null;
     let reachabilityData = null;
     let expandedNodes = new Set();      // track which tree nodes are open
-    let openContextMenu = null;
-    let contextMenuOpener = null;       // the ⋮ that opened it: where a question asked from it gives the focus back         // currently open [⋯] menu element
+    let openContextMenu = null;         // currently open [⋯] menu element
+    let contextMenuOpener = null;       // the ⋮ that opened it: where a question asked from it gives the focus back
 
     // ========================================================================
     // Helpers
     // ========================================================================
 
-    // A word of the page: the `sitemapPage` translations sitemap.php writes as QS_SITEMAP_I18N.
-    function t(key, fallback) {
-        const translations = window.QS_SITEMAP_I18N || {};
-        return translations[key] || fallback || key;
-    }
+    // A word of the page's own section (`sitemapPage`, which sitemap.php hands), by its name in that section.
+    function t(name, params) { return QSPanelWords.t('sitemapPage.' + name, params); }
 
     function getCoverageClass(percent) {
         if (percent >= 95) return 'sitemap__coverage--excellent';
@@ -47,7 +44,7 @@
     }
 
     // ========================================================================
-    // Tree Building (adapted from dashboard.js)
+    // Tree Building (dashboard.js builds the same tree for its sitemap card)
     // ========================================================================
 
     function buildRouteTree(routes) {
@@ -62,19 +59,6 @@
             });
         });
         return tree;
-    }
-
-    /**
-     * Count children (non-_route keys) recursively
-     */
-    function countDescendants(node) {
-        let count = 0;
-        for (const [key, child] of Object.entries(node)) {
-            if (key === '_route') continue;
-            count++;
-            count += countDescendants(child);
-        }
-        return count;
     }
 
     /**
@@ -158,9 +142,7 @@
         if (paramCount > 0) {
             const badge = document.createElement('span');
             badge.className = 'sitemap__route-badge--params';
-            const labelKey = paramCount === 1 ? 'paramSingular' : 'paramPlural';
-            const labelFallback = paramCount === 1 ? 'param' : 'params';
-            badge.textContent = paramCount + ' ' + t(labelKey, labelFallback);
+            badge.textContent = QSPanelWords.count('sitemapPage.paramCount', paramCount);
             wrapper.appendChild(badge);
         }
 
@@ -175,21 +157,25 @@
 
             const badge = document.createElement('span');
             badge.className = 'sitemap__route-badge--resolver';
-            badge.textContent = count === 1
-                ? t('resolverBadge', 'resolver')
-                : t('resolverBadge', 'resolver') + ' × ' + count;
+            badge.textContent = QSPanelWords.count('sitemapPage.resolverBadge', count);
             // Tooltip surfaces each endpoint id so authors can see "which
             // endpoints does this route fetch?" without opening the list.
             const endpoints = configs
                 .map((c) => (c && typeof c.endpoint === 'string') ? c.endpoint : '')
                 .filter((e) => e !== '');
             badge.title = endpoints.length > 0
-                ? t('resolverBadgeTitle', 'Server-side resolver') + ' — ' + endpoints.join(', ')
-                : t('resolverBadgeTitle', 'Server-side resolver');
+                ? t('resolverBadgeTitleEndpoints', { endpoints: QSPanelWords.list(endpoints, 'unit') })
+                : t('resolverBadgeTitle');
             wrapper.appendChild(badge);
         }
 
         return wrapper;
+    }
+
+    /** A layout toggle's tooltip: whether the route shows the menu (field 'menu') or the footer. */
+    function _layoutToggleTitle(field, on) {
+        if (field === 'menu') return on ? t('menuOn') : t('menuOff');
+        return on ? t('footerOn') : t('footerOff');
     }
 
     /**
@@ -206,7 +192,7 @@
         menuBtn.className = 'sitemap-layout-toggle' + (layout.menu ? ' sitemap-layout-toggle--on' : '');
         menuBtn.setAttribute('data-action', 'toggle-menu');
         menuBtn.setAttribute('data-route', routePath);
-        menuBtn.title = layout.menu ? t('menuOn', 'Menu: visible') : t('menuOff', 'Menu: hidden');
+        menuBtn.title = _layoutToggleTitle('menu', layout.menu);
         menuBtn.appendChild(QSDom.iconEl(ICONS.menu, 13));
         wrap.appendChild(menuBtn);
 
@@ -215,7 +201,7 @@
         footerBtn.className = 'sitemap-layout-toggle' + (layout.footer ? ' sitemap-layout-toggle--on' : '');
         footerBtn.setAttribute('data-action', 'toggle-footer');
         footerBtn.setAttribute('data-route', routePath);
-        footerBtn.title = layout.footer ? t('footerOn', 'Footer: visible') : t('footerOff', 'Footer: hidden');
+        footerBtn.title = _layoutToggleTitle('footer', layout.footer);
         footerBtn.appendChild(QSDom.iconEl(ICONS.footer, 13));
         wrap.appendChild(footerBtn);
 
@@ -248,7 +234,7 @@
         ctxBtn.setAttribute('data-is-home', String(isHome));
         ctxBtn.setAttribute('data-has-children', String(hasChildren));
         ctxBtn.setAttribute('data-depth', String(routeDepth));
-        ctxBtn.title = 'Actions';
+        ctxBtn.title = t('actions');
         ctxBtn.appendChild(QSDom.iconEl(ICONS.actions, 14));
         wrap.appendChild(ctxBtn);
 
@@ -256,7 +242,7 @@
     }
 
     // ========================================================================
-    // Step 2: Render Route Tree (with action buttons for Steps 4-6)
+    // Route Tree (each row with its actions)
     // ========================================================================
 
     /**
@@ -304,7 +290,7 @@
                 const toggleBtn = document.createElement('button');
                 toggleBtn.className = 'sitemap__tree-toggle';
                 toggleBtn.type = 'button';
-                toggleBtn.setAttribute('aria-label', 'Toggle');
+                toggleBtn.setAttribute('aria-label', t('treeToggle'));
                 toggleBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 12));
                 header.appendChild(toggleBtn);
 
@@ -354,19 +340,18 @@
     }
 
     // ========================================================================
-    // Step 2: Summary bar
+    // Summary bar (its counts are the dashboard sitemap card's words)
     // ========================================================================
 
     function renderSummary(data, validationData) {
         const routes = data.routes || [];
-        const dashSitemap = window.QUICKSITE_CONFIG?.translations?.dashboard?.sitemap || {};
 
         const summary = document.createElement('div');
         summary.className = 'sitemap__summary';
 
         const totalSpan = document.createElement('span');
         totalSpan.className = 'sitemap__total';
-        totalSpan.textContent = data.totalUrls + ' ' + (dashSitemap.urls || 'URLs');
+        totalSpan.textContent = QSPanelWords.count('dashboard.sitemap.urlCount', data.totalUrls);
         summary.appendChild(totalSpan);
 
         const dividerA = document.createElement('span');
@@ -375,7 +360,7 @@
         summary.appendChild(dividerA);
 
         const routesSpan = document.createElement('span');
-        routesSpan.textContent = routes.length + ' ' + (dashSitemap.routes || 'routes');
+        routesSpan.textContent = QSPanelWords.count('dashboard.sitemap.routeCount', routes.length);
         summary.appendChild(routesSpan);
 
         const dividerB = document.createElement('span');
@@ -388,8 +373,13 @@
     }
 
     // ========================================================================
-    // Step 2: Language Coverage
+    // Language Coverage
     // ========================================================================
+
+    /** A coverage figure (validateTranslations' percent, two decimals at most) in the panel's language: "86.67%". */
+    function _percentText(percent) {
+        return QSPanelWords.number(percent / 100, { style: 'percent', maximumFractionDigits: 2 });
+    }
 
     function renderCoverage(data, validationData) {
         const multilingual = data.multilingual || false;
@@ -421,9 +411,13 @@
             const coveragePercent = langCoverage?.coverage_percent ?? null;
             const missingCount = langCoverage?.total_missing ?? 0;
             const coverageClass = coveragePercent !== null ? getCoverageClass(coveragePercent) : '';
-            const tooltip = coveragePercent !== null
-                ? `${langName}: ${coveragePercent}% coverage` + (missingCount > 0 ? ` (${missingCount} missing keys)` : '')
-                : langName;
+            let tooltip = langName;
+            if (coveragePercent !== null) {
+                const figures = { language: langName, percent: _percentText(coveragePercent) };
+                tooltip = missingCount > 0
+                    ? QSPanelWords.count('sitemapPage.coverageTooltipMissing', missingCount, figures)
+                    : t('coverageTooltip', figures);
+            }
 
             const badge = document.createElement('span');
             badge.className = 'sitemap-lang-badge' + (coverageClass ? ' ' + coverageClass : '');
@@ -449,7 +443,7 @@
             if (coveragePercent !== null) {
                 const pct = document.createElement('span');
                 pct.className = 'sitemap-lang-badge__pct';
-                pct.textContent = coveragePercent + '%';
+                pct.textContent = _percentText(coveragePercent);
                 badge.appendChild(pct);
             }
 
@@ -460,7 +454,7 @@
     }
 
     // ========================================================================
-    // Step 3: Reachability Graph
+    // Reachability Graph
     // ========================================================================
 
     /**
@@ -476,7 +470,7 @@
             block.style.textAlign = 'center';
             const val = document.createElement('div');
             val.style.cssText = 'font-size:var(--font-size-2xl); font-weight:var(--font-weight-bold);' + (color ? ' color:' + color + ';' : '');
-            val.textContent = String(value);
+            val.textContent = QSPanelWords.number(value);
             const lbl = document.createElement('div');
             lbl.style.cssText = 'font-size:var(--font-size-sm); color:var(--admin-text-muted);';
             lbl.textContent = label;
@@ -485,9 +479,9 @@
             return block;
         }
 
-        stats.appendChild(statBlock(total_routes, t('totalRoutes', 'Total Routes')));
-        stats.appendChild(statBlock(reachable_count, t('reachable', 'Reachable'), 'var(--admin-success)'));
-        stats.appendChild(statBlock(orphan_count, t('orphans', 'Orphans'),
+        stats.appendChild(statBlock(total_routes, t('totalRoutes')));
+        stats.appendChild(statBlock(reachable_count, t('reachable'), 'var(--admin-success)'));
+        stats.appendChild(statBlock(orphan_count, t('orphans'),
             orphan_count > 0 ? 'var(--admin-error)' : 'var(--admin-text-muted)'));
         return stats;
     }
@@ -503,7 +497,7 @@
 
         const h3 = document.createElement('h3');
         h3.style.cssText = 'margin-bottom:var(--space-sm); color:var(--admin-error);';
-        h3.textContent = t('unreachableRoutes', 'Unreachable Routes');
+        h3.textContent = t('unreachableRoutes');
         section.appendChild(h3);
 
         const list = document.createElement('div');
@@ -532,14 +526,15 @@
 
         const h3 = document.createElement('h3');
         h3.style.marginBottom = 'var(--space-sm)';
-        h3.textContent = t('globalNav', 'Global Navigation Links');
+        h3.textContent = t('globalNav');
         section.appendChild(h3);
 
+        // label: the row's word, its colon in it ("Menu:")
         function navRow(label, links, isLast) {
             const row = document.createElement('div');
             if (!isLast) row.style.marginBottom = 'var(--space-xs)';
             const strong = document.createElement('strong');
-            strong.textContent = label + ':';
+            strong.textContent = label;
             row.appendChild(strong);
             row.appendChild(document.createTextNode(' '));
             if (links && links.length > 0) {
@@ -552,14 +547,14 @@
                 });
             } else {
                 const em = document.createElement('em');
-                em.textContent = t('none', 'none');
+                em.textContent = t('none');
                 row.appendChild(em);
             }
             return row;
         }
 
-        section.appendChild(navRow(t('menu', 'Menu'), globalLinks?.menu, false));
-        section.appendChild(navRow(t('footer', 'Footer'), globalLinks?.footer, true));
+        section.appendChild(navRow(t('menu'), globalLinks?.menu, false));
+        section.appendChild(navRow(t('footer'), globalLinks?.footer, true));
         return section;
     }
 
@@ -571,7 +566,7 @@
 
         const h3 = document.createElement('h3');
         h3.style.marginBottom = 'var(--space-sm)';
-        h3.textContent = t('linkGraph', 'Link Graph');
+        h3.textContent = t('linkGraph');
         section.appendChild(h3);
 
         const desc = document.createElement('p');
@@ -586,11 +581,11 @@
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         const th1 = document.createElement('th');
-        th1.textContent = t('route', 'Route');
+        th1.textContent = t('route');
         headerRow.appendChild(th1);
         headerRow.appendChild(document.createElement('th'));
         const th3 = document.createElement('th');
-        th3.textContent = t('linksTo', 'Links To');
+        th3.textContent = t('linksTo');
         headerRow.appendChild(th3);
         thead.appendChild(headerRow);
         table.appendChild(thead);
@@ -627,7 +622,7 @@
             } else {
                 const em = document.createElement('em');
                 em.style.color = 'var(--admin-text-muted)';
-                em.textContent = t('noLinks', 'no links');
+                em.textContent = t('noLinks');
                 td3.appendChild(em);
             }
             row.appendChild(td3);
@@ -646,7 +641,7 @@
         if (!data) {
             const p = document.createElement('p');
             p.style.color = 'var(--admin-text-muted)';
-            p.textContent = 'Could not load reachability data.';
+            p.textContent = t('reachabilityError');
             return p;
         }
 
@@ -662,7 +657,7 @@
         const bannerStrong = document.createElement('strong');
         bannerStrong.textContent = allGood
             ? t('allReachable')
-            : t('orphansFound').replace('{count}', orphan_count);
+            : QSPanelWords.count('sitemapPage.orphanRoutesFound', orphan_count);
         banner.appendChild(bannerStrong);
         fragment.appendChild(banner);
 
@@ -676,7 +671,7 @@
     }
 
     // ========================================================================
-    // Step 4: Inline Add Route Form
+    // Inline Add Route Form
     // ========================================================================
 
     /**
@@ -692,7 +687,6 @@
         hideInlineAddForm();
 
         const isRoot = !parentRoute;
-        const label = isRoot ? t('newRoute', 'New route') : `${t('newChildOf', 'New child of')} "${parentRoute}"`;
 
         const form = document.createElement('div');
         form.className = 'sitemap-inline-form';
@@ -700,16 +694,14 @@
 
         const labelSpan = document.createElement('span');
         labelSpan.className = 'sitemap-inline-form__label';
-        labelSpan.textContent = label + ':';
+        labelSpan.textContent = isRoot ? t('newRoute') : t('newChildOf', { route: parentRoute });
         form.appendChild(labelSpan);
 
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'admin-input admin-input--sm';
         nameInput.id = 'sitemap-new-route-name';
-        nameInput.placeholder = isRoot
-            ? t('routeNameNested', 'route-name or parent/child')
-            : t('routeName', 'route-name');
+        nameInput.placeholder = isRoot ? t('routeNameNested') : t('routeName');
         // Escape the '/' inside the class — an unescaped '/' is invalid in a character
         // class under the RegExp 'v' flag that modern browsers use to compile the
         // pattern attribute (throws "invalid character in class" while typing).
@@ -721,14 +713,14 @@
         createBtn.type = 'button';
         createBtn.className = 'admin-btn admin-btn--primary';
         createBtn.id = 'sitemap-create-btn';
-        createBtn.textContent = t('create', 'Create');
+        createBtn.textContent = t('create');
         form.appendChild(createBtn);
 
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
         cancelBtn.className = 'admin-btn admin-btn--ghost';
         cancelBtn.id = 'sitemap-cancel-btn';
-        cancelBtn.textContent = t('cancel', 'Cancel');
+        cancelBtn.textContent = t('cancel');
         form.appendChild(cancelBtn);
 
         const errorSpan = document.createElement('span');
@@ -771,8 +763,7 @@
             const segments = name.split('/');
             const badSeg = segments.find(s => !isLiteralSeg(s) && !isParamSeg(s));
             if (badSeg !== undefined) {
-                document.getElementById('sitemap-add-error').textContent =
-                    'Invalid segment "' + badSeg + '". Use lowercase letters, numbers, hyphens (no leading/trailing hyphens), or ":name" for a path parameter, separated by /.';
+                document.getElementById('sitemap-add-error').textContent = t('invalidSegment', { segment: badSeg });
                 return;
             }
 
@@ -799,29 +790,27 @@
                     if (Array.isArray(payload.cascade_created)) {
                         payload.cascade_created.forEach(r => expandedNodes.add(r));
                     }
-                    QuickSiteAdmin.showToast(t('routeCreated', 'Route created successfully'), 'success');
+                    QuickSiteAdmin.showToast(t('routeCreated'), 'success');
 
-                    // Surface server-side conflict warnings as
-                    // toasts. Each warning carries 'type' (i18n key for future
-                    // localisation) + EN 'message' fallback we display today.
-                    // Future polish could render inline beneath the form.
+                    // Server-side conflict warnings show as toasts: each its
+                    // own message (the command's words), else its type.
                     if (Array.isArray(payload.warnings) && payload.warnings.length > 0) {
                         payload.warnings.forEach((w) => {
-                            const msg = w.message || w.type || 'Route warning';
+                            const msg = w.message || w.type || t('routeWarning');
                             QuickSiteAdmin.showToast(msg, 'warning');
                         });
                     }
 
                     await refreshAll();
                 } else {
-                    document.getElementById('sitemap-add-error').textContent = result.data?.message || 'Error';
+                    document.getElementById('sitemap-add-error').textContent = result.data?.message || QSPanelWords.t('common.status.error');
                     createBtn.disabled = false;
-                    createBtn.textContent = t('create', 'Create');
+                    createBtn.textContent = t('create');
                 }
             } catch (err) {
                 document.getElementById('sitemap-add-error').textContent = err.message;
                 createBtn.disabled = false;
-                createBtn.textContent = t('create', 'Create');
+                createBtn.textContent = t('create');
             }
         };
 
@@ -838,7 +827,7 @@
     }
 
     // ========================================================================
-    // Step 5: Context Menu
+    // Context Menu
     // ========================================================================
 
     /**
@@ -876,27 +865,27 @@
         if (canAddChild) {
             menu.appendChild(_ctxMenuItem({
                 action: 'add-child', route,
-                label: t('addChild', 'Add child'),
+                label: t('addChild'),
                 icon: QuickSiteUtils.ICON_PATHS.plus,
             }));
         }
 
         menu.appendChild(_ctxMenuItem({
             action: 'view-in-editor', route,
-            label: t('viewInEditor', 'View in editor'),
+            label: t('viewInEditor'),
             icon: ICONS.viewInEditor,
         }));
 
         menu.appendChild(_ctxMenuItem({
             action: 'open-page', route,
-            label: t('openPage', 'Open page'),
+            label: t('openPage'),
             icon: QuickSiteUtils.ICON_PATHS.externalLink,
         }));
 
         // The panel's pencil, as every edit control draws it.
         menu.appendChild(_ctxMenuItem({
             action: 'edit-title', route,
-            label: t('editTitle', 'Edit title'),
+            label: t('editTitle'),
             icon: QuickSiteUtils.ICON_PATHS.edit,
         }));
 
@@ -906,7 +895,7 @@
         // pencil (content) and the layout-toggle hamburger/footer icons.
         menu.appendChild(_ctxMenuItem({
             action: 'configure-resolver', route,
-            label: t('configureResolver', 'Configure resolver'),
+            label: t('configureResolver'),
             icon: ICONS.resolver,
         }));
 
@@ -917,13 +906,13 @@
         if (!isHome) {
             menu.appendChild(_ctxMenuItem({
                 action: 'delete', route, hasChildren,
-                label: t('deleteRoute', 'Delete route'),
+                label: t('deleteRoute'),
                 danger: true, icon: QuickSiteUtils.ICON_PATHS.trash,
             }));
         } else {
             menu.appendChild(_ctxMenuItem({
                 disabled: true,
-                label: t('cannotDeleteHome', 'Cannot delete home'),
+                label: t('cannotDeleteHome'),
                 icon: QuickSiteUtils.ICON_PATHS.trash,
             }));
         }
@@ -971,20 +960,20 @@
     }
 
     // ========================================================================
-    // Step 5: Delete Route
+    // Delete Route
     // ========================================================================
 
     async function deleteRoute(route, hasChildren) {
         const childCount = hasChildren ? countDescendantsForRoute(route) : 0;
         // The question names the route; a route with children says they go with it.
         const message = hasChildren
-            ? t('deleteConfirmChildren', 'Route /{route} has {count} children. Delete all?').replace('{route}', route).replace('{count}', childCount)
+            ? QSPanelWords.count('sitemapPage.deleteConfirmChildrenCount', childCount, { route })
             : '';
 
         if (!(await QuickSiteUtils.confirm(message, {
-            title: t('deleteConfirm', 'Delete route /{route}?').replace('{route}', route),
+            title: t('deleteConfirm', { route }),
             type: 'danger',
-            confirmText: t('deleteRoute', 'Delete route'),
+            confirmText: t('deleteRoute'),
             returnFocus: () => (contextMenuOpener && contextMenuOpener.isConnected ? contextMenuOpener : null),
         }))) return;
 
@@ -996,13 +985,13 @@
             if (result.ok) {
                 saveExpandedState();
                 expandedNodes.delete(route);
-                QuickSiteAdmin.showToast(t('routeDeleted', 'Route deleted'), 'success');
+                QuickSiteAdmin.showToast(t('routeDeleted'), 'success');
                 await refreshAll();
             } else {
-                QuickSiteAdmin.showToast(result.data?.message || 'Delete failed', 'error');
+                QuickSiteAdmin.showToast(result.data?.message || t('deleteFailed'), 'error');
             }
         } catch (err) {
-            QuickSiteAdmin.showToast('Error: ' + err.message, 'error');
+            QuickSiteAdmin.showToast(t('errorMessage', { message: err.message }), 'error');
         }
     }
 
@@ -1011,10 +1000,6 @@
         if (!sitemapData?.routes) return 0;
         return sitemapData.routes.filter(r => r.name !== routePath && r.name.startsWith(routePath + '/')).length;
     }
-
-    // ========================================================================
-    // Step 6: Layout Toggle
-    // ========================================================================
 
     // ========================================================================
     // State Management
@@ -1103,9 +1088,7 @@
 
         // Optimistic UI update
         btn.classList.toggle('sitemap-layout-toggle--on', newValue);
-        btn.title = field === 'menu'
-            ? (newValue ? t('menuOn', 'Menu: visible') : t('menuOff', 'Menu: hidden'))
-            : (newValue ? t('footerOn', 'Footer: visible') : t('footerOff', 'Footer: hidden'));
+        btn.title = _layoutToggleTitle(field, newValue);
 
         try {
             const result = await QuickSiteAdmin.apiRequest('setRouteLayout', 'POST', {
@@ -1130,11 +1113,13 @@
             } else {
                 // Revert
                 btn.classList.toggle('sitemap-layout-toggle--on', !newValue);
-                QuickSiteAdmin.showToast(result.data?.message || 'Error', 'error');
+                btn.title = _layoutToggleTitle(field, !newValue);
+                QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('common.status.error'), 'error');
             }
         } catch (err) {
             btn.classList.toggle('sitemap-layout-toggle--on', !newValue);
-            QuickSiteAdmin.showToast('Error: ' + err.message, 'error');
+            btn.title = _layoutToggleTitle(field, !newValue);
+            QuickSiteAdmin.showToast(t('errorMessage', { message: err.message }), 'error');
         }
     }
 
@@ -1236,7 +1221,7 @@
         // Reset modal UI.
         refs.route.textContent = '"' + route + '"';
         refs.rows.replaceChildren();
-        refs.status.textContent = 'Loading…';
+        refs.status.textContent = t('loading');
         refs.status.style.color = '';
         refs.save.disabled = true;
         refs.modal.style.display = '';
@@ -1244,7 +1229,7 @@
         // Every language's words, from the one list: on a one-language site default.json, the file its pages read.
         const list = await QSSiteWords.read({ fresh: true });
         if (!list) {
-            refs.status.textContent = 'The titles could not be read — close and try again.';
+            refs.status.textContent = t('editTitleReadFailed');
             refs.status.style.color = 'var(--admin-error)';
             return;
         }
@@ -1280,7 +1265,7 @@
             input.setAttribute('data-title-lang', lang);
             input.setAttribute('data-original', hasValue ? value : '');
             input.value = hasValue ? value : '';
-            input.placeholder = 'Title in ' + lang + '…';
+            input.placeholder = t('editTitlePlaceholder', { lang });
 
             row.appendChild(langSpan);
             row.appendChild(input);
@@ -1312,7 +1297,7 @@
         const routeTxt = refs.route.textContent || '';
         const route = routeTxt.replace(/^"|"$/g, '');
         if (!route) {
-            refs.status.textContent = 'Could not determine target route — close and try again.';
+            refs.status.textContent = t('editTitleNoRoute');
             refs.status.style.color = 'var(--admin-error)';
             return;
         }
@@ -1328,13 +1313,13 @@
             if (value !== original) changes.push({ lang, value });
         });
         if (changes.length === 0) {
-            refs.status.textContent = 'No changes to save.';
+            refs.status.textContent = t('editTitleNoChanges');
             refs.status.style.color = '';
             return;
         }
 
         refs.save.disabled = true;
-        refs.status.textContent = 'Saving (' + changes.length + ' language' + (changes.length === 1 ? '' : 's') + ')…';
+        refs.status.textContent = QSPanelWords.count('sitemapPage.editTitleSaving', changes.length);
         refs.status.style.color = '';
 
         // Each changed language through the one list of the site's words (QSSiteWords.write(): its answer checked,
@@ -1346,16 +1331,21 @@
                 const words = {};
                 words[titleKey] = value;
                 const done = await QSSiteWords.write(lang, words);
-                if (!done.ok) failures.push(lang + ': ' + done.message);
+                if (!done.ok) failures.push(t('editTitleFailure', { lang, message: done.message }));
             }
             if (failures.length > 0) {
-                refs.status.textContent = 'Saved ' + (changes.length - failures.length) + '/' + changes.length + ' — ' + failures.join(' | ');
+                // The failures, each a language and the refusal's own words, set apart by a bar
+                refs.status.textContent = t('editTitleSavedSome', {
+                    saved: QSPanelWords.number(changes.length - failures.length),
+                    total: QSPanelWords.number(changes.length),
+                    failures: failures.join(' | '),
+                });
                 refs.status.style.color = 'var(--admin-warning, #b3691e)';
                 refs.save.disabled = false;
                 if (failures.length < changes.length) await refreshAll();
                 return;
             }
-            refs.status.textContent = '✓ Saved ' + changes.length + ' translation' + (changes.length === 1 ? '' : 's') + '.';
+            refs.status.textContent = QSPanelWords.count('sitemapPage.editTitleSaved', changes.length);
             refs.status.style.color = 'var(--admin-success, #2c7a3f)';
             // The coverage badges count the titles: they follow the save.
             await refreshAll();
@@ -1363,7 +1353,7 @@
             setTimeout(closeEditTitleModal, 700);
         } catch (err) {
             console.error('[sitemap] edit-title save failed:', err);
-            refs.status.textContent = 'Save failed — see console.';
+            refs.status.textContent = t('editTitleSaveFailed');
             refs.status.style.color = 'var(--admin-error)';
             refs.save.disabled = false;
         }
@@ -1525,9 +1515,7 @@
     /**
      * Normalise an auth value (endpoint OR api level) to its string type.
      *
-     * The api-endpoints.json schema accepts auth in TWO shapes (legacy
-     * from the apis.js fix that persists endpoint auth: 'none' explicit
-     * + load missing as 'inherit'):
+     * The api-endpoints.json schema accepts auth in TWO shapes:
      *   - string: 'none' / 'apiKey' / 'bearer' / 'cookie' / 'basic' /
      *     'inherit' (special: means "fall through to API-level")
      *   - object: {type: '<one of the above>', ...config}
@@ -1535,10 +1523,10 @@
      * Returns null when the value means "inherit" or is malformed —
      * callers fall through to the parent (API) level.
      *
-     * Previously this was inlined as `(x && x.type)` which fails when
-     * x is a bare string ('none'.type === undefined), causing endpoints
-     * with explicit 'none' auth to silently inherit the API's bearer
-     * and show "disabled for bearer" in the cache badge.
+     * Reading `(x && x.type)` alone would miss a bare string
+     * ('none'.type === undefined): an endpoint with explicit 'none' auth
+     * would inherit the API's bearer and show "disabled for bearer" in
+     * the cache badge.
      */
     function _normalizeAuthValue(authValue) {
         // `required` carries the API's auth, as `inherit` does: neither names a type.
@@ -1622,7 +1610,6 @@
             close:        document.getElementById('sitemap-resolver-close'),
             cancel:       document.getElementById('sitemap-resolver-cancel'),
             save:         document.getElementById('sitemap-resolver-save'),
-            clear:        document.getElementById('sitemap-resolver-clear'),
             route:        document.getElementById('sitemap-resolver-route'),
             endpoint:     document.getElementById('sitemap-resolver-endpoint'),
             endpointMeta: document.getElementById('sitemap-resolver-endpoint-meta'),
@@ -1631,7 +1618,6 @@
         if (_resolverRefs.close)  _resolverRefs.close.addEventListener('click', closeResolverModal);
         if (_resolverRefs.cancel) _resolverRefs.cancel.addEventListener('click', closeResolverModal);
         if (_resolverRefs.save)   _resolverRefs.save.addEventListener('click', submitResolverModal);
-        if (_resolverRefs.clear)  _resolverRefs.clear.addEventListener('click', clearResolverFromModal);
         if (_resolverRefs.endpoint) {
             _resolverRefs.endpoint.addEventListener('change', _onResolverEndpointChange);
         }
@@ -1689,7 +1675,7 @@
 
         const blank = document.createElement('option');
         blank.value = '';
-        blank.textContent = t('resolverEndpointPlaceholder', '— Select an endpoint —');
+        blank.textContent = t('resolverEndpointPlaceholder');
         refs.endpoint.appendChild(blank);
 
         apis.forEach((api) => {
@@ -1727,7 +1713,7 @@
             if (refs.endpoint.value !== currentEndpointRef) {
                 const orphan = document.createElement('option');
                 orphan.value = currentEndpointRef;
-                orphan.textContent = '⚠ ' + currentEndpointRef + ' — ' + t('resolverEndpointOrphanShort', 'not in registry');
+                orphan.textContent = t('resolverEndpointOrphanShort', { endpoint: currentEndpointRef });
                 orphan.dataset.orphan = 'true';
                 refs.endpoint.appendChild(orphan);
                 refs.endpoint.value = currentEndpointRef;
@@ -1753,10 +1739,7 @@
         }
         const selected = refs.endpoint.options[refs.endpoint.selectedIndex];
         if (selected && selected.dataset && selected.dataset.orphan === 'true') {
-            refs.endpointMeta.textContent = t(
-                'resolverEndpointOrphan',
-                'This endpoint id is not in the current API registry. Re-register it at /admin/apis or pick another endpoint.'
-            );
+            refs.endpointMeta.textContent = t('resolverEndpointOrphan');
             refs.endpointMeta.style.color = 'var(--admin-warning, #b3691e)';
             return;
         }
@@ -1771,8 +1754,11 @@
             const epAuth = _normalizeAuthValue(ep.auth)
                 || _normalizeAuthValue(api.auth)
                 || 'none';
-            refs.endpointMeta.textContent = ep.method + ' ' + (api.baseUrl || '') + ep.path
-                + ' · ' + t('resolverEndpointAuth', 'auth') + ': ' + epAuth;
+            refs.endpointMeta.textContent = t('resolverEndpointMeta', {
+                method: ep.method,
+                url: (api.baseUrl || '') + ep.path,
+                auth: epAuth,
+            });
             refs.endpointMeta.style.color = '';
         }
 
@@ -1882,7 +1868,7 @@
                 el.className = 'admin-input sitemap-resolver-input-row__name';
                 const blank = document.createElement('option');
                 blank.value = '';
-                blank.textContent = t('resolverInputNamePlaceholder', '— pick a param —');
+                blank.textContent = t('resolverInputNamePlaceholder');
                 el.appendChild(blank);
                 params.forEach((p) => {
                     const opt = document.createElement('option');
@@ -1899,8 +1885,7 @@
                 if (el.value !== currentValue && currentValue !== '') {
                     const orphan = document.createElement('option');
                     orphan.value = currentValue;
-                    orphan.textContent = '⚠ ' + currentValue + ' — '
-                        + t('resolverInputNameOrphan', 'not in endpoint params');
+                    orphan.textContent = t('resolverInputNameOrphan', { name: currentValue });
                     orphan.dataset.orphan = 'true';
                     el.appendChild(orphan);
                     el.value = currentValue;
@@ -1909,7 +1894,7 @@
                 el = document.createElement('input');
                 el.type = 'text';
                 el.className = 'admin-input sitemap-resolver-input-row__name';
-                el.placeholder = t('resolverInputName', 'param name');
+                el.placeholder = t('resolverInputName');
                 el.value = currentValue;
             }
 
@@ -1940,24 +1925,22 @@
         // Kind selector.
         const kindSelect = document.createElement('select');
         kindSelect.className = 'admin-input sitemap-resolver-input-row__kind';
+        // A route with no :name segment offers param: disabled, its label saying why
         const kinds = [
-            { v: 'param',   l: t('resolverKindParam',   'param:') },
-            { v: 'query',   l: t('resolverKindQuery',   'query:') },
-            { v: 'literal', l: t('resolverKindLiteral', 'literal') },
+            { v: 'param',   l: paramSegments.length === 0 ? t('resolverKindParamNoSegments') : t('resolverKindParam') },
+            { v: 'query',   l: t('resolverKindQuery') },
+            { v: 'literal', l: t('resolverKindLiteral') },
         ];
         // A resolver is given no session, so `session:` always reads as nothing and is never offered. A row
         // saved with it still shows what it holds, and saves as it was unless its author changes it.
         if (initialKind === 'session') {
-            kinds.push({ v: 'session', l: t('resolverKindSession', 'session:') + ' ' + t('resolverKindSessionNothing') });
+            kinds.push({ v: 'session', l: t('resolverKindSessionNothing') });
         }
         kinds.forEach(({ v, l }) => {
             const opt = document.createElement('option');
             opt.value = v;
             opt.textContent = l;
-            if (v === 'param' && paramSegments.length === 0) {
-                opt.disabled = true;
-                opt.textContent += ' ' + t('resolverKindParamNoSegments', '(route has no :params)');
-            }
+            if (v === 'param' && paramSegments.length === 0) opt.disabled = true;
             kindSelect.appendChild(opt);
         });
         kindSelect.value = initialKind;
@@ -1991,9 +1974,9 @@
                 el.type = 'text';
                 el.className = 'admin-input';
                 el.placeholder =
-                    k === 'query'   ? t('resolverValueQuery',   'query string key') :
-                    k === 'session' ? t('resolverValueSession', 'session field name') :
-                                      t('resolverValueLiteral', 'literal value');
+                    k === 'query'   ? t('resolverValueQuery') :
+                    k === 'session' ? t('resolverValueSession') :
+                                      t('resolverValueLiteral');
                 el.value = currentValue || '';
             }
             valueCell.appendChild(el);
@@ -2024,7 +2007,7 @@
         });
 
         // The small ×: the row leaves the form, nothing is written before Save.
-        row.appendChild(QSControls.removeRow(t('resolverRemoveInput', 'Remove input'), () => row.remove()));
+        row.appendChild(QSControls.removeRow(t('resolverRemoveInput'), () => row.remove()));
 
         return row;
     }
@@ -2042,15 +2025,12 @@
 
         const label = document.createElement('label');
         label.className = 'sitemap-resolver-label';
-        label.textContent = t('resolverInputs', 'Inputs');
+        label.textContent = t('resolverInputs');
         section.appendChild(label);
 
         const hint = document.createElement('p');
         hint.className = 'sitemap-resolver-hint';
-        hint.textContent = t(
-            'resolverInputsHint',
-            'Wire endpoint parameters to URL params, query string, session, or literal values. When the endpoint declares parameters, names are picked from a dropdown — otherwise free-text.'
-        );
+        hint.textContent = t('resolverInputsHint');
         section.appendChild(hint);
 
         // Symmetric "endpoint has no declared parameters" warning to
@@ -2059,10 +2039,7 @@
         const noParamsHint = document.createElement('p');
         noParamsHint.id = 'sitemap-resolver-inputs-no-params-hint';
         noParamsHint.className = 'sitemap-resolver-hint sitemap-resolver-hint--warning';
-        noParamsHint.textContent = t(
-            'resolverInputsNoParamsHint',
-            '⚠ This endpoint does not declare any parameters. Names are free-text — typo-prone. Declaring parameters in /admin/apis enables dropdown-driven name selection.'
-        );
+        noParamsHint.textContent = t('resolverInputsNoParamsHint');
         noParamsHint.style.display = (endpointParams && endpointParams.length > 0) ? 'none' : '';
         section.appendChild(noParamsHint);
 
@@ -2080,7 +2057,7 @@
         addBtn.type = 'button';
         addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost';
         addBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 14));
-        addBtn.appendChild(document.createTextNode(' ' + t('resolverInputAdd', 'Add input')));
+        addBtn.appendChild(document.createTextNode(' ' + t('resolverInputAdd')));
         addBtn.addEventListener('click', () => {
             // New row uses the most up-to-date endpoint parameters so it
             // gets the right cell type immediately.
@@ -2141,8 +2118,8 @@
      *     No legitimate inputs case wants an empty value (param: dropdown
      *     is auto-picked, query:/session: with empty key is meaningless,
      *     empty literal is ~always a mistake). Inputs-specific rule —
-     *     expose (Step 4) has a different policy because empty dot-path
-     *     means "expose the whole response" per the design doc.
+     *     expose has a different policy because an empty dot-path
+     *     means "expose the whole response".
      *
      * Side effect: rows are visually marked with the --error class as
      * each is evaluated, so the user sees every offender at once.
@@ -2239,7 +2216,7 @@
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'admin-input sitemap-resolver-expose-row__name';
-        nameInput.placeholder = t('resolverExposeName', 'variable name');
+        nameInput.placeholder = t('resolverExposeName');
         nameInput.value = varName || '';
         nameInput.addEventListener('input', () => {
             if ((nameInput.value || '').trim() !== '') {
@@ -2274,9 +2251,7 @@
                 paths.forEach((p) => {
                     const opt = document.createElement('option');
                     opt.value = p;
-                    opt.textContent = (p === '')
-                        ? t('resolverExposeWholeResponse', '(whole response)')
-                        : p;
+                    opt.textContent = (p === '') ? t('resolverExposeWholeResponse') : p;
                     el.appendChild(opt);
                 });
                 el.value = currentValue;
@@ -2287,8 +2262,7 @@
                 if (el.value !== currentValue) {
                     const orphan = document.createElement('option');
                     orphan.value = currentValue;
-                    orphan.textContent = '⚠ ' + currentValue + ' — '
-                        + t('resolverExposePathOrphan', 'not in schema');
+                    orphan.textContent = t('resolverExposePathOrphan', { path: currentValue });
                     orphan.dataset.orphan = 'true';
                     el.appendChild(orphan);
                     el.value = currentValue;
@@ -2297,7 +2271,7 @@
                 el = document.createElement('input');
                 el.type = 'text';
                 el.className = 'admin-input sitemap-resolver-expose-row__path';
-                el.placeholder = t('resolverExposePath', 'data.field.path (empty = whole response)');
+                el.placeholder = t('resolverExposePath');
                 el.value = currentValue;
             }
 
@@ -2318,7 +2292,7 @@
         row._refreshPathCell = _refreshPathCell;
 
         // The small ×: the row leaves the form, nothing is written before Save.
-        row.appendChild(QSControls.removeRow(t('resolverRemoveExpose', 'Remove expose'), () => row.remove()));
+        row.appendChild(QSControls.removeRow(t('resolverRemoveExpose'), () => row.remove()));
 
         return row;
     }
@@ -2341,15 +2315,12 @@
 
         const label = document.createElement('label');
         label.className = 'sitemap-resolver-label';
-        label.textContent = t('resolverExpose', 'Expose');
+        label.textContent = t('resolverExpose');
         section.appendChild(label);
 
         const hint = document.createElement('p');
         hint.className = 'sitemap-resolver-hint';
-        hint.textContent = t(
-            'resolverExposeHint',
-            'Map response fields to template variables. Empty path means "expose the whole response as this variable." When the endpoint declares a response schema, paths are picked from a dropdown — otherwise free-text.'
-        );
+        hint.textContent = t('resolverExposeHint');
         section.appendChild(hint);
 
         // No-schema warning. Always rendered (stable id) so endpoint
@@ -2358,10 +2329,7 @@
         const noSchemaHint = document.createElement('p');
         noSchemaHint.id = 'sitemap-resolver-expose-no-schema-hint';
         noSchemaHint.className = 'sitemap-resolver-hint sitemap-resolver-hint--warning';
-        noSchemaHint.textContent = t(
-            'resolverExposeNoSchemaHint',
-            '⚠ This endpoint does not declare a response schema. Paths are free-text — typo-prone, no autocomplete. Adding a schema in /admin/apis enables dropdown-driven path selection.'
-        );
+        noSchemaHint.textContent = t('resolverExposeNoSchemaHint');
         noSchemaHint.style.display = (schemaPaths && schemaPaths.length > 0) ? 'none' : '';
         section.appendChild(noSchemaHint);
 
@@ -2379,7 +2347,7 @@
         addBtn.type = 'button';
         addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost';
         addBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 14));
-        addBtn.appendChild(document.createTextNode(' ' + t('resolverExposeAdd', 'Add expose')));
+        addBtn.appendChild(document.createTextNode(' ' + t('resolverExposeAdd')));
         addBtn.addEventListener('click', () => {
             // New row uses the most up-to-date schema paths so it gets
             // the right cell type immediately. Null schema → [] paths →
@@ -2402,7 +2370,7 @@
      *   - Empty name + filled path:              reason `missing_name`.
      *     Author typed a path but forgot to name it.
      *   - Filled name + empty path:              ACCEPT.
-     *     Empty path = whole response per the design doc. Common case
+     *     Empty path = whole response. Common case
      *     for "give me the whole API response as $data".
      */
     function _collectResolverExpose() {
@@ -2453,8 +2421,8 @@
     // ====================================================================
     // Number input (seconds) + shared-cache-safe badge. The badge is a
     // read-only surface for the server-side rule: caching is force-
-    // disabled for bearer/cookie/basic auth REGARDLESS of TTL (locked
-    // design — would leak per-user data across users via shared cache).
+    // disabled for bearer/cookie/basic auth REGARDLESS of TTL (a shared
+    // cache would leak per-user data across users).
 
     /**
      * Refresh both the auth-cacheable badge AND the TTL input's
@@ -2475,12 +2443,12 @@
             badge.classList.remove('sitemap-resolver-cache-badge--ok', 'sitemap-resolver-cache-badge--blocked');
             if (cacheable) {
                 badge.classList.add('sitemap-resolver-cache-badge--ok');
-                badge.textContent = t('resolverCacheCacheable', 'cacheable');
-                badge.title = t('resolverCacheCacheableTitle', 'Auth: ' + at + ' — shared-safe, server honours cacheTTL.');
+                badge.textContent = t('resolverCacheCacheable');
+                badge.title = t('resolverCacheCacheableTitle', { auth: at });
             } else {
                 badge.classList.add('sitemap-resolver-cache-badge--blocked');
-                badge.textContent = t('resolverCacheBlocked', 'disabled for ' + at);
-                badge.title = t('resolverCacheBlockedTitle', 'Per-user auth (' + at + ') cannot share cache entries between users — server forces no-cache regardless of TTL.');
+                badge.textContent = t('resolverCacheBlocked', { auth: at });
+                badge.title = t('resolverCacheBlockedTitle', { auth: at });
             }
         }
         if (input) {
@@ -2496,7 +2464,7 @@
         const label = document.createElement('label');
         label.className = 'sitemap-resolver-label';
         label.setAttribute('for', 'sitemap-resolver-cache-ttl');
-        label.textContent = t('resolverCacheTTL', 'Cache TTL');
+        label.textContent = t('resolverCacheTTL');
         section.appendChild(label);
 
         const row = document.createElement('div');
@@ -2519,7 +2487,7 @@
 
         const unit = document.createElement('span');
         unit.className = 'sitemap-resolver-cache-unit';
-        unit.textContent = t('resolverCacheTTLUnit', 'seconds');
+        unit.textContent = t('resolverCacheTTLUnit');
         row.appendChild(unit);
 
         const badge = document.createElement('span');
@@ -2537,10 +2505,7 @@
 
         const hint = document.createElement('p');
         hint.className = 'sitemap-resolver-hint';
-        hint.textContent = t(
-            'resolverCacheTTLHint',
-            'Server-side cache duration in seconds. 0 (or empty) = no cache, every request fires fresh. Caching is server-force-disabled for bearer / cookie / basic auth (would leak per-user data through shared cache).'
-        );
+        hint.textContent = t('resolverCacheTTLHint');
         section.appendChild(hint);
     }
 
@@ -2568,9 +2533,8 @@
     // ====================================================================
     // onMiss section
     // ====================================================================
-    // Single-select for the failure-mode behaviour. Two options now
-    // (default + render-empty); future values (redirect:<url> etc.)
-    // reserved but not in v1 scope.
+    // Single-select for the failure-mode behaviour: the default, or
+    // render-empty.
 
     function _renderResolverOnMissSection(onMiss) {
         const section = document.getElementById('sitemap-resolver-onmiss-section');
@@ -2580,15 +2544,15 @@
         const label = document.createElement('label');
         label.className = 'sitemap-resolver-label';
         label.setAttribute('for', 'sitemap-resolver-onmiss');
-        label.textContent = t('resolverOnMiss', 'On miss');
+        label.textContent = t('resolverOnMiss');
         section.appendChild(label);
 
         const select = document.createElement('select');
         select.id = 'sitemap-resolver-onmiss';
         select.className = 'admin-input sitemap-resolver-onmiss-select';
         [
-            { v: '', l: t('resolverOnMissDefault',     '(default — fail loud: 404 / 500)') },
-            { v: 'render-empty', l: t('resolverOnMissRenderEmpty', 'render-empty — expose null vars, render template with empty-state UI') },
+            { v: '', l: t('resolverOnMissDefault') },
+            { v: 'render-empty', l: t('resolverOnMissRenderEmpty') },
         ].forEach(({ v, l }) => {
             const opt = document.createElement('option');
             opt.value = v;
@@ -2600,18 +2564,14 @@
 
         const hint = document.createElement('p');
         hint.className = 'sitemap-resolver-hint';
-        hint.textContent = t(
-            'resolverOnMissHint',
-            'How to respond when the resolver fetch fails or returns non-2xx. Default sends 404 / 500 to the user. render-empty keeps the page rendering with null/empty exposed vars — pair with data-state-show-empty in the template for graceful "no data" UI.'
-        );
+        hint.textContent = t('resolverOnMissHint');
         section.appendChild(hint);
     }
 
     /**
      * Read the onMiss select. Empty (default) → null (omitted from
-     * saved config). Non-empty value → string. v1 ONLY allows
-     * 'render-empty' in the dropdown; future values reserved per the
-     * design doc but not surfaced here.
+     * saved config). Non-empty value → string: the dropdown offers
+     * 'render-empty' alone, so the select reports no error.
      */
     function _collectResolverOnMiss() {
         const select = document.getElementById('sitemap-resolver-onmiss');
@@ -2625,19 +2585,12 @@
      *
      * Always invoked from the list view.
      * The optional `options` second arg carries:
-     *   - config:    the resolver config to pre-populate from (NEW: pass
-     *                explicitly; we no longer read from sitemapData here
-     *                because the list view has its own normalised array
-     *                snapshot)
+     *   - config:    the resolver config to pre-populate from (a slot of
+     *                the list view's normalised array snapshot)
      *   - editIndex: which slot of the array this submit will target
      *                (= setRouteResolver `index` param). For new
      *                resolvers via "+ Add resolver", this equals the
      *                current array length (= append).
-     *
-     * Backward-compat path: when called with no options (legacy
-     * single-resolver path), still reads from sitemapData. This branch
-     * isn't used by the new context-menu flow but stays for any future
-     * callsites that haven't migrated.
      */
     async function openResolverModal(route, options) {
         const refs = _ensureResolverRefs();
@@ -2648,30 +2601,14 @@
         options = options || {};
 
         _resolverCurrentRoute = route;
-        // When called from list view, the caller passes the config
-        // directly + the index. When called legacy-style, fall back to
-        // reading sitemapData (single-resolver shape only).
-        if (options.config !== undefined || options.editIndex !== undefined) {
-            _resolverCurrentConfig = options.config || null;
-        } else {
-            const raw = (sitemapData && sitemapData.routeResolvers && sitemapData.routeResolvers[route]) || null;
-            _resolverCurrentConfig = Array.isArray(raw) ? (raw[0] || null) : raw;
-        }
+        // The list view passes the config (null for a new one) and the index.
+        _resolverCurrentConfig = options.config || null;
 
         refs.route.textContent = '"' + route + '"';
         refs.save.disabled = true;
-        // Clear button hidden in list-view mode — each row's bin on
-        // the list view handles individual removal; the Done button on
-        // the list closes everything cleanly.
-        if (_resolverEditFromList) {
-            refs.clear.style.display = 'none';
-        } else {
-            refs.clear.style.display = _resolverCurrentConfig ? '' : 'none';
-            refs.clear.disabled = false;
-        }
         refs.modal.style.display = '';
 
-        refs.status.textContent = t('loading', 'Loading…');
+        refs.status.textContent = t('loading');
         refs.status.style.color = '';
 
         const apis = await _loadApiEndpointsForResolver();
@@ -2682,7 +2619,7 @@
         // (e.g. `user/:id/posts/:postid` → ['id','postid']) and drives
         // the kind=param value picker. endpointParams comes from the
         // selected endpoint's declared parameters and drives the input
-        // NAME picker (added in Step 4 follow-up).
+        // NAME picker.
         const paramSegments = _extractParamSegments(route);
         const endpointParams = _findCurrentEndpointParameters();
         _renderResolverInputsSection(
@@ -2764,7 +2701,8 @@
 
         // Pre-flight: validate ALL form sections before going to the
         // network. inputs + expose use the per-row collectors; cacheTTL
-        // / onMiss use single-field collectors. All errors aggregate
+        // / onMiss use single-field collectors (the onMiss select offers
+        // only valid values, so it reports no error). All errors aggregate
         // into one status message + first errant element gets focus.
         const collectedInputs   = _collectResolverInputs();
         const collectedExpose   = _collectResolverExpose();
@@ -2774,52 +2712,42 @@
         collectedInputs.errors.forEach((e) => allErrors.push(Object.assign({ section: 'input' },  e)));
         collectedExpose.errors.forEach((e) => allErrors.push(Object.assign({ section: 'expose' }, e)));
         collectedCacheTTL.errors.forEach((e) => allErrors.push(Object.assign({ section: 'cache' },  e)));
-        collectedOnMiss.errors.forEach((e) => allErrors.push(Object.assign({ section: 'onmiss' }, e)));
 
         if (allErrors.length > 0) {
+            // Each error is one sentence: where it is (a row-based section
+            // names the row's number, the cache field names itself) and why.
+            // The sections and reasons are those the collectors above report.
             const msgs = allErrors.map((e) => {
-                let reasonLabel;
+                let reason;
                 switch (e.reason) {
                     case 'empty_row':
-                        reasonLabel = t('resolverErrEmptyRow', 'row is empty — fill it or × remove it');
+                        reason = t('resolverErrEmptyRow');
                         break;
                     case 'missing_name':
-                        reasonLabel = t('resolverErrMissingName', 'name is required');
+                        reason = t('resolverErrMissingName');
                         break;
                     case 'missing_value':
-                        reasonLabel = t('resolverErrMissingValue', 'value is required');
+                        reason = t('resolverErrMissingValue');
                         break;
                     case 'invalid_input_name_chars':
                         // Input names allow hyphens (kebab-case for API params).
-                        reasonLabel = t('resolverErrInvalidInputNameChars',
-                            'name must start with a letter or underscore and use only letters, digits, underscores, or hyphens');
+                        reason = t('resolverErrInvalidInputNameChars');
                         break;
                     case 'invalid_expose_name_chars':
                         // Expose names become PHP template vars — strict identifier rule.
-                        reasonLabel = t('resolverErrInvalidExposeNameChars',
-                            'name must start with a letter or underscore and use only letters, digits, and underscores (becomes a $variable in the template)');
+                        reason = t('resolverErrInvalidExposeNameChars');
                         break;
                     case 'invalid_cache_ttl':
-                        reasonLabel = t('resolverErrInvalidCacheTTL',
-                            'cache TTL must be a non-negative integer (seconds), or empty for no cache');
+                        reason = t('resolverErrInvalidCacheTTL');
                         break;
-                    default:
-                        reasonLabel = e.reason;
                 }
-                // Section label per error origin — row-based sections
-                // include the row number; single-field sections (cache /
-                // onmiss) skip the row number.
-                let sectionLabel;
-                let withRow = true;
                 switch (e.section) {
-                    case 'input':  sectionLabel = t('resolverErrInputRow',  'Input row'); break;
-                    case 'expose': sectionLabel = t('resolverErrExposeRow', 'Expose row'); break;
-                    case 'cache':  sectionLabel = t('resolverErrCacheField',  'Cache TTL');   withRow = false; break;
-                    case 'onmiss': sectionLabel = t('resolverErrOnMissField', 'On miss');     withRow = false; break;
-                    default:       sectionLabel = e.section; withRow = false;
+                    case 'input':  return t('resolverErrInputRow',  { row: QSPanelWords.number(e.rowNumber), reason });
+                    case 'expose': return t('resolverErrExposeRow', { row: QSPanelWords.number(e.rowNumber), reason });
+                    case 'cache':  return t('resolverErrCacheField', { reason });
                 }
-                return sectionLabel + (withRow ? ' ' + e.rowNumber : '') + ': ' + reasonLabel;
             });
+            // A separator between whole messages, not a list inside a sentence
             refs.status.textContent = msgs.join('; ');
             refs.status.style.color = 'var(--admin-error)';
             // Focus the first errant element so the user knows where to fix.
@@ -2829,10 +2757,8 @@
             return;
         }
 
-        // Step 5 closer — every resolver field now comes from the form,
-        // so the snapshot carry-over block drops entirely. Saving an
-        // empty cacheTTL / onMiss form-side correctly OMITS the field
-        // from the config (which is the schema-correct "default
+        // Every resolver field comes from the form. An empty cacheTTL /
+        // onMiss OMITS the field from the config (the schema's "default
         // behaviour" signal — see _collectResolverCacheTTL /
         // _collectResolverOnMiss docblocks for the per-field nulling
         // rules).
@@ -2843,8 +2769,7 @@
         if (collectedOnMiss.result)   config.onMiss   = collectedOnMiss.result;
 
         refs.save.disabled = true;
-        refs.clear.disabled = true;
-        refs.status.textContent = t('saving', 'Saving…');
+        refs.status.textContent = t('saving');
         refs.status.style.color = '';
 
         try {
@@ -2860,7 +2785,7 @@
             }
             const res = await QuickSiteAdmin.apiRequest('setRouteResolver', 'POST', body);
             if (res.ok) {
-                QuickSiteAdmin.showToast(t('resolverSaved', 'Resolver saved'), 'success');
+                QuickSiteAdmin.showToast(t('resolverSaved'), 'success');
                 // Stash the route + list-mode flag BEFORE close clears them.
                 // Pass false to closeResolverModal so it doesn't auto-
                 // return — we need to await refreshAll() first, then
@@ -2875,62 +2800,20 @@
             } else {
                 // Surface validateResolverConfig errors. setRouteResolver
                 // returns {errors: [{field, reason, hint?}]} on 400; show
-                // the hint when present (more actionable than reason).
+                // the hint when present (more actionable than reason): the
+                // command's own words, set apart as whole messages.
                 const errors = (res.data && Array.isArray(res.data.errors)) ? res.data.errors : [];
                 const summary = errors.length > 0
                     ? errors.map((e) => e.hint || e.reason || e.field).filter(Boolean).join(' · ')
-                    : ((res.data && res.data.message) || 'Save failed');
+                    : ((res.data && res.data.message) || QSPanelWords.t('common.saveFailed'));
                 refs.status.textContent = summary;
                 refs.status.style.color = 'var(--admin-error)';
                 refs.save.disabled = false;
-                refs.clear.disabled = false;
             }
         } catch (err) {
-            refs.status.textContent = err.message || 'Save failed';
+            refs.status.textContent = err.message || QSPanelWords.t('common.saveFailed');
             refs.status.style.color = 'var(--admin-error)';
             refs.save.disabled = false;
-            refs.clear.disabled = false;
-        }
-    }
-
-    async function clearResolverFromModal() {
-        const refs = _ensureResolverRefs();
-        if (!_resolverCurrentRoute) return;
-        if (!(await QuickSiteUtils.confirm(t('resolverClearText', 'The route will render again without server-side data.'), {
-            title: t('resolverClearTitle', 'Clear the resolver of /{route}?').replace('{route}', _resolverCurrentRoute),
-            type: 'danger',
-            confirmText: t('resolverClear', 'Clear resolver'),
-        }))) {
-            return;
-        }
-
-        refs.clear.disabled = true;
-        refs.save.disabled = true;
-        refs.status.textContent = t('clearing', 'Clearing…');
-        refs.status.style.color = '';
-
-        try {
-            const res = await QuickSiteAdmin.apiRequest('setRouteResolver', 'POST', {
-                route: _resolverCurrentRoute,
-                // No `resolver` field — setRouteResolver treats absence as
-                // the clear signal (idempotent — safe even when nothing
-                // was attached).
-            });
-            if (res.ok) {
-                QuickSiteAdmin.showToast(t('resolverCleared', 'Resolver cleared'), 'success');
-                closeResolverModal();
-                await refreshAll();
-            } else {
-                refs.status.textContent = (res.data && res.data.message) || 'Clear failed';
-                refs.status.style.color = 'var(--admin-error)';
-                refs.clear.disabled = false;
-                refs.save.disabled = !refs.endpoint.value;
-            }
-        } catch (err) {
-            refs.status.textContent = err.message || 'Clear failed';
-            refs.status.style.color = 'var(--admin-error)';
-            refs.clear.disabled = false;
-            refs.save.disabled = !refs.endpoint.value;
         }
     }
 
@@ -3043,9 +2926,7 @@
         if (refs.count) {
             refs.count.textContent = count === 0
                 ? ''
-                : '(' + count + ' ' + (count === 1
-                    ? t('resolverListCountOne', 'resolver')
-                    : t('resolverListCountMany', 'resolvers')) + ')';
+                : QSPanelWords.count('sitemapPage.resolverListCount', count);
         }
 
         if (count === 0) {
@@ -3074,7 +2955,7 @@
         // means a no-op drag (drop onto itself = no reorder).
         const handle = document.createElement('span');
         handle.className = 'sitemap-resolver-list-row__handle';
-        handle.title = t('resolverListReorderHint', 'Drag to reorder');
+        handle.title = t('resolverListReorderHint');
         handle.textContent = '⋮⋮';
         row.appendChild(handle);
 
@@ -3086,14 +2967,14 @@
         const endpointLabel = document.createElement('span');
         endpointLabel.className = 'sitemap-resolver-list-row__endpoint';
         const endpoint = (config && typeof config.endpoint === 'string') ? config.endpoint : '';
-        endpointLabel.textContent = endpoint || t('resolverListNoEndpoint', '(no endpoint)');
+        endpointLabel.textContent = endpoint || t('resolverListNoEndpoint');
         if (!endpoint) endpointLabel.style.color = 'var(--admin-warning, #b3691e)';
         row.appendChild(endpointLabel);
 
         const name = 'r' + idx;
-        row.appendChild(QSControls.edit(t('resolverListEditNamed', 'Edit the resolver {name}').replace('{name}', name),
+        row.appendChild(QSControls.edit(t('resolverListEditNamed', { name }),
             () => _handleResolverListEdit(idx), { focusKey: 'resolver-edit:' + name }));
-        row.appendChild(QSControls.bin(t('resolverListRemoveNamed', 'Remove the resolver {name}').replace('{name}', name),
+        row.appendChild(QSControls.bin(t('resolverListRemoveNamed', { name }),
             () => _handleResolverListRemove(idx), { focusKey: 'resolver-remove:' + name }));
 
         // Drag-and-drop handlers — native HTML5. Reorder applies
@@ -3169,8 +3050,8 @@
 
     /**
      * Remove row N → confirm + POST setRouteResolver with the index
-     * (no resolver body = remove-at-index per the locked command
-     * surface). On success, refresh + re-render the list view in place.
+     * (no resolver body = remove-at-index, as the command defines it).
+     * On success, refresh + re-render the list view in place.
      */
     async function _handleResolverListRemove(idx) {
         const refs = _ensureResolverListRefs();
@@ -3178,16 +3059,14 @@
         if (!route) return;
         const isLast = _resolverListCurrentConfigs.length === 1;
         // The question names the resolver; the route's only one says what the route loses.
-        const confirmMsg = isLast
-            ? t('resolverListRemoveLastText', 'It is the only resolver of this route: the route will render without server-side data.')
-            : '';
+        const confirmMsg = isLast ? t('resolverListRemoveLastText') : '';
         if (!(await QuickSiteUtils.confirm(confirmMsg, {
-            title: t('resolverListRemoveTitle', 'Remove the resolver {name} of /{route}?').replace('{name}', 'r' + idx).replace('{route}', route),
+            title: t('resolverListRemoveTitle', { name: 'r' + idx, route }),
             type: 'danger',
-            confirmText: t('remove', 'Remove'),
+            confirmText: t('remove'),
         }))) return;
 
-        refs.status.textContent = t('removing', 'Removing…');
+        refs.status.textContent = t('removing');
         refs.status.style.color = '';
 
         try {
@@ -3196,18 +3075,18 @@
                 index: idx,
             });
             if (res.ok) {
-                QuickSiteAdmin.showToast(t('resolverRemoved', 'Resolver removed'), 'success');
+                QuickSiteAdmin.showToast(t('resolverRemoved'), 'success');
                 await refreshAll();
                 // Re-open the list view with the refreshed data. If the
                 // last resolver was removed, the route now has none —
                 // the list view shows the empty state.
                 openResolverListModal(route);
             } else {
-                refs.status.textContent = (res.data && res.data.message) || 'Remove failed';
+                refs.status.textContent = (res.data && res.data.message) || t('removeFailed');
                 refs.status.style.color = 'var(--admin-error)';
             }
         } catch (err) {
-            refs.status.textContent = err.message || 'Remove failed';
+            refs.status.textContent = err.message || t('removeFailed');
             refs.status.style.color = 'var(--admin-error)';
         }
     }
@@ -3216,9 +3095,7 @@
      * Reorder via drag-and-drop — swap the snapshot, POST the full
      * array, refresh + re-render. No optimistic update; we wait for the
      * server's confirmation before showing the new order (avoids a
-     * brief flicker if the save fails for some reason — e.g. validation
-     * rejected the new order because... well, validation doesn't reject
-     * order today, but it might in some future cache-collision check).
+     * brief flicker if the save fails).
      */
     async function _handleResolverListReorder(fromIdx, toIdx) {
         const refs = _ensureResolverListRefs();
@@ -3230,7 +3107,7 @@
         const [moved] = next.splice(fromIdx, 1);
         next.splice(toIdx, 0, moved);
 
-        refs.status.textContent = t('reordering', 'Reordering…');
+        refs.status.textContent = t('reordering');
         refs.status.style.color = '';
 
         try {
@@ -3239,15 +3116,15 @@
                 resolver: next,
             });
             if (res.ok) {
-                QuickSiteAdmin.showToast(t('resolverReordered', 'Order updated'), 'success');
+                QuickSiteAdmin.showToast(t('resolverReordered'), 'success');
                 await refreshAll();
                 openResolverListModal(route);
             } else {
-                refs.status.textContent = (res.data && res.data.message) || 'Reorder failed';
+                refs.status.textContent = (res.data && res.data.message) || t('reorderFailed');
                 refs.status.style.color = 'var(--admin-error)';
             }
         } catch (err) {
-            refs.status.textContent = err.message || 'Reorder failed';
+            refs.status.textContent = err.message || t('reorderFailed');
             refs.status.style.color = 'var(--admin-error)';
         }
     }
@@ -3341,7 +3218,7 @@
         const countEl = document.getElementById('sitemap-pages-kept');
         if (!countEl) return;
         const kept = document.querySelectorAll('#sitemap-url-list [data-sitemap-route]:not(.sitemap-url--excluded)').length;
-        countEl.textContent = t('pagesKept').replace('{count}', kept);
+        countEl.textContent = QSPanelWords.count('sitemapPage.pagesKeptCount', kept);
     }
 
     /**
@@ -3372,7 +3249,7 @@
             text.appendChild(document.createTextNode(' '));
             const langCount = document.createElement('span');
             langCount.className = 'sitemap-url__lang-count';
-            langCount.textContent = '×' + urls.length + ' ' + t('langs');
+            langCount.textContent = QSPanelWords.count('sitemapPage.langCount', urls.length);
             text.appendChild(langCount);
         }
         row.appendChild(text);
@@ -3436,14 +3313,14 @@
                 customUrls
             });
             if (!result.ok) {
-                QuickSiteAdmin.showToast(result.data?.message || QuickSiteAdmin.t('common.error'), 'error');
+                QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('common.status.error'), 'error');
                 return;
             }
             QuickSiteAdmin.showToast(t('sitemapSaved'), 'success');
             // A custom URL that is not a full address never reaches the file: the command names it
             const rejected = result.data?.data?.rejectedUrls || [];
             if (rejected.length) {
-                QuickSiteAdmin.showToast(t('customUrlsRejected').replace('{urls}', rejected.join(', ')), 'warning');
+                QuickSiteAdmin.showToast(t('customUrlsRejected', { urls: QSPanelWords.list(rejected, 'unit') }), 'warning');
             }
             await showGeneratedSitemap(baseUrl);
         } catch (err) {
@@ -3467,13 +3344,12 @@
         }
         const urls = text.split('\n').filter(Boolean);
         document.getElementById('sitemap-file-text').textContent = urls.join('\n');
-        document.getElementById('sitemap-file-count').textContent = t('urlCount').replace('{count}', urls.length);
+        document.getElementById('sitemap-file-count').textContent = QSPanelWords.count('sitemapPage.fileUrlCount', urls.length);
         document.getElementById('sitemap-file').hidden = false;
     }
 
     function copyGeneratedSitemap() {
-        const btn = document.getElementById('sitemap-file-copy');
-        QuickSiteUtils.copyToClipboard(document.getElementById('sitemap-file-text').textContent, btn.dataset.copied);
+        QuickSiteUtils.copyToClipboard(document.getElementById('sitemap-file-text').textContent, QSPanelWords.t('common.copied'));
     }
 
     // ========================================================================

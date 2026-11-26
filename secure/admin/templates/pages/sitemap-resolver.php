@@ -8,10 +8,8 @@
  * setRouteResolver directly.
  *
  * Wired by: public/admin/assets/js/pages/sitemap.js (search for
- * `openResolverModal`). Submits via `setRouteResolver` POST. Clear
- * button (visible only when the route currently has a resolver) POSTs
- * with no resolver param — the command treats absence as the clear
- * signal (per its idempotent set/clear contract).
+ * `openResolverModal`). Submits via `setRouteResolver` POST; a resolver is
+ * removed by its row's bin in the list view.
  *
  * This partial scaffolds the modal + endpoint picker. sitemap.js renders
  * the inputs / expose / cacheTTL / onMiss editors into their placeholder
@@ -28,7 +26,7 @@
     <div class="sitemap-resolver-modal__content">
         <div class="sitemap-resolver-modal__header">
             <h3>
-                <?= __admin('sitemapPage.resolverTitle', 'Configure resolver') ?>
+                <?= adminEscape(__admin('sitemapPage.resolverTitle')) ?>
                 <code id="sitemap-resolver-route" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
             </h3>
             <button type="button" class="admin-modal__close" id="sitemap-resolver-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
@@ -36,14 +34,14 @@
 
         <div class="sitemap-resolver-modal__body">
             <p style="margin: 0 0 var(--space-md); color: var(--admin-text);">
-                <?= __admin('sitemapPage.resolverHint', 'Attach a server-side data resolver to this route. The resolver fires before the page renders, fetching from the chosen API endpoint and exposing values as template variables.') ?>
+                <?= adminEscape(__admin('sitemapPage.resolverHint')) ?>
             </p>
 
-            <!-- Endpoint picker (Step 2) — populated on open from listApiEndpoints. -->
+            <!-- Endpoint picker — populated on open from listApiEndpoints. -->
             <div class="sitemap-resolver-section">
                 <label for="sitemap-resolver-endpoint" class="sitemap-resolver-label">
-                    <?= __admin('sitemapPage.resolverEndpoint', 'Endpoint') ?>
-                    <span class="sitemap-resolver-label__required" title="<?= __admin('common.required', 'Required') ?>">*</span>
+                    <?= adminEscape(__admin('sitemapPage.resolverEndpoint')) ?>
+                    <span class="sitemap-resolver-label__required" title="<?= adminAttr(__admin('common.required')) ?>">*</span>
                 </label>
                 <select id="sitemap-resolver-endpoint" class="admin-input"></select>
                 <p class="sitemap-resolver-hint" id="sitemap-resolver-endpoint-meta"></p>
@@ -60,18 +58,11 @@
         </div>
 
         <div class="sitemap-resolver-modal__footer">
-            <!-- Clear is shown only when a resolver currently exists on this route.
-                 By design, Clear stays inside the modal so the
-                 context menu stays uncluttered; the user already opened "Configure"
-                 with intent, so "Clear" is a button there. -->
-            <button type="button" class="admin-btn admin-btn--danger" id="sitemap-resolver-clear" style="display: none; margin-right: auto;">
-                <?= __admin('sitemapPage.resolverClear', 'Clear resolver') ?>
-            </button>
             <button type="button" class="admin-btn admin-btn--ghost" id="sitemap-resolver-cancel">
-                <?= __admin('common.cancel', 'Cancel') ?>
+                <?= adminEscape(__admin('common.cancel')) ?>
             </button>
             <button type="button" class="admin-btn admin-btn--primary" id="sitemap-resolver-save" disabled>
-                <?= __admin('common.save', 'Save') ?>
+                <?= adminEscape(__admin('common.save')) ?>
             </button>
         </div>
     </div>

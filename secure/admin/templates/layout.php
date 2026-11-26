@@ -115,10 +115,8 @@ if (!$isLoginPage && !empty($__pkUserId)) {
     $writeRatePanel = qs_write_rate_panel($__pkUserId);
 }
 
-// Get page title from translations or fallback to capitalized page name
-$pageTitle = $lang->has('nav.' . $currentPage) 
-    ? __admin('nav.' . $currentPage) 
-    : ucfirst($currentPage);
+// The page's title: its nav.<page> word, which every page the router knows has (a page without one shows the key).
+$pageTitle = __admin('nav.' . $currentPage);
 
 // Get available admin languages and current language
 $adminLang = AdminTranslation::getInstance();
@@ -145,7 +143,7 @@ $langNames = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title><?= __admin('common.appName') ?> - <?= adminEscape($pageTitle) ?></title>
+    <title><?= adminEscape(__admin('common.appName')) ?> - <?= adminEscape($pageTitle) ?></title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="64x64" href="<?= $baseUrl ?>/admin/assets/images/favicon.png">
@@ -187,9 +185,14 @@ $langNames = [
     <!-- The three views: every media query of the panel. Stays the last stylesheet. -->
     <link rel="stylesheet" href="<?= $versionedAsset('/css/responsive.css') ?>">
     <!-- The panel's words (QSPanelWords): the one way a script reads a panel word, first of every script. The sections
-         every page shares are handed here; a page hands its own in its template, before its scripts (__adminWords). -->
+         the scripts of every page read are handed here (the header's, admin.js's, api.js's, the mode's, the roles'
+         names and, on an operator's page, the update notice's); a page hands its own in its template, before its scripts
+         (__adminWords). -->
     <script src="<?= $versionedAsset('/js/core/panel-words.js') ?>"></script>
-    <?= __adminWords(['common', 'nav']) ?>
+    <?= __adminWords(['common', 'nav', 'writeRate', 'shortcuts', 'panelMode', 'commands', 'roles']) ?>
+    <?php if ($isOperator): ?>
+    <?= __adminWords(['updateNotice']) ?>
+    <?php endif; ?>
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
     <!-- Shared DOM factory — must load before any page script that references QSDom -->
@@ -216,7 +219,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
         <div class="admin-header__brand">
             <a href="<?= $router->url('dashboard') ?>" class="admin-header__logo">
                 <img class="admin-header__mark" src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="" width="28" height="26">
-                <img class="admin-header__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= __admin('common.appName') ?>" width="76" height="24">
+                <img class="admin-header__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= adminAttr(__admin('common.appName')) ?>" width="76" height="24">
             </a>
         </div>
         
@@ -227,8 +230,8 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
             // (data-requires-command), and admin.js then draws a group with one entry left as that entry.
             require_once SECURE_FOLDER_PATH . '/admin/functions/panelMenu.php';
             $navMenu = qs_admin_menu_drawn();
-            $navWords = static function (array $label): string {
-                return $label[1] === null ? __admin($label[0]) : __admin($label[0], $label[1]);
+            $navWords = static function (string $key): string {
+                return __admin($key);
             };
             $navIcon = static function (string $inner): string {
                 return '<svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' . $inner . '</svg>';
@@ -242,13 +245,13 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                 return '<a href="' . adminAttr($router->url($entry['page'])) . '" class="admin-nav__link' . ($active ? ' admin-nav__link--active' : '') . '"'
                     . (($entry['requires'] ?? '') !== '' ? ' data-requires-command="' . adminAttr($entry['requires']) . '"' : '')
                     . ($entry['simple'] ? '' : ' data-menu-advanced')
-                    . '>' . $navIcon($entry['icon']) . '<span>' . $navWords($entry['label']) . '</span>' . $navBadge($entry['badge'] ?? null) . '</a>';
+                    . '>' . $navIcon($entry['icon']) . '<span>' . adminEscape($navWords($entry['label'])) . '</span>' . $navBadge($entry['badge'] ?? null) . '</a>';
             };
 
             // A group's arrow, a button of its own beside the word, which stays a link to its page: a touch
             // and a key have no hover to open a group with. Its dropdown is admin-nav-menu-<group>.
             $navGroupArrow = static function (string $group, string $name): string {
-                $label = __admin('nav.groupMenu', 'Menu:') . ' ' . $name;
+                $label = __admin('nav.groupMenu', ['name' => $name]);
                 return '<button type="button" class="admin-nav__group-arrow-btn" aria-expanded="false"'
                     . ' aria-controls="admin-nav-menu-' . adminAttr($group) . '" aria-label="' . adminAttr($label) . '">'
                     . '<svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
@@ -275,18 +278,18 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
             </span>
             <?php endif; ?>
             <?php if (!empty($myProjectIds) && count($myProjectIds) > 1): ?>
-            <label class="admin-btn admin-btn--ghost admin-project-badge admin-project-picker" title="<?= __admin('common.activeProject', 'Active project') ?>">
+            <label class="admin-btn admin-btn--ghost admin-project-badge admin-project-picker" title="<?= adminAttr(__admin('common.activeProject')) ?>">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                <select id="admin-project-picker" aria-label="<?= __admin('common.activeProject', 'Active project') ?>" style="background:transparent;border:none;color:inherit;font:inherit;cursor:pointer;outline:none;padding:0 2px;max-width:16rem;">
+                <select id="admin-project-picker" aria-label="<?= adminAttr(__admin('common.activeProject')) ?>" style="background:transparent;border:none;color:inherit;font:inherit;cursor:pointer;outline:none;padding:0 2px;max-width:16rem;">
                     <?php foreach ($myProjectIds as $pid): ?>
                     <option value="<?= adminEscape($pid) ?>"<?= $pid === $editingProject ? ' selected' : '' ?>><?= adminEscape(qs_project_label($pid)) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
             <?php elseif ($editingProject): ?>
-            <a href="<?= $router->url('dashboard') ?>" class="admin-btn admin-btn--ghost admin-project-badge" title="<?= __admin('common.activeProject', 'Active project') ?>">
+            <a href="<?= $router->url('dashboard') ?>" class="admin-btn admin-btn--ghost admin-project-badge" title="<?= adminAttr(__admin('common.activeProject')) ?>">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
@@ -312,7 +315,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                     <polyline points="15 3 21 3 21 9"/>
                     <line x1="10" y1="14" x2="21" y2="3"/>
                 </svg>
-                <span><?= __admin('common.backToSite') ?></span>
+                <span><?= adminEscape(__admin('common.backToSite')) ?></span>
             </a>
             <?php endif; ?>
         </div>
@@ -325,7 +328,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                     id="admin-user-badge"
                     aria-expanded="false"
                     aria-controls="admin-account-menu"
-                    aria-label="<?= adminAttr(__admin('nav.accountMenu', 'Account menu')) ?>">
+                    aria-label="<?= adminAttr(__admin('nav.accountMenu')) ?>">
                 <svg class="admin-user-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                     <circle cx="12" cy="7" r="4"/>
@@ -343,22 +346,22 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                 </div>
                 <a href="<?= adminAttr($router->url('account')) ?>"
                    class="admin-nav__link<?= $currentPage === 'account' ? ' admin-nav__link--active' : '' ?>"
-                   title="<?= adminAttr(__admin('account.navHint', 'Your account settings')) ?>">
+                   title="<?= adminAttr(__admin('account.navHint')) ?>">
                     <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                         <circle cx="12" cy="7" r="4"/>
                     </svg>
-                    <span><?= __admin('nav.account') ?></span>
+                    <span><?= adminEscape(__admin('nav.account')) ?></span>
                 </a>
 
                 <!-- The panel's language, the current one marked; the script below answers these buttons' clicks alone. -->
                 <div class="admin-account__lang">
-                    <span class="admin-account__lang-label"><?= __admin('footer.language') ?>:</span>
+                    <span class="admin-account__lang-label"><?= adminEscape(__admin('footer.language')) ?>:</span>
                     <?php foreach ($availableLangs as $langCode): ?>
                         <?php if ($langCode === $currentLang): ?>
-                            <span class="admin-account__lang-btn admin-account__lang-btn--active"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></span>
+                            <span class="admin-account__lang-btn admin-account__lang-btn--active"><?= adminEscape($langNames[$langCode] ?? strtoupper($langCode)) ?></span>
                         <?php else: ?>
-                            <button type="button" class="admin-account__lang-btn" data-lang="<?= $langCode ?>"><?= $langNames[$langCode] ?? strtoupper($langCode) ?></button>
+                            <button type="button" class="admin-account__lang-btn" data-lang="<?= adminAttr($langCode) ?>"><?= adminEscape($langNames[$langCode] ?? strtoupper($langCode)) ?></button>
                         <?php endif; ?>
                     <?php endforeach; ?>
                 </div>
@@ -367,10 +370,10 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                      pages a beginner needs, advanced every page. It hides menu entries and grants or refuses
                      nothing. js/core/panel-mode.js answers a click, at once and saved. -->
                 <div class="admin-account__mode" id="admin-account-mode" role="group" aria-labelledby="admin-account-mode-label">
-                    <span class="admin-account__mode-label" id="admin-account-mode-label"><?= __admin('nav.mode', 'Mode') ?>:</span>
+                    <span class="admin-account__mode-label" id="admin-account-mode-label"><?= adminEscape(__admin('nav.mode')) ?>:</span>
                     <?php foreach (QS_PANEL_MODES as $modeOption): ?>
                     <button type="button" class="admin-account__mode-btn<?= $modeOption === $panelMode ? ' admin-account__mode-btn--active' : '' ?>"
-                            data-panel-mode="<?= adminAttr($modeOption) ?>" aria-pressed="<?= $modeOption === $panelMode ? 'true' : 'false' ?>"><?= __admin('nav.mode' . ucfirst($modeOption)) ?></button>
+                            data-panel-mode="<?= adminAttr($modeOption) ?>" aria-pressed="<?= $modeOption === $panelMode ? 'true' : 'false' ?>"><?= adminEscape(__admin('nav.mode' . ucfirst($modeOption))) ?></button>
                     <?php endforeach; ?>
                 </div>
 
@@ -386,7 +389,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                             <polyline points="16 17 21 12 16 7"/>
                             <line x1="21" y1="12" x2="9" y2="12"/>
                         </svg>
-                        <span><?= __admin('nav.logout') ?></span>
+                        <span><?= adminEscape(__admin('nav.logout')) ?></span>
                     </button>
                 </form>
 
@@ -402,7 +405,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                             <line x1="21" y1="12" x2="9" y2="12"/>
                             <circle cx="18" cy="6" r="3"/>
                         </svg>
-                        <span><?= __admin('nav.logoutEverywhere') ?></span>
+                        <span><?= adminEscape(__admin('nav.logoutEverywhere')) ?></span>
                     </button>
                 </form>
             </div>
@@ -417,9 +420,9 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                 <line x1="3" y1="12" x2="21" y2="12"/>
                 <line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
-            <span class="admin-header__menu-label"><?= __admin('nav.menu', 'Menu') ?></span>
+            <span class="admin-header__menu-label"><?= adminEscape(__admin('nav.menu')) ?></span>
             <span class="admin-header__menu-dot" id="admin-header-menu-dot" hidden>
-                <span class="admin-header__menu-label"><?= __admin('nav.menuWaiting', 'Something waits for you') ?></span>
+                <span class="admin-header__menu-label"><?= adminEscape(__admin('nav.menuWaiting')) ?></span>
             </span>
         </button>
 
@@ -433,7 +436,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                 <?= $navLink($navItem) ?>
                 <?php else: ?>
                 <div class="admin-nav__group<?= in_array($currentPage, $navItem['active'], true) ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="<?= adminAttr($navItem['group']) ?>"<?= $navItem['simple'] ? '' : ' data-menu-advanced' ?>>
-                    <a href="<?= adminAttr($router->url($navItem['page'])) ?>" class="admin-nav__group-toggle"><?= $navIcon($navItem['icon']) ?><span><?= $navWords($navItem['label']) ?></span><?= $navBadge($navItem['badge'] ?? null) ?></a>
+                    <a href="<?= adminAttr($router->url($navItem['page'])) ?>" class="admin-nav__group-toggle"><?= $navIcon($navItem['icon']) ?><span><?= adminEscape($navWords($navItem['label'])) ?></span><?= $navBadge($navItem['badge'] ?? null) ?></a>
                     <?= $navGroupArrow($navItem['group'], $navWords($navItem['label'])) ?>
                     <div class="admin-nav__group-dropdown" id="admin-nav-menu-<?= adminAttr($navItem['group']) ?>">
                         <?php foreach ($navItem['entries'] as $navEntry): ?>
@@ -464,8 +467,8 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
              it lives, with the Mode row's own switch. Drawn in either mode, shown in simple alone, so a switch needs no reload. It
              opens the page as ever: the mode is no lock. -->
         <div class="admin-alert admin-alert--info admin-mode-notice" id="admin-mode-notice">
-            <span class="admin-mode-notice__text"><?= __admin('panelMode.notice.text', 'This page is in the Advanced menu: you reached it from its address or a link.') ?></span>
-            <button type="button" class="admin-btn admin-btn--outline" data-panel-mode="advanced"><?= __admin('panelMode.notice.switch', 'Switch to Advanced') ?></button>
+            <span class="admin-mode-notice__text"><?= adminEscape(__admin('panelMode.notice.text')) ?></span>
+            <button type="button" class="admin-btn admin-btn--outline" data-panel-mode="advanced"><?= adminEscape(__admin('panelMode.notice.switch')) ?></button>
         </div>
         <?php endif; ?>
         <?php require $templatePath; ?>
@@ -480,7 +483,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
             require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
             $qsPanelVersion = qs_local_version();
             ?>
-            <p><?php if ($qsPanelVersion !== null): ?><?= __admin('footer.version', ['version' => adminEscape($qsPanelVersion)]) ?> &bull; <?php endif; ?><?= __admin('footer.powered') ?></p>
+            <p><?php if ($qsPanelVersion !== null): ?><?= adminEscape(__admin('footer.version', ['version' => $qsPanelVersion])) ?> &bull; <?php endif; ?><?= adminEscape(__admin('footer.powered')) ?></p>
         </div>
     </footer>
     <?php endif; ?>
@@ -529,206 +532,6 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
             // the way every data value in an inline script is.
             defaultLang: <?= qs_inline_script_json(qs_project_default_language()) ?>,
             multilingual: <?= qs_project_is_multilingual() ? 'true' : 'false' ?>,
-            translations: {
-                common: {
-                    success: '<?= __adminJs('common.status.success') ?>',
-                    error: '<?= __adminJs('common.status.error') ?>',
-                    loading: '<?= __adminJs('common.loading') ?>',
-                    noResults: '<?= __adminJs('common.noResults') ?>',
-                    execute: '<?= __adminJs('common.execute') ?>',
-                    copy: '<?= __adminJs('common.copy') ?>',
-                    close: '<?= __adminJs('common.close') ?>',
-                    validate: '<?= __adminJs('common.validate') ?>',
-                    // The confirm dialog and the clipboard toast in
-                    // js/core/utils.js are panel-wide chrome, so their default
-                    // labels ship on every page like admin.js's do.
-                    cancel: '<?= __adminJs('common.cancel') ?>',
-                    confirm: '<?= __adminJs('common.confirm') ?>',
-                    copyFailed: '<?= __adminJs('common.copyFailed') ?>',
-                    // The searchable select's words (core/searchable-select.js),
-                    // for every list in the panel that is one.
-                    selectPlaceholder: '<?= __adminJs('common.selectPlaceholder') ?>',
-                    search: '<?= __adminJs('common.search') ?>',
-                    noMatchesFor: '<?= __adminJs('common.noMatchesFor') ?>',
-                    createFromSearch: '<?= __adminJs('common.createFromSearch') ?>',
-                    // The star toggle (the dashboard's first line, My Memberships).
-                    starred: '<?= __adminJs('common.starred') ?>',
-                    starProject: '<?= __adminJs('common.starProject') ?>',
-                    unstarProject: '<?= __adminJs('common.unstarProject') ?>',
-                    starFailed: '<?= __adminJs('common.starFailed') ?>'
-                },
-                // A wait or a limit in time, in the words __adminDuration() uses on
-                // the pages the server writes: QuickSiteAdmin.durationText() reads them.
-                duration: {
-                    second: '<?= __adminJs('common.duration.second') ?>',
-                    seconds: '<?= __adminJs('common.duration.seconds') ?>',
-                    minute: '<?= __adminJs('common.duration.minute') ?>',
-                    minutes: '<?= __adminJs('common.duration.minutes') ?>',
-                    hour: '<?= __adminJs('common.duration.hour') ?>',
-                    hours: '<?= __adminJs('common.duration.hours') ?>',
-                    day: '<?= __adminJs('common.duration.day') ?>',
-                    days: '<?= __adminJs('common.duration.days') ?>'
-                },
-                // The write rate's strings: the header's figure and its hover, and
-                // the refusal api.js says in the panel's language.
-                writeRate: {
-                    refused: '<?= __adminJs('writeRate.refused') ?>',
-                    figure: '<?= __adminJs('writeRate.figure') ?>',
-                    titleHead: '<?= __adminJs('writeRate.titleHead') ?>',
-                    titleWindow: '<?= __adminJs('writeRate.titleWindow') ?>',
-                    titleWindowFull: '<?= __adminJs('writeRate.titleWindowFull') ?>',
-                    period_day: '<?= __adminJs('writeRate.period_day') ?>',
-                    period_days: '<?= __adminJs('writeRate.period_days') ?>',
-                    period_hour: '<?= __adminJs('writeRate.period_hour') ?>',
-                    period_hours: '<?= __adminJs('writeRate.period_hours') ?>',
-                    period_minute: '<?= __adminJs('writeRate.period_minute') ?>',
-                    period_minutes: '<?= __adminJs('writeRate.period_minutes') ?>',
-                    period_seconds: '<?= __adminJs('writeRate.period_seconds') ?>',
-                    waitSeconds: '<?= __adminJs('writeRate.waitSeconds') ?>',
-                    waitMinutes: '<?= __adminJs('writeRate.waitMinutes') ?>'
-                },
-                dashboard: {
-                    projects: {
-                        // Each with its English, as these two questions never read a key's path in a language that lacks the word.
-                        copyId: <?= json_encode(__admin('nav.copyProjectId', "Copy this project's id")) ?>,
-                        idCopied: <?= json_encode(__admin('nav.projectIdCopied', 'Project id copied')) ?>,
-                        deleteTitle: <?= json_encode(__admin('dashboard.projects.deleteTitle', 'Delete Project')) ?>,
-                        deleteBtn: <?= json_encode(__admin('dashboard.projects.deleteBtn', 'Delete Project')) ?>,
-                        deleteConfirmNamed: <?= json_encode(__admin('dashboard.projects.deleteConfirmNamed', 'Delete ":name" permanently? Its pages, translations, assets and backups are removed and cannot be recovered.')) ?>,
-                        deleteConfirmEditing: <?= json_encode(__admin('dashboard.projects.deleteConfirmEditing', 'This is the project you are editing.')) ?>,
-                        switch: <?= json_encode(__admin('dashboard.projects.switch', 'Switch Project')) ?>,
-                        switchBtn: <?= json_encode(__admin('dashboard.projects.switchBtn', 'Switch')) ?>,
-                        switchConfirmNamed: <?= json_encode(__admin('dashboard.projects.switchConfirmNamed', 'Switch to ":name"? Every page of the panel then works on this project.')) ?>,
-                        restoreQuestion: '<?= __adminJs('dashboard.projects.restoreQuestion') ?>',
-                        restoreBtn: '<?= __adminJs('dashboard.projects.restoreBtn') ?>',
-                        restore_success: '<?= __adminJs('dashboard.projects.restore_success') ?>',
-                        restore_failed: '<?= __adminJs('dashboard.projects.restore_failed') ?>',
-                        restore_incomplete: '<?= __adminJs('dashboard.projects.restore_incomplete') ?>',
-                        backup_created: '<?= __adminJs('dashboard.projects.backup_created') ?>',
-                        backup_failed: '<?= __adminJs('dashboard.projects.backup_failed') ?>',
-                        backup_incomplete: '<?= __adminJs('dashboard.projects.backup_incomplete') ?>'
-                    },
-                    columns: {
-                        command: '<?= __adminJs('dashboard.history.columns.command') ?>',
-                        status: '<?= __adminJs('dashboard.history.columns.status') ?>',
-                        duration: '<?= __adminJs('dashboard.history.columns.duration') ?>',
-                        time: '<?= __adminJs('dashboard.history.columns.time') ?>'
-                    },
-                    // Strings the owner-space panel builds in JS (the panel's
-                    // static labels are rendered server-side by __admin()).
-                    storage: {
-                        ownerProjects: '<?= __adminJs('dashboard.storage.ownerProjects') ?>',
-                        ownerOneProject: '<?= __adminJs('dashboard.storage.ownerOneProject') ?>',
-                        cachedHint: '<?= __adminJs('dashboard.storage.cachedHint') ?>',
-                        backups: '<?= __adminJs('dashboard.storage.backups') ?>',
-                        exports: '<?= __adminJs('dashboard.storage.exports') ?>',
-                        showAll: '<?= __adminJs('dashboard.storage.showAll') ?>',
-                        showTop: '<?= __adminJs('dashboard.storage.showTop') ?>',
-                        noMatch: '<?= __adminJs('dashboard.storage.noMatch') ?>',
-                        // A build's or a backup's bin, and the question it asks.
-                        deleteBuild: '<?= __adminJs('dashboard.storage.deleteBuild') ?>',
-                        deleteBuildTitle: '<?= __adminJs('dashboard.storage.deleteBuildTitle') ?>',
-                        deleteBackup: '<?= __adminJs('dashboard.storage.deleteBackup') ?>',
-                        deleteBackupTitle: '<?= __adminJs('dashboard.storage.deleteBackupTitle') ?>',
-                        delete: '<?= __adminJs('dashboard.storage.delete') ?>',
-                        clearAll: '<?= __adminJs('dashboard.storage.clearAll') ?>',
-                        confirmClearExports: '<?= __adminJs('dashboard.storage.confirmClearExports') ?>'
-                    }
-                },
-                history: {
-                    noHistoryFiltered: '<?= __adminJs('history.noHistoryFiltered') ?>',
-                    pagination: {
-                        info: '<?= __adminJs('history.pagination.info') ?>'
-                    },
-                    errors: {
-                        loadFailed: '<?= __adminJs('history.errors.loadFailed') ?>'
-                    }
-                },
-                commandForm: {
-                    errors: {
-                        docNotFound: '<?= __adminJs('commandForm.errors.docNotFound') ?>',
-                        docLoadFailed: '<?= __adminJs('commandForm.errors.docLoadFailed') ?>'
-                    }
-                },
-                // admin.js is loaded on EVERY page, so the strings it builds in
-                // JS are emitted for every page too: the command executor's
-                // button states and destructive-command prompt, the response
-                // panel, the JSON editor toolbar, and the '?' shortcuts dialog.
-                commands: {
-                    execute: '<?= __adminJs('commands.execute') ?>',
-                    uploading: '<?= __adminJs('commands.uploading') ?>',
-                    executing: '<?= __adminJs('commands.executing') ?>',
-                    responseStatus: '<?= __adminJs('commands.responseStatus') ?>',
-                    errorLoadingOptions: '<?= __adminJs('commands.errorLoadingOptions') ?>',
-                    executedMsg: '<?= __adminJs('commands.executedMsg') ?>',
-                    notPermittedHint: '<?= __adminJs('commands.notPermittedHint') ?>',
-                    failedMsg: '<?= __adminJs('commands.failedMsg') ?>',
-                    errorPrefix: '<?= __adminJs('commands.errorPrefix') ?>',
-                    downloadedPrefix: '<?= __adminJs('commands.downloadedPrefix') ?>',
-                    responseCopied: '<?= __adminJs('commands.responseCopied') ?>',
-                    selectPlaceholder: '<?= __adminJs('commands.selectPlaceholder') ?>',
-                    confirmDestructive: {
-                        question: '<?= __adminJs('commands.confirmDestructive.question') ?>',
-                        text: '<?= __adminJs('commands.confirmDestructive.text') ?>'
-                    },
-                    jsonEditor: {
-                        format: '<?= __adminJs('commands.jsonEditor.format') ?>',
-                        valid: '<?= __adminJs('commands.jsonEditor.valid') ?>',
-                        invalid: '<?= __adminJs('commands.jsonEditor.invalid') ?>',
-                        invalidShort: '<?= __adminJs('commands.jsonEditor.invalidShort') ?>',
-                        empty: '<?= __adminJs('commands.jsonEditor.empty') ?>'
-                    }
-                },
-                shortcuts: {
-                    title: '<?= __adminJs('shortcuts.title') ?>',
-                    navGroup: '<?= __adminJs('shortcuts.navGroup') ?>',
-                    actionsGroup: '<?= __adminJs('shortcuts.actionsGroup') ?>',
-                    focusSearch: '<?= __adminJs('shortcuts.focusSearch') ?>',
-                    showHelp: '<?= __adminJs('shortcuts.showHelp') ?>',
-                    closeModal: '<?= __adminJs('shortcuts.closeModal') ?>'
-                },
-                // The mode's words built in JS (js/core/panel-mode.js): the bubble after the first pick, and a
-                // save that failed.
-                panelMode: {
-                    bubble: '<?= __adminJs('panelMode.bubble') ?>',
-                    bubbleClose: '<?= __adminJs('panelMode.bubbleClose') ?>',
-                    saveFailed: '<?= __adminJs('panelMode.saveFailed') ?>'
-                },
-                nav: {
-                    dashboard: '<?= __adminJs('nav.dashboard') ?>',
-                    commands: '<?= __adminJs('nav.commands') ?>',
-                    history: '<?= __adminJs('nav.history') ?>',
-                    settings: '<?= __adminJs('nav.settings') ?>',
-                    notLoggedIn: '<?= __adminJs('nav.notLoggedIn') ?>',
-                    unknownUser: '<?= __adminJs('nav.unknownUser') ?>',
-                    noProject: '<?= __adminJs('nav.noProject') ?>'
-                },
-                <?php if ($isOperator): ?>
-                // Only an operator's page loads update-notice.js, so only an
-                // operator's page carries its strings.
-                updateNotice: {
-                    label: '<?= __adminJs('updateNotice.label') ?>',
-                    available: '<?= __adminJs('updateNotice.available') ?>',
-                    availableSuffix: '<?= __adminJs('updateNotice.availableSuffix') ?>',
-                    youHave: '<?= __adminJs('updateNotice.youHave') ?>',
-                    howTo: '<?= __adminJs('updateNotice.howTo') ?>',
-                    releaseNotes: '<?= __adminJs('updateNotice.releaseNotes') ?>',
-                    dismiss: '<?= __adminJs('updateNotice.dismiss') ?>'
-                },
-                <?php endif; ?>
-                settings: {
-                    toast: {
-                        preferencesSaved: '<?= __adminJs('settings.toast.preferencesSaved') ?>',
-                        defaultLangUpdated: '<?= __adminJs('settings.toast.defaultLangUpdated') ?>'
-                    },
-                    errors: {
-                        sysInfoFailed: '<?= __adminJs('settings.errors.sysInfoFailed') ?>',
-                        routesFailed: '<?= __adminJs('settings.errors.routesFailed') ?>',
-                        languagesFailed: '<?= __adminJs('settings.errors.languagesFailed') ?>',
-                        defaultLangFailed: '<?= __adminJs('settings.errors.defaultLangFailed') ?>'
-                    }
-                }
-            },
             adminLang: <?= json_encode($currentLang) ?>
         };
         
@@ -807,8 +610,8 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                 minWidth: 288,
                 currentOnTop: true,
                 currentCopy: {
-                    title: <?= json_encode(__admin('nav.copyProjectId', "Copy this project's id")) ?>,
-                    done: <?= json_encode(__admin('nav.projectIdCopied', 'Project id copied')) ?>
+                    title: QSPanelWords.t('nav.copyProjectId'),
+                    done: QSPanelWords.t('nav.projectIdCopied')
                 }
             });
             document.addEventListener('quicksite:stars-changed', function () {
@@ -835,12 +638,12 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                             window.location.href = window.location.pathname + '?t=' + Date.now();
                         } else {
                             backToEditing();
-                            QuickSiteUtils.showToast('<?= __adminJs('nav.switchProjectFailed') ?>' + ((res && res.data && res.data.message) || '<?= __adminJs('common.unknownError') ?>'), 'error');
+                            QuickSiteUtils.showToast(QSPanelWords.t('nav.switchProjectFailed', { message: (res && res.data && res.data.message) || QSPanelWords.t('common.unknownError') }), 'error');
                         }
                     })
                     .catch(function (err) {
                         backToEditing();
-                        QuickSiteUtils.showToast('<?= __adminJs('nav.switchProjectFailed') ?>' + ((err && err.message) || err), 'error');
+                        QuickSiteUtils.showToast(QSPanelWords.t('nav.switchProjectFailed', { message: (err && err.message) || String(err) }), 'error');
                     });
             });
         }

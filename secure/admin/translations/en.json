@@ -2,18 +2,14 @@
     "common": {
         "appName": "QuickSite Admin",
         "loading": "Loading...",
-        "current": "Current:",
         "custom": "Custom...",
         "saving": "Saving...",
         "error": "Error",
-        "success": "Success",
-        "warning": "Warning",
         "confirm": "Confirm",
         "cancel": "Cancel",
         "save": "Save",
         "delete": "Delete",
         "edit": "Edit",
-        "view": "View",
         "back": "Back",
         "next": "Next",
         "previous": "Previous",
@@ -21,16 +17,15 @@
         "clear": "Clear",
         "refresh": "Refresh",
         "yes": "Yes",
-        "no": "No",
         "search": "Search...",
         "noResults": "No results found",
         "selectPlaceholder": "Select…",
-        "noMatchesFor": "No matches for “:query”",
-        "createFromSearch": "➕ Create “:query”",
+        "noMatchesFor": "No matches for “{query}”",
+        "createFromSearch": "➕ Create “{query}”",
         "starred": "Starred",
         "starProject": "Star this project: it comes first in your project lists",
         "unstarProject": "Unstar this project",
-        "starFailed": "Could not save the star: ",
+        "starFailed": "Could not save the star: {message}",
         "unknownError": "unknown error",
         "saveFailed": "Save failed",
         "required": "Required",
@@ -41,15 +36,10 @@
         "copied": "Copied!",
         "backToSite": "Back to Site",
         "clearAll": "Clear All",
-        "notApplicable": "N/A",
         "validate": "Validate",
-        "preview": "Preview",
-        "load": "Load",
         "add": "Add",
         "remove": "Remove",
         "format": "Format",
-        "enabled": "Enabled",
-        "default": "Default",
         "status": {
             "success": "Success",
             "error": "Error"
@@ -57,14 +47,22 @@
         "copyFailed": "Failed to copy to clipboard",
         "activeProject": "Active project",
         "duration": {
-            "second": ":count second",
-            "seconds": ":count seconds",
-            "minute": ":count minute",
-            "minutes": ":count minutes",
-            "hour": ":count hour",
-            "hours": ":count hours",
-            "day": ":count day",
-            "days": ":count days"
+            "second": {
+                "one": "{count} second",
+                "other": "{count} seconds"
+            },
+            "minute": {
+                "one": "{count} minute",
+                "other": "{count} minutes"
+            },
+            "hour": {
+                "one": "{count} hour",
+                "other": "{count} hours"
+            },
+            "day": {
+                "one": "{count} day",
+                "other": "{count} days"
+            }
         },
         "size": {
             "bytes": "{size} B",
@@ -75,23 +73,53 @@
         "colorPicker": {
             "cssVariables": "CSS Variables:",
             "title": "Color Picker"
-        }
+        },
+        "errorDetail": "Error: {message}",
+        "request": {
+            "projectRequired": "No project selected for project-scoped command: {command}",
+            "tooLarge": "The file is too large for this server to accept. It was refused by the web server before QuickSite saw it — on nginx this is client_max_body_size, which defaults to 1 MB. Raising it is a server change: see the shipped nginx-vhosts.conf.example in the deploy folder.",
+            "notResponding": "The server is not responding (HTTP {status}). It may be restarting, or the request may have taken too long.",
+            "incomplete": "The request did not complete.",
+            "unreadable": "The server answered HTTP {status} with a response QuickSite could not read. It came from the web server or a proxy rather than from QuickSite itself.",
+            "noToken": "No authentication token",
+            "network": "Network error",
+            "uploadFailed": "Upload failed",
+            "notAccount": "The server answered this request with something other than an account response. Nothing was changed. Reload the page and try again."
+        },
+        "adminUnavailable": "QuickSiteAdmin not available"
     },
     "writeRate": {
-        "refused": "This server allows {max} changes per {period}. They are used up until {time} (in {wait}).",
-        "figure": "{remaining} changes left",
         "titleHead": "Changes you can still make on this server:",
         "titleWindow": "{remaining} of {max} per {period} \u00b7 full again at {time}",
         "titleWindowFull": "{remaining} of {max} per {period}",
-        "period_day": "day",
-        "period_days": "{n} days",
-        "period_hour": "hour",
-        "period_hours": "{n} hours",
-        "period_minute": "minute",
-        "period_minutes": "{n} minutes",
-        "period_seconds": "{n} seconds",
         "waitSeconds": "{n} s",
-        "waitMinutes": "{n} min"
+        "waitMinutes": "{n} min",
+        "figure": {
+            "other": "{count} changes left",
+            "one": "{count} change left"
+        },
+        "refused": {
+            "other": "This server allows {count} changes per {period}. They are used up until {time} (in {wait}).",
+            "one": "This server allows {count} change per {period}. It is used up until {time} (in {wait})."
+        },
+        "period": {
+            "day": {
+                "one": "day",
+                "other": "{count} days"
+            },
+            "hour": {
+                "one": "hour",
+                "other": "{count} hours"
+            },
+            "minute": {
+                "one": "minute",
+                "other": "{count} minutes"
+            },
+            "second": {
+                "other": "{count} seconds",
+                "one": "second"
+            }
+        }
     },
     "login": {
         "title": "Admin Login",
@@ -106,11 +134,10 @@
         "invalidCredentials": "Invalid username or password",
         "missingFields": "The form arrived without a username or password — hard-refresh this page (Ctrl+F5) and try again",
         "csrfFailed": "Your session could not be verified — the form was too old, or it came from another site. Reload this page and try again.",
-        "throttled": "Too many failed attempts — try again in :duration",
+        "throttled": "Too many failed attempts — try again in {duration}",
         "serverError": "Could not create the session — try again",
         "showPassword": "Show password",
         "hidePassword": "Hide password",
-        "connectionError": "Could not connect to API",
         "privacyNote": "By checking 'Keep me signed in', you consent to a persistent authentication cookie on this device.",
         "registerLink": "No account yet? Create one",
         "registerSuccess": "Account created — sign in with your username and password",
@@ -127,14 +154,14 @@
     },
     "privacy": {
         "dialogs": {
-            "overwritePage": "Route /:route already exists. Overwrite its content with the privacy-policy page?",
+            "overwritePage": "Route /{route} already exists. Overwrite its content with the privacy-policy page?",
             "deletePage": "Delete the generated privacy page? This removes the route and its page.",
-            "deleteDatum": "Delete “:name”?",
+            "deleteDatum": "Delete “{name}”?",
             "deleteDatumText": "Every field mapped to it becomes unset.",
             "delete": "Delete",
             "overwrite": "Overwrite",
-            "unsetMapping": "Unset the field “:field”?",
-            "unsetMappingText": "It no longer counts as “:datum” on the privacy page. The API is not changed."
+            "unsetMapping": "Unset the field “{field}”?",
+            "unsetMappingText": "It no longer counts as “{datum}” on the privacy page. The API is not changed."
         },
         "languages": {
             "shownIn": "Labels and purposes shown in",
@@ -142,11 +169,11 @@
             "language": "Language of the label and purpose",
             "label": "Label",
             "purpose": "Purpose",
-            "purposeIn": "Purpose (:language)",
-            "noLabelIn": "No label in :language yet.",
-            "noPurposeIn": "No purpose in :language yet.",
-            "labelRequiredIn": "A label is required in :language.",
-            "unread": "The words in :language could not be read: reload the page."
+            "purposeIn": "Purpose ({language})",
+            "noLabelIn": "No label in {language} yet.",
+            "noPurposeIn": "No purpose in {language} yet.",
+            "labelRequiredIn": "A label is required in {language}.",
+            "unread": "The words in {language} could not be read: reload the page."
         },
         "errors": {
             "deleteFailed": "Delete failed",
@@ -154,15 +181,96 @@
             "mappingFailed": "Mapping failed",
             "generateFailed": "Generate failed",
             "cookieSectionFailed": "Failed to update cookie section",
-            "routeRequired": "Enter a route, e.g. privacy"
+            "routeRequired": "Enter a route, e.g. privacy",
+            "loadFailed": "Could not load privacy status."
         },
         "mapping": {
-            "unset": "Unset"
+            "unset": "Unset",
+            "title": "Map \"{field}\" to:",
+            "empty": "No data collected yet.",
+            "newDatum": "+ New data collected from this field"
         },
         "actions": {
-            "edit": "Edit “:name”",
-            "delete": "Delete “:name”",
-            "editHost": "Edit “:host”"
+            "edit": "Edit “{name}”",
+            "delete": "Delete “{name}”",
+            "editHost": "Edit “{host}”"
+        },
+        "title": "Privacy helper",
+        "subtitle": "What this site sends out — built from your API registry (third-party data sharing) + sign-in providers. Map each field the site sends to a \"data collected\" entry to cover your privacy policy.",
+        "loading": "Loading privacy status…",
+        "coverage": {
+            "fraction": "{mapped} / {total}",
+            "fieldsMapped": "fields mapped",
+            "unverifiableEndpoints": "unverifiable endpoints",
+            "unclassifiedHosts": "unclassified hosts",
+            "complete": "Complete",
+            "incomplete": "Incomplete"
+        },
+        "page": {
+            "title": "Privacy page",
+            "generatedAt": "Generated at {route}",
+            "update": "Update",
+            "updateHint": "Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).",
+            "route": "Page route",
+            "routePlaceholder": "e.g. privacy",
+            "generate": "Generate",
+            "staleRoute": "The previous route \"{route}\" no longer exists — generate to recreate it.",
+            "omitCookies": "Don’t mention cookies on this page"
+        },
+        "cookies": {
+            "omitted": "Cookie section: omitted (set by you). The privacy page will not mention cookies.",
+            "detected": "Cookie policy detected at {route} — the privacy page will link to it.",
+            "none": "No cookie-policy page yet. You may want to generate one in Storage, or mark cookies as not applicable."
+        },
+        "collected": {
+            "title": "Data collected",
+            "add": "+ Add data collected",
+            "empty": "No \"data collected\" entries yet. Add one, then map the fields below to it."
+        },
+        "collectedDialog": {
+            "titleAdd": "Add data collected",
+            "titleEdit": "Edit data collected",
+            "labelPlaceholder": "e.g. Email address",
+            "purposePlaceholder": "What you do with it",
+            "addHint": "A stable id is derived from the label; the label stays editable afterwards.",
+            "editHint": "Editing is live — no regenerate needed.",
+            "labelRequired": "A label is required.",
+            "noId": "Could not derive an id from that label — use letters or numbers.",
+            "failedIn": "{language}: {message}"
+        },
+        "hostDialog": {
+            "title": "Classify host",
+            "self": "A server you operate",
+            "thirdParty": "A third party",
+            "name": "Third-party name",
+            "namePlaceholder": "Name, e.g. Mailchimp",
+            "privacyUrl": "Privacy-policy URL"
+        },
+        "hosts": {
+            "title": "API hosts",
+            "empty": "No API hosts in the registry.",
+            "thirdParty": "third party",
+            "thirdPartyNamed": "third party: {name}",
+            "self": "your server",
+            "unclassified": "unclassified",
+            "classify": "Classify"
+        },
+        "signIn": {
+            "title": "Detected sign-in",
+            "none": "No sign-in flows detected (OAuth / magic-link). Nothing to auto-suggest.",
+            "oauth": "OAuth sign-in",
+            "oauthDetail": "providers: {providers} · collects: {collects}",
+            "magicLink": "Magic-link sign-in",
+            "magicLinkDetail": "collects: {collects}"
+        },
+        "endpoints": {
+            "title": "Endpoints sending data",
+            "empty": "No endpoints in the API registry.",
+            "noDeclaredBody": "no declared body",
+            "clickToMap": "Click to map",
+            "mappedTo": "→ {datum}",
+            "unset": "unset",
+            "noFields": "no fields sent"
         }
     },
     "register": {
@@ -227,17 +335,11 @@
     },
     "updateNotice": {
         "label": "QuickSite update:",
-        "available": "version",
-        "availableSuffix": "is available.",
-        "youHave": "is available — you have",
         "howTo": "Update on the server with git pull, then reload this page.",
         "releaseNotes": "Release notes",
-        "dismiss": "Dismiss"
-    },
-    "logout": {
-        "title": "Logout",
-        "message": "You have been logged out successfully",
-        "redirect": "Redirecting to login..."
+        "dismiss": "Dismiss",
+        "availableWithCurrent": "version {latest} is available — you have {current}.",
+        "availableOnly": "version {latest} is available."
     },
     "memberships": {
         "title": "My Memberships",
@@ -245,13 +347,11 @@
         "myProjects": {
             "title": "My projects",
             "empty": "You are not a member of any project yet. Accept an invitation or send a join request below.",
-        "createCta": "Create your own project",
-            "roleChip": "role",
+            "createCta": "Create your own project",
             "ownedChip": "OWNED",
             "editingChip": "editing",
             "editBtn": "Edit this project",
             "buildsBtn": "Builds",
-            "buildsTitle": "Build, download or delete this project's build",
             "leaveBtn": "Leave",
             "leaveTitle": "Leave project",
             "leaveConfirm": "You are about to leave {project}. You will need a fresh invitation to rejoin.",
@@ -260,9 +360,9 @@
         "inbox": {
             "title": "Invitation inbox",
             "empty": "No pending invitations.",
-            "invitedBy": "Invited by",
-            "proposedBy": "proposed by",
-            "offeredRole": "offered role",
+            "invitedBy": "Invited by {name}",
+            "proposedBy": "proposed by {name}",
+            "offeredRole": "offered role: {role}",
             "accept": "Accept",
             "decline": "Decline",
             "acceptedMsg": "Invitation accepted — welcome aboard",
@@ -283,7 +383,7 @@
             "title": "My proposals",
             "hint": "People you vouched for on your projects. A proposal that disappears without joining was either denied or answered by the person.",
             "empty": "No outgoing proposals.",
-            "for": "for",
+            "for": "for {project}",
             "pendingValidation": "awaiting validation",
             "awaitingAnswer": "invitation sent — awaiting their answer",
             "withdrawnMsg": "Proposal withdrawn",
@@ -300,10 +400,9 @@
             "statusDeleted": "Project deleted",
             "statusApproved": "Join request accepted",
             "statusRoleChanged": "Role changed",
-            "roleFrom": "from",
-            "roleTo": "to",
-            "changedBy": "Changed by",
-            "reason": "Reason"
+            "changedBy": "Changed by {name}",
+            "reason": "Reason:",
+            "roleChange": "from {from} to {to}"
         },
         "request": {
             "title": "Request to join a project",
@@ -331,12 +430,12 @@
             "title": "Roster",
             "empty": "No members (this should not happen — a project always has its owner).",
             "you": "you",
-            "changeRoleTitle": "Change role",
+            "changeRoleTitle": "Change role — {name}",
             "newRoleLabel": "New role",
             "apply": "Apply",
             "roleChangedMsg": "Role updated",
             "remove": "Remove",
-            "removeTitle": "Remove member",
+            "removeTitle": "Remove member — {name}",
             "removeNoteLabel": "Reason (optional — shown to them)",
             "removedMsg": "Member removed",
             "changeRoleOf": "Change the role of {name}",
@@ -348,16 +447,16 @@
             "chipInvite": "invitation",
             "chipRequest": "join request",
             "chipProposal": "proposal",
-            "invitedBy": "invited by",
-            "askedBy": "asked by",
-            "proposedBy": "proposed by",
+            "invitedBy": "invited by {name}",
+            "askedBy": "asked by {name}",
+            "proposedBy": "proposed by {name}",
             "approve": "Approve",
             "deny": "Deny",
             "approveTitle": "Approve this request?",
             "approveRoleLabel": "Role to grant",
             "approvedMsg": "Approved — they are now a member",
             "convertedMsg": "Proposal approved — invitation sent, awaiting their answer",
-            "denyTitle": "Deny this request",
+            "denyTitle": "Deny this request — {name}",
             "denyNoteLabel": "Reason (required — shown to the requester)",
             "denyNoteRequired": "The refusal reason is required.",
             "deniedMsg": "Request denied",
@@ -405,7 +504,8 @@
             "noteLabel": "Why this person?",
             "send": "Propose",
             "sentMsg": "Proposal recorded — an admin or the owner must validate it",
-            "vouchRequired": "The vouch note is required."
+            "vouchRequired": "The vouch note is required.",
+            "hintAdmin": "You can invite anyone below your own rank directly (above). Use a proposal only to ask the OWNER to sign off on someone you cannot invite yourself — another admin. Your note IS the vouch."
         },
         "policy": {
             "title": "Who can ask to join",
@@ -417,7 +517,9 @@
             "closed": "closed",
             "savedMsg": "Join policy updated",
             "advisory": "Privacy note: this project has an OPEN join policy — any authenticated account that knows or guesses its id can send a request and thereby learn the project exists.",
-            "confirmOpenPrivate": "Opening the join policy makes this project knockable by id: anyone authenticated who knows or guesses the id can send a request and learn the project exists. Open anyway?"
+            "confirmOpenPrivate": "Opening the join policy makes this project knockable by id: anyone authenticated who knows or guesses the id can send a request and learn the project exists. Open anyway?",
+            "confirmOpenTitle": "Open the join policy?",
+            "confirmOpenSubmit": "Open"
         },
         "transfer": {
             "title": "Transfer ownership",
@@ -450,12 +552,7 @@
             "queue": "Awaiting your validation"
         },
         "title": "Dashboard",
-        "welcome": "Welcome to QuickSite Admin",
         "subtitle": "Manage your site through a friendly interface",
-        "quickActions": "Quick Actions",
-        "recentCommands": "Recent Commands",
-        "noHistory": "No command history yet",
-        "viewAllHistory": "View All History",
         "stats": {
             "title": "Site Statistics",
             "routes": "Routes",
@@ -465,24 +562,36 @@
         },
         "sitemap": {
             "title": "Site Map",
-            "urls": "URLs",
-            "routes": "routes",
-            "languages": "languages",
-            "pages": "pages",
             "default": "Default",
             "monolingual": "Single language",
-            "coverage": "Translation Coverage",
-            "error": "Failed to load site map"
+            "error": "Failed to load site map",
+            "toggle": "Toggle",
+            "urlCount": {
+                "one": "{count} URL",
+                "other": "{count} URLs"
+            },
+            "routeCount": {
+                "one": "{count} route",
+                "other": "{count} routes"
+            },
+            "languageCount": {
+                "one": "{count} language",
+                "other": "{count} languages"
+            },
+            "pageCount": {
+                "one": "{count} page",
+                "other": "{count} pages"
+            }
         },
         "projects": {
             "switch": "Switch Project",
             "switchBtn": "Switch",
-            "switchConfirmNamed": "Switch to \":name\"? Every page of the panel then works on this project.",
-            "switched": "Project switched successfully",
+            "switchConfirmNamed": "Switch to \"{name}\"? Every page of the panel then works on this project.",
+            "switched": "Switched to project: {name}",
             "create": "New Project",
             "createTitle": "Create New Project",
             "createBtn": "Create Project",
-            "created": "Project created successfully",
+            "created": "Project created: {name}",
             "export": "Export",
             "exported": "Project exported successfully",
             "exportTooltip": "Export for sharing (secure JSON format)",
@@ -501,9 +610,9 @@
             "backup": "Backup",
             "backupTooltip": "Create instant backup (internal, fast restore)",
             "backing_up": "Creating backup...",
-            "backup_created": "Backup created",
+            "backup_created": "Backup created: {name} ({size})",
             "backup_failed": "Failed to create backup",
-            "backup_incomplete": "The backup could not be made completely: :items could not be copied. Nothing was kept and no older backup was removed. The project itself is untouched; fix the cause (most often a file held open by another process, or a permission the web server does not have) and back it up again.",
+            "backup_incomplete": "The backup could not be made completely: {items} could not be copied. Nothing was kept and no older backup was removed. The project itself is untouched; fix the cause (most often a file held open by another process, or a permission the web server does not have) and back it up again.",
             "restore": "Restore",
             "restoreTooltip": "Restore from a previous backup",
             "restoreTitle": "Restore Backup",
@@ -511,9 +620,7 @@
             "restoreBtn": "Restore",
             "restore_success": "Backup restored successfully",
             "restore_failed": "Failed to restore backup",
-            "restore_incomplete": "The backup was only partly restored: :items could not be restored completely. The backup itself is untouched; fix the cause (most often a file held open by another process, or a permission the web server does not have) and restore it again.",
-            "restore_warning": "A pre-restore backup will be created automatically.",
-            "confirm_restore": "Restore from backup",
+            "restore_incomplete": "The backup was only partly restored: {items} could not be restored completely. The backup itself is untouched; fix the cause (most often a file held open by another process, or a permission the web server does not have) and restore it again.",
             "restoreFrom": "Restore from backup",
             "restoreWarningTitle": "Warning",
             "restoreWarningWithBackup": "A backup of your current project will be created before restoring.",
@@ -522,9 +629,7 @@
             "deleteBackupAfterRestore": "Delete this backup once it is restored",
             "no_backups": "No backups yet",
             "backup_hint": "Click \"Backup\" to create your first backup",
-            "backups_count": "backup(s)",
-            "total_size": "total",
-            "files": "files",
+            "total_size": "{size} total",
             "pre_restore": "Pre-restore",
             "backup_deleted": "Backup deleted",
             "clone": "Clone",
@@ -534,14 +639,14 @@
             "cloneFrom": "Clone from",
             "cloneNameLabel": "Name of the copy",
             "cloneNameHelp": "Up to 60 characters. The copy always gets an id of its own.",
-            "cloned": "Project cloned successfully",
+            "cloned": "Project cloned: {name}",
             "cloneOAuthKeys": "The clone has no OAuth keys: its addresses differ from the source's, so its sign-in needs keys registered for them. Create keys for {providers} on the clone's OAuth providers page",
             "cloning": "Cloning...",
             "activateAfterClone": "Switch to the cloned project",
             "activateAfterImport": "Switch to the imported project",
             "deleteTitle": "Delete Project",
             "deleteBtn": "Delete Project",
-            "deleteConfirmNamed": "Delete \":name\" permanently? Its pages, translations, assets and backups are removed and cannot be recovered.",
+            "deleteConfirmNamed": "Delete \"{name}\" permanently? Its pages, translations, assets and backups are removed and cannot be recovered.",
             "deleteConfirmEditing": "This is the project you are editing.",
             "deleted": "Project deleted successfully",
             "nameLabel": "Project name",
@@ -557,10 +662,34 @@
             "renameHelp": "Up to 60 characters. The project keeps its id and its address; the site's own texts are not changed.",
             "renameBtn": "Rename",
             "renaming": "Renaming...",
-            "renamed": "Project renamed",
-            "active": "Active",
-            "error": "Failed to load project info",
-            "restoreQuestion": "Restore the backup “:name”?"
+            "renamed": "Project renamed: {name}",
+            "restoreQuestion": "Restore the backup “{name}”?",
+            "editing": "Editing",
+            "noProjects": "You are not a member of any project yet.",
+            "noProjectsHint": "Create a project to get started.",
+            "creating": "Creating...",
+            "exporting": "Exporting...",
+            "deleteNamed": "Delete Project: {name}",
+            "switchNamed": "Switch Project: {name}",
+            "clonedFiles": {
+                "one": "Project cloned: {name} ({count} file)",
+                "other": "Project cloned: {name} ({count} files)"
+            },
+            "clonedKeysLeft": "{cloned}. {keys}",
+            "deleteFailed": "Failed to delete project",
+            "switchFailed": "Failed to switch project",
+            "renameFailed": "Failed to rename project",
+            "cloneFailed": "Failed to clone project",
+            "createFailed": "Failed to create project",
+            "exportFailed": "Failed to export project",
+            "importFailed": "Failed to import project",
+            "loadBackupsFailed": "Failed to load backups",
+            "deleteBackupFailed": "Failed to delete backup",
+            "fileCount": {
+                "one": "{count} file",
+                "other": "{count} files"
+            },
+            "justNow": "just now"
         },
         "storage": {
             "backups": "Backups",
@@ -569,8 +698,7 @@
             "manageSpace": "Manage Space",
             "buildsPage": "Open builds page",
             "noItems": "No items",
-            "deleted": "Deleted",
-            "exportFiles": "export file(s)",
+            "deleted": "Deleted: {name}",
             "clearAll": "Clear All",
             "confirmClearExports": "Clear all export files?",
             "exportsCleared": "Exports cleared",
@@ -580,8 +708,6 @@
             "overQuota": "none — over the {limit} limit",
             "overTitle": "Your projects are over your storage quota",
             "overBody": "Until you free space, QuickSite refuses what would add to it: uploads, imports, backups, clones, builds, saved exports, new projects, restores that would grow your projects, and any change that makes a file larger. Delete backups, exports or unused projects, then refresh this figure.",
-            "ownerProjects": "{n} projects",
-            "ownerOneProject": "1 project",
             "content": "Content",
             "refresh": "Refresh",
             "cachedHint": "Cached \u2014 refresh to recalculate",
@@ -591,52 +717,53 @@
             "showAll": "Show all ({n})",
             "showTop": "Show the {n} largest",
             "noMatch": "No project matches “{query}”.",
-            "deleteBuild": "Delete the build “:name”",
-            "deleteBuildTitle": "Delete the build “:name”?",
-            "deleteBackup": "Delete the backup “:name”",
-            "deleteBackupTitle": "Delete the backup “:name”?",
-            "delete": "Delete"
-        },
-        "structure": {
-            "viewFull": "View Full Structure",
-            "routes": "Routes",
-            "languages": "Languages"
-        },
-        "categories": {
-            "title": "Commands by Category"
-        },
-        "history": {
-            "columns": {
-                "command": "Command",
-                "status": "Status",
-                "duration": "Duration",
-                "time": "Time"
+            "deleteBuild": "Delete the build “{name}”",
+            "deleteBuildTitle": "Delete the build “{name}”?",
+            "deleteBackup": "Delete the backup “{name}”",
+            "deleteBackupTitle": "Delete the backup “{name}”?",
+            "delete": "Delete",
+            "ownerProjects": {
+                "other": "{count} projects",
+                "one": "{count} project"
+            },
+            "incomplete": "incomplete",
+            "download": "Download",
+            "downloadFailed": "Download failed",
+            "deleteFailed": "Delete failed",
+            "clearFailed": "Clear failed",
+            "loadError": "Error loading data",
+            "freeOfLimit": "{free} / {limit}",
+            "backupCount": {
+                "one": "{count} backup",
+                "other": "{count} backups"
+            },
+            "exportCount": {
+                "one": "{count} export",
+                "other": "{count} exports"
+            },
+            "exportFileCount": {
+                "one": "{count} export file",
+                "other": "{count} export files"
             }
         }
     },
     "commands": {
         "uploading": "Uploading...",
         "executing": "Executing...",
-        "responseStatus": "Status",
+        "responseStatus": "(Status: {status})",
         "errorLoadingOptions": "Error loading options",
         "executedMsg": "Command executed successfully.",
         "notPermittedHint": "Your role in this project does not allow this command. Open it to read its documentation.",
         "failedMsg": "Command failed",
-        "errorPrefix": "Error: ",
-        "downloadedPrefix": "Downloaded: ",
         "jsonEditor": {
             "format": "Format JSON",
             "valid": "Valid JSON",
-            "invalid": "Invalid JSON: :message",
-            "invalidShort": "Invalid: :message",
+            "invalid": "Invalid JSON: {message}",
+            "invalidShort": "Invalid: {message}",
             "empty": "Empty"
         },
         "title": "Commands",
         "subtitle": "Browse and execute API commands",
-        "tabs": {
-            "commands": "Commands",
-            "history": "History"
-        },
         "disabled": {
             "title": "The command console is turned off",
             "text": "The operator of this installation chose not to offer it. This removes a page, not a permission: every command still answers on the Management API to any caller whose role allows it, and the panel's other pages are unaffected."
@@ -647,9 +774,6 @@
             "back": "All commands"
         },
         "searchPlaceholder": "Search commands...",
-        "allCategories": "All Categories",
-        "method": "Method",
-        "parameters": "Parameters",
         "noParameters": "No parameters required",
         "requiredParams": "Required Parameters",
         "conditionalParams": "Required in Some Cases",
@@ -662,19 +786,31 @@
         "notes": "Notes",
         "successResponse": "Success Response",
         "errorResponses": "Error Responses",
-        "paramTypes": {
-            "string": "String",
-            "number": "Number",
-            "boolean": "Boolean",
-            "array": "Array",
-            "object": "Object",
-            "file": "File"
-        },
         "responseCopied": "Response copied to clipboard!",
         "selectPlaceholder": "Select...",
         "confirmDestructive": {
-            "question": "Run “:command”?",
+            "question": "Run “{command}”?",
             "text": "This command may make changes that cannot be taken back."
+        },
+        "downloaded": "Downloaded: {file}",
+        "categoryNames": {
+            "route_management": "Route Management",
+            "structure_management": "Structure Management",
+            "node_management": "Node Management",
+            "alias_management": "URL Aliases",
+            "language_management": "Languages",
+            "asset_management": "Assets",
+            "style_management": "Styles",
+            "css_variables_rules": "CSS Variables & Rules",
+            "css_animations": "CSS Animations",
+            "site_customization": "Site Customization",
+            "project_management": "Project Management",
+            "auth_session": "Authentication / Session",
+            "js_functions": "JavaScript Functions / Interactions",
+            "oauth_providers": "OAuth Providers",
+            "storage_registry": "Storage Registry",
+            "snippet_management": "Snippets",
+            "documentation": "Documentation"
         }
     },
     "commandForm": {
@@ -682,7 +818,7 @@
             "renameNoExtension": "Enter new name without extension — it is preserved automatically"
         },
         "toast": {
-            "deleteFailed": "Delete failed:",
+            "deleteFailed": "Delete failed: {message}",
             "nodeLoaded": "Node content loaded into structure field",
             "stylesFailed": "Failed to load current styles",
             "stylesReloaded": "Styles reloaded",
@@ -696,12 +832,15 @@
             "selectExistingAnimation": "Please select an existing animation first",
             "selectKey": "Please select a key",
             "noUnusedKeys": "No unused keys to add",
-            "addedVariable": "Added: :name",
-            "addedFrame": "Added frame: :key",
-            "nameSet": "Name set: :name",
-            "framesLoaded": "Loaded frames for: :name",
-            "addedKey": "Added: :key",
-            "addedUnusedKeys": "Added :count unused keys"
+            "addedVariable": "Added: {name}",
+            "addedFrame": "Added frame: {key}",
+            "nameSet": "Name set: {name}",
+            "framesLoaded": "Loaded frames for: {name}",
+            "addedKey": "Added: {key}",
+            "addedUnusedKeysCount": {
+                "one": "Added {count} unused key",
+                "other": "Added {count} unused keys"
+            }
         },
         "placeholder": {
             "loadingNode": "Loading node content...",
@@ -714,12 +853,12 @@
             "cssContent": "CSS content...",
             "stylesFailed": "Failed to load styles. Enter CSS manually.",
             "newName": "new-name (without extension)",
-            "currentTitle": "Current: :title",
+            "currentTitle": "Current: {title}",
             "noTitleSet": "No title set for this route/language"
         },
         "errors": {
             "docNotFound": "Command documentation not found",
-            "docLoadFailed": "Failed to load command documentation:",
+            "docLoadFailed": "Failed to load command documentation: {message}",
             "loadKeys": "Error loading keys",
             "loadNodes": "Error loading nodes",
             "loadImages": "Error loading images",
@@ -773,7 +912,7 @@
             "keyframe": "Select keyframe...",
             "structureRoot": "root (the top of the structure)",
             "jsFunction": "Select function...",
-            "verbsForEvent": "Suggested for :event",
+            "verbsForEvent": "Suggested for {event}",
             "verbsOther": "Other functions",
             "verbsAll": "All functions",
             "routeCustom": "Type a route that does not exist yet…",
@@ -783,9 +922,9 @@
             "backToPicker": "Back to the list",
             "nodeFirst": "Select node first...",
             "event": "Select event...",
-            "eventWithCount": ":event (:count)",
+            "eventWithCount": "{event} ({count})",
             "eventsCommon": "Common",
-            "eventsCommonFor": "Common for <:tag>",
+            "eventsCommonFor": "Common for <{tag}>",
             "eventsLessCommon": "Less common",
             "eventCustom": "Type an event that is not listed…",
             "eventCustomHint": "Use an event name the element does not normally carry",
@@ -817,31 +956,40 @@
         "deleteAsset": {
             "filesToDelete": "Files to delete",
             "selectAll": "Select all",
-            "selectedOne": ":count file selected for deletion",
-            "selectedMany": ":count files selected for deletion",
-            "deletingOne": "Deleting :count file...",
-            "deletingMany": "Deleting :count files...",
-            "deletedOne": "File deleted!",
-            "deletedMany": ":count files deleted!",
-            "deletedPartial": ":deleted of :total files deleted. Not deleted: :names",
-            "deleteFailed": "Delete failed"
+            "deleteFailed": "Delete failed",
+            "selectedCount": {
+                "one": "{count} file selected for deletion",
+                "other": "{count} files selected for deletion"
+            },
+            "deletingCount": {
+                "one": "Deleting {count} file...",
+                "other": "Deleting {count} files..."
+            },
+            "deletedCount": {
+                "one": "File deleted!",
+                "other": "{count} files deleted!"
+            },
+            "deletedPartialCount": {
+                "one": "{deleted} of {count} file deleted. Not deleted: {names}",
+                "other": "{deleted} of {count} files deleted. Not deleted: {names}"
+            }
         },
         "uploadAsset": {
             "or": "or",
-            "multiFileTip": "Need to upload multiple files? Use the :link page.",
+            "multiFileTip": "Need to upload multiple files? Use the {link} page.",
             "assetManagement": "Media",
-            "allowedExtensions": "Allowed: :list · Category auto-detected from extension"
+            "allowedExtensions": "Allowed: {list} · Category auto-detected from extension"
         },
         "keyGroup": {
-            "unset": "🔴 Unset Keys (:count) - Need Translation",
-            "used": "🟢 Used Keys (:count)",
-            "unused": "🟡 Unused Keys (:count)"
+            "unset": "🔴 Unset Keys ({count}) - Need Translation",
+            "used": "🟢 Used Keys ({count})",
+            "unused": "🟡 Unused Keys ({count})"
         },
         "editFavicon": {
             "pngOnlyHint": "💡 Only PNG images are supported for favicon. Images marked with ✓ are PNG files."
         },
         "clearHistory": {
-            "hint": "💡 All log entries :before this date will be deleted. Set :confirm to false first to preview what will be deleted.",
+            "hint": "💡 All log entries {before} this date will be deleted. Set {confirm} to false first to preview what will be deleted.",
             "hintBefore": "before"
         },
         "editStyles": {
@@ -854,7 +1002,8 @@
             "loadingVariables": "Loading variables...",
             "newValue": "New value...",
             "addUpdate": "Add/Update →",
-            "hint": "Select a variable to edit, or type a new value. This merges with existing variables."
+            "hint": "Select a variable to edit, or type a new value. This merges with existing variables.",
+            "currentValue": "Current: {value}"
         },
         "styleRule": {
             "title": "CSS Selector Picker",
@@ -887,9 +1036,6 @@
             "optionKeywords": "Whole structure",
             "optionNodes": "A single node"
         },
-        "fileSize": {
-            "bytes": "Bytes"
-        },
         "addComponent": {
             "selectPosition": "Select position...",
             "positionInside": "Inside (as first child)",
@@ -910,7 +1056,7 @@
             "loadingKeys": "Loading translation keys...",
             "orEnterManually": "or enter manually:",
             "textKeyPlaceholder": "e.g., page.home.title",
-            "valuePlaceholder": "Enter :name..."
+            "valuePlaceholder": "Enter {name}..."
         },
         "setTranslationKeys": {
             "title": "Translation Key Selector",
@@ -929,7 +1075,7 @@
             "hint": "Hold Ctrl/Cmd to select multiple keys. Unused keys are safe to delete."
         },
         "field": {
-            "urlSegment": "(URL segment)",
+            "urlSegment": "{name} (URL segment)",
             "date": "Date",
             "hour": "Hour",
             "minute": "Min",
@@ -944,7 +1090,7 @@
         "noDocumentation": "No additional documentation available.",
         "notPermitted": {
             "title": "Your role cannot run this command",
-            "role": "Your role in this project, :role, does not allow this command, so there are no fields and no button here. Its documentation is beside this.",
+            "role": "Your role in this project, {role}, does not allow this command, so there are no fields and no button here. Its documentation is beside this.",
             "noProject": "You have no role in an open project, so there are no fields and no button here. Open a project you belong to, or read this command's documentation beside this.",
             "unread": "Your permissions could not be read, so there are no fields and no button here. Reload the page. This command's documentation is beside this."
         },
@@ -955,8 +1101,40 @@
             "registerDisabled": "This installation does not accept self-registration (registration.allow_self_registration is off), so this command answers 403 to every caller \u2014 the console included. The parameters and documentation below are complete, and describe what it does where the setting is on."
         },
         "setRouteResolver": {
-            "sitemapNote": "The Sitemap has an editor for a route's resolver:",
+            "sitemapNote": "The Sitemap has an editor for a route's resolver: {link}",
             "sitemapLink": "open the Sitemap"
+        },
+        "apiOptions": {
+            "assetFile": "{name} ({size})",
+            "structureTypes": {
+                "page": "Page",
+                "menu": "Menu",
+                "footer": "Footer",
+                "component": "Component"
+            },
+            "errorPage": "404 (Error Page)",
+            "assetCategories": {
+                "images": "Images",
+                "font": "Fonts",
+                "audio": "Audio",
+                "videos": "Videos"
+            },
+            "aliasTypes": {
+                "redirect": "Redirect (301)",
+                "internal": "Internal (Rewrite)"
+            },
+            "editActions": {
+                "update": "Update (Replace node content)",
+                "delete": "Delete (Remove node)",
+                "insertBefore": "Insert Before (Add sibling before)",
+                "insertAfter": "Insert After (Add sibling after)"
+            },
+            "keyframe": {
+                "one": "{name} ({count} frame)",
+                "other": "{name} ({count} frames)"
+            },
+            "globalSelectors": "Global Selectors ({count})",
+            "node": "node"
         }
     },
     "history": {
@@ -971,11 +1149,11 @@
             "all": "All",
             "success": "Success",
             "error": "Error",
-            "showAllDates": "Show all dates (last 7 days)"
+            "showAllDates": "Show all dates (last 7 days)",
+            "commandPlaceholder": "e.g., getStructure, edit, delete..."
         },
         "columns": {
-            "id": "ID",
-            "timestamp": "Timestamp",
+            "timestamp": "Date",
             "command": "Command",
             "method": "Method",
             "user": "User",
@@ -985,7 +1163,7 @@
         },
         "detail": {
             "id": "ID",
-            "timestamp": "Timestamp",
+            "timestamp": "Date",
             "command": "Command",
             "method": "Method",
             "duration": "Duration",
@@ -995,12 +1173,7 @@
             "requestBody": "Request Body",
             "response": "Response"
         },
-        "pagination": {
-            "info": "Page :page of :total (:count entries)"
-        },
         "clearHistory": "Clear History",
-        "clearConfirm": "Are you sure you want to clear command history?",
-        "export": "Export",
         "exportCsv": "Export CSV",
         "exportEmpty": "Nothing to export",
         "clear": {
@@ -1015,40 +1188,37 @@
             "dayGranularHint": "History is stored one file per day and is deleted a whole day at a time, so a day only disappears once the date you pick is after it. Today cannot be cleared.",
             "done": "Command history cleared",
             "title": "Delete this project's command history?",
-            "preview": ":entries entries in :days day(s), :size KB will be permanently deleted.",
             "previewFailed": "Could not read what would be deleted.",
-            "failed": "The history could not be deleted."
+            "failed": "The history could not be deleted.",
+            "preview": {
+                "one": "{count} entry in {days}, {size} will be permanently deleted.",
+                "other": "{count} entries in {days}, {size} will be permanently deleted."
+            },
+            "dayCount": {
+                "one": "{count} day",
+                "other": "{count} days"
+            },
+            "storedDay": {
+                "one": "{date} — {count} entry",
+                "other": "{date} — {count} entries"
+            }
         },
         "errors": {
-            "loadFailed": "Failed to load history:"
-        }
+            "loadFailed": "Failed to load history: {error}"
+        },
+        "pagination": {
+            "info": {
+                "other": "Page {page} of {total} ({count} entries)",
+                "one": "Page {page} of {total} ({count} entry)"
+            }
+        },
+        "durationMs": "{ms}ms"
     },
     "errors": {
         "404": {
             "title": "Page Not Found",
             "message": "The page you're looking for doesn't exist.",
             "backToDashboard": "Back to Dashboard"
-        },
-        "500": {
-            "title": "Server Error",
-            "message": "Something went wrong. Please try again.",
-            "retry": "Retry"
-        },
-        "apiError": "API Error",
-        "networkError": "Network error. Please check your connection."
-    },
-    "form": {
-        "validation": {
-            "required": "This field is required",
-            "invalidFormat": "Invalid format",
-            "minLength": "Minimum :min characters required",
-            "maxLength": "Maximum :max characters allowed",
-            "invalidJson": "Invalid JSON format"
-        },
-        "placeholders": {
-            "selectOption": "Select an option...",
-            "enterValue": "Enter value...",
-            "jsonInput": "Enter JSON data..."
         }
     },
     "account": {
@@ -1098,8 +1268,11 @@
             "doneMsg": "Your account has been deleted.",
             "soleOwnerTitle": "You still own these projects",
             "soleOwnerHint": "Transfer ownership on the Project Members page, or delete the project, then come back.",
-            "memberCount": "members",
-            "wrongCredentials": "Your current password or your username is not correct."
+            "wrongCredentials": "Your current password or your username is not correct.",
+            "membersCount": {
+                "one": "{count} member",
+                "other": "{count} members"
+            }
         }
     },
     "builds": {
@@ -1112,7 +1285,6 @@
         "building": "Building… this can take a while on a large project.",
         "builtMsg": "Build completed",
         "downloadBtn": "Download",
-        "downloading": "Preparing the archive…",
         "downloadFailed": "Download failed",
         "deleteBtn": "Delete",
         "deletedMsg": "Build deleted",
@@ -1131,7 +1303,6 @@
         "fieldFiles": "Files",
         "fieldPages": "Pages",
         "fieldLanguages": "Languages",
-        "fieldSiteName": "Site identity",
         "fieldPublic": "Public folder",
         "fieldSecure": "Secure folder",
         "fieldSpace": "URL space",
@@ -1157,8 +1328,6 @@
         "spaceWarnTitle": "A build may not fit for much longer",
         "spaceWarnBody": "A build is roughly the size of the project's content — about {need} today — and you have {free} of quota available for it. Past half, growth starts to squeeze out the build itself. Free some space, or ask for a larger quota, before it does.",
         "refresh": "Re-measure",
-        "deployDocRoot": "the document root",
-        "deployOutside": "must stay OUTSIDE the document root",
         "optTitle": "Folder names and URL space",
         "optPublicLabel": "Public folder name",
         "optPublicHint": "The deployed site's document root. Change it only when the server you are deploying to forces a name — some hosts insist on htdocs or public_html.",
@@ -1168,7 +1337,9 @@
         "optSpaceHint": "Serve the site from a subdirectory instead of the domain root: shop makes it answer at /shop/. Leave empty for the root.",
         "optPreview": "The build will contain",
         "optSpaceServes": "the site itself — it answers at /{space}/, and a bare / is NOT this site",
-        "optUnlock": "I want to change this"
+        "optUnlock": "I want to change this",
+        "optPublicNote": "the document root",
+        "optSecureNote": "must stay OUTSIDE the document root"
     },
     "shortcuts": {
         "title": "Keyboard Shortcuts",
@@ -1194,8 +1365,6 @@
         "routesReady": "sign-in routes ready",
         "routesPartial": "sign-in routes partly created",
         "routesNone": "no sign-in routes yet",
-        "usedByOne": "used by 1 route",
-        "usedByMany": "used by {count} routes",
         "clientId": "Client ID",
         "clientSecret": "Client secret",
         "secretKeep": "Stored — leave empty to keep it",
@@ -1214,12 +1383,19 @@
         "howStep3Example": "https://your-site.example{path}",
         "howStep4": "Copy the app's client ID and secret into the matching keys below.",
         "copied": "Copied",
-        "noteGoogle": "Google accepts a plain http address only on localhost; anywhere else the address must use https on a public domain. While the app is in Testing, add your own account as a test user.",
-        "noteGithub": "A GitHub OAuth app holds one callback address: create one app for the preview keys and another for the build keys.",
-        "noteAmazon": "Login with Amazon asks for a privacy notice address, and expects its return addresses to use https.",
-        "noteMeta": "Add the email permission, and keep the app in Development mode while you test: only accounts with a role on the app can sign in.",
         "clearTitle": "Remove {set} for {provider}?",
-        "clearText": "Sign-in with {provider} stops working where these keys are used, until new ones are entered."
+        "clearText": "Sign-in with {provider} stops working where these keys are used, until new ones are entered.",
+        "usedBy": {
+            "one": "used by {count} route",
+            "other": "used by {count} routes"
+        },
+        "notes": {
+            "google": "Google accepts a plain http address only on localhost; anywhere else the address must use https on a public domain. While the app is in Testing, add your own account as a test user.",
+            "github": "A GitHub OAuth app holds one callback address: create one app for the preview keys and another for the build keys.",
+            "amazon": "Login with Amazon asks for a privacy notice address, and expects its return addresses to use https.",
+            "meta": "Add the email permission, and keep the app in Development mode while you test: only accounts with a role on the app can sign in."
+        },
+        "clientIdValue": "Client ID: {id}"
     },
     "panelMode": {
         "bubble": "You can switch between Simple and Advanced here at any time.",
@@ -1244,7 +1420,6 @@
     "nav": {
         "oauth-providers": "OAuth providers",
         "members": "Members",
-        "myMemberships": "My memberships",
         "projectMembers": "Project members",
         "login": "Login",
         "dashboard": "Dashboard",
@@ -1256,18 +1431,14 @@
         "settings": "Settings",
         "projectSettings": "Project Settings",
         "apiEndpoints": "API Endpoints",
-        "aiApiKeys": "AI API Keys",
         "ai": "AI",
-        "embedSecurity": "Embed Security",
-        "structure": "Structure",
-        "workflows": "Workflows",
         "visualEditor": "Visual Editor",
         "preview": "Visual Editor",
         "logout": "Logout",
         "notLoggedIn": "Not logged in",
         "unknownUser": "Unknown",
         "noProject": "no project",
-        "switchProjectFailed": "Could not switch project: ",
+        "switchProjectFailed": "Could not switch project: {message}",
         "logoutEverywhere": "Logout everywhere",
         "logoutEverywhereHint": "Signs you out of this browser and ends every other session of your account.",
         "accountMenu": "Account menu",
@@ -1275,24 +1446,28 @@
         "projectIdCopied": "Project id copied",
         "menu": "Menu",
         "menuWaiting": "Something waits for you",
-        "groupMenu": "Menu:",
+        "groupMenu": "Menu: {name}",
         "build": "Build",
         "builds": "Builds",
-        "inspect": "Inspect",
-        "interactions": "Interactions",
         "site": "Site",
         "sitemap": "Sitemap",
         "social-previews": "Social previews",
         "translations": "Translations",
         "optimize": "Optimize",
-        "assets": "Media",
         "authentication": "Authentication",
         "compliance": "Compliance",
         "storage": "Storage",
         "privacy": "Privacy",
         "mode": "Mode",
         "modeSimple": "Simple",
-        "modeAdvanced": "Advanced"
+        "modeAdvanced": "Advanced",
+        "media": "Media",
+        "memberships": "My memberships",
+        "embed-security": "Embed Security",
+        "ai-connections": "AI Connections",
+        "register": "Register",
+        "setup": "Setup",
+        "404": "404"
     },
     "optimize": {
         "title": "Optimization Tools",
@@ -1320,14 +1495,9 @@
             "written": "Written!",
             "writing": "…",
             "tokenNamePlaceholder": "--variable-name",
-            "tokenWritten": ":name written to :root",
-            "writeFailed": "Failed: :message",
-            "selectedOne": ":count change selected",
-            "selectedMany": ":count changes selected",
-            "applySelectedCount": "Apply Selected (:count)",
-            "modalRow": ":label changes",
-            "applyTotalOne": "Apply :count change",
-            "applyTotalMany": "Apply :count changes",
+            "tokenWritten": "{name} written to :root",
+            "writeFailed": "Failed: {message}",
+            "applySelectedCount": "Apply Selected ({count})",
             "analyzers": {
                 "empty-rules": "Empty Rules",
                 "color-normalize": "Color Normalize",
@@ -1338,28 +1508,95 @@
                 "design-tokens": "Design Tokens"
             },
             "statusAnalyzing": "Analyzing…",
-            "statusSuggestions": ":count suggestions",
-            "statusAnalysisFailed": "Analysis failed: :message",
+            "statusAnalysisFailed": "Analysis failed: {message}",
             "statusPreparing": "Preparing…",
             "statusNoSafeChanges": "No safe changes needed — CSS looks clean!",
-            "statusFailed": "Failed: :message",
+            "statusFailed": "Failed: {message}",
             "statusApplying": "Applying…",
             "statusNoNonOverlapping": "No safe non-overlapping changes were available to apply.",
-            "statusAppliedOne": "Applied. :count suggestion remaining.",
-            "statusAppliedMany": "Applied. :count suggestions remaining.",
-            "statusApplyFailed": "Apply failed: :message",
-            "toastSkippedOne": ":count conflicting change was skipped.",
-            "toastSkippedMany": ":count conflicting changes were skipped.",
-            "toastSkippedSafeOne": ":count conflicting safe change was skipped.",
-            "toastSkippedSafeMany": ":count conflicting safe changes were skipped.",
+            "statusApplyFailed": "Apply failed: {message}",
             "statusAllConflicted": "All selected edits conflicted with each other.",
             "toastAutoApplied": "Auto-Refine applied successfully.",
             "toastApplied": "Changes applied successfully.",
-            "toastApplyFailed": "Failed to apply: :message",
-            "errGetStyles": "getStyles failed: :error",
+            "toastApplyFailed": "Failed to apply: {message}",
+            "errGetStyles": "getStyles failed: {error}",
             "errGetStylesEmpty": "getStyles returned no content",
-            "errEditStyles": "editStyles failed: :error",
-            "errSetRootVariables": "setRootVariables failed for :name: :error"
+            "errEditStyles": "editStyles failed: {error}",
+            "errSetRootVariables": "setRootVariables failed for {name}: {error}",
+            "applyTotal": {
+                "one": "Apply {count} change",
+                "other": "Apply {count} changes"
+            },
+            "selected": {
+                "one": "{count} change selected",
+                "other": "{count} changes selected"
+            },
+            "statusApplied": {
+                "one": "Applied. {count} suggestion remaining.",
+                "other": "Applied. {count} suggestions remaining."
+            },
+            "toastSkipped": {
+                "one": "{count} conflicting change was skipped.",
+                "other": "{count} conflicting changes were skipped."
+            },
+            "toastSkippedSafe": {
+                "one": "{count} conflicting safe change was skipped.",
+                "other": "{count} conflicting safe changes were skipped."
+            },
+            "statusSuggestions": {
+                "other": "{count} suggestions",
+                "one": "{count} suggestion"
+            },
+            "modalRow": {
+                "other": "{label} changes",
+                "one": "{label} change"
+            },
+            "tools": {
+                "colorNormalize": {
+                    "found": "Color to normalize: {property} in {selector}",
+                    "foundInMedia": "Color to normalize: {property} in {selector} ({media})"
+                },
+                "designTokens": {
+                    "category": {
+                        "color": "color",
+                        "font": "font",
+                        "other": "other",
+                        "shadow": "shadow",
+                        "size": "size"
+                    },
+                    "found": {
+                        "one": "{value} is used {count} time ({category})",
+                        "other": "{value} is used {count} times ({category})"
+                    }
+                },
+                "duplicates": {
+                    "sameBlock": "Same declarations in {selectors}",
+                    "sameFontFace": "Identical @font-face rules",
+                    "sameKeyframes": "Identical @keyframes: {names}",
+                    "sameSelector": {
+                        "one": "{selector} appears {count} time",
+                        "other": "{selector} appears {count} times"
+                    }
+                },
+                "emptyRules": {
+                    "emptyMedia": "Empty @media block: {condition}",
+                    "found": "Empty rule: {selector}",
+                    "foundInMedia": "Empty rule: {selector} ({media})"
+                },
+                "fuzzyValues": {
+                    "found": "Close values of {property}: {valueA} in {selectorA}, {valueB} in {selectorB}"
+                },
+                "mediaQueries": {
+                    "closeBreakpoints": "Breakpoints {diff} apart: {condA} and {condB}",
+                    "exactDuplicate": {
+                        "one": "{count} @media block with the condition {condition}",
+                        "other": "{count} @media blocks with the same condition {condition}"
+                    }
+                },
+                "nearDuplicates": {
+                    "found": "{selectorA} and {selectorB} are {percent}% alike"
+                }
+            }
         }
     },
     "socialPreviews": {
@@ -1369,7 +1606,7 @@
         "siteHint": "Every page that sets none of its own uses these.",
         "target": "Site or page",
         "pageValuesTitle": "The page {page}",
-        "cardsOfSite": "The cards of the home page, as every page that sets no picture or card type of its own draws them",
+        "cardsOfSite": "The cards of the home page, as every page that sets no picture or card type of its own draws them.",
         "cardsOfSiteOwn": "The home page sets its own picture or card type: these cards show its own.",
         "noTerritory": "No territory",
         "pageHint": "A page's own values win over the site's.",
@@ -1433,13 +1670,22 @@
         "wTitleCut": "{platform} shows about {limit} {unit} of a title",
         "wDescriptionCut": "{platform} shows about {limit} {unit} of a description",
         "sizeWh": "{w} × {h}",
-        "sizeW": "{w} pixels wide",
-        "unitCharacters": "characters",
-        "unitBytes": "bytes",
         "instagram": "Instagram draws no card for a link: a link in a post is plain text, so links go in a profile's links or in a story's link sticker. Read on {date}.",
         "platformName": {
             "x-large": "X (large card)",
             "x-small": "X (small card)"
+        },
+        "unitBytes": {
+            "other": "bytes",
+            "one": "byte"
+        },
+        "unitCharacters": {
+            "other": "characters",
+            "one": "character"
+        },
+        "sizeW": {
+            "other": "{w} pixels wide",
+            "one": "{w} pixel wide"
         }
     },
     "translations": {
@@ -1464,13 +1710,11 @@
         "addLanguageButton": "Add",
         "addLanguageNone": "Every language of the list is already here",
         "addLanguageTitle": "Add {language}?",
-        "addLanguageCopy": "Its words start as a copy of the {n} words of {default}, the default language, to translate here.",
         "addLanguageEmpty": "Its words start empty: the default language holds none yet.",
         "addLanguageSwitch": "This site has one language. Adding a second makes it multilingual: each page then has an address per language.",
         "addLanguageAddresses": "/about becomes /{default}/about and /{code}/about; /about itself still shows the site in {defaultName}. The site's words are kept as its pages show them now.",
         "addLanguageDone": "{language} added.",
         "removeLanguageTitle": "Remove {language}?",
-        "removeLanguageText": "Its {n} words go with it and nothing is kept: the language's file is deleted. This cannot be undone.",
         "removeLanguageToOne": "The site then has one language, {remaining}, and its addresses lose their language: /{remainingCode}/about becomes /about, and an old /{remainingCode}/… or /{code}/… link stops working, on this site and wherever it was shared. The words of {remaining} are kept as its pages show them now.",
         "removeLanguageLinks": "The site's own links that name a language, and will break ({n}):",
         "removeLanguageLinksNone": "None of the site's own links names a language.",
@@ -1500,7 +1744,6 @@
         "stateUnusedHint": "Keys a language holds that nothing on the site names: no page, component, menu, footer, page title or description, consent layer, Media picture, API sentence, Storage or Privacy text.",
         "sameAsDefault": "Same as the default language",
         "sameAsDefaultHint": "Only the keys whose word in a language is still the default language's, as a language added starts.",
-        "count": "{shown} of {total} keys",
         "columnKey": "Key",
         "columnActions": "Actions",
         "gapUnset": "Unset",
@@ -1543,25 +1786,34 @@
             "storage": "Storage descriptions",
             "privacy": "Privacy texts"
         },
-        "removeLanguageNamed": "Remove {language}"
+        "removeLanguageNamed": "Remove {language}",
+        "count": {
+            "other": "{shown} of {count} keys",
+            "one": "{shown} of {count} key"
+        },
+        "addLanguageCopy": {
+            "other": "Its words start as a copy of the {count} words of {default}, the default language, to translate here.",
+            "one": "Its words start as a copy of the {count} word of {default}, the default language, to translate here."
+        },
+        "removeLanguageText": {
+            "other": "Its {count} words go with it and nothing is kept: the language's file is deleted. This cannot be undone.",
+            "one": "Its {count} word goes with it and nothing is kept: the language's file is deleted. This cannot be undone."
+        }
     },
     "sitemapPage": {
-        "resolverKindSessionNothing": "(reads nothing: a resolver is given no session)",
+        "resolverKindSessionNothing": "session: (reads nothing: a resolver is given no session)",
         "title": "Sitemap",
         "subtitle": "Manage your site routes and navigation structure",
         "addRootRoute": "Add root route",
         "addChild": "Add child",
-        "routeName": "Route name",
+        "routeName": "route-name",
         "create": "Create",
         "cancel": "Cancel",
-        "newChildOf": "New child of",
-        "newRoute": "New route",
+        "newChildOf": "New child of \"{route}\":",
+        "newRoute": "New route:",
         "routeNameNested": "route-name or parent/child",
-        "paramSingular": "param",
-        "paramPlural": "params",
         "deleteRoute": "Delete route",
         "deleteConfirm": "Delete route /{route}?",
-        "deleteConfirmChildren": "Route /{route} has {count} children. Delete all?",
         "viewInEditor": "View in editor",
         "openPage": "Open page",
         "menuOn": "Menu: visible",
@@ -1570,13 +1822,12 @@
         "footerOff": "Footer: hidden",
         "reachability": "Reachability",
         "allReachable": "All routes are reachable from home",
-        "orphansFound": "{count} orphan route(s) found",
         "totalRoutes": "Total Routes",
         "reachable": "Reachable",
         "orphans": "Orphans",
         "globalNav": "Global Navigation Links",
-        "menu": "Menu",
-        "footer": "Footer",
+        "menu": "Menu:",
+        "footer": "Footer:",
         "linkGraph": "Link Graph",
         "linkGraphDesc": "Each route and the routes it links to (via page content + menu + footer).",
         "route": "Route",
@@ -1585,7 +1836,6 @@
         "unreachableRoutes": "Unreachable Routes",
         "unreachableHint": "These routes have no navigation path from the home page. Add links to them in a page, menu, or footer.",
         "cannotDeleteHome": "Cannot delete home route",
-        "maxDepth": "Maximum nesting depth reached",
         "emptyHint": "Add your first route to start building your site structure",
         "error": "Failed to load sitemap data",
         "routeCreated": "Route created successfully",
@@ -1596,115 +1846,156 @@
         "baseUrlRequired": "Please enter a base URL",
         "selectLinks": "Select your links",
         "selectLinksHint": "Click a page to leave it out of the sitemap; click it again to bring it back.",
-        "pagesKept": "{count} page(s) kept",
         "generateSitemap": "Generate sitemap.txt",
         "sitemapSaved": "sitemap.txt saved successfully",
         "customUrls": "Custom URLs",
         "customUrlsHint": "Add extra URLs not generated from routes (one per line)",
         "customUrlsRejected": "Left out of the file (not a full address, such as https://…): {urls}",
         "generatedFile": "Generated sitemap.txt",
-        "urlCount": "{count} URL(s)",
         "toggleInclude": "Toggle include/exclude",
-        "langs": "langs",
-        "languageCoverage": "Language Coverage",
         "none": "none",
         "resolverListEditNamed": "Edit the resolver {name}",
         "resolverListRemoveNamed": "Remove the resolver {name}",
         "resolverListRemoveTitle": "Remove the resolver {name} of /{route}?",
         "resolverListRemoveLastText": "It is the only resolver of this route: the route will render without server-side data.",
         "remove": "Remove",
-        "resolverClearTitle": "Clear the resolver of /{route}?",
-        "resolverClearText": "The route will render again without server-side data."
-    },
-    "interactions": {
-        "title": "Interactions",
-        "subtitle": "Manage interaction schemas and project interactions",
-        "refresh": "Refresh",
-        "build": "Build",
-        "building": "Building...",
-        "buildSuccess": "Interactions compiled successfully",
-        "refreshed": "Data refreshed",
-        "deleted": "Deleted successfully",
-        "instancesLabel": "interactions",
-        "status": {
-            "loading": "Loading...",
-            "noInteractions": "No interactions defined",
-            "ready": "Ready to build"
+        "resolverBadge": {
+            "one": "resolver",
+            "other": "resolver × {count}"
         },
-        "schemas": {
-            "title": "Interaction Schemas",
-            "core": "Core",
-            "custom": "Custom",
-            "create": "New Schema",
-            "searchPlaceholder": "Search schemas...",
-            "noCoreSchemas": "No core schemas found",
-            "noCustomSchemas": "No custom schemas yet",
-            "noCustomSchemasHint": "Create custom schemas to extend the interaction system",
-            "params": "params",
-            "noParams": "No parameters",
-            "noDescription": "No description provided",
-            "description": "Description",
-            "parameters": "Parameters",
-            "paramName": "Name",
-            "paramType": "Type",
-            "paramRequired": "Required",
-            "paramDesc": "Description",
-            "handler": "Handler Code",
-            "viewTitle": "Schema Details",
-            "createTitle": "Create Schema",
-            "editTitle": "Edit Schema",
-            "created": "Schema created successfully",
-            "updated": "Schema updated successfully",
-            "form": {
-                "id": "Schema ID",
-                "idHint": "Unique identifier (camelCase, starts with letter)",
-                "description": "Description",
-                "descPlaceholder": "Describe what this schema does...",
-                "params": "Parameters",
-                "addParam": "Add Parameter",
-                "paramName": "Name",
-                "paramDescPlaceholder": "Description",
-                "handler": "Handler Function",
-                "handlerHint": "JavaScript code to execute. 'params' object contains the parameter values."
-            }
+        "resolverBadgeTitle": "Server-side resolver",
+        "editTitle": "Edit title",
+        "configureResolver": "Configure resolver",
+        "resolverEndpointPlaceholder": "— Select an endpoint —",
+        "resolverEndpointOrphanShort": "⚠ {endpoint} — not in registry",
+        "resolverEndpointOrphan": "This endpoint id is not in the current API registry. Re-register it at /admin/apis or pick another endpoint.",
+        "resolverInputNamePlaceholder": "— pick a param —",
+        "resolverInputNameOrphan": "⚠ {name} — not in endpoint params",
+        "resolverInputName": "param name",
+        "resolverKindParam": "param:",
+        "resolverKindQuery": "query:",
+        "resolverKindLiteral": "literal",
+        "resolverKindParamNoSegments": "param: (route has no :params)",
+        "resolverValueQuery": "query string key",
+        "resolverValueSession": "session field name",
+        "resolverValueLiteral": "literal value",
+        "resolverRemoveInput": "Remove input",
+        "resolverInputs": "Inputs",
+        "resolverInputsHint": "Wire endpoint parameters to URL params, query string, session, or literal values. When the endpoint declares parameters, names are picked from a dropdown — otherwise free-text.",
+        "resolverInputsNoParamsHint": "⚠ This endpoint does not declare any parameters. Names are free-text — typo-prone. Declaring parameters in /admin/apis enables dropdown-driven name selection.",
+        "resolverInputAdd": "Add input",
+        "resolverExposeName": "variable name",
+        "resolverExposeWholeResponse": "(whole response)",
+        "resolverExposePathOrphan": "⚠ {path} — not in schema",
+        "resolverExposePath": "data.field.path (empty = whole response)",
+        "resolverRemoveExpose": "Remove expose",
+        "resolverExpose": "Expose",
+        "resolverExposeHint": "Map response fields to template variables. Empty path means \"expose the whole response as this variable.\" When the endpoint declares a response schema, paths are picked from a dropdown — otherwise free-text.",
+        "resolverExposeNoSchemaHint": "⚠ This endpoint does not declare a response schema. Paths are free-text — typo-prone, no autocomplete. Adding a schema in /admin/apis enables dropdown-driven path selection.",
+        "resolverExposeAdd": "Add expose",
+        "resolverCacheCacheable": "cacheable",
+        "resolverCacheCacheableTitle": "Auth: {auth} — shared-safe, server honours cacheTTL.",
+        "resolverCacheBlocked": "disabled for {auth}",
+        "resolverCacheBlockedTitle": "Per-user auth ({auth}) cannot share cache entries between users — server forces no-cache regardless of TTL.",
+        "resolverCacheTTL": "Cache TTL",
+        "resolverCacheTTLUnit": "seconds",
+        "resolverCacheTTLHint": "Server-side cache duration in seconds. 0 (or empty) = no cache, every request fires fresh. Caching is server-force-disabled for bearer / cookie / basic auth (would leak per-user data through shared cache).",
+        "resolverOnMiss": "On miss",
+        "resolverOnMissDefault": "(default — fail loud: 404 / 500)",
+        "resolverOnMissRenderEmpty": "render-empty — expose null vars, render template with empty-state UI",
+        "resolverOnMissHint": "How to respond when the resolver fetch fails or returns non-2xx. Default sends 404 / 500 to the user. render-empty keeps the page rendering with null/empty exposed vars — pair with data-state-show-empty in the template for graceful \"no data\" UI.",
+        "loading": "Loading…",
+        "resolverErrEmptyRow": "row is empty — fill it or × remove it",
+        "resolverErrMissingName": "name is required",
+        "resolverErrMissingValue": "value is required",
+        "resolverErrInvalidInputNameChars": "name must start with a letter or underscore and use only letters, digits, underscores, or hyphens",
+        "resolverErrInvalidExposeNameChars": "name must start with a letter or underscore and use only letters, digits, and underscores (becomes a $variable in the template)",
+        "resolverErrInvalidCacheTTL": "cache TTL must be a non-negative integer (seconds), or empty for no cache",
+        "resolverErrInputRow": "Input row {row}: {reason}",
+        "resolverErrExposeRow": "Expose row {row}: {reason}",
+        "resolverErrCacheField": "Cache TTL: {reason}",
+        "saving": "Saving…",
+        "resolverSaved": "Resolver saved",
+        "resolverListReorderHint": "Drag to reorder",
+        "resolverListNoEndpoint": "(no endpoint)",
+        "removing": "Removing…",
+        "resolverRemoved": "Resolver removed",
+        "reordering": "Reordering…",
+        "resolverReordered": "Order updated",
+        "editTitleTitle": "Edit page title",
+        "editTitleHint": "Page title is the value of <code>page.titles.<route></code> for each language. Empty inputs are written as empty strings (the key still exists but renders blank — fix later if you want a real title there).",
+        "resolverListTitle": "Resolvers for",
+        "resolverListHint": "Each resolver fires in parallel server-side before the page renders. Drag rows to reorder (affects render-time order + namespaced-by-index addressing like <code>$r0</code> / <code>$r1</code>). A resolver's pencil opens its detailed config; its bin removes it.",
+        "resolverListEmpty": "No resolvers configured for this route yet. Click \"+ Add resolver\" below to create the first one.",
+        "resolverListAdd": "Add resolver",
+        "resolverTitle": "Configure resolver",
+        "resolverHint": "Attach a server-side data resolver to this route. The resolver fires before the page renders, fetching from the chosen API endpoint and exposing values as template variables.",
+        "resolverEndpoint": "Endpoint",
+        "actions": "Actions",
+        "treeToggle": "Toggle",
+        "coverageTooltip": "{language}: {percent} coverage",
+        "coverageTooltipMissing": {
+            "one": "{language}: {percent} coverage ({count} missing key)",
+            "other": "{language}: {percent} coverage ({count} missing keys)"
         },
-        "instances": {
-            "title": "Project Interactions",
-            "create": "New Interaction",
-            "searchPlaceholder": "Search interactions...",
-            "noInteractions": "No interactions defined",
-            "noInteractionsHint": "Create interactions to add behavior to your site",
-            "createTitle": "Create Interaction",
-            "editTitle": "Edit Interaction",
-            "created": "Interaction created successfully",
-            "updated": "Interaction updated successfully",
-            "form": {
-                "id": "Interaction ID",
-                "idHint": "Unique identifier for this interaction",
-                "schema": "Schema",
-                "selectSchema": "Select a schema...",
-                "trigger": "Trigger",
-                "triggerHint": "CSS selector and event (e.g., #myBtn click, .card hover)",
-                "params": "Parameters",
-                "onSuccess": "On Success",
-                "onSuccessHint": "Chain another interaction on success",
-                "onFailed": "On Failed",
-                "onFailedHint": "Chain another interaction on failure",
-                "noChain": "None"
-            }
+        "reachabilityError": "Could not load reachability data.",
+        "invalidSegment": "Invalid segment \"{segment}\". Use lowercase letters, numbers, hyphens (no leading/trailing hyphens), or \":name\" for a path parameter, separated by /.",
+        "routeWarning": "Route warning",
+        "deleteFailed": "Delete failed",
+        "errorMessage": "Error: {message}",
+        "editTitleReadFailed": "The titles could not be read — close and try again.",
+        "editTitlePlaceholder": "Title in {lang}…",
+        "editTitleNoRoute": "Could not determine target route — close and try again.",
+        "editTitleNoChanges": "No changes to save.",
+        "editTitleSaving": {
+            "one": "Saving ({count} language)…",
+            "other": "Saving ({count} languages)…"
         },
-        "deleteConfirm": {
-            "title": "Confirm Delete",
-            "message": "Are you sure you want to delete this item?",
-            "schemaMessage": "Are you sure you want to delete schema '{id}'? This cannot be undone.",
-            "interactionMessage": "Are you sure you want to delete interaction '{id}'? This cannot be undone."
+        "editTitleFailure": "{lang}: {message}",
+        "editTitleSavedSome": "Saved {saved}/{total} — {failures}",
+        "editTitleSaved": {
+            "one": "✓ Saved {count} translation.",
+            "other": "✓ Saved {count} translations."
+        },
+        "editTitleSaveFailed": "Save failed — see console.",
+        "removeFailed": "Remove failed",
+        "reorderFailed": "Reorder failed",
+        "resolverEndpointMeta": "{method} {url} · auth: {auth}",
+        "resolverBadgeTitleEndpoints": "Server-side resolver — {endpoints}",
+        "resolverListCount": {
+            "one": "({count} resolver)",
+            "other": "({count} resolvers)"
+        },
+        "paramCount": {
+            "one": "{count} param",
+            "other": "{count} params"
+        },
+        "orphanRoutesFound": {
+            "one": "{count} orphan route found",
+            "other": "{count} orphan routes found"
+        },
+        "deleteConfirmChildrenCount": {
+            "one": "Route /{route} has {count} child. Delete all?",
+            "other": "Route /{route} has {count} children. Delete all?"
+        },
+        "pagesKeptCount": {
+            "one": "{count} page kept",
+            "other": "{count} pages kept"
+        },
+        "langCount": {
+            "one": "×{count} lang",
+            "other": "×{count} langs"
+        },
+        "fileUrlCount": {
+            "one": "{count} URL",
+            "other": "{count} URLs"
         }
     },
     "embedSecurity": {
         "title": "Embed Security",
         "subtitle": "The install-wide sandbox policy for embedded iframes — read-only",
         "readonlyNotice": "This policy is set once for the whole installation and cannot be changed from the panel.",
-        "policyLocation": "It is configured at deployment in the embed policy file, :path.",
+        "policyLocation": "It is configured at deployment in the embed policy file, {path}.",
         "howToChange": "To allow another host — a Vimeo or Google Maps embed, for instance — ask whoever deploys this installation to add it there. An embed whose host is not listed stays sandboxed and may appear empty.",
         "sandboxRules": "Allowed embed hosts",
         "intro": "An iframe on any page is sandboxed by default. The hosts below are granted extra permissions, across every project on this installation.",
@@ -1727,21 +2018,13 @@
     "settings": {
         "subtitle": "View configuration and manage preferences",
         "systemInfo": "System Information",
-        "configuration": "Configuration",
-        "routes": "Active Routes",
-        "languages": "Languages",
         "preferences": "Admin Preferences",
         "keyboardShortcuts": "Keyboard Shortcuts",
         "toastDuration": "Toast Notification Duration",
-        "addRoute": "Add Route",
-        "loadingRoutes": "Loading routes...",
-        "addLanguage": "Add Language",
-        "loadingLanguages": "Loading languages...",
         "savePreferences": "Save Preferences",
         "pref": {
             "enableShortcuts": "Enable keyboard shortcuts",
-            "shortcutsHint": "Press ? to view all shortcuts",
-            "confirmDestructive": "Show confirmation for destructive actions",
+            "shortcutsHint": "Press {key} to view all shortcuts",
             "duration": {
                 "2s": "2 seconds",
                 "4s": "4 seconds",
@@ -1750,42 +2033,16 @@
             }
         },
         "sysInfo": {
-            "apiVersion": "API Version",
             "totalCommands": "Total Commands",
-            "version": "Version"
-        },
-        "config": {
-            "multilingualMode": "Multilingual Mode",
-            "enabled": "Enabled",
-            "singleLanguage": "Single Language",
-            "languages": "Languages",
-            "configured": "configured",
-            "routes": "Routes",
-            "active": "active",
-            "stylesStatus": "Styles Status",
-            "loaded": "Loaded",
-            "error": "Error"
-        },
-        "routesList": {
-            "none": "No routes configured",
-            "delete": "Delete route"
-        },
-        "languagesList": {
-            "none": "No languages configured",
-            "setDefault": "Set Default",
-            "setDefaultTitle": "Set as default language"
+            "version": "Version",
+            "versionUnknown": "unknown"
         },
         "toast": {
-            "preferencesSaved": "Preferences saved",
-            "defaultLangUpdated": "Default language updated"
+            "preferencesSaved": "Preferences saved"
         },
         "errors": {
             "sysInfoFailed": "Could not load system info",
-            "routesFailed": "Could not load routes",
-            "languagesFailed": "Could not load languages",
-            "defaultLangFailed": "Failed to update default language",
-            "permissionsFailed": "Could not load permissions",
-            "generic": "Error: :message"
+            "permissionsFailed": "Could not load permissions"
         },
         "ai": {
             "title": "AI Configuration",
@@ -1798,8 +2055,6 @@
             "status": "Status",
             "configured": "Configured",
             "providers": "Providers",
-            "providersCountOne": ":count provider configured",
-            "providersCount": ":count providers configured",
             "defaultProvider": "Default Provider",
             "storage": "Storage",
             "storagePersistent": "Persistent (localStorage)",
@@ -1807,7 +2062,11 @@
             "noneConfigured": "No AI providers configured",
             "addApiKey": "Add API Key",
             "runWithoutStoppingOn": "Run without stopping: on",
-            "runWithoutStoppingOff": "Run without stopping: off"
+            "runWithoutStoppingOff": "Run without stopping: off",
+            "providersConfiguredCount": {
+                "one": "{count} provider configured",
+                "other": "{count} providers configured"
+            }
         },
         "permissions": {
             "yourRole": "Your Role",
@@ -1815,8 +2074,6 @@
             "accessLevel": "Access Level",
             "customRole": "Custom role",
             "availableCommands": "Available Commands",
-            "allCommands": "All (:count commands)",
-            "commandCount": ":count commands",
             "viewAccessible": "View your accessible commands",
             "role": {
                 "all": "Full system access including token and role management",
@@ -1825,6 +2082,14 @@
                 "designer": "Style editing plus content management",
                 "editor": "Content editing including structure, translations, assets",
                 "viewer": "Read-only access to view content and settings"
+            },
+            "commandsCount": {
+                "one": "{count} command",
+                "other": "{count} commands"
+            },
+            "allCommandsCount": {
+                "one": "All ({count} command)",
+                "other": "All ({count} commands)"
             }
         },
         "yourPermissions": "Your Permissions",
@@ -1833,9 +2098,9 @@
     },
     "storage": {
         "dialogs": {
-            "deletePage": "Delete the cookie-policy page at :route? This removes the route and its page.",
-            "overwritePage": "Route /:route already exists. Overwrite its content with the cookie-policy page?",
-            "deleteKey": "Delete the key “:id”?",
+            "deletePage": "Delete the cookie-policy page at {route}? This removes the route and its page.",
+            "overwritePage": "Route /{route} already exists. Overwrite its content with the cookie-policy page?",
+            "deleteKey": "Delete the key “{id}”?",
             "deleteKeyText": "It leaves the registry. The code that reads or writes it is not touched: the storage scan flags a key still in use that is no longer declared.",
             "delete": "Delete",
             "deleteFailed": "The key could not be deleted.",
@@ -1849,8 +2114,9 @@
             "descriptionHint": "Shown on the cookie-policy page in this language, live. Each language keeps its own: what you type in one is kept while you look at another, until you save.",
             "descriptionHintOne": "Shown on the cookie-policy page, live: no need to generate it again.",
             "noDescription": "No description yet.",
-            "noDescriptionIn": "No description in :language yet.",
-            "unread": "The descriptions in :language could not be read: reload the page."
+            "noDescriptionIn": "No description in {language} yet.",
+            "unread": "The descriptions in {language} could not be read: reload the page.",
+            "descriptionPlaceholder": "What this key is used for"
         },
         "consent": {
             "askAgain": "Ask visitors again",
@@ -1862,75 +2128,138 @@
             "essentialOnly": "Only essential keys are declared, so there is nothing to ask a visitor and no banner shows. The consent rule stays on, and a banner appears by itself once a functional, analytics or marketing key is declared.",
             "essentialOnlyLimit": "No banner does not mean nothing to disclose: third-party embeds and scripts you wrote yourself are not in the registry, and a banner never gated them. That is a reason to keep a cookie-policy page.",
             "essentialBanner": "Create a banner anyway (it is not mandatory)",
-            "noBanner": "No banner was created: only essential keys are declared, so there is nothing to ask a visitor. A banner appears by itself once a functional, analytics or marketing key is declared."
+            "noBanner": "No banner was created: only essential keys are declared, so there is nothing to ask a visitor. A banner appears by itself once a functional, analytics or marketing key is declared.",
+            "title": "Consent layer",
+            "loading": "Loading…",
+            "popupRows": "Popup toggle rows: {categories} (Essential is always-on, locked).",
+            "policyPage": "Cookie-policy page",
+            "policyPageHint": "Update refreshes this page from the registry. To move it to another route, delete it and generate again.",
+            "route": "Cookie-policy page route",
+            "routePlaceholder": "e.g. cookies (leave blank to skip the policy page)",
+            "staleRoute": "The previous route \"{route}\" no longer exists — generate to recreate it, or type a different one.",
+            "deletePage": "Delete page",
+            "deletePageFailed": "Delete failed",
+            "pageDeleted": "Cookie-policy page deleted. The banner no longer links to it.",
+            "pageDeletedNoBanner": "Cookie-policy page deleted.",
+            "update": "Update",
+            "generate": "Generate",
+            "generateFailed": "Generation failed",
+            "layerGenerated": "Consent layer generated and enabled.",
+            "layerUpdated": "Consent layer updated.",
+            "seeded": "Seeded copy: {languages}.",
+            "pageCreated": "Cookie-policy page created at {route}.",
+            "pageUpdated": "Cookie-policy page updated at {route}.",
+            "pageSkipped": "(Cookie-policy page skipped — route exists, not overwritten.)",
+            "pageFailed": "(Cookie-policy page failed: {reason}.)",
+            "previewBanner": "Preview a page to see the banner."
         },
         "actions": {
-            "edit": "Edit “:id”",
-            "delete": "Delete “:id”"
+            "edit": "Edit “{id}”",
+            "delete": "Delete “{id}”"
         },
         "scan": {
-            "dismiss": "Close the scan results"
-        }
-    },
-    "structure": {
-        "title": "Structure Viewer",
-        "subtitle": "Visual tree view of page and component structures",
-        "selectStructure": "Select Structure",
-        "tree": {
-            "title": "Structure Tree",
-            "expandAll": "Expand All",
-            "collapseAll": "Collapse All",
-            "copyJson": "Copy JSON",
-            "structurePrefix": "Structure:"
+            "dismiss": "Close the scan results",
+            "label": "Storage scan results",
+            "title": "Scan results",
+            "scanning": "Scanning the build…",
+            "failed": "Scan failed",
+            "undeclared": {
+                "one": "Undeclared keys ({count})",
+                "other": "Undeclared keys ({count})"
+            },
+            "undeclaredHint": "Used in the build but not in the registry — the GDPR gap. Declare each to add it.",
+            "allDeclared": "All used keys are declared. ✓",
+            "dangling": {
+                "one": "Dangling reads ({count})",
+                "other": "Dangling reads ({count})"
+            },
+            "danglingHint": "Read by a binding but never written anywhere — likely a leftover after the writer was deleted. Review these.",
+            "ok": {
+                "one": "OK ({count})",
+                "other": "OK ({count})"
+            },
+            "okHint": "Declared and written in the build — nothing to do.",
+            "orphans": {
+                "one": "Orphans ({count})",
+                "other": "Orphans ({count})"
+            },
+            "orphansHint": "Declared but not referenced in the build. Safe to keep — may be parked.",
+            "none": "None.",
+            "writes": "writes",
+            "clears": "clears",
+            "reads": "reads",
+            "declare": "Declare",
+            "declaring": "Declaring…",
+            "declareFailed": "Declare failed"
         },
-        "nodeDetails": {
-            "title": "Node Details",
-            "nodeId": "Node ID",
-            "element": "Element",
-            "textContent": "Text Content",
-            "translationKey": "Translation Key",
-            "component": "Component",
-            "attributes": "Attributes",
-            "children": "Children",
-            "childNodes": "child node(s)",
-            "editNode": "Edit This Node",
-            "editFull": "Edit Full Structure"
+        "categories": {
+            "essential": "essential",
+            "functional": "functional",
+            "analytics": "analytics",
+            "marketing": "marketing"
+        },
+        "title": "Storage registry",
+        "subtitle": "Every browser-storage key the site uses (localStorage / sessionStorage / cookie). The GDPR / cookie-consent data layer and the storageKey picker source.",
+        "loading": "Loading storage registry…",
+        "toolbar": {
+            "add": "Add storage key",
+            "scan": "Scan / reconcile",
+            "generateConsent": "Generate consent layer"
+        },
+        "list": {
+            "label": "Storage registry list",
+            "empty": "No storage keys declared yet. Click \"Add storage key\" to declare one.",
+            "emptyScope": "No storage keys with scope \"{scope}\"."
+        },
+        "filter": {
+            "all": {
+                "one": "All · {count}",
+                "other": "All · {count}"
+            },
+            "scope": {
+                "one": "{scope} · {count}",
+                "other": "{scope} · {count}"
+            }
+        },
+        "card": {
+            "needsConsent": "needs consent",
+            "noConsent": "no consent",
+            "keeps": "keeps: {retention}",
+            "storedAs": "stored as {key}",
+            "storedAsTitle": "Every project on this host shares one browser-storage origin, so qs.js prefixes each key with the project id. This is the name you will find in the browser’s developer tools."
+        },
+        "keyDialog": {
+            "titleAdd": "Add storage key",
+            "titleEdit": "Edit \"{id}\"",
+            "titleDeclare": "Declare \"{id}\"",
+            "keyName": "Key name",
+            "keyPlaceholder": "key name, e.g. cartSession",
+            "prefixTitle": "Added automatically. Every project on this host shares one browser-storage origin, so qs.js prefixes each key with the project id. You do not type this part, and the registry does not store it.",
+            "keyHint": {
+                "prefixed": "The storage key as written in code. No spaces. The greyed prefix is added by qs.js and is what you will find in devtools; you type only the part after it, and only that part is stored here. The value is provided by the visitor at runtime — never stored here.",
+                "cookie": "The storage key as written in code. No spaces. Cookies are not prefixed — a cookie is written under exactly this name. The value is provided by the visitor at runtime — never stored here.",
+                "declarePrefixed": "Found in the build by the scan — declaring it adds it to the registry. The greyed prefix is added by qs.js and is what you will find in devtools; you type only the part after it, and only that part is stored here. The value is provided by the visitor at runtime — never stored here.",
+                "declareCookie": "Found in the build by the scan — declaring it adds it to the registry. Cookies are not prefixed — a cookie is written under exactly this name. The value is provided by the visitor at runtime — never stored here."
+            },
+            "scope": "Scope",
+            "category": "Category",
+            "categoryHint": "Drives consent: \"essential\" needs no consent; the others do.",
+            "retention": "Retention",
+            "retentionCustom": "Custom…",
+            "retentionPlaceholder": "e.g. 6 months, 13 months, until-logout",
+            "retentionHint": "How long the key lives — disclosed on the cookie/privacy page.",
+            "cookieDomain": "Cookie domain",
+            "cookieDomainPlaceholder": "auto (or .example.com)",
+            "cookiePath": "Cookie path",
+            "cookieSameSite": "SameSite",
+            "cookieSecure": "Secure (HTTPS only)",
+            "save": "Save changes",
+            "add": "Add storage key",
+            "keyRequired": "Key name is required.",
+            "keyNoSpaces": "Key name cannot contain spaces."
         },
         "errors": {
-            "loadOptions": "Error loading options"
-        },
-        "mode": {
-            "content": "Content",
-            "components": "Components"
-        },
-        "componentList": {
-            "title": "Components",
-            "subtitle": "Edit reusable component structures",
-            "searchPlaceholder": "Search components...",
-            "newComponent": "New Component",
-            "loading": "Loading components...",
-            "empty": "No components yet",
-            "emptyHint": "Create your first reusable component",
-            "usages": "usages",
-            "usage": "usage",
-            "variables": "variables",
-            "slots": "slots",
-            "actions": {
-                "edit": "Edit Structure",
-                "duplicate": "Duplicate",
-                "rename": "Rename",
-                "delete": "Delete",
-                "whereUsed": "Where Used"
-            },
-            "confirm": {
-                "deleteTitle": "Delete Component",
-                "deleteMessage": "Are you sure you want to delete ':name'? This component is used in :count place(s)."
-            },
-            "toast": {
-                "deleted": "Component ':name' deleted",
-                "duplicated": "Component duplicated as ':name'",
-                "renamed": "Component renamed to ':name'"
-            }
+            "network": "Network error"
         }
     },
     "workflows": {
@@ -3972,7 +4301,7 @@
             "authNone": "None (public endpoint)",
             "authRequired": "Required (sends the API's credential)",
             "endpointAuthHint": "What a call to this endpoint carries: the API's credential, or nothing.",
-            "authOwn": "Its own auth (:type), set through the API. Save keeps it.",
+            "authOwn": "Its own auth ({type}), set through the API. Save keeps it.",
             "callableFrom": "Callable from",
             "callableFromAuto": "Auto (derive from auth type)",
             "callableFromClient": "Client only (browser)",
@@ -3994,13 +4323,18 @@
             "refreshTokenKey": "Refresh token key name",
             "refreshTokenKeyHint": "Where the refresh token is stored at runtime. Restricted to browser storage.",
             "refreshBodyField": "Body field name for refresh token",
-            "refreshBodyFieldHint": "The field in the refresh endpoint's POST body that carries the stored refresh token (sent as <code>{&lt;field&gt;: &lt;value&gt;}</code>).",
+            "refreshBodyFieldHint": "The field in the refresh endpoint's POST body that carries the stored refresh token (sent as <code>{<field>: <value>}</code>).",
             "refreshResponseTokenPath": "Response path: new access token",
             "refreshResponseTokenPathHint": "Dot-path in the refresh response where the new access token lives (e.g. <code>token</code> or <code>data.access_token</code>).",
             "refreshResponseRefreshTokenPath": "Response path: new refresh token (optional)",
             "refreshResponseRefreshTokenPathHint": "Dot-path for the rotated refresh token, if your endpoint returns one. Leave blank to keep the existing refresh token.",
             "namePlaceholder": "Main Backend API",
-            "descriptionPlaceholder": "Optional description..."
+            "descriptionPlaceholder": "Optional description...",
+            "callableFromResolves": {
+                "both": "both",
+                "server": "server"
+            },
+            "refreshEndpointMissing": "{ref} (missing)"
         },
         "auth": {
             "none": "None",
@@ -4022,10 +4356,10 @@
             "sometimesNull": "Null in some elements. The draft keeps the other type:",
             "sometimesAbsent": "Missing from some elements:",
             "mixed": "A different type between elements, all listed. Response Mapping does not look inside these:",
-            "map": "Keyed by what look like ids, addresses or tokens, or by more than :fields names. Those names are data, so they are not written, and the draft describes their values instead:",
+            "map": "Keyed by what look like ids, addresses or tokens, or by more than {fields} names. Those names are data, so they are not written, and the draft describes their values instead:",
             "unsafe": "Left out, because a field by this name cannot be read back by the page (it names part of a JavaScript object):",
-            "sampled": "A long list, of which the first :items elements were read:",
-            "deep": "Read to :depth levels. What lies below was not read:",
+            "sampled": "A long list, of which the first {items} elements were read:",
+            "deep": "Read to {depth} levels. What lies below was not read:",
             "top": "(the top of the response)",
             "replaceTitle": "Replace the saved schema?",
             "replaceQuestion": "This endpoint already has a response schema. Open the form with the draft in its place? Nothing is saved until you press Save.",
@@ -4035,9 +4369,6 @@
             "request": "Request",
             "response": "Response",
             "run": "Run Test",
-            "authToken": "Auth Token",
-            "authTokenPlaceholder": "Enter token or leave empty",
-            "authTokenHint": "Click save to remember for this API",
             "saveToken": "Save token for this API",
             "showHide": "Show/Hide token",
             "rawJson": "Advanced: Raw JSON",
@@ -4048,7 +4379,7 @@
             "selectPlaceholder": "-- Select --",
             "arrayPlaceholder": "value1, value2, value3",
             "arrayHint": "Comma-separated values",
-            "formatPlaceholder": "Format: :format",
+            "formatPlaceholder": "Format: {format}",
             "testing": "Testing...",
             "executing": "Executing...",
             "waiting": "Waiting for response...",
@@ -4059,29 +4390,68 @@
         },
         "importModal": {
             "converter": {
-                "idSuffixed": "Endpoint id auto-suffixed to avoid collision: :base → :id",
-                "headerParamsDropped": ":count header parameter(s) dropped: QuickSite configures headers at the API level (auth.tokenSource: \"header:X-Key\").",
-                "refParamsResolved": ":count $ref parameter(s) resolved from components.parameters.",
-                "refParamsUnresolved": ":count $ref parameter(s) skipped (unresolved or external).",
-                "examples": "Schema examples: :list.",
-                "examplesCopied": ":count copied",
-                "examplesStripped": ":count stripped as credential-like",
-                "compositionsSkipped": ":count schema composition(s) (oneOf/anyOf) skipped: refine manually after import.",
-                "refsExternal": ":count external $ref(s) skipped (only same-document refs resolved).",
-                "refsCycle": ":count $ref cycle(s) broken with empty-object placeholder.",
-                "refsUnresolved": ":count $ref(s) could not be resolved (missing target).",
-                "depthExceeded": ":count schema branch(es) hit max depth (:max).",
-                "schemasDropped": ":count schema(s) dropped: failed shape validation (set them manually after import).",
-                "altSchemes": "Alternate security schemes used by some endpoints: :list. Those endpoints are set to auth \"required\", which sends this API's credential: refine per-endpoint or switch the API auth in preview.",
-                "altSchemesNoAuth": "Alternate security schemes used by some endpoints: :list. Those endpoints are set to auth \"required\". This API has no auth yet, so they send nothing until you set it.",
-                "apiKeyInCookie": "Security: scheme \":scheme\" is apiKey-in-cookie (cookie: \":cookie\"), mapped to QuickSite cookie auth. Verify your server session cookie matches Pattern X before going live.",
-                "apiKeyInQuery": "Security: scheme \":scheme\" sends its key in the URL (param: \":param\"). QuickSite does not send a key in a URL, where it lands in every log on the way, so this API is imported without that auth. If it also takes the key in a request header, set API Key with that header by hand. If not, call it through a server of your own.",
-                "oauth2": "Security: scheme \":scheme\" is oauth2, mapped to bearer (oauth2 yields a bearer token at runtime). Configure the OAuth handler separately on the API.",
-                "openIdConnect": "Security: scheme \":scheme\" is openIdConnect, mapped to bearer auth. Verify token source after import.",
-                "severalSchemes": "Security: API declares :count schemes (:list); using \":name\". Edit auth in preview to switch.",
+                "idSuffixed": "Endpoint id auto-suffixed to avoid collision: {base} → {id}",
+                "examples": "Schema examples: {list}.",
+                "altSchemes": "Alternate security schemes used by some endpoints: {list}. Those endpoints are set to auth \"required\", which sends this API's credential: refine per-endpoint or switch the API auth in preview.",
+                "altSchemesNoAuth": "Alternate security schemes used by some endpoints: {list}. Those endpoints are set to auth \"required\". This API has no auth yet, so they send nothing until you set it.",
+                "apiKeyInCookie": "Security: scheme \"{scheme}\" is apiKey-in-cookie (cookie: \"{cookie}\"), mapped to QuickSite cookie auth. Verify your server session cookie matches Pattern X before going live.",
+                "apiKeyInQuery": "Security: scheme \"{scheme}\" sends its key in the URL (param: \"{param}\"). QuickSite does not send a key in a URL, where it lands in every log on the way, so this API is imported without that auth. If it also takes the key in a request header, set API Key with that header by hand. If not, call it through a server of your own.",
+                "oauth2": "Security: scheme \"{scheme}\" is oauth2, mapped to bearer (oauth2 yields a bearer token at runtime). Configure the OAuth handler separately on the API.",
+                "openIdConnect": "Security: scheme \"{scheme}\" is openIdConnect, mapped to bearer auth. Verify token source after import.",
                 "noScheme": "Security: no scheme could be mapped. API set to public: configure auth manually after import.",
-                "severalServers": ":count server URLs declared; using first (\":url\"). Edit in preview to switch.",
-                "relativeBase": "Base URL is relative (\":url\"). Set an absolute URL in the \"Base URL\" field above the JSON preview before importing."
+                "relativeBase": "Base URL is relative (\"{url}\"). Set an absolute URL in the \"Base URL\" field above the JSON preview before importing.",
+                "headerParamsDropped": {
+                    "other": "{count} header parameters dropped: QuickSite configures headers at the API level (auth.tokenSource: \"header:X-Key\").",
+                    "one": "{count} header parameter dropped: QuickSite configures headers at the API level (auth.tokenSource: \"header:X-Key\")."
+                },
+                "refParamsResolved": {
+                    "other": "{count} $ref parameters resolved from components.parameters.",
+                    "one": "{count} $ref parameter resolved from components.parameters."
+                },
+                "refParamsUnresolved": {
+                    "other": "{count} $ref parameters skipped (unresolved or external).",
+                    "one": "{count} $ref parameter skipped (unresolved or external)."
+                },
+                "compositionsSkipped": {
+                    "other": "{count} schema compositions (oneOf/anyOf) skipped: refine manually after import.",
+                    "one": "{count} schema composition (oneOf/anyOf) skipped: refine manually after import."
+                },
+                "refsExternal": {
+                    "other": "{count} external $refs skipped (only same-document refs resolved).",
+                    "one": "{count} external $ref skipped (only same-document refs resolved)."
+                },
+                "refsCycle": {
+                    "other": "{count} $ref cycles broken with empty-object placeholder.",
+                    "one": "{count} $ref cycle broken with empty-object placeholder."
+                },
+                "refsUnresolved": {
+                    "other": "{count} $refs could not be resolved (missing target).",
+                    "one": "{count} $ref could not be resolved (missing target)."
+                },
+                "depthExceeded": {
+                    "other": "{count} schema branches hit max depth ({max}).",
+                    "one": "{count} schema branch hit max depth ({max})."
+                },
+                "schemasDropped": {
+                    "other": "{count} schemas dropped: failed shape validation (set them manually after import).",
+                    "one": "{count} schema dropped: failed shape validation (set it manually after import)."
+                },
+                "examplesCopied": {
+                    "other": "{count} copied",
+                    "one": "{count} copied"
+                },
+                "examplesStripped": {
+                    "other": "{count} stripped as credential-like",
+                    "one": "{count} stripped as credential-like"
+                },
+                "severalSchemes": {
+                    "other": "Security: API declares {count} schemes ({list}); using \"{name}\". Edit auth in preview to switch.",
+                    "one": "Security: API declares {count} scheme ({list}); using \"{name}\". Edit auth in preview to switch."
+                },
+                "severalServers": {
+                    "other": "{count} server URLs declared; using first (\"{url}\"). Edit in preview to switch.",
+                    "one": "{count} server URL declared; using first (\"{url}\"). Edit in preview to switch."
+                }
             },
             "warning": "Importing will merge with existing APIs. APIs with the same ID will be overwritten.",
             "pasteJson": "Paste JSON",
@@ -4090,48 +4460,59 @@
             "baseUrlFixer": "Set absolute base URL (must start with http:// or https://)",
             "treeLabel": "Endpoints to import (uncheck to exclude)",
             "advancedJson": "Advanced: raw JSON",
-            "previewJson": "Converted JSON (edit before import if needed)",
             "previewJsonHint": "Edits here take effect on Import. Use this to fine-tune schemas or descriptions before saving.",
-            "keyUndeclared": "API \":api\": its token is read from the key \":key\" (:location), which is not declared. Under a consent layer an undeclared key is never stored or read. After the import, open the API and pick or create its key.",
+            "keyUndeclared": "API \"{api}\": its token is read from the key \"{key}\" ({location}), which is not declared. Under a consent layer an undeclared key is never stored or read. After the import, open the API and pick or create its key.",
             "keysUnchecked": "The declared storage keys could not be read, so the token sources in this import were not checked.",
-            "swagger2": "Swagger 2.0 detected — not yet supported. Convert your spec to OpenAPI 3.x first (e.g. :link).",
-            "unknownFormat": "Unrecognised format. Expected :shape, OpenAPI 3.x (:openapi), or test.api file-manager (:publicPath / :securedPath).",
-            "flagHostBothWays": "Host \":host\" is classified both ways across APIs — the last import wins.",
-            "flagFieldUnknown": "Endpoint \":endpoint\" field \":field\" → label \":label\" not in this API's collects — will be skipped.",
-            "detectedFormat": "Detected format:",
+            "swagger2": "Swagger 2.0 detected — not yet supported. Convert your spec to OpenAPI 3.x first (e.g. {link}).",
+            "unknownFormat": "Unrecognised format. Expected {shape}, OpenAPI 3.x ({openapi}), or test.api file-manager ({publicPath} / {securedPath}).",
+            "flagHostBothWays": "Host \"{host}\" is classified both ways across APIs — the last import wins.",
+            "flagFieldUnknown": "Endpoint \"{endpoint}\" field \"{field}\" → label \"{label}\" not in this API's collects — will be skipped.",
             "formatNative": "native",
             "formatUnknown": "unknown",
-            "summaryCreate": ". Will create :apis, :endpoints.",
-            "summaryReplaces": " Replaces :count existing: :list.",
-            "privacySummary": "Privacy: will create :datums data-collected, classify :hosts, map :fields.",
-            "hostCountOne": ":count host",
-            "hostCountMany": ":count hosts",
-            "fieldCountOne": ":count field",
-            "fieldCountMany": ":count fields",
+            "privacySummary": "Privacy: will create {datums}, classify {hosts}, map {fields}.",
             "noApis": "No APIs to import.",
             "noEndpointsInApi": "No endpoints in this API.",
             "authPublic": "public",
             "authRequired": "🔐 required",
             "authInherit": "inherit",
-            "authInheritFrom": "🔐 inherit (:type)",
+            "authInheritFrom": "🔐 inherit ({type})",
             "authMismatch": "Operation declares a security scheme different from the API auth — refine after import.",
             "badgeReq": "req",
             "badgeResp": "resp",
             "hasRequestSchema": "Has request schema",
             "hasResponseSchema": "Has response schema",
             "pasteFirst": "Paste JSON first (or use one of the example buttons).",
-            "invalidJson": "Invalid JSON: :message",
+            "invalidJson": "Invalid JSON: {message}",
             "converterEmpty": "Converter returned no APIs.",
             "importing": "Importing…",
             "loadExampleOurs": "Load example (our format)",
-            "pasteHint": "Paste JSON in our format or a recognised foreign format. We will detect and convert before saving."
+            "pasteHint": "Paste JSON in our format or a recognised foreign format. We will detect and convert before saving.",
+            "hostCount": {
+                "one": "{count} host",
+                "other": "{count} hosts"
+            },
+            "fieldCount": {
+                "one": "{count} field",
+                "other": "{count} fields"
+            },
+            "summaryReplaces": {
+                "other": "Replaces {count} existing: {list}.",
+                "one": "Replaces {count} existing: {list}."
+            },
+            "datumCount": {
+                "one": "{count} data-collected",
+                "other": "{count} data-collected"
+            },
+            "endpointsChecked": {
+                "one": "{checked} / {count} endpoint",
+                "other": "{checked} / {count} endpoints"
+            },
+            "summary": "Detected format: {format}. Will create {apis}, {endpoints}."
         },
         "deleteApi": "Delete API",
         "authTokenLabel": "🔑 Auth Token:",
-        "authTokenPlaceholder": "Enter your :type token",
-        "authBadgeTitle": "Auth: :type",
-        "endpointCountOne": ":count endpoint",
-        "endpointCountMany": ":count endpoints",
+        "authTokenPlaceholder": "Enter your {type} token",
+        "authBadgeTitle": "Auth: {type}",
         "columns": {
             "endpoint": "Endpoint",
             "actions": "Actions"
@@ -4139,21 +4520,19 @@
         "actions": {
             "test": "Test"
         },
-        "apiCountOne": ":count API",
-        "apiCountMany": ":count APIs",
         "toast": {
             "loadFailed": "Failed to load APIs",
-            "loadFailedDetail": "Failed to load APIs: :message",
-            "refreshIncomplete": "Refresh config incomplete. Missing: :list",
+            "loadFailedDetail": "Failed to load APIs: {message}",
+            "refreshIncomplete": "Refresh config incomplete. Missing: {list}",
             "apiSaved": "API saved successfully",
             "apiSaveFailed": "Failed to save API",
-            "apiSaveFailedDetail": "Failed to save API: :message",
-            "authKeysDropped": "This API's type changed, so what its old type held went with it: :list.",
+            "apiSaveFailedDetail": "Failed to save API: {message}",
+            "authKeysDropped": "This API's type changed, so what its old type held went with it: {list}.",
             "invalidRequestSchema": "Invalid request schema JSON",
             "invalidResponseSchema": "Invalid response schema JSON",
             "endpointSaved": "Endpoint saved successfully",
             "endpointSaveFailed": "Failed to save endpoint",
-            "endpointSaveFailedDetail": "Failed to save endpoint: :message",
+            "endpointSaveFailedDetail": "Failed to save endpoint: {message}",
             "deleted": "Deleted successfully",
             "deleteFailed": "Failed to delete",
             "endpointNotFound": "Endpoint not found",
@@ -4163,20 +4542,30 @@
             "tokenSaveFailed": "Failed to save token",
             "invalidBodyJson": "Invalid JSON in request body",
             "invalidQueryJson": "Invalid JSON in query params",
-            "previewInvalid": "Preview JSON is invalid: :message",
+            "previewInvalid": "Preview JSON is invalid: {message}",
             "previewNoApis": "Preview JSON must have a top-level \"apis\" object",
             "nothingSelected": "Nothing selected — check at least one endpoint to import.",
-            "baseUrlInvalid": "Base URL for \":api\" must start with http:// or https:// — set it in the form above the JSON preview.",
-            "importedOk": "Imported :count API(s) successfully",
-            "importedWithErrors": "Imported :count API(s) with :errors error(s)",
-            "importRefused": "\":api\" was not imported: :message",
-            "importEndpointRefused": "\":api\" was imported without its endpoint \":endpoint\": :message",
-            "importMoreRefused": ":count more were refused.",
+            "baseUrlInvalid": "Base URL for \"{api}\" must start with http:// or https:// — set it in the form above the JSON preview.",
+            "importedWithErrors": "Imported {apis} with {errors}",
+            "importRefused": "\"{api}\" was not imported: {message}",
+            "importEndpointRefused": "\"{api}\" was imported without its endpoint \"{endpoint}\": {message}",
             "exported": "APIs exported successfully",
             "templateInserted": "Template inserted",
             "jsonFormatted": "JSON formatted",
             "cannotFormat": "Cannot format: invalid JSON",
-            "privacyRefused": "The API is imported, but part of its privacy details was refused: :reasons"
+            "privacyRefused": "The API is imported, but part of its privacy details was refused: {reasons}",
+            "importedOk": {
+                "other": "Imported {count} APIs successfully",
+                "one": "Imported {count} API successfully"
+            },
+            "importMoreRefused": {
+                "other": "{count} more were refused.",
+                "one": "{count} more was refused."
+            },
+            "errorCount": {
+                "one": "{count} error",
+                "other": "{count} errors"
+            }
         },
         "refreshMissing": {
             "endpoint": "endpoint",
@@ -4187,27 +4576,37 @@
         "schema": {
             "request": "Request schema",
             "response": "Response schema",
-            "mustBeObject": ":label must be a JSON object — e.g. { \"type\": \"object\", \"properties\": {...} }.",
-            "doubleWrapped": ":label looks double-wrapped — paste only the inner schema (the value of \":wrapKey\"), not the whole envelope.",
-            "needsType": ":label must have a top-level \"type\" field (e.g. \"object\", \"array\", \"string\").",
-            "typeShape": ":label's \"type\" must be a string or array of strings.",
-            "needsProperties": ":label is type \"object\" but missing a \"properties\" object. Add \"properties\": {} even if empty.",
+            "mustBeObject": "{label} must be a JSON object — e.g. { \"type\": \"object\", \"properties\": {...} }.",
+            "doubleWrapped": "{label} looks double-wrapped — paste only the inner schema (the value of \"{wrapKey}\"), not the whole envelope.",
+            "needsType": "{label} must have a top-level \"type\" field (e.g. \"object\", \"array\", \"string\").",
+            "typeShape": "{label}'s \"type\" must be a string or array of strings.",
+            "needsProperties": "{label} is type \"object\" but missing a \"properties\" object. Add \"properties\": {} even if empty.",
             "validJson": "✓ Valid JSON",
             "invalidJson": "✗ Invalid JSON"
         },
         "confirm": {
-            "deleteApiEndpointsOne": "This will also delete :count endpoint.",
-            "deleteApiEndpointsMany": "This will also delete :count endpoints.",
-            "deleteApi": "Delete the API “:name”?",
-            "deleteEndpoint": "Delete the endpoint “:name”?",
-            "delete": "Delete"
+            "deleteApi": "Delete the API “{name}”?",
+            "deleteEndpoint": "Delete the endpoint “{name}”?",
+            "delete": "Delete",
+            "deleteApiEndpoints": {
+                "one": "This will also delete {count} endpoint.",
+                "other": "This will also delete {count} endpoints."
+            }
+        },
+        "apiCount": {
+            "one": "{count} API",
+            "other": "{count} APIs"
+        },
+        "endpointCount": {
+            "one": "{count} endpoint",
+            "other": "{count} endpoints"
         }
     },
     "aiConnections": {
         "title": "AI Connections",
         "subtitleLead": "Cloud (BYOK) and local AI endpoints, named and managed in your browser.",
         "subtitleDirect": "browser → provider directly",
-        "subtitleTail": "Calls go :direct — keys never touch the server.",
+        "subtitleTail": "Calls go {direct} — keys never touch the server.",
         "connections": "Connections",
         "connectionsHint": "Click the dot to test in place. The starred connection is the default.",
         "addConnection": "Add connection",
@@ -4216,7 +4615,7 @@
         "persistHint": "Off = cleared on tab close (sessionStorage). Local connections always persist (URLs aren't sensitive).",
         "runWithoutStoppingLabel": "Run without stopping",
         "autoExecuteCaution": "Use with caution.",
-        "runWithoutStoppingHint": ":caution An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the Workflows panel (Preview → Workflows). What a part deletes or changes is still confirmed first.",
+        "runWithoutStoppingHint": "{caution} An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the Workflows panel (Preview → Workflows). What a part deletes or changes is still confirmed first.",
         "modalTitle": "Add a connection",
         "empty": "No AI connection yet.",
         "emptyAdd": "+ Add your first connection",
@@ -4225,30 +4624,28 @@
         "streamingOff": "streaming off",
         "typeLocal": "Local",
         "typeCloud": "Cloud",
-        "modelCountOne": ":count model",
-        "modelCountMany": ":count models",
         "setDefaultTitle": "Set as default",
         "testTitle": "Click to test now",
         "setDefault": "Set default",
         "delete": "Delete",
         "neverTested": "Never tested",
-        "statusOk": "OK (:ago)",
+        "statusOk": "OK ({ago})",
         "statusFailed": "Failed",
         "justNow": "just now",
-        "secondsAgo": ":count s ago",
-        "minutesAgo": ":count m ago",
-        "hoursAgo": ":count h ago",
-        "confirmDelete": "Delete connection \":name\"?",
+        "secondsAgo": "{count} s ago",
+        "minutesAgo": "{count} m ago",
+        "hoursAgo": "{count} h ago",
+        "confirmDelete": "Delete connection \"{name}\"?",
         "kindQuestion": "What kind of AI do you want to connect?",
         "kindsCloud": "Cloud · BYOK",
         "kindsLocal": "Local · runs on your machine",
         "kindCustom": "Custom",
         "kindCustomSub": "OpenAI-compatible endpoint",
         "nameLabel": "Name",
-        "namePlaceholder": "My :provider",
+        "namePlaceholder": "My {provider}",
         "nameFallback": "connection",
         "baseUrlLabel": "Base URL",
-        "baseUrlHint": "OpenAI-compatible chat-completions root (without :path).",
+        "baseUrlHint": "OpenAI-compatible chat-completions root (without {path}).",
         "apiKeyLabel": "API key",
         "apiKeyLabelOptional": "API key (optional)",
         "keyPlaceholderLocal": "(leave empty if not required)",
@@ -4257,8 +4654,8 @@
         "getKeyPrefix": "Get a key →",
         "streamingLabel": "Streaming (recommended)",
         "maxOutputTokensLabel": "Output limit (tokens)",
-        "maxOutputTokensHint": "The most the AI may write in one answer (default :default). A workflow that builds a whole site needs a long answer; a model refuses a limit above its own.",
-        "maxOutputTokensInvalid": "A whole number from :min to :max.",
+        "maxOutputTokensHint": "The most the AI may write in one answer (default {default}). A workflow that builds a whole site needs a long answer; a model refuses a limit above its own.",
+        "maxOutputTokensInvalid": "A whole number from {min} to {max}.",
         "probeIdleLocal": "Enter a base URL to test the connection.",
         "probeIdleCloud": "Enter an API key to test the connection.",
         "back": "← Back",
@@ -4269,20 +4666,35 @@
         "selectAll": "all",
         "selectNone": "none",
         "defaultModel": "Default model:",
-        "corsSummary": "⚠️ :summary — show fix",
+        "corsSummary": "⚠️ {summary} — show fix",
         "editConnection": "Edit connection",
         "probeLocal": "Probing endpoint…",
         "probeCloud": "Testing key…",
-        "probeOkOne": "✅ Connected. :count model found.",
-        "probeOkMany": "✅ Connected. :count models found.",
-        "probeErr": "❌ :message",
-        "probeErrCategory": "❌ :message [:category]",
+        "probeErr": "❌ {message}",
+        "probeErrCategory": "❌ {message} [{category}]",
         "failed": "Failed",
-        "editNamed": "Edit “:name”",
-        "deleteNamed": "Delete “:name”"
+        "editNamed": "Edit “{name}”",
+        "deleteNamed": "Delete “{name}”",
+        "modelCount": {
+            "one": "{count} model",
+            "other": "{count} models"
+        },
+        "probeOk": {
+            "one": "✅ Connected. {count} model found.",
+            "other": "✅ Connected. {count} models found."
+        },
+        "call": {
+            "aborted": "Aborted",
+            "failed": "Failed",
+            "networkError": "Network error",
+            "noEndpoint": "No endpoint configured for {type}",
+            "requestAborted": "Request aborted",
+            "streamFailed": "Stream read failed",
+            "unknownProvider": "Unknown providerType: {type}"
+        }
     },
     "media": {
-        "uploadingProgress": "Uploading :current/:total...",
+        "uploadingProgress": "Uploading {current}/{total}...",
         "infoCategory": "Category:",
         "infoSize": "Size:",
         "infoModified": "Modified:",
@@ -4294,23 +4706,18 @@
         "title": "Media",
         "subtitle": "Upload, browse, and manage your project files",
         "uploadTitle": "Upload",
-        "dropHere": "Drop files here or :browse",
+        "dropHere": "Drop files here or {browse}",
         "browseLink": "click to browse",
         "loadingExtensions": "Loading allowed extensions...",
         "orPasteUrls": "and / or paste URLs",
-        "maxSize": "Max size — :sizes",
+        "maxSize": "Max size — {sizes}",
         "dataUriUnsupported": "Data URIs not supported — save the file locally first, then upload it",
-        "unsupportedType": "Unsupported file type: :name",
-        "overLimit": ":name is :size — the limit for :category on this server is :max.",
+        "unsupportedType": "Unsupported file type: {name}",
+        "overLimit": "{name} is {size} — the limit for {category} on this server is {max}.",
         "descriptionPlaceholder": "Description",
-        "queueReadyOne": ":count file ready",
-        "queueReadyMany": ":count files ready",
         "uploading": "Uploading...",
-        "uploadItemFailed": "✗ :message",
-        "uploadedOne": ":count file uploaded",
-        "uploadedMany": ":count files uploaded",
-        "allUploadsFailed": "All :count uploads failed",
-        "uploadedPartial": ":ok uploaded, :failed failed",
+        "uploadItemFailed": "✗ {message}",
+        "uploadedPartial": "{ok}, {failed}",
         "uploadAll": "Upload All",
         "tabAll": "All",
         "tabImages": "Images",
@@ -4318,63 +4725,100 @@
         "tabAudio": "Audio",
         "tabVideos": "Videos",
         "searchPlaceholder": "Search files...",
-        "loadingAssets": "Loading assets...",
-        "noMatch": "No assets matching ':query'.",
-        "noneInCategory": "No :category found.",
-        "noneYet": "No assets yet. Drop files above to get started.",
+        "loadingFiles": "Loading files...",
+        "noMatch": "No files matching '{query}'.",
+        "noneInCategory": "No {category} found.",
+        "noneYet": "No files yet. Drop some above to get started.",
         "faviconCurrent": "This is the site favicon — click to clear it",
         "faviconUse": "Use as the site favicon",
-        "faviconUseAria": "Use :name as the site favicon",
+        "faviconUseAria": "Use {name} as the site favicon",
         "play": "Play",
         "unstar": "Unstar (used in AI prompts)",
         "star": "Star for AI prompts",
-        "renamed": "Renamed to :name ✓",
+        "renamed": "Renamed to {name} ✓",
         "renameFailed": "Rename failed",
-        "renameFailedDetail": "Rename failed: :message",
-        "editAsset": "Edit Asset",
-        "editTitle": "Edit: :name",
+        "renameFailedDetail": "Rename failed: {message}",
+        "editTitle": "Edit: {name}",
         "altLabel": "Alt Text",
         "altLongPlaceholder": "Image alt text (accessibility)",
         "altLanguage": "Language",
         "altHint": "What the picture shows, read by screen readers and search engines. One per language.",
         "altHintOne": "What the picture shows, read by screen readers and search engines.",
-        "altMissing": "No alt text: :langs",
+        "altMissing": "No alt text: {langs}",
         "altMissingOne": "No alt text",
-        "altRefused": "The alt text in :lang was not saved: :message",
-        "altNotTakenBack": "What was already written could not be taken back: the word files keep it under :key (:langs).",
-        "altUnreadable": "The alt texts could not be read, so they cannot be changed now: :message",
-        "view": "View :name",
+        "altRefused": "The alt text in {lang} was not saved: {message}",
+        "altNotTakenBack": "What was already written could not be taken back: the word files keep it under {key} ({langs}).",
+        "altUnreadable": "The alt texts could not be read, so they cannot be changed now: {message}",
+        "view": "View {name}",
         "descriptionLabel": "Description",
         "descriptionLongPlaceholder": "File description",
         "saveChanges": "Save Changes",
         "noChanges": "No changes.",
-        "updated": ":name updated ✓",
-        "confirmDeleteOne": "Delete :name?",
-        "deleted": ":name deleted ✓",
+        "updated": "{name} updated ✓",
+        "confirmDeleteOne": "Delete {name}?",
+        "deleted": "{name} deleted ✓",
         "deleteFailed": "Delete failed",
-        "deleteFailedDetail": "Delete failed: :message",
-        "starLimit": "Maximum 15 starred assets. Unstar one first.",
+        "deleteFailedDetail": "Delete failed: {message}",
+        "starLimit": "Maximum 15 starred files. Unstar one first.",
         "starFailed": "Star toggle failed",
-        "starFailedDetail": "Star toggle failed: :message",
+        "starFailedDetail": "Star toggle failed: {message}",
         "faviconCleared": "Favicon cleared",
-        "faviconSet": "Favicon set to :name",
+        "faviconSet": "Favicon set to {name}",
         "faviconFailed": "Could not set the favicon",
-        "faviconFailedDetail": "Could not set the favicon: :message",
-        "selectedCount": ":count selected",
+        "faviconFailedDetail": "Could not set the favicon: {message}",
         "noneSelected": "None selected",
         "selectAll": "Select All",
         "deselectAll": "Deselect All",
         "deleteSelected": "Delete Selected",
-        "deletedManyOne": ":count file deleted ✓",
-        "deletedManyMany": ":count files deleted ✓",
-        "deletedPartial": ":deleted of :total files deleted. Not deleted: :names",
-        "rename": "Rename “:name”",
-        "editDetails": "Edit the details of “:name”",
-        "deleteNamed": "Delete “:name”",
-        "removeNamed": "Remove “:name”",
+        "rename": "Rename “{name}”",
+        "editDetails": "Edit the details of “{name}”",
+        "deleteNamed": "Delete “{name}”",
+        "removeNamed": "Remove “{name}”",
         "cannotUndo": "This cannot be undone.",
-        "deleteManyTitleOne": "Delete :count file?",
-        "deleteManyTitleMany": "Delete :count files?"
+        "queueReady": {
+            "one": "{count} file ready",
+            "other": "{count} files ready"
+        },
+        "uploaded": {
+            "one": "{count} file uploaded",
+            "other": "{count} files uploaded"
+        },
+        "deleteManyTitle": {
+            "one": "Delete {count} file?",
+            "other": "Delete {count} files?"
+        },
+        "deletedMany": {
+            "one": "{count} file deleted ✓",
+            "other": "{count} files deleted ✓"
+        },
+        "allUploadsFailed": {
+            "other": "All {count} uploads failed",
+            "one": "The upload failed"
+        },
+        "deletedPartial": {
+            "other": "{deleted} of {count} files deleted. Not deleted: {names}",
+            "one": "{deleted} of {count} file deleted. Not deleted: {names}"
+        },
+        "selectedCount": {
+            "other": "{count} selected",
+            "one": "{count} selected"
+        },
+        "editFile": "Edit File",
+        "category": {
+            "audio": "audio",
+            "font": "font",
+            "images": "images",
+            "videos": "videos"
+        },
+        "failedCount": {
+            "one": "{count} failed",
+            "other": "{count} failed"
+        },
+        "maxSizeOf": "{category} {size}",
+        "uploadedCount": {
+            "one": "{count} uploaded",
+            "other": "{count} uploaded"
+        }
     },
     "complexWizard": {
         "rowEditor": {
@@ -4788,5 +5232,148 @@
             "storesLoading": "Loading state stores…",
             "valueShape": "Value shape:"
         }
+    },
+    "answers": {
+        "unauthorized": "Unauthorized",
+        "common": {
+            "authRequired": "Authentication required",
+            "requiredField": "Required field",
+            "projectRequired": "project is required",
+            "invalidProject": "Invalid project identifier",
+            "notMember": "You are not a member of this project",
+            "nameRequired": "name is required"
+        },
+        "account": {
+            "passwordFieldsRequired": "current_password and new_password are required",
+            "externallyManaged": "This account has no local password (externally managed)",
+            "passwordTooShort": "New password is too short",
+            "minimumLength": "Minimum length: {length}",
+            "tooManyAttempts": "Too many failed attempts — try again later",
+            "currentPasswordWrong": "Current password is incorrect",
+            "passwordNotSaved": "Could not persist the new password",
+            "sessionsNotEnded": "Password changed, but your other sessions could not be ended — sign out everywhere to be sure",
+            "passwordChanged": "Password changed",
+            "deleteFieldsRequired": "current_password and username are required",
+            "deletionNotConfirmed": "Account deletion must be confirmed",
+            "setConfirm": "Set confirm=true to proceed",
+            "deletionWarning": "This permanently deletes your account, ends every session, and removes you from every project you belong to. It cannot be undone.",
+            "credentialsWrong": "The current password or the username is incorrect",
+            "stillOwner": {
+                "one": "You still own {count} project. Transfer ownership or delete it first, then delete your account.",
+                "other": "You still own {count} projects. Transfer ownership or delete them first, then delete your account."
+            },
+            "stillOwnerHint": "Use transferOwnership to hand a project to another member, or deleteProject to destroy it.",
+            "detachFailed": "Could not detach your membership from a project — your account was NOT deleted. Nothing was changed.",
+            "recordNotDeleted": "Could not delete the account record. Your project memberships were already removed — retry, or contact the operator.",
+            "deleted": "Your account has been permanently deleted",
+            "spaceUsageRetrieved": "Owner space usage retrieved successfully",
+            "permissionsRetrieved": "Permissions retrieved successfully"
+        },
+        "membership": {
+            "invitationsListed": "Invitations listed successfully",
+            "noInvitation": "No pending invitation for you on this project",
+            "invitationVoid": "This invitation is no longer valid (the inviter no longer holds the authority that offered it)",
+            "alreadyMember": "You are already a member of this project",
+            "invitationAccepted": "Invitation accepted — welcome aboard",
+            "invitationDeclined": "Invitation declined",
+            "ownerCannotLeave": "The owner cannot leave the project — transfer ownership first (or delete the project)",
+            "leftProject": "You left the project",
+            "noticeKinds": "notice must be one of: {kinds}",
+            "unknownNotice": "Unknown notice",
+            "noNotice": "No notice for this project",
+            "notDismissable": "Only a notice can be dismissed — end a membership by leaving the project, and a pending invitation by declining it",
+            "dismissalNotSaved": "Failed to persist the dismissal",
+            "noticeDismissed": "Notice dismissed",
+            "noteNotUtf8": "The note is not valid UTF-8 text",
+            "mustBeUtf8": "Must be valid UTF-8 text",
+            "requestFieldsRequired": "project and note are required — a join request always carries its reason",
+            "noticeWaiting": "A notice for this project is still in your inbox — dismiss it on your memberships page before requesting again",
+            "joinUnavailable": "This project does not accept join requests",
+            "invitationWaiting": "You already have a pending invitation for this project — accept or decline it instead",
+            "requestWaiting": "You already have a pending join request for this project — withdraw it to re-ask",
+            "requestSent": "Join request sent — a project admin or the owner will answer it",
+            "noRequest": "No join request of yours on this project",
+            "requestWithdrawn": "Join request withdrawn",
+            "proposalsListed": "Proposals listed successfully",
+            "rosterUnsound": "The project membership file is missing or unsound; refusing to operate on it",
+            "valueUnencodable": "A submitted value could not be stored; check the text encoding",
+            "changeNotSaved": "Failed to persist the membership change"
+        },
+        "contacts": {
+            "listed": "Contacts listed successfully",
+            "userIdRequired": "user_id is required",
+            "userIdMalformed": "user_id is not a user identifier",
+            "malformedIdentifier": "Malformed identifier",
+            "notOwnContact": "You are not one of your own contacts",
+            "refersToCaller": "Refers to the caller",
+            "listFull": "Your contact list is full",
+            "saveFailed": "Failed to save the contact",
+            "saved": "Contact saved",
+            "updateFailed": "Failed to update your contacts",
+            "removed": "Contact removed"
+        },
+        "directory": {
+            "lookupDone": "Lookup complete",
+            "noRoles": "No roles configured",
+            "rolesRetrieved": "Roles retrieved successfully"
+        },
+        "panelState": {
+            "userNotFound": "User record not found",
+            "selectionNotSaved": "Failed to persist selected project",
+            "nowEditing": "Now editing project '{project}'",
+            "starredNotBoolean": "starred must be true or false",
+            "mustBeBoolean": "Must be true or false",
+            "starNotSaved": "Failed to persist the star",
+            "starred": "Project '{project}' starred",
+            "unstarred": "Project '{project}' unstarred",
+            "modeInvalid": "mode must be simple or advanced",
+            "mustBeMode": "Must be simple or advanced",
+            "modeNotSaved": "Failed to persist the mode",
+            "modeSet": "Panel mode set to '{mode}'"
+        },
+        "api": {
+            "projectScoped": "This action is project-scoped. Target a project with /admin/api/p/<projectId>/{action}",
+            "forbidden": "Forbidden",
+            "componentNameRequired": "Component name required",
+            "componentNotFound": "Component not found",
+            "routeAndLanguageRequired": "Route and language parameters required",
+            "typeRequired": "Type parameter required",
+            "nameRequiredFor": "Name parameter required for {type}",
+            "specIdMissing": "Missing spec ID",
+            "specNotFound": "Spec not found: {id}",
+            "methodNotAllowed": "Method not allowed",
+            "workflowIdMissing": "Missing workflowId",
+            "phaseNotNumber": "phase must be a number",
+            "answerNotList": "answer must be a list of commands",
+            "keyNotString": "key must be a string",
+            "workflowNotFound": "Workflow not found",
+            "planChanged": "The run's plan changed",
+            "noSuchPhase": "No such phase",
+            "invalidSpec": "Invalid spec",
+            "workflowUnresolved": "The workflow could not be resolved",
+            "unknownAction": "Unknown action: {action}",
+            "commandNotFound": "Command not found: {command}",
+            "commandFileNotFound": "Command file not found: {command}",
+            "commandFunctionNotFound": "Command function not found: {function}"
+        },
+        "self": {
+            "unknownRoute": "Unknown account route",
+            "methodOnly": "This route only accepts {method}"
+        },
+        "state": {
+            "postOnly": "This endpoint only accepts POST",
+            "unknownKey": "Unknown panel state key"
+        },
+        "update": {
+            "versionUnreadable": "Could not read VERSION file. Make sure a VERSION file exists at the installation root."
+        }
+    },
+    "roles": {
+        "viewer": "viewer",
+        "editor": "editor",
+        "designer": "designer",
+        "developer": "developer",
+        "admin": "admin",
+        "owner": "owner"
     }
 }

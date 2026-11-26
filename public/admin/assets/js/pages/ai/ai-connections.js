@@ -8,36 +8,14 @@
  * Two-step wizard:
  *   1. Pick a kind (cloud provider, Ollama, LM Studio, LiteLLM, vLLM, custom).
  *   2. Fill in name + key/base URL — auto-probe on change to surface models.
+ *
+ * Its words: ai-connections.php hands the `aiConnections` section; every word is read by its key's whole path
+ * through QSPanelWords.
  */
 (function () {
     'use strict';
 
     const STORAGE = window.QuickSiteStorageKeys;
-
-    /**
-     * Resolve one admin string by its FULL dot path, from the sub-trees
-     * ai-connections.php emits. A path that resolves to nothing returns THE
-     * PATH ITSELF, so an unset string is visible on screen.
-     *
-     * @param {string} path      e.g. 'aiConnections.empty'
-     * @param {Object} [params]  :name markers, as PHP's t() does
-     * @returns {string}
-     */
-    function t(path, params) {
-        let node = window.QS_AI_CONNECTIONS_I18N || {};
-        for (const part of String(path).split('.')) {
-            if (node === null || typeof node !== 'object' || !(part in node)) return path;
-            node = node[part];
-        }
-        if (typeof node !== 'string') return path;
-        let value = node;
-        if (params) {
-            for (const name of Object.keys(params)) {
-                value = value.split(':' + name).join(String(params[name]));
-            }
-        }
-        return value;
-    }
 
     /**
      * A provider logo, falling back to an emoji when the SVG is missing.
@@ -95,13 +73,13 @@
                 type: 'button',
                 class: 'admin-btn admin-btn--primary',
                 id: 'qsac-empty-add',
-                text: t('aiConnections.emptyAdd'),
+                text: QSPanelWords.t('aiConnections.emptyAdd'),
                 onclick: function () { openWizard(); }
             });
             root.appendChild(QSDom.el('div', {
                 style: 'padding: var(--space-lg) 0; text-align:center;'
             }, [
-                QSDom.el('p', { text: t('aiConnections.empty') }),
+                QSDom.el('p', { text: QSPanelWords.t('aiConnections.empty') }),
                 addBtn
             ]));
             return;
@@ -126,10 +104,10 @@
             ? QSDom.el('span', { class: 'qsac-key-hint', text: maskKey(c.key) })
             : QSDom.el('span', {
                 class: 'qsac-key-hint qsac-key-hint--none',
-                text: t('aiConnections.noKey')
+                text: QSPanelWords.t('aiConnections.noKey')
             });
         const modelCount = (c.enabledModels || c.models || []).length;
-        const streamingTag = t(c.streaming
+        const streamingTag = QSPanelWords.t(c.streaming
             ? 'aiConnections.streamingOn' : 'aiConnections.streamingOff');
 
         // Pick a logo: cloud → providerType id; local → preset id (if known)
@@ -149,38 +127,36 @@
                 QSDom.el('span', {
                     class: 'qsac-star',
                     'data-qsac-action': 'default',
-                    title: t('aiConnections.setDefaultTitle'),
+                    title: QSPanelWords.t('aiConnections.setDefaultTitle'),
                     text: star
                 }),
                 QSDom.el('span', { class: 'qsac-name', text: c.name }),
                 QSDom.el('span', {
                     class: 'qsac-status',
                     'data-qsac-action': 'test',
-                    title: t('aiConnections.testTitle')
+                    title: QSPanelWords.t('aiConnections.testTitle')
                 }, [statusDot(status)])
             ]),
             QSDom.el('div', { class: 'qsac-card__meta' }, [
                 QSDom.el('span', {
                     class: 'qsac-type qsac-type--' + c.type,
-                    text: t(c.type === 'local' ? 'aiConnections.typeLocal' : 'aiConnections.typeCloud')
+                    text: QSPanelWords.t(c.type === 'local' ? 'aiConnections.typeLocal' : 'aiConnections.typeCloud')
                 }),
                 QSDom.el('span', { text: ' · ' + label }),
                 QSDom.el('span', null, [' · ', keyHint]),
                 QSDom.el('span', {
-                    text: ' · ' + t(modelCount === 1
-                        ? 'aiConnections.modelCountOne'
-                        : 'aiConnections.modelCountMany', { count: modelCount })
+                    text: ' · ' + QSPanelWords.count('aiConnections.modelCount', modelCount)
                 }),
                 QSDom.el('span', { text: ' · ' + streamingTag })
             ]),
             QSDom.el('div', { class: 'qsac-card__actions' }, [
                 QSDom.el('button', {
-                    type: 'button', class: 'admin-btn', 'data-qsac-action': 'default', text: t('aiConnections.setDefault')
+                    type: 'button', class: 'admin-btn', 'data-qsac-action': 'default', text: QSPanelWords.t('aiConnections.setDefault')
                 }),
-                QSControls.edit(t('aiConnections.editNamed', { name: c.name }), null, {
+                QSControls.edit(QSPanelWords.t('aiConnections.editNamed', { name: c.name }), null, {
                     focusKey: 'edit:' + c.id, attrs: { 'data-qsac-action': 'edit' }
                 }),
-                QSControls.bin(t('aiConnections.deleteNamed', { name: c.name }), null, {
+                QSControls.bin(QSPanelWords.t('aiConnections.deleteNamed', { name: c.name }), null, {
                     focusKey: 'delete:' + c.id, attrs: { 'data-qsac-action': 'delete' }
                 })
             ])
@@ -192,7 +168,7 @@
         if (!status) {
             return QSDom.el('span', {
                 class: 'qsac-dot qsac-dot--unknown',
-                title: t('aiConnections.neverTested'),
+                title: QSPanelWords.t('aiConnections.neverTested'),
                 text: '◌'
             });
         }
@@ -201,22 +177,22 @@
             const cls = ageMs < 5 * 60 * 1000 ? 'qsac-dot--ok' : 'qsac-dot--stale';
             return QSDom.el('span', {
                 class: 'qsac-dot ' + cls,
-                title: t('aiConnections.statusOk', { ago: formatAgo(ageMs) }),
+                title: QSPanelWords.t('aiConnections.statusOk', { ago: formatAgo(ageMs) }),
                 text: '●'
             });
         }
         return QSDom.el('span', {
             class: 'qsac-dot qsac-dot--err',
-            title: status.message || t('aiConnections.statusFailed'),
+            title: status.message || QSPanelWords.t('aiConnections.statusFailed'),
             text: '●'
         });
     }
 
     function formatAgo(ms) {
-        if (ms < 1000) return t('aiConnections.justNow');
-        if (ms < 60_000) return t('aiConnections.secondsAgo', { count: Math.round(ms / 1000) });
-        if (ms < 3_600_000) return t('aiConnections.minutesAgo', { count: Math.round(ms / 60_000) });
-        return t('aiConnections.hoursAgo', { count: Math.round(ms / 3_600_000) });
+        if (ms < 1000) return QSPanelWords.t('aiConnections.justNow');
+        if (ms < 60_000) return QSPanelWords.t('aiConnections.secondsAgo', { count: Math.round(ms / 1000) });
+        if (ms < 3_600_000) return QSPanelWords.t('aiConnections.minutesAgo', { count: Math.round(ms / 60_000) });
+        return QSPanelWords.t('aiConnections.hoursAgo', { count: Math.round(ms / 3_600_000) });
     }
 
     function maskKey(key) {
@@ -240,9 +216,9 @@
         } else if (action === 'delete') {
             // The list is drawn again before the question closes, so the focus goes to the next card's bin.
             await QuickSiteUtils.confirm('', {
-                title: t('aiConnections.confirmDelete', { name: conn.name }),
+                title: QSPanelWords.t('aiConnections.confirmDelete', { name: conn.name }),
                 type: 'danger',
-                confirmText: t('aiConnections.delete'),
+                confirmText: QSPanelWords.t('aiConnections.delete'),
                 action: () => {
                     window.QSConnectionsStore.removeConnection(id);
                     renderList();
@@ -318,7 +294,7 @@
         lastProbe = null;
         const modal = document.getElementById('qsac-modal');
         if (modal) modal.style.display = 'flex';
-        document.getElementById('qsac-modal-title').textContent = t(existing
+        document.getElementById('qsac-modal-title').textContent = QSPanelWords.t(existing
             ? 'aiConnections.editConnection'
             : 'aiConnections.modalTitle');
         if (existing) renderWizardForm();
@@ -356,29 +332,29 @@
         cloudKinds.forEach((k) => cloudRow.appendChild(kindTile({
             kind: 'cloud', data: { provider: k.id },
             logoId: k.id, name: k.name,
-            sub: t('aiConnections.kindsCloud'), emojiFallback: k.icon
+            sub: QSPanelWords.t('aiConnections.kindsCloud'), emojiFallback: k.icon
         })));
 
         const localRow = QSDom.el('div', { class: 'qsac-kinds' });
         presets.forEach((p) => localRow.appendChild(kindTile({
             kind: 'local', data: { preset: p.id },
             logoId: p.id, name: p.name,
-            sub: t('aiConnections.typeLocal'), emojiFallback: p.icon
+            sub: QSPanelWords.t('aiConnections.typeLocal'), emojiFallback: p.icon
         })));
         localRow.appendChild(kindTile({
             kind: 'custom', data: null,
-            logoId: 'custom', name: t('aiConnections.kindCustom'),
-            sub: t('aiConnections.kindCustomSub'), emojiFallback: '⚙️'
+            logoId: 'custom', name: QSPanelWords.t('aiConnections.kindCustom'),
+            sub: QSPanelWords.t('aiConnections.kindCustomSub'), emojiFallback: '⚙️'
         }));
 
         QSDom.clear(body);
-        body.appendChild(QSDom.el('p', { text: t('aiConnections.kindQuestion') }));
+        body.appendChild(QSDom.el('p', { text: QSPanelWords.t('aiConnections.kindQuestion') }));
         body.appendChild(QSDom.el('h4', {
-            class: 'qsac-kinds-heading', text: t('aiConnections.kindsCloud')
+            class: 'qsac-kinds-heading', text: QSPanelWords.t('aiConnections.kindsCloud')
         }));
         body.appendChild(cloudRow);
         body.appendChild(QSDom.el('h4', {
-            class: 'qsac-kinds-heading', text: t('aiConnections.kindsLocal')
+            class: 'qsac-kinds-heading', text: QSPanelWords.t('aiConnections.kindsLocal')
         }));
         body.appendChild(localRow);
 
@@ -387,7 +363,7 @@
             type: 'button',
             class: 'admin-btn',
             'data-qsac-close': '',
-            text: t('common.cancel'),
+            text: QSPanelWords.t('common.cancel'),
             onclick: closeWizard
         }));
         body.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', onKindPick));
@@ -456,7 +432,7 @@
             current = {
                 type: 'local',
                 providerType: 'openai-compatible',
-                name: t('aiConnections.kindCustom'),
+                name: QSPanelWords.t('aiConnections.kindCustom'),
                 baseUrl: 'http://localhost:8000/v1',
                 streaming: true
             };
@@ -475,13 +451,13 @@
 
         body.appendChild(QSDom.el('div', { class: 'admin-form-group' }, [
             QSDom.el('label', {
-                class: 'admin-label', for: 'qsac-name', text: t('aiConnections.nameLabel')
+                class: 'admin-label', for: 'qsac-name', text: QSPanelWords.t('aiConnections.nameLabel')
             }),
             QSDom.el('input', {
                 type: 'text', id: 'qsac-name', class: 'admin-input',
                 value: current.name || '',
-                placeholder: t('aiConnections.namePlaceholder', {
-                    provider: cat ? cat.name : t('aiConnections.nameFallback')
+                placeholder: QSPanelWords.t('aiConnections.namePlaceholder', {
+                    provider: cat ? cat.name : QSPanelWords.t('aiConnections.nameFallback')
                 })
             })
         ]));
@@ -490,7 +466,7 @@
             body.appendChild(QSDom.el('div', { class: 'admin-form-group' }, [
                 QSDom.el('label', {
                     class: 'admin-label', for: 'qsac-baseurl',
-                    text: t('aiConnections.baseUrlLabel')
+                    text: QSPanelWords.t('aiConnections.baseUrlLabel')
                 }),
                 QSDom.el('input', {
                     type: 'text', id: 'qsac-baseurl',
@@ -498,14 +474,17 @@
                     value: current.baseUrl || '',
                     placeholder: 'http://localhost:11434/v1'
                 }),
-                _renderPathHint('aiConnections.baseUrlHint', '/chat/completions')
+                // One sentence, its {path} the path drawn as code.
+                QSDom.el('p', { class: 'admin-hint' }, QSPanelWords.parts('aiConnections.baseUrlHint', {
+                    path: QSDom.el('code', { text: '/chat/completions' })
+                }))
             ]));
         }
 
         const keyGroup = QSDom.el('div', { class: 'admin-form-group' }, [
             QSDom.el('label', {
                 class: 'admin-label', for: 'qsac-key',
-                text: t(isLocal ? 'aiConnections.apiKeyLabelOptional' : 'aiConnections.apiKeyLabel')
+                text: QSPanelWords.t(isLocal ? 'aiConnections.apiKeyLabelOptional' : 'aiConnections.apiKeyLabel')
             }),
             QSDom.el('div', {}, [
                 QSDom.el('input', {
@@ -513,19 +492,19 @@
                     class: 'admin-input',
                     autocomplete: 'off', spellcheck: 'false',
                     value: current.key || '',
-                    placeholder: t(isLocal
+                    placeholder: QSPanelWords.t(isLocal
                         ? 'aiConnections.keyPlaceholderLocal'
                         : 'aiConnections.keyPlaceholderCloud')
                 }),
                 QSDom.el('button', {
                     type: 'button', class: 'admin-btn',
-                    id: 'qsac-key-toggle', title: t('aiConnections.keyToggleTitle')
+                    id: 'qsac-key-toggle', title: QSPanelWords.t('aiConnections.keyToggleTitle')
                 }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eye, 18)])
             ])
         ]);
         if (keyUrl) {
             keyGroup.appendChild(QSDom.el('p', { class: 'admin-hint' }, [
-                t('aiConnections.getKeyPrefix') + ' ',
+                QSPanelWords.t('aiConnections.getKeyPrefix') + ' ',
                 QSDom.el('a', {
                     href: keyUrl, target: '_blank', rel: 'noopener', text: keyUrl
                 })
@@ -539,7 +518,7 @@
             QSDom.el('label', { class: 'admin-checkbox' }, [
                 streamingCb,
                 QSDom.el('span', {
-                    text: t('aiConnections.streamingLabel')
+                    text: QSPanelWords.t('aiConnections.streamingLabel')
                 })
             ])
         ]));
@@ -552,7 +531,7 @@
         }, [
             QSDom.el('div', {
                 class: 'qsac-probe__msg',
-                text: t(isLocal ? 'aiConnections.probeIdleLocal' : 'aiConnections.probeIdleCloud')
+                text: QSPanelWords.t(isLocal ? 'aiConnections.probeIdleLocal' : 'aiConnections.probeIdleCloud')
             })
         ]));
 
@@ -564,13 +543,13 @@
         QSDom.clear(footer);
         footer.appendChild(QSDom.el('button', {
             type: 'button', class: 'admin-btn', id: 'qsac-back',
-            text: current._editing ? t('common.cancel') : t('aiConnections.back')
+            text: current._editing ? QSPanelWords.t('common.cancel') : QSPanelWords.t('aiConnections.back')
         }));
         const saveBtn = QSDom.el('button', {
             type: 'button', class: 'admin-btn admin-btn--primary', id: 'qsac-save',
             text: current._editing
-                ? t('aiConnections.saveChanges')
-                : t('aiConnections.addConnectionBtn')
+                ? QSPanelWords.t('aiConnections.saveChanges')
+                : QSPanelWords.t('aiConnections.addConnectionBtn')
         });
         saveBtn.disabled = true;
         footer.appendChild(saveBtn);
@@ -618,24 +597,9 @@
         const text = ins[os] || ins.all || ins.linux || '';
         return QSDom.el('details', { class: 'qsac-cors-hint' }, [
             QSDom.el('summary', {
-                text: t('aiConnections.corsSummary', { summary: preset.corsHint.summary })
+                text: QSPanelWords.t('aiConnections.corsSummary', { summary: preset.corsHint.summary })
             }),
             QSDom.el('pre', { class: 'qsac-cors-cmd', text: text })
-        ]);
-    }
-
-    /**
-     * A hint sentence whose :path marker becomes a <code> element — the
-     * whole-sentence-key convention, so a translator gets one string rather
-     * than three fragments.
-     * @returns {HTMLElement} one <p class="admin-hint">
-     */
-    function _renderPathHint(key, code) {
-        const parts = t(key).split(':path');
-        return QSDom.el('p', { class: 'admin-hint' }, [
-            parts[0],
-            QSDom.el('code', { text: code }),
-            parts.slice(1).join(':path')
         ]);
     }
 
@@ -656,7 +620,7 @@
         const range = cat.MAX_OUTPUT_TOKENS_RANGE;
         return QSDom.el('div', { class: 'admin-form-group' }, [
             QSDom.el('label', {
-                class: 'admin-label', for: 'qsac-max-output', text: t('aiConnections.maxOutputTokensLabel')
+                class: 'admin-label', for: 'qsac-max-output', text: QSPanelWords.t('aiConnections.maxOutputTokensLabel')
             }),
             QSDom.el('input', {
                 type: 'number', id: 'qsac-max-output', class: 'admin-input',
@@ -671,8 +635,8 @@
     function _outputLimitHint(valid) {
         const cat = window.QSProviderCatalog;
         return valid
-            ? t('aiConnections.maxOutputTokensHint', { default: cat.DEFAULT_MAX_OUTPUT_TOKENS })
-            : t('aiConnections.maxOutputTokensInvalid', cat.MAX_OUTPUT_TOKENS_RANGE);
+            ? QSPanelWords.t('aiConnections.maxOutputTokensHint', { default: cat.DEFAULT_MAX_OUTPUT_TOKENS })
+            : QSPanelWords.t('aiConnections.maxOutputTokensInvalid', cat.MAX_OUTPUT_TOKENS_RANGE);
     }
 
     /** Whether the limit typed may be saved: none typed (the shown value stays), or a whole number in range. */
@@ -709,7 +673,7 @@
         if (probeAbort) probeAbort.abort();
         probeAbort = new AbortController();
 
-        setProbeUI('busy', t(current.type === 'local'
+        setProbeUI('busy', QSPanelWords.t(current.type === 'local'
             ? 'aiConnections.probeLocal'
             : 'aiConnections.probeCloud'));
         try {
@@ -721,22 +685,20 @@
                     if (!current.enabledModels || !current.enabledModels.length) current.enabledModels = r.models.slice();
                     if (!current.defaultModel) current.defaultModel = r.models[0];
                 }
-                setProbeUI('ok', t(r.models.length === 1
-                    ? 'aiConnections.probeOkOne'
-                    : 'aiConnections.probeOkMany', { count: r.models.length }));
+                setProbeUI('ok', QSPanelWords.count('aiConnections.probeOk', r.models.length));
                 renderModelPicker(r.models);
             } else {
                 setProbeUI('err', r.category
-                    ? t('aiConnections.probeErrCategory', {
-                        message: r.message || t('aiConnections.failed'),
+                    ? QSPanelWords.t('aiConnections.probeErrCategory', {
+                        message: r.message || QSPanelWords.t('aiConnections.failed'),
                         category: r.category })
-                    : t('aiConnections.probeErr', {
-                        message: r.message || t('aiConnections.failed') }));
+                    : QSPanelWords.t('aiConnections.probeErr', {
+                        message: r.message || QSPanelWords.t('aiConnections.failed') }));
             }
         } catch (e) {
             if (e && e.name === 'AbortError') return;
-            setProbeUI('err', t('aiConnections.probeErr', {
-                message: e.message || t('aiConnections.testFailed') }));
+            setProbeUI('err', QSPanelWords.t('aiConnections.probeErr', {
+                message: e.message || QSPanelWords.t('aiConnections.testFailed') }));
         }
     }
 
@@ -775,20 +737,20 @@
         QSDom.clear(slot);
         slot.appendChild(QSDom.el('div', { class: 'qsac-models' }, [
             QSDom.el('div', { class: 'qsac-models__head' }, [
-                QSDom.el('span', { text: t('aiConnections.enabledModels') }),
+                QSDom.el('span', { text: QSPanelWords.t('aiConnections.enabledModels') }),
                 QSDom.el('span', null, [
                     QSDom.el('a', {
-                        href: '#', 'data-qsac-models': 'all', text: t('aiConnections.selectAll')
+                        href: '#', 'data-qsac-models': 'all', text: QSPanelWords.t('aiConnections.selectAll')
                     }),
                     ' · ',
                     QSDom.el('a', {
-                        href: '#', 'data-qsac-models': 'none', text: t('aiConnections.selectNone')
+                        href: '#', 'data-qsac-models': 'none', text: QSPanelWords.t('aiConnections.selectNone')
                     })
                 ])
             ]),
             list,
             QSDom.el('div', { class: 'qsac-models__default' }, [
-                t('aiConnections.defaultModel') + ' ',
+                QSPanelWords.t('aiConnections.defaultModel') + ' ',
                 select
             ])
         ]));

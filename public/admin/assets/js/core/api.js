@@ -196,8 +196,7 @@ window.QuickSiteAPI = (function() {
 
     // Shared client-side error for a project-scoped call with no project selected.
     function noProjectError(command) {
-        return clientError('client.project_required',
-            'No project selected for project-scoped command: ' + command, 0);
+        return clientError('client.project_required', QSPanelWords.t('common.request.projectRequired', { command: command }), 0);
     }
 
     // Every failure this module answers WITHOUT reaching the server carries the
@@ -280,20 +279,15 @@ window.QuickSiteAPI = (function() {
     // fact. Anyone with server access finds the shipped example by name.
     function nonJsonMessage(status) {
         if (status === 413) {
-            return 'The file is too large for this server to accept. It was refused by the web '
-                 + 'server before QuickSite saw it — on nginx this is client_max_body_size, '
-                 + 'which defaults to 1 MB. Raising it is a server change: see the shipped '
-                 + 'nginx-vhosts.conf.example in the deploy folder.';
+            return QSPanelWords.t('common.request.tooLarge');
         }
         if (status === 502 || status === 503 || status === 504) {
-            return 'The server is not responding (HTTP ' + status + '). It may be restarting, '
-                 + 'or the request may have taken too long.';
+            return QSPanelWords.t('common.request.notResponding', { status: status });
         }
         if (status === 0) {
-            return 'The request did not complete.';
+            return QSPanelWords.t('common.request.incomplete');
         }
-        return 'The server answered HTTP ' + status + ' with a response QuickSite could not read. '
-             + 'It came from the web server or a proxy rather than from QuickSite itself.';
+        return QSPanelWords.t('common.request.unreadable', { status: status });
     }
 
     // No fence for the dashboard here. Every project.data command
@@ -383,7 +377,7 @@ window.QuickSiteAPI = (function() {
     async function request(command, method = 'GET', data = null, urlParams = [], queryParams = {}, _isRetry = false, opts = {}) {
         const token = getToken();
         if (!token) {
-            return clientError('client.no_token', 'No authentication token', 401);
+            return clientError('client.no_token', QSPanelWords.t('common.request.noToken'), 401);
         }
 
         // Build URL — project-scoped commands carry the '/p/<projectId>/' marker;
@@ -474,7 +468,7 @@ window.QuickSiteAPI = (function() {
             };
         } catch (error) {
             logRequestError('API request error:', error);
-            return clientError('client.network_error', error.message || 'Network error', 0);
+            return clientError('client.network_error', error.message || QSPanelWords.t('common.request.network'), 0);
         }
     }
 
@@ -532,7 +526,7 @@ window.QuickSiteAPI = (function() {
     async function downloadFile(command, urlParams = [], queryParams = {}, opts = {}) {
         const token = getToken();
         if (!token) {
-            return clientError('client.no_token', 'No authentication token', 401);
+            return clientError('client.no_token', QSPanelWords.t('common.request.noToken'), 401);
         }
 
         const commandPath = buildCommandPath(command, opts.project);
@@ -563,7 +557,7 @@ window.QuickSiteAPI = (function() {
             });
         } catch (error) {
             logRequestError('Download error:', error);
-            return clientError('client.network_error', error.message || 'Network error', 0);
+            return clientError('client.network_error', error.message || QSPanelWords.t('common.request.network'), 0);
         }
 
         noteWriteRate(response);
@@ -621,7 +615,7 @@ window.QuickSiteAPI = (function() {
     async function upload(command, formData, urlParams = [], _isRetry = false) {
         const token = getToken();
         if (!token) {
-            return clientError('client.no_token', 'No authentication token', 401);
+            return clientError('client.no_token', QSPanelWords.t('common.request.noToken'), 401);
         }
 
         // Project-scoped commands (uploadAsset) carry the '/p/<projectId>/' marker
@@ -681,7 +675,7 @@ window.QuickSiteAPI = (function() {
             };
         } catch (error) {
             logRequestError('API upload error:', error);
-            return clientError('client.upload_failed', error.message || 'Upload failed', 0);
+            return clientError('client.upload_failed', error.message || QSPanelWords.t('common.request.uploadFailed'), 0);
         }
     }
 
@@ -723,7 +717,7 @@ window.QuickSiteAPI = (function() {
     async function fetchHelper(action, params = []) {
         const token = getToken();
         if (!token) {
-            throw new Error('No authentication token');
+            throw new Error(QSPanelWords.t('common.request.noToken'));
         }
 
         let url = `${config.adminBase}/api/${helperPath(action)}`;
@@ -734,7 +728,8 @@ window.QuickSiteAPI = (function() {
         const response = await fetch(url, {
             credentials: 'same-origin', // the session cookie is the credential
             headers: {
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Accept-Language': QSPanelWords.lang
             }
         });
 
@@ -800,7 +795,7 @@ window.QuickSiteAPI = (function() {
     async function postPanelState(key, body) {
         const token = getToken();
         if (!token) {
-            return clientError('client.no_token', 'No authentication token', 401);
+            return clientError('client.no_token', QSPanelWords.t('common.request.noToken'), 401);
         }
 
         try {
@@ -809,7 +804,8 @@ window.QuickSiteAPI = (function() {
                 credentials: 'same-origin',   // the session cookie is the credential
                 headers: {
                     'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept-Language': QSPanelWords.lang
                 },
                 body: JSON.stringify(body)
             });
@@ -820,7 +816,7 @@ window.QuickSiteAPI = (function() {
             };
         } catch (error) {
             logRequestError('Panel state request error:', error);
-            return clientError('client.network_error', error.message || 'Network error', 0);
+            return clientError('client.network_error', error.message || QSPanelWords.t('common.request.network'), 0);
         }
     }
 
@@ -848,13 +844,13 @@ window.QuickSiteAPI = (function() {
     async function accountRequest(route, method, body) {
         const token = getToken();
         if (!token) {
-            return clientError('client.no_token', 'No authentication token', 401);
+            return clientError('client.no_token', QSPanelWords.t('common.request.noToken'), 401);
         }
 
         const options = {
             method: method,
             credentials: 'same-origin',   // the session cookie is the credential
-            headers: { 'Authorization': `Bearer ${token}` }
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept-Language': QSPanelWords.lang }
         };
         if (method === 'POST') {
             options.headers['Content-Type'] = 'application/json';
@@ -881,12 +877,7 @@ window.QuickSiteAPI = (function() {
             const fromEndpoint = body && typeof body === 'object'
                 && typeof body.status === 'number' && typeof body.code === 'string';
             if (response.ok && !fromEndpoint) {
-                return clientError(
-                    'client.unexpected_response',
-                    'The server answered this request with something other than an account '
-                        + 'response. Nothing was changed. Reload the page and try again.',
-                    response.status
-                );
+                return clientError('client.unexpected_response', QSPanelWords.t('common.request.notAccount'), response.status);
             }
 
             return {
@@ -896,7 +887,7 @@ window.QuickSiteAPI = (function() {
             };
         } catch (error) {
             logRequestError('Account request error:', error);
-            return clientError('client.network_error', error.message || 'Network error', 0);
+            return clientError('client.network_error', error.message || QSPanelWords.t('common.request.network'), 0);
         }
     }
 
@@ -991,41 +982,27 @@ window.QuickSiteAPI = (function() {
         return !writeRate.reads.has(command);
     }
 
-    /** A translation of the write-rate strings layout.php hands, with {name} filled. */
-    function rateText(key, fallback, vars) {
-        const set = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.translations
-            && window.QUICKSITE_CONFIG.translations.writeRate) || {};
-        let s = set[key] || fallback;
-        Object.keys(vars || {}).forEach(k => { s = s.split('{' + k + '}').join(String(vars[k])); });
-        return s;
-    }
-
-    /** "hour", "2 hours", "minute"… for a period in seconds, in the panel's language. */
+    /** "hour", "2 hours", "minute"… for a period in seconds, in the panel's language (writeRate.period.*). */
     function periodText(seconds) {
-        const units = [[86400, 'day', 'days'], [3600, 'hour', 'hours'], [60, 'minute', 'minutes']];
-        for (const [size, one, many] of units) {
+        const units = [[86400, 'day'], [3600, 'hour'], [60, 'minute']];
+        for (const [size, unit] of units) {
             if (seconds % size === 0) {
-                const n = seconds / size;
-                return n === 1 ? rateText('period_' + one, one) : rateText('period_' + many, '{n} ' + many, { n });
+                return QSPanelWords.count('writeRate.period.' + unit, seconds / size);
             }
         }
-        return rateText('period_seconds', '{n} seconds', { n: seconds });
+        return QSPanelWords.count('writeRate.period.second', seconds);
     }
 
     /** A wait in seconds, as the panel says it: "45 s", "12 min". */
     function waitText(seconds) {
         return seconds < 120
-            ? rateText('waitSeconds', '{n} s', { n: Math.max(0, Math.round(seconds)) })
-            : rateText('waitMinutes', '{n} min', { n: Math.ceil(seconds / 60) });
+            ? QSPanelWords.t('writeRate.waitSeconds', { n: QSPanelWords.number(Math.max(0, Math.round(seconds))) })
+            : QSPanelWords.t('writeRate.waitMinutes', { n: QSPanelWords.number(Math.ceil(seconds / 60)) });
     }
 
-    /** A clock time, local to the viewer, for a moment in milliseconds. */
+    /** A clock time, in the panel's language, for a moment in milliseconds. */
     function clockText(ms) {
-        try {
-            return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } catch {
-            return new Date(ms).toTimeString().slice(0, 5);
-        }
+        return QSPanelWords.date(ms, { hour: '2-digit', minute: '2-digit' });
     }
 
     /**
@@ -1039,13 +1016,11 @@ window.QuickSiteAPI = (function() {
             return;
         }
         const wait = Number(result.data.retry_after) || 0;
-        result.message = rateText('refused',
-            'This server allows {max} changes per {period}. They are used up until {time} (in {wait}).', {
-                max: result.data.window.max_commands,
-                period: periodText(Number(result.data.window.period_seconds)),
-                time: clockText(Date.now() + wait * 1000),
-                wait: waitText(wait)
-            });
+        result.message = QSPanelWords.count('writeRate.refused', Number(result.data.window.max_commands), {
+            period: periodText(Number(result.data.window.period_seconds)),
+            time: clockText(Date.now() + wait * 1000),
+            wait: waitText(wait)
+        });
     }
 
     // ============================================
@@ -1099,7 +1074,6 @@ window.QuickSiteAPI = (function() {
         // for what counts (see the section above).
         getWriteRate,
         countsAsWrite,
-        rateText,
         periodText,
         waitText,
         clockText

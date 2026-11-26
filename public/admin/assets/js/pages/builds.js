@@ -23,7 +23,6 @@
     'use strict';
 
     var CFG = window.QS_BUILDS_CONFIG || {};
-    var T = window.QS_BUILDS_I18N || {};
     var el = window.QSDom.el;
     var svgIcon = window.QSDom.svgIcon;
     var clearNode = window.QSDom.clear;
@@ -32,10 +31,6 @@
     var ICON_BUILD = 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z';
     var ICON_REFRESH = 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15';
     var ICON_WARNING = 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01';
-
-    // Last successful getBuild payload — the delete modal's download-first button
-    // and the space panel both read it rather than re-fetching.
-    var currentBuild = null;
 
     /**
      * What the next build will be shaped like.
@@ -66,12 +61,9 @@
         window.QuickSiteAdmin.showToast(message, type || 'info');
     }
 
-    function serverMessage(res, fallback) {
-        return (res && res.data && (res.data.message || res.data.error)) || fallback || T.error || 'Error';
-    }
-
-    function formatSize(bytes) {
-        return window.QuickSiteUtils.formatSize(Number(bytes) || 0);
+    /** The server's own words for a refusal, else the page's word for what failed. */
+    function serverMessage(res, word) {
+        return (res && res.data && (res.data.message || res.data.error)) || word;
     }
 
     /** Can this page run `command` now: the panel's one rule, QuickSiteAdmin.canRun() (permission and a project). */
@@ -101,21 +93,23 @@
         var leftOut = Array.isArray(report.secrets_left_out) ? report.secrets_left_out : [];
         var notOffered = Array.isArray(report.not_offered) ? report.not_offered : [];
         var lines = [];
-        if (missing.length) lines.push(String(T.oauthMissingBody || '').split('{providers}').join(missing.join(', ')));
+        if (missing.length) lines.push(QSPanelWords.t('builds.oauthMissingBody', { providers: QSPanelWords.list(missing) }));
         if (leftOut.length) {
-            lines.push(String(T.oauthLeftOutBody || '').split('{providers}').join(leftOut.join(', '))
-                .split('{secure}').join(String(secureName || 'secure')));
+            lines.push(QSPanelWords.t('builds.oauthLeftOutBody', {
+                providers: QSPanelWords.list(leftOut),
+                secure: String(secureName || 'secure')
+            }));
         }
-        if (notOffered.length) lines.push(String(T.oauthNotOffered || '').split('{providers}').join(notOffered.join(', ')));
-        if (report.address_routes_without_keys === true) lines.push(T.oauthAddressNoKeys || '');
+        if (notOffered.length) lines.push(QSPanelWords.t('builds.oauthNotOffered', { providers: QSPanelWords.list(notOffered) }));
+        if (report.address_routes_without_keys === true) lines.push(QSPanelWords.t('builds.oauthAddressNoKeys'));
         if (!lines.length) return null;
-        var children = [el('strong', { class: 'builds-alert__title', text: T.oauthMissingTitle || '' })];
+        var children = [el('strong', { class: 'builds-alert__title', text: QSPanelWords.t('builds.oauthMissingTitle') })];
         lines.forEach(function (text) { children.push(el('p', { class: 'builds-alert__body', text: text })); });
         // The link only for a role that can open the page (it is gated on listOAuthProviders).
         var url = String(CFG.oauthPageUrl || '');
         if (url !== '' && canRun('listOAuthProviders')) {
             children.push(el('p', { class: 'builds-alert__body' }, [
-                el('a', { href: url, class: 'builds-alert__link', text: T.oauthKeysLink || '' }),
+                el('a', { href: url, class: 'builds-alert__link', text: QSPanelWords.t('builds.oauthKeysLink') }),
             ]));
         }
         return el('div', { class: 'admin-alert admin-alert--warning' }, children);
@@ -159,17 +153,17 @@
     function setLoading(message) {
         setBody([el('div', { class: 'admin-loading' }, [
             el('span', { class: 'admin-spinner' }),
-            el('span', { text: message || T.loading || 'Loading...' }),
+            el('span', { text: message }),
         ])]);
     }
 
     async function loadBuild() {
-        setLoading();
+        setLoading(QSPanelWords.t('common.loading'));
         var res;
         try {
             res = await api('getBuild');
         } catch (e) {
-            setBody([_renderAlert('error', T.error || 'Error', String(e && e.message ? e.message : e))]);
+            setBody([_renderAlert('error', QSPanelWords.t('common.error'), String(e && e.message ? e.message : e))]);
             return;
         }
 
@@ -177,26 +171,24 @@
         // normal starting point.
         var data = (res && res.ok) ? (res.data && res.data.data) : null;
         if (!data || !data.exists) {
-            currentBuild = null;
             if (res && !res.ok && res.status !== 404) {
-                setBody([_renderAlert('error', T.error || 'Error', serverMessage(res))]);
+                setBody([_renderAlert('error', QSPanelWords.t('common.error'), serverMessage(res, QSPanelWords.t('common.error')))]);
                 return;
             }
             setBody(_renderEmptyState());
             return;
         }
 
-        currentBuild = data;
         setBody(_renderBuild(data));
     }
 
     function _renderEmptyState(errorText) {
         var nodes = [
-            el('p', { class: 'builds-empty__title', text: T.none || 'This project has no build yet.' }),
-            el('p', { class: 'admin-hint', text: T.noneHint || '' }),
+            el('p', { class: 'builds-empty__title', text: QSPanelWords.t('builds.none') }),
+            el('p', { class: 'admin-hint', text: QSPanelWords.t('builds.noneHint') }),
         ];
         if (errorText) {
-            nodes.push(_renderAlert('error', T.error || 'Error', errorText));
+            nodes.push(_renderAlert('error', QSPanelWords.t('common.error'), errorText));
         }
         if (canRun('build')) {
             // Opened when a build was just refused: the reason is almost always
@@ -207,10 +199,10 @@
             // refuses the parameter from any other.
             if (canRun('setOAuthCredentials')) nodes.push(_renderSecretsBox());
             nodes.push(el('div', { class: 'builds-actions' }, [
-                _renderButton(T.buildBtn || 'Build now', ICON_BUILD, 'primary', onBuild),
+                _renderButton(QSPanelWords.t('builds.buildBtn'), ICON_BUILD, 'primary', onBuild),
             ]));
         } else {
-            nodes.push(_renderAlert('info', null, T.noControls || ''));
+            nodes.push(_renderAlert('info', null, QSPanelWords.t('builds.noControls')));
         }
         return nodes;
     }
@@ -259,7 +251,7 @@
 
             if (locked) {
                 input.setAttribute('readonly', 'readonly');
-                var unlock = _renderButton(T.optUnlock || '', null, 'primary', function () {
+                var unlock = _renderButton(QSPanelWords.t('builds.optUnlock'), null, 'primary', function () {
                     input.removeAttribute('readonly');
                     unlock.remove();
                 });
@@ -275,29 +267,29 @@
             var sec = buildOptions.secure || 'secure';
             var space = buildOptions.space || '';
             clearNode(preview);
-            preview.appendChild(el('span', { class: 'builds-field__label', text: T.optPreview || '' }));
-            preview.appendChild(_renderPathLine(pub + '/', T.deployDocRoot || ''));
+            preview.appendChild(el('span', { class: 'builds-field__label', text: QSPanelWords.t('builds.optPreview') }));
+            preview.appendChild(_renderPathLine(pub + '/', QSPanelWords.t('builds.optPublicNote')));
             // The one the README had to be corrected for: with a space set, the
             // document root is still <public>/ and the site lives one level in,
             // so "/" is NOT the site.
             if (space !== '') {
-                preview.appendChild(_renderPathLine(pub + '/' + space + '/', (T.optSpaceServes || '').replace('{space}', space)));
+                preview.appendChild(_renderPathLine(pub + '/' + space + '/', QSPanelWords.t('builds.optSpaceServes', { space: space })));
             }
-            preview.appendChild(_renderPathLine(sec + '/', T.deployOutside || '', true));
+            preview.appendChild(_renderPathLine(sec + '/', QSPanelWords.t('builds.optSecureNote'), true));
             _refreshSecretsHint();
         }
         refresh();
 
         var body = el('div', { class: 'builds-options__body' }, [
-            field('public', T.optPublicLabel || '', T.optPublicHint || '', 'public', true),
-            field('secure', T.optSecureLabel || '', T.optSecureHint || '', 'secure'),
-            field('space', T.optSpaceLabel || '', T.optSpaceHint || '', ''),
+            field('public', QSPanelWords.t('builds.optPublicLabel'), QSPanelWords.t('builds.optPublicHint'), 'public', true),
+            field('secure', QSPanelWords.t('builds.optSecureLabel'), QSPanelWords.t('builds.optSecureHint'), 'secure'),
+            field('space', QSPanelWords.t('builds.optSpaceLabel'), QSPanelWords.t('builds.optSpaceHint'), ''),
             preview,
         ]);
 
         var details = el('details', { class: 'builds-options' });
         if (open) details.setAttribute('open', 'open');
-        details.appendChild(el('summary', { class: 'builds-options__summary', text: T.optTitle || '' }));
+        details.appendChild(el('summary', { class: 'builds-options__summary', text: QSPanelWords.t('builds.optTitle') }));
         details.appendChild(body);
         return details;
     }
@@ -316,7 +308,7 @@
         return el('div', { class: 'admin-alert admin-alert--warning' }, [
             el('label', { class: 'admin-checkbox', for: 'builds-opt-oauth-secrets' }, [
                 box,
-                el('strong', { class: 'builds-alert__title' }, [svgIcon(ICON_WARNING, 16), ' ' + (T.secretsLabel || '')]),
+                el('strong', { class: 'builds-alert__title' }, [svgIcon(ICON_WARNING, 16), ' ' + QSPanelWords.t('builds.secretsLabel')]),
             ]),
             secretsHint,
         ]);
@@ -325,7 +317,7 @@
     /** The box's explanation, with the secure folder the next build is given. */
     function _refreshSecretsHint() {
         if (!secretsHint) return;
-        secretsHint.textContent = String(T.secretsHint || '').split('{secure}').join(buildOptions.secure || 'secure');
+        secretsHint.textContent = QSPanelWords.t('builds.secretsHint', { secure: buildOptions.secure || 'secure' });
     }
 
     function _renderBuild(b) {
@@ -333,15 +325,15 @@
 
         var nameChildren = [el('strong', { class: 'builds-name', text: b.name })];
         if (b.complete === false) {
-            nameChildren.push(el('span', { class: 'builds-badge builds-badge--incomplete', text: T.incomplete || 'incomplete' }));
+            nameChildren.push(el('span', { class: 'builds-badge builds-badge--incomplete', text: QSPanelWords.t('builds.incomplete') }));
         }
         nodes.push(el('div', { class: 'builds-head' }, nameChildren));
 
         if (b.complete === false) {
-            nodes.push(_renderAlert('warning', null, T.incompleteBody || ''));
+            nodes.push(_renderAlert('warning', null, QSPanelWords.t('builds.incompleteBody')));
         }
         if (b.oauth_secrets_included) {
-            nodes.push(_renderAlert('warning', null, T.oauthWarn || ''));
+            nodes.push(_renderAlert('warning', null, QSPanelWords.t('builds.oauthWarn')));
         }
         var oauthGaps = _renderOAuthGaps(b.oauth, b.secure);
         if (oauthGaps) nodes.push(oauthGaps);
@@ -356,33 +348,33 @@
         // A build already exists, so `build` will refuse. Say so HERE rather than
         // letting the user find out from a 409 — and say what to do about it.
         if (canRun('build') && !outOfReach) {
-            nodes.push(_renderAlert('info', T.oneAtATime || '', T.oneAtATimeBody || ''));
+            nodes.push(_renderAlert('info', QSPanelWords.t('builds.oneAtATime'), QSPanelWords.t('builds.oneAtATimeBody')));
         }
 
         if (outOfReach) {
-            nodes.push(_renderAlert('info', null, T.secretsRoleOnly || ''));
+            nodes.push(_renderAlert('info', null, QSPanelWords.t('builds.secretsRoleOnly')));
         }
 
         var actions = [];
         if (_mayDownload(b)) {
-            actions.push(_renderButton(T.downloadBtn || 'Download', ICON_DOWNLOAD, 'outline', function () {
+            actions.push(_renderButton(QSPanelWords.t('builds.downloadBtn'), ICON_DOWNLOAD, 'outline', function () {
                 onDownload(this);
             }));
         }
         if (_mayDelete(b)) {
-            actions.push(_renderButton(T.deleteBtn || 'Delete', null, 'danger', function () {
+            actions.push(_renderButton(QSPanelWords.t('builds.deleteBtn'), null, 'danger', function () {
                 onDeleteConfirm(b);
             }));
         }
         if (actions.length) {
             nodes.push(el('div', { class: 'builds-actions' }, actions));
         } else if (!outOfReach) {
-            nodes.push(_renderAlert('info', null, T.noControls || ''));
+            nodes.push(_renderAlert('info', null, QSPanelWords.t('builds.noControls')));
         }
 
         // How this build reaches a server: only for a caller who can take the archive.
         if (_mayDownload(b)) {
-            nodes.push(el('p', { class: 'admin-hint', text: T.serverHint || '' }));
+            nodes.push(el('p', { class: 'admin-hint', text: QSPanelWords.t('builds.serverHint') }));
         }
 
         return nodes;
@@ -410,21 +402,23 @@
     function _renderFacts(b) {
         var fields = [];
         if (b.created) {
-            fields.push(_renderField(T.fieldCreated || 'Created', new Date(b.created).toLocaleString()));
+            fields.push(_renderField(QSPanelWords.t('builds.fieldCreated'), QSPanelWords.date(b.created)));
         }
-        fields.push(_renderField(T.fieldSize || 'Size', formatSize(b.size_bytes)));
+        fields.push(_renderField(QSPanelWords.t('builds.fieldSize'), window.QuickSiteUtils.formatSize(b.size_bytes)));
         if (typeof b.file_count === 'number') {
-            fields.push(_renderField(T.fieldFiles || 'Files', String(b.file_count)));
+            fields.push(_renderField(QSPanelWords.t('builds.fieldFiles'), QSPanelWords.number(b.file_count)));
         }
         if (typeof b.pages_count === 'number') {
-            fields.push(_renderField(T.fieldPages || 'Pages', String(b.pages_count)));
+            fields.push(_renderField(QSPanelWords.t('builds.fieldPages'), QSPanelWords.number(b.pages_count)));
         }
         if (Array.isArray(b.languages) && b.languages.length) {
-            fields.push(_renderField(T.fieldLanguages || 'Languages', b.languages.join(', ')));
+            // Language codes, a value rather than a sentence: listed with the panel's language's separator, no "and".
+            fields.push(_renderField(QSPanelWords.t('builds.fieldLanguages'),
+                new Intl.ListFormat(QSPanelWords.lang, { style: 'narrow', type: 'conjunction' }).format(b.languages.map(String))));
         }
-        if (b.public) fields.push(_renderField(T.fieldPublic || 'Public folder', b.public));
-        if (b.secure) fields.push(_renderField(T.fieldSecure || 'Secure folder', b.secure));
-        fields.push(_renderField(T.fieldSpace || 'URL space', b.space ? b.space : (T.spaceRoot || '(root)')));
+        if (b.public) fields.push(_renderField(QSPanelWords.t('builds.fieldPublic'), b.public));
+        if (b.secure) fields.push(_renderField(QSPanelWords.t('builds.fieldSecure'), b.secure));
+        fields.push(_renderField(QSPanelWords.t('builds.fieldSpace'), b.space ? b.space : QSPanelWords.t('builds.spaceRoot')));
         return el('div', { class: 'builds-facts' }, fields);
     }
 
@@ -433,7 +427,7 @@
     // ============================================================
 
     async function onBuild() {
-        setLoading(T.building || 'Building…');
+        setLoading(QSPanelWords.t('builds.building'));
         // Empty means "use the default", which is what the server does with an
         // absent parameter — so an empty field is sent as absent rather than as
         // an empty string the validator would then have to have an opinion about.
@@ -452,7 +446,7 @@
         }
 
         if (res && res.ok) {
-            toast(T.builtMsg || 'Build completed', 'success');
+            toast(QSPanelWords.t('builds.builtMsg'), 'success');
             // The next build starts from the safe default again.
             includeOAuthSecrets = false;
             await loadBuild();
@@ -466,14 +460,14 @@
         // refused, and the two buttons that resolve it.
         if (res && res.status === 409) {
             await loadBuild();
-            toast(serverMessage(res), 'warning');
+            toast(serverMessage(res, QSPanelWords.t('common.error')), 'warning');
             return;
         }
         // Anything else — a rejected folder name, most likely — comes back into
         // the FORM with what was typed still in it and the server's own reason
         // above it. Replacing the panel with a bare error would make the user
         // re-enter three fields to fix one character.
-        setBody(_renderEmptyState(serverMessage(res)));
+        setBody(_renderEmptyState(serverMessage(res, QSPanelWords.t('common.error'))));
     }
 
     /**
@@ -486,12 +480,12 @@
         try {
             var res = await window.QuickSiteAdmin.downloadFile('downloadBuild');
             if (!res.ok) {
-                toast(serverMessage(res, T.downloadFailed), 'error');
+                toast(serverMessage(res, QSPanelWords.t('builds.downloadFailed')), 'error');
                 return false;
             }
             return true;
         } catch (e) {
-            toast(T.downloadFailed || 'Download failed', 'error');
+            toast(QSPanelWords.t('builds.downloadFailed'), 'error');
             return false;
         } finally {
             if (btn) btn.disabled = false;
@@ -509,29 +503,29 @@
      */
     async function onDeleteConfirm(b) {
         var body = [
-            el('p', { text: T.deleteBody || '' }),
-            el('p', { class: 'admin-hint', text: T.deleteWhy || '' }),
+            el('p', { text: QSPanelWords.t('builds.deleteBody') }),
+            el('p', { class: 'admin-hint', text: QSPanelWords.t('builds.deleteWhy') }),
             el('p', { class: 'builds-modal__name', text: b.name }),
         ];
         if (_mayDownload(b)) {
-            body.push(el('div', {}, [_renderButton(T.deleteDownloadFirst || 'Download it first', ICON_DOWNLOAD, 'outline', async function () {
+            body.push(el('div', {}, [_renderButton(QSPanelWords.t('builds.deleteDownloadFirst'), ICON_DOWNLOAD, 'outline', async function () {
                 var ok = await onDownload(this);
-                if (ok) toast(T.deleteDownloaded || 'Downloaded', 'success');
+                if (ok) toast(QSPanelWords.t('builds.deleteDownloaded'), 'success');
             })]));
         }
         var deleted = await QuickSiteUtils.confirm('', {
-            title: T.deleteTitle || 'Delete this build?',
+            title: QSPanelWords.t('builds.deleteTitle'),
             body: body,
             type: 'danger',
-            confirmText: T.deleteBtn || 'Delete',
+            confirmText: QSPanelWords.t('builds.deleteBtn'),
             action: async function () {
                 var res = await api('deleteBuild', 'POST', {});
-                if (!res || !res.ok) return { ok: false, message: serverMessage(res, T.deleteFailed) };
+                if (!res || !res.ok) return { ok: false, message: serverMessage(res, QSPanelWords.t('builds.deleteFailed')) };
                 return true;
             },
         });
         if (!deleted) return;
-        toast(T.deletedMsg || 'Build deleted', 'success');
+        toast(QSPanelWords.t('builds.deletedMsg'), 'success');
         await loadBuild();
         await loadSpace(true);
     }
@@ -563,7 +557,7 @@
         clearNode(panel);
         panel.appendChild(el('div', { class: 'admin-loading' }, [
             el('span', { class: 'admin-spinner' }),
-            el('span', { text: T.loading || 'Loading...' }),
+            el('span', { text: QSPanelWords.t('common.loading') }),
         ]));
 
         var res;
@@ -574,14 +568,14 @@
             );
         } catch (e) {
             clearNode(panel);
-            panel.appendChild(_renderAlert('error', T.error || 'Error', String(e && e.message ? e.message : e)));
+            panel.appendChild(_renderAlert('error', QSPanelWords.t('common.error'), String(e && e.message ? e.message : e)));
             return;
         }
 
         var data = (res && res.ok) ? (res.data && res.data.data) : null;
         clearNode(panel);
         if (!data) {
-            panel.appendChild(_renderAlert('error', T.error || 'Error', serverMessage(res)));
+            panel.appendChild(_renderAlert('error', QSPanelWords.t('common.error'), serverMessage(res, QSPanelWords.t('common.error'))));
             return;
         }
 
@@ -591,7 +585,7 @@
         });
 
         if (!row) {
-            panel.appendChild(el('p', { class: 'admin-hint', text: T.spaceNotOwner || '' }));
+            panel.appendChild(el('p', { class: 'admin-hint', text: QSPanelWords.t('builds.spaceNotOwner') }));
             return;
         }
 
@@ -599,13 +593,15 @@
         var buildBytes = (row.builds && row.builds.size) || 0;
 
         panel.appendChild(el('div', { class: 'builds-facts' }, [
-            _renderField(T.spaceProject || 'This project uses', formatSize(row.total)),
-            _renderField(T.spaceOfWhich || 'of which the build is', formatSize(buildBytes)),
-            quota.configured ? _renderField(T.spaceFree || 'Left in your quota', formatSize(quota.free)) : null,
+            _renderField(QSPanelWords.t('builds.spaceProject'), window.QuickSiteUtils.formatSize(row.total)),
+            _renderField(QSPanelWords.t('builds.spaceOfWhich'), window.QuickSiteUtils.formatSize(buildBytes)),
+            quota.configured
+                ? _renderField(QSPanelWords.t('builds.spaceFree'), window.QuickSiteUtils.formatSize(quota.free))
+                : null,
         ]));
 
         if (!quota.configured) {
-            panel.appendChild(el('p', { class: 'admin-hint', text: T.spaceNoQuota || '' }));
+            panel.appendChild(el('p', { class: 'admin-hint', text: QSPanelWords.t('builds.spaceNoQuota') }));
         } else {
             var need = Number(row.content) || 0;
             var available = (Number(quota.free) || 0) + buildBytes;
@@ -613,16 +609,17 @@
             if (need > available * fraction) {
                 panel.appendChild(_renderAlert(
                     'warning',
-                    T.spaceWarnTitle || '',
-                    (T.spaceWarnBody || '')
-                        .replace('{need}', formatSize(need))
-                        .replace('{free}', formatSize(available))
+                    QSPanelWords.t('builds.spaceWarnTitle'),
+                    QSPanelWords.t('builds.spaceWarnBody', {
+                        need: window.QuickSiteUtils.formatSize(need),
+                        free: window.QuickSiteUtils.formatSize(available)
+                    })
                 ));
             }
         }
 
         panel.appendChild(el('div', { class: 'builds-actions' }, [
-            _renderButton(T.refresh || 'Re-measure', ICON_REFRESH, 'ghost', function () {
+            _renderButton(QSPanelWords.t('builds.refresh'), ICON_REFRESH, 'ghost', function () {
                 this.disabled = true;
                 loadSpace(true);
             }),

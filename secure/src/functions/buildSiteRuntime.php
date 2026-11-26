@@ -33,7 +33,7 @@ if (!function_exists('qs_site_runtime_source')) {
 
 if (!function_exists('qs_site_config_php')) {
     /**
-     * The generated `qs-site.php` — the six values that make one build
+     * The generated `qs-site.php` — the seven values that make one build
      * different from another.
      *
      * PHP rather than JSON, deliberately: this file sits in the document root,
@@ -45,9 +45,10 @@ if (!function_exists('qs_site_config_php')) {
      *
      * Values go through var_export. The four names are already validated before
      * a build starts (the project id by the project-name check, the folder names
-     * and the space by the relative-path check), the version is an integer and
-     * the icon is the build's own decision, but a generator is the wrong place
-     * to rely on a caller's validation still holding.
+     * and the space by the relative-path check), the version is an integer, the
+     * icon is the build's own decision and the words come from QuickSite's own
+     * word files, but a generator is the wrong place to rely on a caller's
+     * validation still holding.
      *
      * @param string      $project The real project id — becomes PROJECT_NAME.
      * @param string      $public  Public folder name/path.
@@ -59,8 +60,11 @@ if (!function_exists('qs_site_config_php')) {
      * @param string|null $icon    The icon every page links (a path on the site,
      *                             or an absolute URL), or null when the build
      *                             carries none.
+     * @param array       $words   QuickSite's own words for the site's visitor,
+     *                             one set per language of the site, keyed by its
+     *                             code (qs_visitor_words()).
      */
-    function qs_site_config_php(string $project, string $public, string $secure, string $space, int $version, ?string $icon): string
+    function qs_site_config_php(string $project, string $public, string $secure, string $space, int $version, ?string $icon, array $words): string
     {
         $values = [
             'project' => $project,
@@ -69,6 +73,7 @@ if (!function_exists('qs_site_config_php')) {
             'space'   => $space,
             'version' => $version,
             'icon'    => $icon,
+            'words'   => $words,
         ];
 
         $lines = '';
@@ -91,6 +96,8 @@ if (!function_exists('qs_site_config_php')) {
  *            time the site was built), so a browser fetches them again after
  *            a new build is deployed
  *   icon     the icon each page links, or null when the build carried none
+ *   words    QuickSite's own words for the site's visitor, one set per
+ *            language of the site
  *
  * index.php reads this. A direct request for it is a 404: it names the secure
  * folder, and that name is what keeps the engine out of reach of anyone

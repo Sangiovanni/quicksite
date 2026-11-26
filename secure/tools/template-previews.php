@@ -19,7 +19,8 @@
  * its addresses are made relative, so the files work wherever the installation is mounted,
  * and the full address a build writes for a shared link (og:url) is left out, as a preview has
  * no address of its own; the files it loads as scripts are left out, and of its own scripts
- * only the theme switch's stay. The project's own files it links (a template's photos) are
+ * only the theme switch's stay, with the page's words block when it holds the switch's labels
+ * (the label a press shows is read from it). The project's own files it links (a template's photos) are
  * kept once for both themes, beside them, byte for byte. The panel shows a preview in a frame that is given no access to
  * the panel.
  *
@@ -420,11 +421,13 @@ function qs_tp_outside(string &$html): int {
     return $marked;
 }
 
-/** A built page as a preview keeps it: relative addresses, no loaded script, the theme switch's own scripts only, its outside links switched off. */
+/** A built page as a preview keeps it: relative addresses, no loaded script, the theme switch's own scripts and words only, its outside links switched off. */
 function qs_tp_page(string $html, string $projectId, array $langs, array $pages, string $up, array &$assets, bool &$scripts): string {
     $html = preg_replace('#<script\b[^>]*\bsrc="[^"]*"[^>]*>\s*</script>#i', '', $html);
     $html = preg_replace_callback('#<script\b[^>]*>(.*?)</script>#is', static function (array $m) use (&$scripts): string {
-        if (strpos($m[1], 'data-theme') === false) return '';
+        // The page's words block (window.QS_VISITOR_WORDS) holds the switch's labels when the switch is wired: kept with it.
+        $switchWords = strncmp($m[1], 'window.QS_VISITOR_WORDS=', 24) === 0 && strpos($m[1], '"themeSwitch"') !== false;
+        if (!$switchWords && strpos($m[1], 'data-theme') === false) return '';
         $scripts = true;
         return $m[0];
     }, $html);

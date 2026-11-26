@@ -26,11 +26,11 @@
     'use strict';
 
     var CONFIG = window.QUICKSITE_CONFIG || {};
-    var WORDS = (CONFIG.translations && CONFIG.translations.panelMode) || {};
     var MODES = ['simple', 'advanced'];
 
-    function word(key, fallback) {
-        return WORDS[key] || fallback;
+    /** A word of the `panelMode` section, which layout.php hands on every page. */
+    function word(key) {
+        return QSPanelWords.t('panelMode.' + key);
     }
 
     /** The menu as one mode draws it: the page's class, then the groups (ruling: one entry left is a link); the page told. */
@@ -108,7 +108,7 @@
             current = was;
             drawMenu(was);
             markRow(was);
-            window.QuickSiteUtils.showToast(word('saveFailed', 'Your choice could not be saved. Try again.'), 'error');
+            window.QuickSiteUtils.showToast(word('saveFailed'), 'error');
         });
     }
 
@@ -138,10 +138,10 @@
         var close = QSDom.el('button', {
             type: 'button',
             class: 'admin-mode-bubble__close',
-            'aria-label': word('bubbleClose', 'Close')
+            'aria-label': word('bubbleClose')
         }, [QSDom.iconEl(window.QuickSiteUtils.ICON_PATHS.close, 14)]);
         return QSDom.el('div', { class: 'admin-mode-bubble', id: 'admin-mode-bubble', role: 'status' }, [
-            QSDom.el('p', { class: 'admin-mode-bubble__text', text: word('bubble', 'You can switch between Simple and Advanced here at any time.') }),
+            QSDom.el('p', { class: 'admin-mode-bubble__text', text: word('bubble') }),
             close
         ]);
     }

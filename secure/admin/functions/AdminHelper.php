@@ -20,121 +20,76 @@ function adminAttr(string $string): string {
 }
 
 /**
- * Format a timestamp for display
- */
-function adminFormatDate(string $timestamp, string $format = 'Y-m-d H:i:s'): string {
-    try {
-        $date = new DateTime($timestamp);
-        return $date->format($format);
-    } catch (Exception $e) {
-        return $timestamp;
-    }
-}
-
-/**
- * Format JSON for display
- */
-function adminFormatJson($data, bool $pretty = true): string {
-    return json_encode($data, $pretty ? JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE : JSON_UNESCAPED_UNICODE);
-}
-
-/**
- * Get CSS class for status badge
- */
-function adminStatusClass(string $status): string {
-    return match ($status) {
-        'success' => 'badge--success',
-        'error' => 'badge--error',
-        'warning' => 'badge--warning',
-        'info' => 'badge--info',
-        default => 'badge--default'
-    };
-}
-
-/**
- * Generate a unique ID for HTML elements
- */
-function adminUniqueId(string $prefix = 'admin'): string {
-    static $counter = 0;
-    return $prefix . '-' . (++$counter);
-}
-
-/**
- * Check if request is AJAX
- */
-function isAdminAjax(): bool {
-    return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-           strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-}
-
-/**
- * Get command categories from help.php structure
+ * The command console's categories, in the order it lists them: each one's label in the panel's
+ * language, its icon, and its commands. Hand-curated: a command shows on /admin/command only once it
+ * is named here. A label is the word the panel already gives the same feature where it has one (its
+ * menu entry, or its page's title), so the console and that page read the same; any other label is
+ * its own word, under commands.categoryNames.
  */
 function getCommandCategories(): array {
-    // This will be populated from help.php response
     return [
         'route_management' => [
-            'label' => 'Route Management',
+            'label' => __admin('commands.categoryNames.route_management'),
             'icon' => 'route',
             'commands' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'setRouteResolver', 'getRoutes', 'getSiteMap', 'setSiteMapConfig', 'getSocialPreview', 'setSocialPreview', 'analyzeReachability']
         ],
         'structure_management' => [
-            'label' => 'Structure Management',
+            'label' => __admin('commands.categoryNames.structure_management'),
             'icon' => 'structure',
             'commands' => ['getStructure', 'editStructure', 'getComponent', 'listComponents', 'listPages', 'findComponentUsages', 'renameComponent', 'duplicateComponent']
         ],
         'node_management' => [
-            'label' => 'Node Management',
+            'label' => __admin('commands.categoryNames.node_management'),
             'icon' => 'nodes',
             'commands' => ['moveNode', 'deleteNode', 'addNode', 'addComplexElement', 'duplicateNode', 'editNode', 'addComponentToNode', 'editComponentToNode']
         ],
         'alias_management' => [
-            'label' => 'URL Aliases',
+            'label' => __admin('commands.categoryNames.alias_management'),
             'icon' => 'link',
             'commands' => ['createAlias', 'deleteAlias', 'listAliases']
         ],
         'translation_management' => [
-            'label' => 'Translations',
+            'label' => __admin('nav.translations'),
             'icon' => 'translate',
             'commands' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations', 'cleanOrphanTranslations', 'importStructureTranslations']
         ],
         'language_management' => [
-            'label' => 'Languages',
+            'label' => __admin('commands.categoryNames.language_management'),
             'icon' => 'language',
             'commands' => ['getLangList', 'getLanguageList', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang']
         ],
         'asset_management' => [
-            'label' => 'Assets',
+            'label' => __admin('commands.categoryNames.asset_management'),
             'icon' => 'image',
             'commands' => ['uploadAsset', 'deleteAsset', 'listAssets', 'editAsset']
         ],
         'style_management' => [
-            'label' => 'Styles',
+            'label' => __admin('commands.categoryNames.style_management'),
             'icon' => 'palette',
             'commands' => ['getStyles', 'editStyles']
         ],
         'css_variables_rules' => [
-            'label' => 'CSS Variables & Rules',
+            'label' => __admin('commands.categoryNames.css_variables_rules'),
             'icon' => 'css',
             'commands' => ['getRootVariables', 'setRootVariables', 'setThemeMode', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule']
         ],
         'css_animations' => [
-            'label' => 'CSS Animations',
+            'label' => __admin('commands.categoryNames.css_animations'),
             'icon' => 'animation',
             'commands' => ['listKeyframes', 'getKeyframes', 'getAnimatedSelectors', 'setKeyframes', 'deleteKeyframes']
         ],
         'site_customization' => [
-            'label' => 'Site Customization',
+            'label' => __admin('commands.categoryNames.site_customization'),
             'icon' => 'settings',
             'commands' => ['editFavicon', 'editTitle']
         ],
         'builds' => [
-            'label' => 'Builds',
+            'label' => __admin('nav.builds'),
             'icon' => 'package',
             'commands' => ['build', 'getBuild', 'deleteBuild', 'cleanResolverCache', 'downloadBuild']
         ],
         'project_management' => [
-            'label' => 'Project Management',
+            'label' => __admin('commands.categoryNames.project_management'),
             'icon' => 'folder-tree',
             'commands' => ['listProjects', 'createProject', 'cloneProject', 'renameProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
@@ -142,29 +97,24 @@ function getCommandCategories(): array {
         // management, request adjudication + the join-policy knob + the
         // any-member sponsor lane…
         'member_management' => [
-            'label' => 'Project Members',
+            'label' => __admin('members.title'),
             'icon' => 'users',
             'commands' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'reconcileMemberships']
         ],
-        // The caller's OWN membership surface used to sit here as a
-        // 'my_memberships' section. It is gone — not emptied — because all nine
-        // of its entries stopped being commands: joining a project,
-        // leaving one, and looking somebody up in order to invite them are
-        // operations on an ACCOUNT, not steps in developing a project. They are
-        // served by /admin/self and reached from the My Memberships page. An
-        // emptied section renders as a category with nothing in it, which is why
-        // this one was removed with its last command.
+        // The caller's OWN memberships are not here: joining a project, leaving
+        // one, and looking somebody up in order to invite them are operations on
+        // an ACCOUNT, not steps in developing a project. They are served by
+        // /admin/self and reached from the My Memberships page. A category with
+        // no command is left out, never kept empty: an empty one renders as a
+        // category with nothing in it.
         'command_history' => [
-            'label' => 'Command History',
+            'label' => __admin('history.title'),
             'icon' => 'history',
             'commands' => ['getCommandHistory', 'clearCommandHistory']
         ],
-        // Session lifecycle. (This slot previously held the removed
-        // generateToken/listTokens/revokeToken trio under a duplicate
-        // 'authentication' key that the OAuth block below silently clobbered —
-        // the trio never actually rendered. Unique keys now.)
+        // Session lifecycle.
         'auth_session' => [
-            'label' => 'Authentication / Session',
+            'label' => __admin('commands.categoryNames.auth_session'),
             'icon' => 'key',
             // changePassword / deleteMyAccount are not commands — managing
             // the login you sign in with is not project
@@ -174,62 +124,49 @@ function getCommandCategories(): array {
             'commands' => ['login', 'logoutSession', 'register']
         ],
         'js_functions' => [
-            'label' => 'JavaScript Functions / Interactions',
+            'label' => __admin('commands.categoryNames.js_functions'),
             'icon' => 'zap',
             'commands' => ['listJsFunctions', 'listDataBindings', 'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction', 'getPageEvents', 'addPageEvent', 'editPageEvent', 'deletePageEvent', 'getStateStores', 'setStateStores']
         ],
         'api_registry' => [
-            'label' => 'API Registry',
+            'label' => __admin('apis.title'),
             'icon' => 'globe',
             'commands' => ['listApiEndpoints', 'getApiEndpoint', 'addApi', 'editApi', 'deleteApi', 'testApiEndpoint']
         ],
         'oauth_providers' => [
-            'label' => 'OAuth Providers',
+            'label' => __admin('commands.categoryNames.oauth_providers'),
             'icon' => 'shield',
             'commands' => ['listOAuthProviders', 'setOAuthCredentials']
         ],
         'storage_registry' => [
-            'label' => 'Storage Registry',
+            'label' => __admin('commands.categoryNames.storage_registry'),
             'icon' => 'database',
             'commands' => ['listStorageItems', 'addStorageItem', 'editStorageItem', 'deleteStorageItem', 'scanStorageUsage', 'getConsentStatus', 'generateConsentLayer', 'generateCookiePolicy', 'deleteCookiePolicy']
         ],
         'privacy_registry' => [
-            'label' => 'Privacy',
+            'label' => __admin('nav.privacy'),
             'icon' => 'shield',
             'commands' => ['getPrivacyStatus', 'setCollectedDatum', 'deleteCollectedDatum', 'setPrivacyMapping', 'setPrivacyHost', 'generatePrivacyPolicy', 'deletePrivacyPolicy', 'setPrivacyCookieSection']
         ],
         'snippet_management' => [
-            'label' => 'Snippets',
+            'label' => __admin('commands.categoryNames.snippet_management'),
             'icon' => 'puzzle',
             'commands' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet', 'injectSnippetCss']
         ],
-        // Install-wide embed policy. Only the READ survives: the policy is set at
-        // deployment and no command writes it, so the console lists just the read.
-        // The label is the one the panel already uses for this feature —
-        // nav.embedSecurity, the /admin/embed-security page — so the console
-        // section and the nav entry read as the same thing.
+        // Install-wide embed policy: it is set at deployment and no command
+        // writes it, so the console lists the read alone. The label is the one
+        // the panel already uses for this feature — nav.embed-security, the
+        // /admin/embed-security page — so the console section and the nav entry
+        // read as the same thing.
         'embed_security' => [
-            'label' => 'Embed Security',
+            'label' => __admin('nav.embed-security'),
             'icon' => 'shield',
             'commands' => ['getIframeSandbox']
         ],
         'documentation' => [
-            'label' => 'Documentation',
+            'label' => __admin('commands.categoryNames.documentation'),
             'icon' => 'book',
             'commands' => ['help']
         ]
     ];
-}
-
-/**
- * Get method badge color
- */
-function getMethodBadgeClass(string $method): string {
-    return match (strtoupper($method)) {
-        'GET' => 'badge--get',
-        'POST' => 'badge--post',
-        'PUT' => 'badge--put',
-        'DELETE' => 'badge--delete',
-        default => 'badge--default'
-    };
 }

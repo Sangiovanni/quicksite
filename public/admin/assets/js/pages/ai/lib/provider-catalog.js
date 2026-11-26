@@ -186,12 +186,13 @@
      */
     function buildUrl(connection, model) {
         const p = get(connection.providerType);
-        if (!p) throw new Error('Unknown providerType: ' + connection.providerType);
+        // Their messages reach a screen through ai-call.js (a probe's line, a failed send): panel words.
+        if (!p) throw new Error(QSPanelWords.t('aiConnections.call.unknownProvider', { type: connection.providerType }));
 
         let url = connection.baseUrl
             ? joinPath(connection.baseUrl, defaultPathFor(p.requestFormat))
             : p.endpoint;
-        if (!url) throw new Error('No endpoint configured for ' + connection.providerType);
+        if (!url) throw new Error(QSPanelWords.t('aiConnections.call.noEndpoint', { type: connection.providerType }));
 
         if (p.requestFormat === 'google') {
             url = url.replace('{model}', encodeURIComponent(model));

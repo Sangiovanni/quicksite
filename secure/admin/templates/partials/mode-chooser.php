@@ -14,9 +14,6 @@
  */
 require_once SECURE_FOLDER_PATH . '/admin/functions/panelMenu.php';
 
-$chooserWords = static function (array $label): string {
-    return $label[1] === null ? __admin($label[0]) : __admin($label[0], $label[1]);
-};
 $chooserPages = qs_admin_menu_pages();
 $chooserSimple = array_values(array_filter($chooserPages, static fn($p) => $p['simple']));
 $chooserMore = array_values(array_filter($chooserPages, static fn($p) => !$p['simple']));
@@ -69,27 +66,27 @@ $chooserDrawing = static function (bool $simple): string {
     return $svg . $drop . '</svg>';
 };
 
-/** One page of a list: the menu entry's words, hidden by the same role filter as the entry. */
-$chooserItem = static function (array $page) use ($chooserWords): string {
+/** One page of a list: the menu entry's word (its label is the key), hidden by the same role filter as the entry. */
+$chooserItem = static function (array $page): string {
     return '<li class="admin-mode-chooser__item"' . ($page['requires'] !== '' ? ' data-requires-command="' . adminAttr($page['requires']) . '"' : '')
-        . '>' . $chooserWords($page['label']) . '</li>';
+        . '>' . adminEscape(__admin($page['label'])) . '</li>';
 };
 ?>
 <template id="admin-mode-chooser">
     <div class="admin-modal-dialog admin-modal-dialog--chooser" role="dialog" aria-modal="true"
          aria-labelledby="admin-mode-chooser-title" aria-describedby="admin-mode-chooser-intro">
         <div class="admin-modal-dialog__content admin-mode-chooser">
-            <h2 class="admin-modal-dialog__title" id="admin-mode-chooser-title"><?= __admin('panelMode.chooser.title', 'How should your panel look?') ?></h2>
-            <p class="admin-mode-chooser__intro" id="admin-mode-chooser-intro"><?= __admin('panelMode.chooser.intro', 'Pick the menu that suits you. Both give you the same panel: Simple shows the pages you need to build and publish a site, Advanced shows every page.') ?></p>
+            <h2 class="admin-modal-dialog__title" id="admin-mode-chooser-title"><?= adminEscape(__admin('panelMode.chooser.title')) ?></h2>
+            <p class="admin-mode-chooser__intro" id="admin-mode-chooser-intro"><?= adminEscape(__admin('panelMode.chooser.intro')) ?></p>
             <div class="admin-mode-chooser__cards">
                 <?php foreach (['simple' => $chooserSimple, 'advanced' => $chooserMore] as $chooserMode => $chooserList): ?>
                 <div class="admin-mode-chooser__card" data-panel-mode="<?= $chooserMode ?>">
                     <?= $chooserDrawing($chooserMode === 'simple') ?>
-                    <h3 class="admin-mode-chooser__name" id="admin-mode-chooser-<?= $chooserMode ?>-name"><?= __admin('nav.mode' . ucfirst($chooserMode)) ?></h3>
-                    <p class="admin-mode-chooser__lead"><?= __admin('panelMode.chooser.' . $chooserMode . 'Lead') ?></p>
+                    <h3 class="admin-mode-chooser__name" id="admin-mode-chooser-<?= $chooserMode ?>-name"><?= adminEscape(__admin('nav.mode' . ucfirst($chooserMode))) ?></h3>
+                    <p class="admin-mode-chooser__lead"><?= adminEscape(__admin('panelMode.chooser.' . $chooserMode . 'Lead')) ?></p>
                     <ul class="admin-mode-chooser__list" id="admin-mode-chooser-<?= $chooserMode ?>-list">
                         <?php if ($chooserMode === 'advanced'): ?>
-                        <li class="admin-mode-chooser__item admin-mode-chooser__item--all"><?= __admin('panelMode.chooser.everythingInSimple', 'Everything in Simple, plus:') ?></li>
+                        <li class="admin-mode-chooser__item admin-mode-chooser__item--all"><?= adminEscape(__admin('panelMode.chooser.everythingInSimple')) ?></li>
                         <?php endif; ?>
                         <?php foreach ($chooserList as $chooserPage): ?>
                         <?= $chooserItem($chooserPage) ?>
@@ -97,16 +94,16 @@ $chooserItem = static function (array $page) use ($chooserWords): string {
                         <?php if ($chooserMode === 'advanced'): ?>
                         <?php /* When the role leaves Advanced nothing more (an account in no project yet), panel-mode.js shows this line
                                  in place of "plus:" over an empty list. */ ?>
-                        <li class="admin-mode-chooser__item admin-mode-chooser__item--none" hidden><?= __admin('panelMode.chooser.advancedNone', 'The same pages for now: the others come with a role in a project.') ?></li>
+                        <li class="admin-mode-chooser__item admin-mode-chooser__item--none" hidden><?= adminEscape(__admin('panelMode.chooser.advancedNone')) ?></li>
                         <?php endif; ?>
                     </ul>
                     <button type="button" class="admin-btn admin-btn--primary admin-mode-chooser__pick" data-panel-mode="<?= $chooserMode ?>"
-                            aria-describedby="admin-mode-chooser-<?= $chooserMode ?>-list"><?= __admin('panelMode.chooser.pick' . ucfirst($chooserMode)) ?></button>
+                            aria-describedby="admin-mode-chooser-<?= $chooserMode ?>-list"><?= adminEscape(__admin('panelMode.chooser.pick' . ucfirst($chooserMode))) ?></button>
                 </div>
                 <?php endforeach; ?>
             </div>
-            <p class="admin-mode-chooser__note"><strong><?= __admin('panelMode.chooser.note', 'You can change this at any time from the account menu, top right.') ?></strong></p>
-            <p class="admin-mode-chooser__error" role="alert" hidden><?= __admin('panelMode.saveFailed', 'Your choice could not be saved. Try again.') ?></p>
+            <p class="admin-mode-chooser__note"><strong><?= adminEscape(__admin('panelMode.chooser.note')) ?></strong></p>
+            <p class="admin-mode-chooser__error" role="alert" hidden><?= adminEscape(__admin('panelMode.saveFailed')) ?></p>
         </div>
     </div>
 </template>

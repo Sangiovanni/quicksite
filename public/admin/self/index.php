@@ -101,7 +101,7 @@ if (!isset(QS_SELF_ROUTE_METHODS[$key])) {
     echo json_encode([
         'status'  => 404,
         'code'    => 'resource.not_found',
-        'message' => 'Unknown account route',
+        'message' => __admin('answers.self.unknownRoute'),
     ]);
     exit;
 }
@@ -114,7 +114,7 @@ if ($method !== $expected) {
     echo json_encode([
         'status'  => 405,
         'code'    => 'validation.method_not_allowed',
-        'message' => 'This route only accepts ' . $expected,
+        'message' => __admin('answers.self.methodOnly', ['method' => $expected]),
     ]);
     exit;
 }

@@ -15,10 +15,13 @@
  *                           rules name (French "many" for a million) is used where its file writes it, else <path>.other,
  *                           the category every count falls in that a language does not set apart; {count} is n,
  *                           formatted in the panel's language
+ *   parts(path, params)     the word cut at its {name} parts, each given its value as it is (a string or an element),
+ *                           for a sentence that holds an element (a version in a <code>)
  *   has(path)               whether a word is there: a catalog shows its own text where it names no key (a person's own
  *                           snippet)
  *   number(n, options)      a number in the panel's language (Intl.NumberFormat)
  *   date(value, options)    a date and time in the panel's language (Date#toLocaleString)
+ *   list(items, type)       items joined the panel language's way (Intl.ListFormat): 'conjunction' (the default) or 'unit'
  *   lang                    the panel's language: <html lang>, which layout.php writes
  *   add(tree)               called only by the blocks __adminWords() writes
  * There is no fallback: a word a script reads and nothing hands shows its path.
@@ -82,12 +85,40 @@ window.QSPanelWords = (function () {
         return lookup(path) !== undefined;
     }
 
+    /**
+     * The word cut at its {name} parts, each part given its value as it is: a string, or an element (a version drawn in
+     * a <code>, a count in bold), so a sentence holding an element stays one word. Returns a list of strings and the
+     * values, for QSDom.el's children; a part with no value stays as written; a path that holds no word, the path.
+     */
+    function parts(path, params) {
+        const word = lookup(path);
+        if (word === undefined) return [String(path)];
+        const out = [];
+        const re = /\{([A-Za-z0-9_]+)\}/g;
+        let last = 0;
+        let mark;
+        while ((mark = re.exec(word)) !== null) {
+            if (!params || !own.call(params, mark[1])) continue;
+            if (mark.index > last) out.push(word.slice(last, mark.index));
+            const value = params[mark[1]];
+            out.push(typeof value === 'object' && value !== null ? value : String(value));
+            last = mark.index + mark[0].length;
+        }
+        if (last < word.length) out.push(word.slice(last));
+        return out;
+    }
+
     function number(n, options) {
         return new Intl.NumberFormat(lang, options).format(n);
     }
 
     function date(value, options) {
         return new Date(value).toLocaleString(lang, options);
+    }
+
+    /** Items joined the panel language's way (Intl.ListFormat): 'conjunction' (a, b and c, the default) or 'unit' (a, b, c). */
+    function list(items, type) {
+        return new Intl.ListFormat(lang, { style: 'long', type: type || 'conjunction' }).format(items.map(String));
     }
 
     function count(path, n, params) {
@@ -97,5 +128,5 @@ window.QSPanelWords = (function () {
         return t(chosen, Object.assign({ count: number(n) }, params));
     }
 
-    return { t: t, count: count, has: has, number: number, date: date, lang: lang, add: add };
+    return { t: t, count: count, parts: parts, has: has, number: number, date: date, list: list, lang: lang, add: add };
 })();

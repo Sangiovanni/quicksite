@@ -13,9 +13,9 @@
         <line x1="9" y1="9" x2="9.01" y2="9"/>
         <line x1="15" y1="9" x2="15.01" y2="9"/>
     </svg>
-    <h2 class="admin-empty__title"><?= __admin('errors.404.title') ?></h2>
-    <p class="admin-empty__text"><?= __admin('errors.404.message') ?></p>
+    <h2 class="admin-empty__title"><?= adminEscape(__admin('errors.404.title')) ?></h2>
+    <p class="admin-empty__text"><?= adminEscape(__admin('errors.404.message')) ?></p>
     <a href="<?= $router->url('dashboard') ?>" class="admin-btn admin-btn--primary">
-        <?= __admin('errors.404.backToDashboard') ?>
+        <?= adminEscape(__admin('errors.404.backToDashboard')) ?>
     </a>
 </div>

@@ -902,7 +902,7 @@ window.PreviewAiTools = (function () {
     function _fetchWorkflowDetail(id) {
         var cfg = window.PreviewConfig || {};
         var url = (cfg.adminUrl || '') + 'api/' + _helperPath('ai-spec-raw') + '/' + encodeURIComponent(id) + '?withData=1';
-        var headers = { 'Accept': 'application/json' };
+        var headers = { 'Accept': 'application/json', 'Accept-Language': QSPanelWords.lang };
         if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
         return fetch(url, { headers: headers }).then(function (res) {
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -2339,7 +2339,7 @@ window.PreviewAiTools = (function () {
             if (hit) matched++;
             rows[i].hidden = !hit && !(box && box.checked);
         }
-        none.textContent = QSPanelWords.t('common.noMatchesFor').replace(':query', function () { return query.trim(); });
+        none.textContent = QSPanelWords.t('common.noMatchesFor', { query: query.trim() });
         none.hidden = q === '' || matched > 0;
     }
 
@@ -4409,7 +4409,7 @@ window.PreviewAiTools = (function () {
     function _workflowRequest(body) {
         var cfg = window.PreviewConfig || {};
         var url = (cfg.adminUrl || '') + 'api/' + _helperPath('workflow-generate-steps');
-        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Accept-Language': QSPanelWords.lang };
         if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
         var id = _activeWorkflowSummary && _activeWorkflowSummary.id;
         return fetch(url, {

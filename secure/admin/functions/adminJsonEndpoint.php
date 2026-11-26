@@ -49,6 +49,12 @@ if (!function_exists('qs_admin_json_boot')) {
         header('Content-Type: application/json');
         header('Cache-Control: no-store');
 
+        // The panel's own answers are in the panel's language, which the panel's request names (api.js sends it as
+        // Accept-Language): read from that header alone, so no word ever opens the session these endpoints read
+        // through a closed snapshot. A command's own message, passed through, stays as it comes.
+        require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
+        AdminTranslation::takeLanguageFromHeader();
+
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
@@ -61,7 +67,7 @@ if (!function_exists('qs_admin_json_boot')) {
 
         if ($tokenInfo === null) {
             http_response_code(401);
-            echo json_encode(['error' => 'Unauthorized']);
+            echo json_encode(['error' => __admin('answers.unauthorized')]);
             exit;
         }
 

@@ -87,9 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              takes its own 1025 pixel width and pushes the form below the fold. The CSS
              rule still wins when it loads, so nothing changes on a healthy install. -->
         <img class="admin-login__mark" src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="" width="69" height="64">
-        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= __admin('common.appName') ?>" width="140" height="44">
-        <h1 class="admin-login__title"><?= __admin('login.title') ?></h1>
-        <p class="admin-login__subtitle"><?= __admin('login.subtitle') ?></p>
+        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= adminAttr(__admin('common.appName')) ?>" width="140" height="44">
+        <h1 class="admin-login__title"><?= adminEscape(__admin('login.title')) ?></h1>
+        <p class="admin-login__subtitle"><?= adminEscape(__admin('login.subtitle')) ?></p>
     </div>
 
     <div class="admin-card">
@@ -98,8 +98,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php /* One box, because the name and the instruction to save it are one
                      message: splitting them read as two unrelated notices. */ ?>
             <div class="admin-alert admin-alert--success">
-                <strong><?= __admin('login.registered.title') ?></strong>
-                <p><?= __admin('login.registered.intro') ?></p>
+                <strong><?= adminEscape(__admin('login.registered.title')) ?></strong>
+                <p><?= adminEscape(__admin('login.registered.intro')) ?></p>
                 <p class="admin-alert__highlight"><code><?= adminAttr($assignedUsername) ?></code></p>
                 <p class="admin-alert__note">
                     <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -107,30 +107,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <line x1="12" y1="9" x2="12" y2="13"/>
                         <line x1="12" y1="17" x2="12.01" y2="17"/>
                     </svg>
-                    <span><?= __admin('login.registered.warning', ['hours' => $registerNoteHours]) ?></span>
+                    <span><?= adminEscape(__admin('login.registered.warning', ['hours' => $registerNoteHours])) ?></span>
                 </p>
             </div>
             <?php elseif ($setupUsername !== ''): ?>
-            <div class="admin-alert admin-alert--success"><?= __admin('login.registerSuccess') ?></div>
+            <div class="admin-alert admin-alert--success"><?= adminEscape(__admin('login.registerSuccess')) ?></div>
             <?php endif; ?>
 
             <?php if ($loginError === 'csrf'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('login.csrfFailed')) ?></div>
             <?php elseif ($loginError === 'throttled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.throttled', ['duration' => __adminDuration($loginRetryAfter)]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('login.throttled', ['duration' => __adminDuration($loginRetryAfter)])) ?></div>
             <?php elseif ($loginError === 'server'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.serverError') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('login.serverError')) ?></div>
             <?php elseif ($loginError === 'missing_fields'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.missingFields') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('login.missingFields')) ?></div>
             <?php elseif ($loginError !== null): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.invalidCredentials') ?><?php if ($loginRetryAfter > 0): ?><br><?= __admin('login.throttled', ['duration' => __adminDuration($loginRetryAfter)]) ?><?php endif; ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('login.invalidCredentials')) ?><?php if ($loginRetryAfter > 0): ?><br><?= adminEscape(__admin('login.throttled', ['duration' => __adminDuration($loginRetryAfter)])) ?><?php endif; ?></div>
             <?php endif; ?>
 
             <form id="admin-login-form" method="POST" action="">
                 <input type="hidden" name="form_token" value="<?= adminAttr($router->formToken()) ?>">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="username">
-                        <?= __admin('login.usernameLabel') ?>
+                        <?= adminEscape(__admin('login.usernameLabel')) ?>
                     </label>
                     <input
                         type="text"
@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="password">
-                        <?= __admin('login.passwordLabel') ?>
+                        <?= adminEscape(__admin('login.passwordLabel')) ?>
                     </label>
                     <div style="position: relative;">
                         <input
@@ -193,23 +193,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <?= isset($_POST['remember']) ? 'checked' : '' ?>
                         >
                         <label for="remember" class="admin-checkbox-label">
-                            <?= __admin('login.rememberSession') ?>
+                            <?= adminEscape(__admin('login.rememberSession')) ?>
                         </label>
                     </div>
-                    <p class="admin-hint"><?= $rememberHint ?></p>
+                    <p class="admin-hint"><?= adminEscape($rememberHint) ?></p>
                 </div>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">
-                    <?= __admin('login.submit') ?>
+                    <?= adminEscape(__admin('login.submit')) ?>
                 </button>
 
                 <p class="admin-hint" style="margin-top: var(--space-md); text-align: center;">
-                    <?= __admin('login.privacyNote') ?>
+                    <?= adminEscape(__admin('login.privacyNote')) ?>
                 </p>
 
                 <?php if ($router->isRegistrationOpen()): ?>
                 <p class="admin-hint" style="margin-top: var(--space-md); text-align: center;">
-                    <a href="<?= adminAttr($router->url('register')) ?>"><?= __admin('login.registerLink') ?></a>
+                    <a href="<?= adminAttr($router->url('register')) ?>"><?= adminEscape(__admin('login.registerLink')) ?></a>
                 </p>
                 <?php endif; ?>
             </form>
@@ -217,11 +217,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <div class="admin-login__help">
-        <div class="admin-login__help-title"><?= __admin('login.help.title') ?></div>
-        <p class="admin-login__help-text"><?= $router->isRegistrationOpen() ? __admin('login.help.textRegisterOpen') : __admin('login.help.text') ?></p>
+        <div class="admin-login__help-title"><?= adminEscape(__admin('login.help.title')) ?></div>
+        <p class="admin-login__help-text"><?= adminEscape($router->isRegistrationOpen() ? __admin('login.help.textRegisterOpen') : __admin('login.help.text')) ?></p>
     </div>
 </div>
 
+<?= __adminWords(['login.showPassword', 'login.hidePassword']) ?>
 <script>
 // Password visibility toggle — lets the user verify a pasted password.
 (function () {
@@ -230,17 +231,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     var eye = document.getElementById('password-eye');
     var eyeOff = document.getElementById('password-eye-off');
     if (!input || !btn) return;
-    var labels = {
-        show: <?= json_encode(__admin('login.showPassword')) ?>,
-        hide: <?= json_encode(__admin('login.hidePassword')) ?>
-    };
     btn.addEventListener('click', function () {
         var reveal = input.type === 'password';
+        var label = QSPanelWords.t(reveal ? 'login.hidePassword' : 'login.showPassword');
         input.type = reveal ? 'text' : 'password';
         eye.style.display = reveal ? 'none' : '';
         eyeOff.style.display = reveal ? '' : 'none';
-        btn.setAttribute('aria-label', reveal ? labels.hide : labels.show);
-        btn.setAttribute('title', reveal ? labels.hide : labels.show);
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('title', label);
         input.focus();
     });
 })();

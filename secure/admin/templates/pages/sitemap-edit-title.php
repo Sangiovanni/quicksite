@@ -17,7 +17,7 @@
     <div class="sitemap-edit-title-modal__content">
         <div class="sitemap-edit-title-modal__header">
             <h3>
-                <?= __admin('sitemapPage.editTitleTitle', 'Edit page title') ?>
+                <?= adminEscape(__admin('sitemapPage.editTitleTitle')) ?>
                 <code id="sitemap-edit-title-route" style="font-size: 0.9em; color: var(--admin-text-muted);"></code>
             </h3>
             <button type="button" class="admin-modal__close" id="sitemap-edit-title-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
@@ -25,7 +25,7 @@
 
         <div class="sitemap-edit-title-modal__body">
             <p style="margin: 0 0 var(--space-md); color: var(--admin-text);">
-                <?= __admin('sitemapPage.editTitleHint', 'Page title is the value of <code>page.titles.&lt;route&gt;</code> for each language. Empty inputs are written as empty strings (the key still exists but renders blank — fix later if you want a real title there).') ?>
+                <?= adminEscapeCode(__admin('sitemapPage.editTitleHint')) ?>
             </p>
 
             <!-- Per-language input rows are added by the JS handler on open. -->
@@ -36,10 +36,10 @@
 
         <div class="sitemap-edit-title-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" id="sitemap-edit-title-cancel">
-                <?= __admin('common.cancel', 'Cancel') ?>
+                <?= adminEscape(__admin('common.cancel')) ?>
             </button>
             <button type="button" class="admin-btn admin-btn--primary" id="sitemap-edit-title-save">
-                <?= __admin('common.save', 'Save') ?>
+                <?= adminEscape(__admin('common.save')) ?>
             </button>
         </div>
     </div>

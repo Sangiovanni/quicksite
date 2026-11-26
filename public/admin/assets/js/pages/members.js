@@ -12,13 +12,13 @@
  *
  * Built with QSDom.el + named _render* helpers (one Element each) per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing.
- * Static structure lives in templates/pages/members.php.
+ * Static structure lives in templates/pages/members.php, which hands the words
+ * this file reads (QSPanelWords, each by its key's whole path).
  */
 (function () {
     'use strict';
 
     var CFG = window.QS_MEMBERS_CONFIG || {};
-    var T = window.QS_MEMBERS_I18N || {};
     var el = window.QSDom.el;
     var svgIcon = window.QSDom.svgIcon;
     var clearNode = window.QSDom.clear;
@@ -40,7 +40,7 @@
     function api(cmd, method, body) {
         var admin = window.QuickSiteAdmin;
         if (!admin || typeof admin.apiRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return admin.apiRequest(cmd, method, body);
     }
@@ -51,8 +51,9 @@
         }
     }
 
-    function serverMessage(res, fallback) {
-        return (res && res.data && (res.data.message || res.data.error)) || fallback || T.error || 'Error';
+    /** The server's own words for a refusal, else `word` (a panel word the caller names), else the panel's Error. */
+    function serverMessage(res, word) {
+        return (res && res.data && (res.data.message || res.data.error)) || word || QSPanelWords.t('common.error');
     }
 
     function notifyMembershipChange() {
@@ -109,7 +110,7 @@
     // ============================================================
 
     function _renderRoleChip(role) {
-        return el('span', { class: 'members-role-chip members-role-chip--' + String(role || ''), text: String(role || '?') });
+        return el('span', { class: 'members-role-chip members-role-chip--' + String(role || ''), text: role ? QuickSiteUtils.roleName(role) : '?' });
     }
 
     function _renderNote(noteText) {
@@ -171,15 +172,10 @@
         return res && res.ok ? true : { ok: false, message: serverMessage(res) };
     }
 
-    /** A name in a word ({name}). */
-    function named(word, name) {
-        return String(word).split('{name}').join(name);
-    }
-
     function _renderRoleSelect(id, roles) {
         var sel = el('select', { class: 'admin-input', id: id });
         roles.forEach(function (r) {
-            sel.appendChild(el('option', { value: r, text: r }));
+            sel.appendChild(el('option', { value: r, text: QuickSiteUtils.roleName(r) }));
         });
         return sel;
     }
@@ -188,7 +184,7 @@
         if (!selectEl) return;
         clearNode(selectEl);
         roles.forEach(function (r) {
-            selectEl.appendChild(el('option', { value: r, text: r }));
+            selectEl.appendChild(el('option', { value: r, text: QuickSiteUtils.roleName(r) }));
         });
     }
 
@@ -208,7 +204,7 @@
         var main = [
             el('span', { class: 'members-row__title' }, [
                 el('strong', { text: m.name || '?' }),
-                isSelf ? el('span', { class: 'members-chip members-chip--you', text: T.you || 'you' }) : null,
+                isSelf ? el('span', { class: 'members-chip members-chip--you', text: QSPanelWords.t('members.roster.you') }) : null,
             ]),
             el('span', { class: 'members-row__chips' }, [_renderRoleChip(m.role)]),
             el('code', { class: 'members-row__id', text: m.user_id }),
@@ -216,9 +212,9 @@
         var actions = [];
         if (!isSelf && !m.is_owner && iOutrank(m.role)) {
             var who = m.name || m.user_id;
-            actions.push(QSControls.edit(named(T.changeRoleOf, who), function () { openChangeRoleModal(m); },
+            actions.push(QSControls.edit(QSPanelWords.t('members.roster.changeRoleOf', { name: who }), function () { openChangeRoleModal(m); },
                 { focusKey: 'member-role:' + m.user_id }));
-            actions.push(QSControls.bin(named(T.removeOf, who), function () { openRemoveModal(m); },
+            actions.push(QSControls.bin(QSPanelWords.t('members.roster.removeOf', { name: who }), function () { openRemoveModal(m); },
                 { focusKey: 'member-remove:' + m.user_id }));
         }
         return _renderRow(main, actions);
@@ -236,7 +232,7 @@
         clearNode(root);
         setCount('members-roster-count', state.roster.length);
         if (!state.roster.length) {
-            root.appendChild(_renderEmpty(T.rosterEmpty || 'No members.'));
+            root.appendChild(_renderEmpty(QSPanelWords.t('members.roster.empty')));
             return;
         }
         state.roster.forEach(function (m) { root.appendChild(_renderMemberRow(m)); });
@@ -246,19 +242,19 @@
         var sel = _renderRoleSelect('change-role-select', assignableRoles());
         sel.value = iOutrank(m.role) && rankOf(m.role) > 0 ? m.role : sel.value;
         ask(
-            (T.changeRoleTitle || 'Change role') + ' — ' + (m.name || m.user_id),
+            QSPanelWords.t('members.roster.changeRoleTitle', { name: m.name || m.user_id }),
             [
                 el('div', { class: 'admin-form-group' }, [
-                    el('label', { class: 'admin-label', for: 'change-role-select', text: T.newRoleLabel || 'New role' }),
+                    el('label', { class: 'admin-label', for: 'change-role-select', text: QSPanelWords.t('members.roster.newRoleLabel') }),
                     sel,
                 ]),
             ],
-            T.apply || 'Apply', false,
+            QSPanelWords.t('members.roster.apply'), false,
             async function () {
                 var res = await api('changeMemberRole', 'POST', { user_id: m.user_id, role: sel.value });
                 await refreshLists();
                 if (!res || !res.ok) return answered(res);
-                toast(T.roleChangedMsg || 'Role updated', 'success');
+                toast(QSPanelWords.t('members.roster.roleChangedMsg'), 'success');
                 return true;
             },
             sel
@@ -268,14 +264,14 @@
     function openRemoveModal(m) {
         var noteInput = el('input', { type: 'text', class: 'admin-input', id: 'remove-note-input', maxlength: '500' });
         ask(
-            (T.removeTitle || 'Remove member') + ' — ' + (m.name || m.user_id),
+            QSPanelWords.t('members.roster.removeTitle', { name: m.name || m.user_id }),
             [
                 el('div', { class: 'admin-form-group' }, [
-                    el('label', { class: 'admin-label', for: 'remove-note-input', text: T.removeNoteLabel || 'Reason (optional)' }),
+                    el('label', { class: 'admin-label', for: 'remove-note-input', text: QSPanelWords.t('members.roster.removeNoteLabel') }),
                     noteInput,
                 ]),
             ],
-            T.remove || 'Remove', true,
+            QSPanelWords.t('members.roster.remove'), true,
             async function () {
                 var body = { user_id: m.user_id };
                 var note = noteInput.value.trim();
@@ -284,7 +280,7 @@
                 await refreshLists();
                 notifyMembershipChange();
                 if (!res || !res.ok) return answered(res);
-                toast(T.removedMsg || 'Member removed', 'success');
+                toast(QSPanelWords.t('members.roster.removedMsg'), 'success');
                 return true;
             }
         );
@@ -298,12 +294,13 @@
         var isInvite = q.direction === 'invite';
         var isSelfRequest = !isInvite && q.invited_by && q.invited_by.user_id === q.user_id;
         var kindChip = isInvite
-            ? el('span', { class: 'members-chip members-chip--invite', text: T.chipInvite || 'invitation' })
+            ? el('span', { class: 'members-chip members-chip--invite', text: QSPanelWords.t('members.queue.chipInvite') })
             : (isSelfRequest
-                ? el('span', { class: 'members-chip members-chip--request', text: T.chipRequest || 'join request' })
-                : el('span', { class: 'members-chip members-chip--proposal', text: T.chipProposal || 'proposal' }));
+                ? el('span', { class: 'members-chip members-chip--request', text: QSPanelWords.t('members.queue.chipRequest') })
+                : el('span', { class: 'members-chip members-chip--proposal', text: QSPanelWords.t('members.queue.chipProposal') }));
 
-        var byLabel = isInvite ? (T.invitedBy || 'invited by') : (isSelfRequest ? (T.askedBy || 'asked by') : (T.proposedBy || 'proposed by'));
+        // Who sent it, in the words of its kind: an invitation, the person's own request, a member's proposal.
+        var byKey = isInvite ? 'members.queue.invitedBy' : (isSelfRequest ? 'members.queue.askedBy' : 'members.queue.proposedBy');
         var byName = q.invited_by ? (q.invited_by.name || q.invited_by.user_id) : null;
 
         var main = [
@@ -313,8 +310,8 @@
             ]),
             el('span', { class: 'members-row__chips' }, [_renderRoleChip(q.role)]),
             _renderMeta([
-                byName ? byLabel + ' ' + byName : null,
-                q.sponsored_by ? (T.proposedBy || 'proposed by') + ' ' + (q.sponsored_by.name || q.sponsored_by.user_id) : null,
+                byName ? QSPanelWords.t(byKey, { name: byName }) : null,
+                q.sponsored_by ? QSPanelWords.t('members.queue.proposedBy', { name: q.sponsored_by.name || q.sponsored_by.user_id }) : null,
                 q.at || null,
             ]),
             el('code', { class: 'members-row__id', text: q.user_id }),
@@ -324,11 +321,11 @@
         var actions = [];
         if (iOutrank(q.role)) {
             if (isInvite) {
-                actions.push(QSControls.bin(named(T.cancelInviteOf, q.name || q.user_id), function () { openCancelInviteModal(q); },
+                actions.push(QSControls.bin(QSPanelWords.t('members.queue.cancelInviteOf', { name: q.name || q.user_id }), function () { openCancelInviteModal(q); },
                     { focusKey: 'invite-delete:' + q.user_id }));
             } else {
-                actions.push(_renderActionBtn(T.approve || 'Approve', ICON_CHECK, 'primary', function () { openApproveModal(q); }));
-                actions.push(_renderActionBtn(T.deny || 'Deny', null, 'danger', function () { openDenyModal(q); }));
+                actions.push(_renderActionBtn(QSPanelWords.t('members.queue.approve'), ICON_CHECK, 'primary', function () { openApproveModal(q); }));
+                actions.push(_renderActionBtn(QSPanelWords.t('members.queue.deny'), null, 'danger', function () { openDenyModal(q); }));
             }
         }
         return _renderRow(main, actions);
@@ -346,7 +343,7 @@
         clearNode(root);
         setCount('members-queue-count', state.queue.length);
         if (!state.queue.length) {
-            root.appendChild(_renderEmpty(T.queueEmpty || 'Nothing pending.'));
+            root.appendChild(_renderEmpty(QSPanelWords.t('members.queue.empty')));
             return;
         }
         state.queue.forEach(function (q) { root.appendChild(_renderQueueRow(q)); });
@@ -365,21 +362,21 @@
         var body = [
             el('p', {}, [el('strong', { text: q.name || q.user_id })]),
             el('div', { class: 'admin-form-group' }, [
-                el('label', { class: 'admin-label', for: 'approve-role-select', text: T.approveRoleLabel || 'Role to grant' }),
+                el('label', { class: 'admin-label', for: 'approve-role-select', text: QSPanelWords.t('members.queue.approveRoleLabel') }),
                 roleSelect,
             ]),
         ];
         if (q.note) body.push(_renderNote(q.note));
         ask(
-            T.approveTitle || 'Approve this request?', body,
-            T.approve || 'Approve', false,
+            QSPanelWords.t('members.queue.approveTitle'), body,
+            QSPanelWords.t('members.queue.approve'), false,
             async function () {
                 var res = await api('approveJoinRequest', 'POST', { user_id: q.user_id, role: roleSelect.value });
                 await refreshLists();
                 notifyMembershipChange();
                 if (!res || !res.ok) return answered(res);
                 var converted = res.data && res.data.data && res.data.data.converted_to_invitation;
-                toast(converted ? (T.convertedMsg || 'Invitation sent') : (T.approvedMsg || 'Approved'), 'success');
+                toast(QSPanelWords.t(converted ? 'members.queue.convertedMsg' : 'members.queue.approvedMsg'), 'success');
                 return true;
             },
             roleSelect
@@ -389,25 +386,25 @@
     function openDenyModal(q) {
         var noteInput = el('textarea', { class: 'admin-input', id: 'deny-note-input', rows: '3', maxlength: '500' });
         ask(
-            (T.denyTitle || 'Deny this request') + ' — ' + (q.name || q.user_id),
+            QSPanelWords.t('members.queue.denyTitle', { name: q.name || q.user_id }),
             [
                 el('div', { class: 'admin-form-group' }, [
-                    el('label', { class: 'admin-label', for: 'deny-note-input', text: T.denyNoteLabel || 'Reason (required)' }),
+                    el('label', { class: 'admin-label', for: 'deny-note-input', text: QSPanelWords.t('members.queue.denyNoteLabel') }),
                     noteInput,
                 ]),
             ],
-            T.deny || 'Deny', true,
+            QSPanelWords.t('members.queue.deny'), true,
             async function () {
                 var note = noteInput.value.trim();
                 if (!note) {
                     noteInput.focus();
-                    return { ok: false, message: T.denyNoteRequired || 'The refusal reason is required.' };
+                    return { ok: false, message: QSPanelWords.t('members.queue.denyNoteRequired') };
                 }
                 var res = await api('denyJoinRequest', 'POST', { user_id: q.user_id, note: note });
                 await refreshLists();
                 notifyMembershipChange();
                 if (!res || !res.ok) return answered(res);
-                toast(T.deniedMsg || 'Request denied', 'success');
+                toast(QSPanelWords.t('members.queue.deniedMsg'), 'success');
                 return true;
             },
             noteInput
@@ -416,15 +413,15 @@
 
     function openCancelInviteModal(q) {
         ask(
-            named(T.withdrawInviteTitle, q.name || q.user_id),
+            QSPanelWords.t('members.queue.withdrawInviteTitle', { name: q.name || q.user_id }),
             [el('p', {}, [el('strong', { text: q.name || q.user_id }), ' — ', _renderRoleChip(q.role)])],
-            T.withdrawInvite, true,
+            QSPanelWords.t('members.queue.withdrawInvite'), true,
             async function () {
                 var res = await api('cancelInvitation', 'POST', { user_id: q.user_id });
                 await refreshLists();
                 notifyMembershipChange();
                 if (!res || !res.ok) return answered(res);
-                toast(T.cancelledMsg || 'Invitation cancelled', 'success');
+                toast(QSPanelWords.t('members.queue.cancelledMsg'), 'success');
                 return true;
             }
         );
@@ -438,7 +435,7 @@
         return el('div', { class: 'members-match-row' }, [
             el('span', { class: 'members-row__title' }, [el('strong', { text: match.name })]),
             el('code', { class: 'members-row__id', text: match.user_id }),
-            _renderActionBtn(T.select || 'Select', ICON_CHECK, 'ghost', function () { onPick(match); }),
+            _renderActionBtn(QSPanelWords.t('members.invite.select'), ICON_CHECK, 'ghost', function () { onPick(match); }),
         ]);
     }
 
@@ -460,7 +457,7 @@
     function selfRequest(route, method, body) {
         var admin = window.QuickSiteAdmin;
         if (!admin || typeof admin.accountRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return admin.accountRequest(route, method, body);
     }
@@ -486,20 +483,19 @@
                 // The membership change already succeeded — this is the list not
                 // being updated, which is worth a word but is not a failure of
                 // what the operator asked for.
-                toast(res && res.status === 409
-                    ? (T.contactsFull || 'members.contacts.full')
-                    : (T.contactSaveFailed || 'members.contacts.saveFailed'), 'warning');
+                toast(QSPanelWords.t(res && res.status === 409 ? 'members.contacts.full' : 'members.contacts.saveFailed'), 'warning');
             });
     }
 
     /** Forget a contact, asked first: a refusal stays in the question. Answers whether it was forgotten. */
     function forgetContact(contact) {
-        return ask(named(T.contactForgetTitle, contact.name || contact.user_id), [el('p', { text: T.contactForgetText })],
-            T.contactForget, true,
+        return ask(QSPanelWords.t('members.contacts.forgetTitle', { name: contact.name || contact.user_id }),
+            [el('p', { text: QSPanelWords.t('members.contacts.forgetText') })],
+            QSPanelWords.t('members.contacts.forget'), true,
             async function () {
                 var res = await selfRequest('remove-contact', 'POST', { user_id: contact.user_id });
-                if (!res || !res.ok) return { ok: false, message: serverMessage(res, T.contactForgetFailed || 'members.contacts.forgetFailed') };
-                toast(T.contactForgotten || 'members.contacts.forgotten', 'success');
+                if (!res || !res.ok) return { ok: false, message: serverMessage(res, QSPanelWords.t('members.contacts.forgetFailed')) };
+                toast(QSPanelWords.t('members.contacts.forgotten'), 'success');
                 loadContacts();
                 return true;
             });
@@ -523,7 +519,7 @@
             return false;
         }
         selfRequest('remove-contact', 'POST', { user_id: picked.user_id }).then(function () { loadContacts(); });
-        toast(T.contactGone || 'members.contacts.gone', 'warning');
+        toast(QSPanelWords.t('members.contacts.gone'), 'warning');
         return true;
     }
 
@@ -535,7 +531,7 @@
     function _renderPickedRow(match) {
         return el('div', { class: 'members-match-row members-match-row--picked' }, [
             el('span', { class: 'members-row__title' }, [
-                el('span', { class: 'members-chip members-chip--picked', text: T.selected || 'Selected' }),
+                el('span', { class: 'members-chip members-chip--picked', text: QSPanelWords.t('members.invite.selected') }),
                 el('strong', { text: match.name }),
             ]),
             el('code', { class: 'members-row__id', text: match.user_id }),
@@ -590,7 +586,7 @@
             contactsSelect.appendChild(el('option', { value: '' }));
             state.contacts.forEach(function (c) { contactsSelect.appendChild(_renderContactOption(c)); });
             if (!contactsPicker && window.QSSearchableSelect) {
-                contactsPicker = new window.QSSearchableSelect(contactsSelect, { placeholder: T.contactPick || 'members.contacts.pick' });
+                contactsPicker = new window.QSSearchableSelect(contactsSelect, { placeholder: QSPanelWords.t('members.contacts.pick') });
             }
             showPickedInContacts();
         }
@@ -620,7 +616,7 @@
             picked = null;
             if (sendBtn) sendBtn.disabled = true;
             if (!name) {
-                toast(T.nameRequired || 'Type the exact public name first.', 'warning');
+                toast(QSPanelWords.t('members.invite.nameRequired'), 'warning');
                 nameInput.focus();
                 return;
             }
@@ -632,7 +628,7 @@
                 clearNode(results);
                 var matches = (res && res.ok && res.data && res.data.data && res.data.data.matches) || [];
                 if (!matches.length) {
-                    results.appendChild(_renderEmpty(T.searchNoMatch || 'No account with this exact public name.'));
+                    results.appendChild(_renderEmpty(QSPanelWords.t('members.invite.noMatches')));
                     return;
                 }
                 if (matches.length === 1) {
@@ -672,7 +668,7 @@
 
         sendBtn.addEventListener('click', function () {
             var picked = finder.getPicked();
-            if (!picked) { toast(T.pickRequired || 'Search and select a person first.', 'warning'); return; }
+            if (!picked) { toast(QSPanelWords.t('members.invite.pickRequired'), 'warning'); return; }
             var role = document.getElementById('invite-role').value;
             var note = document.getElementById('invite-note').value.trim();
             var body = { user_id: picked.user_id, role: role };
@@ -680,7 +676,7 @@
             sendBtn.disabled = true;
             api('inviteMember', 'POST', body).then(function (res) {
                 if (res && res.ok) {
-                    toast(T.inviteSentMsg || 'Invitation sent', 'success');
+                    toast(QSPanelWords.t('members.invite.sentMsg'), 'success');
                     // Recorded on a SUCCESSFUL offer, not on a successful search:
                     // a contact is somebody you actually brought onto a project,
                     // which is the person you will want again on the next one. A
@@ -708,10 +704,10 @@
 
         sendBtn.addEventListener('click', function () {
             var picked = finder.getPicked();
-            if (!picked) { toast(T.pickRequired || 'Search and select a person first.', 'warning'); return; }
+            if (!picked) { toast(QSPanelWords.t('members.invite.pickRequired'), 'warning'); return; }
             var note = document.getElementById('propose-note').value.trim();
             if (!note) {
-                toast(T.vouchRequired || 'The vouch note is required.', 'warning');
+                toast(QSPanelWords.t('members.propose.vouchRequired'), 'warning');
                 document.getElementById('propose-note').focus();
                 return;
             }
@@ -719,7 +715,7 @@
             sendBtn.disabled = true;
             api('proposeMember', 'POST', { user_id: picked.user_id, role: role, note: note }).then(function (res) {
                 if (res && res.ok) {
-                    toast(T.proposeSentMsg || 'Proposal recorded', 'success');
+                    toast(QSPanelWords.t('members.propose.sentMsg'), 'success');
                     // Same rule as invite above, and it has to be: an admin who
                     // can only propose would otherwise never build a list.
                     rememberContact(picked);
@@ -749,14 +745,14 @@
         if (!valueEl || !toggleBtn) return;
 
         var policy = state.joinPolicy || 'closed';
-        valueEl.textContent = policy === 'open' ? (T.policyOpen || 'open') : (T.policyClosed || 'closed');
+        valueEl.textContent = QSPanelWords.t(policy === 'open' ? 'members.policy.open' : 'members.policy.closed');
         valueEl.className = 'members-policy-value members-policy-value--' + policy;
         toggleBtn.disabled = false;
 
         if (advisory && advisoryText) {
             var showAdvisory = policy === 'open';
             advisory.hidden = !showAdvisory;
-            if (showAdvisory) advisoryText.textContent = T.policyAdvisory || '';
+            if (showAdvisory) advisoryText.textContent = QSPanelWords.t('members.policy.advisory');
         }
     }
 
@@ -766,7 +762,7 @@
         api('setJoinPolicy', 'POST', { policy: target }).then(function (res) {
             if (res && res.ok) {
                 state.joinPolicy = (res.data && res.data.data && res.data.data.join_policy) || target;
-                toast(T.policySavedMsg || 'Join policy updated', 'success');
+                toast(QSPanelWords.t('members.policy.savedMsg'), 'success');
                 // The server attaches an advisory note when the policy it set is
                 // open — surface its exact wording too.
                 var note = res.data && res.data.data && res.data.data.note;
@@ -785,9 +781,9 @@
             var target = (state.joinPolicy || 'closed') === 'open' ? 'closed' : 'open';
             if (target === 'open') {
                 ask(
-                    T.policyTitle || (T.policyOpen || 'open'),
-                    [el('p', { text: T.policyConfirmOpenPrivate || 'Open the join policy?' })],
-                    T.policyOpen || 'open', true,
+                    QSPanelWords.t('members.policy.confirmOpenTitle'),
+                    [el('p', { text: QSPanelWords.t('members.policy.confirmOpenPrivate') })],
+                    QSPanelWords.t('members.policy.confirmOpenSubmit'), true,
                     function () { return true; }
                 ).then(function (yes) { if (yes) applyPolicy(target); });
                 return;
@@ -809,7 +805,7 @@
         clearNode(memberSel);
         state.roster.forEach(function (m) {
             if (m.user_id === CFG.myUserId || m.is_owner) return;
-            memberSel.appendChild(el('option', { value: m.user_id, text: (m.name || m.user_id) + ' (' + (m.role || '?') + ')' }));
+            memberSel.appendChild(el('option', { value: m.user_id, text: (m.name || m.user_id) + ' (' + (m.role ? QuickSiteUtils.roleName(m.role) : '?') + ')' }));
         });
         fillRoleSelect(roleSel, rolesBelowOwner());
         roleSel.value = 'admin';
@@ -823,23 +819,21 @@
             var roleSel = document.getElementById('transfer-old-role');
             var confirmChk = document.getElementById('transfer-confirm');
             var userId = memberSel && memberSel.value;
-            if (!userId) { toast(T.transferMemberRequired || 'Pick the new owner first.', 'warning'); return; }
-            if (!confirmChk || !confirmChk.checked) { toast(T.transferConfirmRequired || 'Tick the confirmation first.', 'warning'); return; }
+            if (!userId) { toast(QSPanelWords.t('members.transfer.memberRequired'), 'warning'); return; }
+            if (!confirmChk || !confirmChk.checked) { toast(QSPanelWords.t('members.transfer.confirmRequired'), 'warning'); return; }
 
             var picked = null;
             state.roster.forEach(function (m) { if (m.user_id === userId) picked = m; });
-            var bodyText = (T.transferBody || 'The project is handed to {name}. Your role becomes {role}.')
-                .replace('{name}', (picked && picked.name) || userId)
-                .replace('{role}', roleSel.value);
+            var bodyText = QSPanelWords.t('members.transfer.modalBody', { name: (picked && picked.name) || userId, role: roleSel.value });
 
             ask(
-                T.transferTitle || 'Transfer ownership — final confirmation',
+                QSPanelWords.t('members.transfer.modalTitle'),
                 [el('p', { text: bodyText })],
-                T.transferBtn || 'Transfer ownership', true,
+                QSPanelWords.t('members.transfer.submit'), true,
                 async function () {
                     var res = await api('transferOwnership', 'POST', { user_id: userId, confirm: true, old_owner_role: roleSel.value });
                     if (!res || !res.ok) return answered(res);
-                    toast(T.transferredMsg || 'Ownership transferred', 'success');
+                    toast(QSPanelWords.t('members.transfer.doneMsg'), 'success');
                     // Roles changed radically (owner → old_owner_role):
                     // reload so the server re-renders the page for the
                     // new reality (sections, banner, pickers). The reload
@@ -870,10 +864,10 @@
                 window.location.href = window.location.pathname + '?t=' + Date.now();
                 return;
             }
-            toast(serverMessage(res, T.elsewhereSwitchFailed || 'Could not switch project'), 'error');
+            toast(serverMessage(res, QSPanelWords.t('members.queue.elsewhereSwitchFailed')), 'error');
             button.disabled = false;
         }, function () {
-            toast(T.elsewhereSwitchFailed || 'Could not switch project', 'error');
+            toast(QSPanelWords.t('members.queue.elsewhereSwitchFailed'), 'error');
             button.disabled = false;
         });
     }
@@ -887,7 +881,7 @@
             class: 'admin-btn admin-btn--primary',
             type: 'button',
             onclick: function () { switchToProject(p.project, go); },
-        }, [T.elsewhereSwitch || 'Switch to this project']);
+        }, [QSPanelWords.t('members.queue.elsewhereSwitch')]);
         return el('div', { class: 'members-elsewhere__row' }, [
             el('span', { class: 'badge badge--warning', text: String(p.count) }),
             el('span', { class: 'members-elsewhere__name', text: label }),
@@ -909,7 +903,7 @@
         clearNode(box);
         box.hidden = !others.length;
         if (!others.length) return;
-        box.appendChild(el('strong', { class: 'members-elsewhere__title', text: T.elsewhereTitle || 'Join requests are waiting in your other projects' }));
+        box.appendChild(el('strong', { class: 'members-elsewhere__title', text: QSPanelWords.t('members.queue.elsewhereTitle') }));
         others.forEach(function (p) { box.appendChild(_renderElsewhereRow(p)); });
     }
 

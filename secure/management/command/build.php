@@ -540,15 +540,24 @@ if (!qs_copy_publishable_directory(PUBLIC_CONTENT_PATH . '/assets', $publicConte
 // fetches them again after a new build is deployed), and the icon (linked only
 // when the build carries its file — a link to a missing file fails on every
 // page view).
+//
+// QuickSite's own words for the site's visitor are decided here too, one set per
+// language of the site (the toasts, the theme switch's labels, the 404 and fatal
+// pages: qs_visitor_words()), so the build carries them and no word file.
 require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
 $siteIcon = qs_page_icon_path();
+$siteWords = [];
+foreach (qs_project_language_codes() as $siteLanguage) {
+    $siteWords[$siteLanguage] = qs_visitor_words($siteLanguage);
+}
 $siteConfigPhp = qs_site_config_php(
     (string) PROJECT_NAME,
     $buildPublicName,
     $buildSecureName,
     $buildPublicSpace,
     time(),
-    qs_page_icon_linked($siteIcon, $publicContentPath) ? $siteIcon : null
+    qs_page_icon_linked($siteIcon, $publicContentPath) ? $siteIcon : null,
+    $siteWords
 );
 if (file_put_contents($publicContentPath . '/qs-site.php', $siteConfigPhp) === false) {
     abort_build(

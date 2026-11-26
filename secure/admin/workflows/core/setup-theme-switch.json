@@ -10,8 +10,30 @@
         "tags": ["theme", "dark", "light", "switch", "toggle"]
     },
     "parameters": [],
+    "dataRequirements": [
+        {
+            "id": "langData",
+            "command": "getLangList",
+            "extract": "data"
+        }
+    ],
     "steps": [
         {
+            "comment": "=== THE SWITCH'S WORDS: its name and its first label, in each of the site's languages, QuickSite's starting words in that language (a language with no word file of its own takes English) ===",
+            "forEach": "langData.languages",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "{{$value}}",
+                "translations": {
+                    "themeSwitch": {
+                        "toggle": "{{startingWord:visitor.aria.themeSwitch}}",
+                        "dark": "{{startingWord:visitor.themeSwitch.dark}}"
+                    }
+                }
+            }
+        },
+        {
+            "comment": "=== THE SWITCH: its label names the mode a press switches to; after a press the site's runtime sets it in the page's language ===",
             "command": "editStructure",
             "params": {
                 "type": "component",
@@ -22,7 +44,7 @@
                         "class": "theme-switch",
                         "data-theme-toggle": "true",
                         "type": "button",
-                        "aria-label": "Toggle light/dark theme",
+                        "aria-label": "themeSwitch.toggle",
                         "aria-pressed": "false"
                     },
                     "children": [
@@ -34,7 +56,7 @@
                         {
                             "tag": "span",
                             "params": { "class": "theme-switch-label" },
-                            "children": [{ "textKey": "__RAW__Dark mode" }]
+                            "children": [{ "textKey": "themeSwitch.dark" }]
                         }
                     ]
                 }

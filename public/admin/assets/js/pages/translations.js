@@ -9,24 +9,17 @@
  * Every control that writes is drawn only for a role that can run its command (translation.write), after the
  * panel's permissions load: a viewer sees the words and the languages, and nothing to press.
  *
- * Template: secure/admin/templates/pages/translations.php (the static structure and the words). Every dynamic part
- * is built here with QSDom.el and named _render* helpers, each returning one Element.
+ * Template: secure/admin/templates/pages/translations.php (the static structure, and the `translations` section it
+ * hands). Every dynamic part is built here with QSDom.el and named _render* helpers, each returning one Element.
  */
 (function () {
     'use strict';
 
-    const W = window.QS_TRANSLATIONS_I18N || {};
     const el = window.QSDom.el;
     const SW = window.QSSiteWords;
 
-    /** A page word, its {name} parts filled. */
-    function t(key, params) {
-        let s = Object.prototype.hasOwnProperty.call(W, key) ? W[key] : key;
-        if (params) {
-            Object.keys(params).forEach(function (name) { s = s.split('{' + name + '}').join(String(params[name])); });
-        }
-        return s;
-    }
+    /** A word of this page (translations), its {name} parts filled. */
+    function t(name, params) { return QSPanelWords.t('translations.' + name, params); }
 
     const state = {
         list: null,
@@ -333,8 +326,8 @@
         switch (done.reason) {
             case 'keyInvalid': return t('keyInvalid');
             case 'wordRequired': return t('wordRequired');
-            case 'exists': return t('keyExists', { key: key, languages: done.languages.map(languageName).join(', ') });
-            case 'clash': return t('keyClash', { key: key, languages: done.languages.map(languageName).join(', ') });
+            case 'exists': return t('keyExists', { key: key, languages: QSPanelWords.list(done.languages.map(languageName), 'unit') });
+            case 'clash': return t('keyClash', { key: key, languages: QSPanelWords.list(done.languages.map(languageName), 'unit') });
             case 'unread': return t('unread');
             default: return t('createFailed', { reason: done.message || '' });
         }
@@ -368,7 +361,7 @@
             if (!byState) return false;
             return !state.filter.same || row.cells.some(function (c) { return c.same; });
         });
-        dom.count.textContent = t('count', { shown: shown.length, total: all.length });
+        dom.count.textContent = QSPanelWords.count('translations.count', all.length, { shown: QSPanelWords.number(shown.length) });
         if (all.length === 0) {
             dom.table.replaceChildren(_renderMessage(t('noKeys'), false));
             return;
@@ -456,8 +449,8 @@
             }
         });
         if (e.busy) area.disabled = true;
-        const save = el('button', { type: 'button', class: 'admin-btn admin-btn--primary', text: t('common.save'), onclick: saveEdit });
-        const cancel = el('button', { type: 'button', class: 'admin-btn', text: t('common.cancel'), onclick: endEdit });
+        const save = el('button', { type: 'button', class: 'admin-btn admin-btn--primary', text: QSPanelWords.t('common.save'), onclick: saveEdit });
+        const cancel = el('button', { type: 'button', class: 'admin-btn', text: QSPanelWords.t('common.cancel'), onclick: endEdit });
         if (e.busy) {
             save.disabled = true;
             cancel.disabled = true;
@@ -570,7 +563,7 @@
         ask({
             title: t('deleteTitle', { key: row.key }),
             body: body,
-            action: t('common.delete'),
+            action: QSPanelWords.t('common.delete'),
             danger: true,
             run: async function () {
                 let targets;
@@ -586,7 +579,7 @@
                     return {
                         ok: false,
                         message: t('deleteFailed', {
-                            languages: done.failures.map(function (f) { return languageName(f.language); }).join(', '),
+                            languages: QSPanelWords.list(done.failures.map(function (f) { return languageName(f.language); }), 'unit'),
                             reason: done.failures.map(function (f) { return f.message; }).join(' | '),
                         }),
                     };
@@ -618,7 +611,7 @@
             })));
         }
         body.push(_renderParagraph(words > 0
-            ? t('addLanguageCopy', { n: words, default: languageName(dflt) })
+            ? QSPanelWords.count('translations.addLanguageCopy', words, { default: languageName(dflt) })
             : t('addLanguageEmpty')));
         ask({
             title: t('addLanguageTitle', { language: name }),
@@ -639,7 +632,7 @@
      */
     async function askRemoveLanguage(lang, words, button) {
         const list = state.list;
-        const body = [_renderParagraph(t('removeLanguageText', { n: words, language: lang.name }))];
+        const body = [_renderParagraph(QSPanelWords.count('translations.removeLanguageText', words, { language: lang.name }))];
         if (list.multilingual && list.codes.length === 2) {
             const remaining = list.defaultLanguage;
             body.push(_renderParagraph(t('removeLanguageToOne', {

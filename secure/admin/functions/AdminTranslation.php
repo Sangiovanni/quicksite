@@ -8,6 +8,8 @@
 
 class AdminTranslation {
     private static ?AdminTranslation $instance = null;
+    /** Whether this request's language is its Accept-Language header alone (the panel's JSON endpoints). */
+    private static bool $fromHeaderOnly = false;
     private array $translations = [];
     private string $currentLang = 'en';
     private string $fallbackLang = 'en';
@@ -29,9 +31,44 @@ class AdminTranslation {
     }
 
     /**
+     * The panel's JSON endpoints (/admin/api, /admin/self, /admin/state) answer in the language the panel's own request
+     * names: api.js sends the panel's language as Accept-Language. Called by qs_admin_json_boot() before any word is read.
+     * The session is never opened for it: those endpoints read the sign-in through a closed snapshot, and opening the
+     * session for a word would lock and write it on every call.
+     */
+    public static function takeLanguageFromHeader(): void {
+        self::$fromHeaderOnly = true;
+        self::$instance = null;
+    }
+
+    /**
+     * The first language an Accept-Language header names that the panel has (its full tag, then its base language),
+     * or null.
+     */
+    private function headerLanguage(): ?string {
+        $header = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
+        if (!is_string($header) || $header === '') {
+            return null;
+        }
+        $first = trim(explode(';', explode(',', $header)[0])[0]);
+        $base = explode('-', $first)[0];
+        foreach (array_unique([$first, $base]) as $candidate) {
+            if ($candidate !== '' && $this->isValidLanguage($candidate)) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Detect user's preferred language
      */
     private function detectLanguage(): void {
+        if (self::$fromHeaderOnly) {
+            $this->currentLang = $this->headerLanguage() ?? $this->fallbackLang;
+            return;
+        }
+
         // The admin language rides the SAME session as the login — a bare
         // session_start() here would open PHP's DEFAULT session instead, giving
         // the panel a second cookie and, worse, leaving $_SESSION pointing at
@@ -77,11 +114,9 @@ class AdminTranslation {
         }
 
         // Finally check browser preference
-        if (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
-            $browserLang = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
-            if ($this->isValidLanguage($browserLang)) {
-                $this->currentLang = $browserLang;
-            }
+        $browserLang = $this->headerLanguage();
+        if ($browserLang !== null) {
+            $this->currentLang = $browserLang;
         }
     }
 
@@ -194,24 +229,48 @@ class AdminTranslation {
 
     /**
      * Translate a key
-     * 
+     *
+     * A parameter is written in the word as {name} (the panel scripts' one form, so a word both a template and a script
+     * read has one spelling) or as :name. Both are filled in one pass from the word as written: a parameter's value is
+     * never read again, so a value holding {x} or :x stays as it is. Among :name parameters the longest name is tried
+     * first.
+     *
      * @param string $key Dot-notation key (e.g., 'login.title')
      * @param array $params Replacement parameters (e.g., ['name' => 'John'])
      * @return string Translated string or key if not found
      */
     public function t(string $key, array $params = []): string {
         $value = $this->getNestedValue($this->translations, $key);
-        
+
         if ($value === null) {
             return $key; // Return key if translation not found
         }
-        
-        // Replace parameters
-        foreach ($params as $param => $replacement) {
-            $value = str_replace(':' . $param, $replacement, $value);
+
+        if ($params === []) {
+            return $value;
         }
-        
-        return $value;
+        $names = array_map('strval', array_keys($params));
+        usort($names, static fn(string $a, string $b): int => strlen($b) - strlen($a));
+        $alternatives = implode('|', array_map(static fn(string $n): string => preg_quote($n, '/'), $names));
+        return preg_replace_callback('/\{(' . $alternatives . ')\}|:(' . $alternatives . ')/', static function (array $m) use ($params): string {
+            $name = ($m[1] ?? '') !== '' ? $m[1] : $m[2];
+            return (string) $params[$name];
+        }, $value);
+    }
+
+    /**
+     * The plural category of $n in the panel's language: 'one' or 'other' (or another category ICU names, when the
+     * intl extension is there to name it). Without intl, 'one' is exactly 1.
+     */
+    public function pluralCategory(int|float $n): string {
+        if (class_exists('MessageFormatter')) {
+            $category = MessageFormatter::formatMessage($this->currentLang,
+                '{n, plural, zero{zero} one{one} two{two} few{few} many{many} other{other}}', ['n' => $n]);
+            if (is_string($category) && $category !== '') {
+                return $category;
+            }
+        }
+        return $n == 1 ? 'one' : 'other';
     }
 
     /**
@@ -288,31 +347,15 @@ class AdminTranslation {
 }
 
 /**
- * Helper function for quick translation
- * 
- * @param string $key Translation key in dot notation
- * @param array|string $paramsOrFallback Either params array or fallback string
- * @param array $params Parameters when fallback is provided
- * @return string Translated string, fallback, or key if not found
+ * A panel word, by its key's whole path, its {name} (or :name) parameters filled: AdminTranslation::t(). A key no language
+ * holds answers its path, so a missing word shows on screen and a scan finds it, never an English fallback.
+ *
+ * @param string $key    Translation key in dot notation
+ * @param array  $params Parameters to fill
+ * @return string The word, or the key when no language holds it
  */
-function __admin(string $key, array|string $paramsOrFallback = [], array $params = []): string {
-    $instance = AdminTranslation::getInstance();
-    
-    // Handle second parameter being either params array or fallback string
-    if (is_string($paramsOrFallback)) {
-        $fallback = $paramsOrFallback;
-        $actualParams = $params;
-    } else {
-        $fallback = null;
-        $actualParams = $paramsOrFallback;
-    }
-    
-    // Check if key exists
-    if (!$instance->has($key)) {
-        return $fallback ?? $key;
-    }
-    
-    return $instance->t($key, $actualParams);
+function __admin(string $key, array $params = []): string {
+    return AdminTranslation::getInstance()->t($key, $params);
 }
 
 /**
@@ -329,7 +372,7 @@ function __admin(string $key, array|string $paramsOrFallback = [], array $params
  */
 function __adminDuration(int $seconds, string $round = 'up'): string {
     $seconds = max(1, $seconds);
-    $count = static fn(int $unit): int => (int)($round === 'nearest' ? round($seconds / $unit) : ceil($seconds / $unit));
+    $count = static fn(int $per): int => (int)($round === 'nearest' ? round($seconds / $per) : ceil($seconds / $per));
     if ($seconds < 60) {
         [$n, $unit] = [$seconds, 'second'];
     } elseif (($n = $count(60)) < 60) {
@@ -339,21 +382,65 @@ function __adminDuration(int $seconds, string $round = 'up'): string {
     } else {
         [$n, $unit] = [$count(86400), 'day'];
     }
-    return __admin('common.duration.' . $unit . ($n === 1 ? '' : 's'), ['count' => (string)$n]);
+    return __adminCount('common.duration.' . $unit, $n);
 }
 
 /**
- * Helper function for translation escaped for JavaScript single-quoted strings
- * Escapes apostrophes, backslashes, and newlines
+ * A counted word: <path>.<category>, the category of $n in the panel's language
+ * (AdminTranslation::pluralCategory()), else <path>.other; {count} (or :count) is $n. The server-side twin of
+ * QSPanelWords.count() (core/panel-words.js).
  */
-function __adminJs(string $key, array $params = []): string {
-    $value = AdminTranslation::getInstance()->t($key, $params);
-    // Escape backslashes first, then single quotes, then newlines
-    return str_replace(
-        ['\\', "'", "\r\n", "\n", "\r"],
-        ['\\\\', "\\'", '\\n', '\\n', '\\n'],
-        $value
-    );
+function __adminCount(string $path, int|float $n, array $params = []): string {
+    $instance = AdminTranslation::getInstance();
+    $chosen = $path . '.' . $instance->pluralCategory($n);
+    if (!$instance->has($chosen)) {
+        $chosen = $path . '.other';
+    }
+    return $instance->t($chosen, ['count' => (string) $n] + $params);
+}
+
+/**
+ * A role's name in the panel's language: a built-in role's word (roles.<id>), and a role an operator adds to roles.php its
+ * id, as no word names it. The server-side twin of QuickSiteUtils.roleName() (core/utils.js).
+ */
+function __adminRole(string $id): string {
+    return AdminTranslation::getInstance()->has('roles.' . $id) ? __admin('roles.' . $id) : $id;
+}
+
+/**
+ * A size in the panel's words: the PHP twin of QuickSiteUtils.formatSize() (core/utils.js), the same tiers and the same
+ * common.size.* words ({size}), the figure with two decimals and no grouping, its decimal mark the panel language's when
+ * the intl extension is there to say it (else a point). Change the two together.
+ */
+function __adminSize(int|float $bytes): string {
+    $n = max(0, (float) $bytes);
+    $figure = static function (float $v, int $decimals): string {
+        if (class_exists('NumberFormatter')) {
+            $f = new NumberFormatter(AdminTranslation::getInstance()->getCurrentLanguage(), NumberFormatter::DECIMAL);
+            $f->setAttribute(NumberFormatter::GROUPING_USED, 0);
+            $f->setAttribute(NumberFormatter::MIN_FRACTION_DIGITS, $decimals);
+            $f->setAttribute(NumberFormatter::MAX_FRACTION_DIGITS, $decimals);
+            $text = $f->format($v);
+            if (is_string($text) && $text !== '') {
+                return $text;
+            }
+        }
+        return number_format($v, $decimals, '.', '');
+    };
+    foreach ([['gigabytes', 1073741824], ['megabytes', 1048576], ['kilobytes', 1024]] as [$tierWord, $tierBytes]) {
+        if ($n >= $tierBytes) {
+            return __admin('common.size.' . $tierWord, ['size' => $figure($n / $tierBytes, 2)]);
+        }
+    }
+    return __admin('common.size.bytes', ['size' => $figure($n, 0)]);
+}
+
+/**
+ * A word written into HTML that holds <code> on purpose: the word escaped whole, then <code> and </code> alone given
+ * back as markup, so every other < in it shows as written.
+ */
+function adminEscapeCode(string $word): string {
+    return str_replace(['&lt;code&gt;', '&lt;/code&gt;'], ['<code>', '</code>'], htmlspecialchars($word, ENT_QUOTES, 'UTF-8'));
 }
 
 /**

@@ -45,9 +45,9 @@ $baseUrl = rtrim(BASE_URL, '/');
                 <polyline points="16 18 22 12 16 6"/>
                 <polyline points="8 6 2 12 8 18"/>
             </svg>
-            <?= __admin('commands.title') ?>
+            <?= adminEscape(__admin('commands.title')) ?>
         </h1>
-        <p class="admin-page-header__subtitle"><?= __admin('commands.subtitle') ?></p>
+        <p class="admin-page-header__subtitle"><?= adminEscape(__admin('commands.subtitle')) ?></p>
     </div>
     <div class="admin-page-header__actions">
     </div>
@@ -69,8 +69,8 @@ $baseUrl = rtrim(BASE_URL, '/');
         <circle cx="12" cy="12" r="10"/>
         <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
     </svg>
-    <h2 class="admin-empty__title"><?= __admin('commands.disabled.title', 'The command console is turned off') ?></h2>
-    <p class="admin-empty__text"><?= __admin('commands.disabled.text', 'The operator of this installation chose not to offer it. This removes a page, not a permission: every command still answers on the Management API to any caller whose role allows it, and the panel\'s other pages are unaffected.') ?></p>
+    <h2 class="admin-empty__title"><?= adminEscape(__admin('commands.disabled.title')) ?></h2>
+    <p class="admin-empty__text"><?= adminEscape(__admin('commands.disabled.text')) ?></p>
 </div>
 
 <?php elseif (!$commandExists): ?>
@@ -80,9 +80,9 @@ $baseUrl = rtrim(BASE_URL, '/');
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
-    <h2 class="admin-empty__title"><?= __admin('commands.notFound.title', 'Command not found') ?></h2>
-    <p class="admin-empty__text"><code><?= adminEscape($selectedCommand) ?></code>: <?= __admin('commands.notFound.text', 'QuickSite has no command by this name. It may have been removed in an update, or the address may be mistyped.') ?></p>
-    <a href="<?= $router->url('command') ?>" class="admin-btn admin-btn--primary"><?= __admin('commands.notFound.back', 'All commands') ?></a>
+    <h2 class="admin-empty__title"><?= adminEscape(__admin('commands.notFound.title')) ?></h2>
+    <p class="admin-empty__text"><code><?= adminEscape($selectedCommand) ?></code>: <?= adminEscape(__admin('commands.notFound.text')) ?></p>
+    <a href="<?= $router->url('command') ?>" class="admin-btn admin-btn--primary"><?= adminEscape(__admin('commands.notFound.back')) ?></a>
 </div>
 
 <?php else: ?>

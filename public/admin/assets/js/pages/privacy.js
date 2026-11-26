@@ -34,22 +34,10 @@
         words: {},                     // {code: {id: {label, purpose}}}: each language read, as its pages show it
     };
 
-    // The words of this page's dialogs and error toasts: window.QS_PRIVACY_I18N, the `privacy` translations
-    // privacy.php writes verbatim. t(path, params) substitutes `:name` markers and returns the
-    // path itself when nothing resolves, so an untranslated string shows on screen.
-    function t(path, params) {
-        var node = window.QS_PRIVACY_I18N || {};
-        var parts = String(path).split('.');
-        for (var i = 0; i < parts.length; i++) {
-            if (node === null || typeof node !== 'object' || !(parts[i] in node)) return path;
-            node = node[parts[i]];
-        }
-        if (typeof node !== 'string') return path;
-        Object.keys(params || {}).forEach(function (name) {
-            node = node.split(':' + name).join(String(params[name]));
-        });
-        return node;
-    }
+    // The page's words are the `privacy` section of the panel's words, which privacy.php hands: each is read
+    // by its key's whole path through QSPanelWords (core/panel-words.js).
+
+    /** Items listed in the panel's language, as a plain enumeration ("a, b, c" in English). */
 
     /** A failure the user must see: the panel's error toast. */
     function showError(text) {
@@ -59,7 +47,8 @@
     function api(cmd, method, body) {
         var adminApi = window.QuickSiteAdmin;
         if (!adminApi || typeof adminApi.apiRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            // Its message is shown: a dialog's error line, an error toast.
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return adminApi.apiRequest(cmd, method, body);
     }
@@ -144,10 +133,17 @@
 
     function _renderCoverage(cov) {
         var box = QSDom.el('div', { class: 'privacy-coverage' + (cov.complete ? ' privacy-coverage--ok' : '') });
+        var unverifiable = (cov.undeclaredEndpoints || []).length;
         var items = [
-            { label: 'fields mapped', value: cov.mappedAtoms + ' / ' + cov.totalAtoms, warn: cov.unmappedAtoms > 0 },
-            { label: 'unverifiable endpoints', value: String((cov.undeclaredEndpoints || []).length), warn: (cov.undeclaredEndpoints || []).length > 0 },
-            { label: 'unclassified hosts', value: String(cov.unclassifiedHosts), warn: cov.unclassifiedHosts > 0 },
+            {
+                label: QSPanelWords.t('privacy.coverage.fieldsMapped'),
+                value: QSPanelWords.t('privacy.coverage.fraction', {
+                    mapped: QSPanelWords.number(cov.mappedAtoms), total: QSPanelWords.number(cov.totalAtoms),
+                }),
+                warn: cov.unmappedAtoms > 0,
+            },
+            { label: QSPanelWords.t('privacy.coverage.unverifiableEndpoints'), value: QSPanelWords.number(unverifiable), warn: unverifiable > 0 },
+            { label: QSPanelWords.t('privacy.coverage.unclassifiedHosts'), value: QSPanelWords.number(cov.unclassifiedHosts), warn: cov.unclassifiedHosts > 0 },
         ];
         items.forEach(function (it) {
             var cell = QSDom.el('div', { class: 'privacy-coverage__cell' + (it.warn ? ' privacy-coverage__cell--warn' : '') });
@@ -156,7 +152,8 @@
             box.appendChild(cell);
         });
         var status = QSDom.el('div', { class: 'privacy-coverage__status' });
-        status.appendChild(_pill(cov.complete ? 'Complete' : 'Incomplete', cov.complete ? 'ok' : 'warn'));
+        status.appendChild(_pill(cov.complete ? QSPanelWords.t('privacy.coverage.complete') : QSPanelWords.t('privacy.coverage.incomplete'),
+            cov.complete ? 'ok' : 'warn'));
         box.appendChild(status);
         return box;
     }
@@ -169,25 +166,25 @@
     function _renderCollectedSection(list) {
         var s = QSDom.el('section', { class: 'privacy-section' });
         var head = QSDom.el('div', { class: 'privacy-section__head' });
-        head.appendChild(QSDom.el('h2', { class: 'privacy-section__title', text: 'Data collected' }));
-        head.appendChild(QSDom.el('span', { class: 'privacy-section__count', text: String(list.length) }));
+        head.appendChild(QSDom.el('h2', { class: 'privacy-section__title', text: QSPanelWords.t('privacy.collected.title') }));
+        head.appendChild(QSDom.el('span', { class: 'privacy-section__count', text: QSPanelWords.number(list.length) }));
 
         var actions = QSDom.el('div', { class: 'privacy-section__actions' });
         if (multilingual()) {
             // The language the cards show, in step with the datum dialog's picker. Changing it moves nothing.
-            actions.appendChild(QSDom.el('label', { class: 'privacy-desclang__label', for: 'privacy-shown-language', text: t('privacy.languages.shownIn') }));
+            actions.appendChild(QSDom.el('label', { class: 'privacy-desclang__label', for: 'privacy-shown-language', text: QSPanelWords.t('privacy.languages.shownIn') }));
             var langSel = _renderLanguageSelect(state.lang);
             langSel.id = 'privacy-shown-language';
             langSel.classList.add('privacy-desclang__select');
             langSel.addEventListener('change', function () { setLanguage(langSel.value); });
             actions.appendChild(langSel);
         }
-        actions.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', 'data-focus-key': 'datum-add', onclick: function () { openDatumModal(null); } }), 'setCollectedDatum'));
+        actions.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: QSPanelWords.t('privacy.collected.add'), 'data-focus-key': 'datum-add', onclick: function () { openDatumModal(null); } }), 'setCollectedDatum'));
         head.appendChild(actions);
         s.appendChild(head);
 
         if (!list.length) {
-            s.appendChild(QSDom.el('p', { class: 'privacy-empty', text: 'No "data collected" entries yet. Add one, then map the fields below to it.' }));
+            s.appendChild(QSDom.el('p', { class: 'privacy-empty', text: QSPanelWords.t('privacy.collected.empty') }));
             return s;
         }
         var wrap = QSDom.el('div', { class: 'privacy-collected' });
@@ -196,9 +193,9 @@
             card.appendChild(_renderDatumWords(d));
             var acts = QSDom.el('div', { class: 'privacy-collected__actions' });
             var name = (storedWords(d.id, state.lang) || {}).label || d.id;
-            acts.appendChild(QSControls.edit(t('privacy.actions.edit', { name: name }), function () { openDatumModal(d); },
+            acts.appendChild(QSControls.edit(QSPanelWords.t('privacy.actions.edit', { name: name }), function () { openDatumModal(d); },
                 { command: 'setCollectedDatum', focusKey: 'datum-edit:' + d.id }));
-            acts.appendChild(QSControls.bin(t('privacy.actions.delete', { name: name }), function () { onDeleteDatum(d); },
+            acts.appendChild(QSControls.bin(QSPanelWords.t('privacy.actions.delete', { name: name }), function () { onDeleteDatum(d); },
                 { command: 'deleteCollectedDatum', focusKey: 'datum-delete:' + d.id }));
             card.appendChild(acts);
             wrap.appendChild(card);
@@ -214,15 +211,15 @@
         var body = QSDom.el('div', { class: 'privacy-collected__body' });
         body.appendChild(QSDom.el('span', { class: 'privacy-collected__label', text: (words && words.label) || d.id }));
         if (words === null) {
-            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose privacy-collected__purpose--none', text: t('privacy.languages.unread', { language: name }) }));
+            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose privacy-collected__purpose--none', text: QSPanelWords.t('privacy.languages.unread', { language: name }) }));
             return body;
         }
         if (!words.label && multilingual()) {
-            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose privacy-collected__purpose--none', text: t('privacy.languages.noLabelIn', { language: name }) }));
+            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose privacy-collected__purpose--none', text: QSPanelWords.t('privacy.languages.noLabelIn', { language: name }) }));
         }
         body.appendChild(QSDom.el('span', {
             class: 'privacy-collected__purpose' + (words.purpose ? '' : ' privacy-collected__purpose--none'),
-            text: words.purpose || (multilingual() ? t('privacy.languages.noPurposeIn', { language: name }) : '—'),
+            text: words.purpose || (multilingual() ? QSPanelWords.t('privacy.languages.noPurposeIn', { language: name }) : '—'),
         }));
         return body;
     }
@@ -238,7 +235,7 @@
         var id = 'privacy-dialog-' + Date.now();
         var errorLine = QSDom.el('p', { class: 'privacy-dialog__error', role: 'alert', hidden: 'hidden' });
         var closeBtn = QSControls.close(null, null);
-        var cancelBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', text: 'Cancel' });
+        var cancelBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost', text: QSPanelWords.t('common.cancel') });
         var saveBtn = _mark(QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary', text: opts.action }), opts.command);
         var modal = QSDom.el('div', {
             class: 'admin-modal-dialog privacy-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': id,
@@ -271,7 +268,7 @@
             try {
                 done = await opts.save(error);
             } catch (e) {
-                error((e && e.message) || t('privacy.errors.network'));
+                error((e && e.message) || QSPanelWords.t('privacy.errors.network'));
             }
             saveBtn.disabled = false;
             if (done) close();
@@ -311,8 +308,8 @@
         var stored = function (code) { return isEdit ? storedWords(datum.id, code) : { label: '', purpose: '' }; };
         if (!isEdit && opts.prefillLabel) drafts[shown] = { label: opts.prefillLabel, purpose: '' };
 
-        var labelInput = QSDom.el('input', { type: 'text', class: 'admin-input privacy-dialog__label-input', autocomplete: 'off', placeholder: 'e.g. Email address' });
-        var purposeInput = QSDom.el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'What you do with it' });
+        var labelInput = QSDom.el('input', { type: 'text', class: 'admin-input privacy-dialog__label-input', autocomplete: 'off', placeholder: QSPanelWords.t('privacy.collectedDialog.labelPlaceholder') });
+        var purposeInput = QSDom.el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: QSPanelWords.t('privacy.collectedDialog.purposePlaceholder') });
         var purposeField = _renderField('', purposeInput);
         var purposeLabel = purposeField.querySelector('label');
         var hint = QSDom.el('p', { class: 'admin-hint' });
@@ -326,9 +323,9 @@
             labelInput.value = draft ? draft.label : ((words && words.label) || '');
             purposeInput.value = draft ? draft.purpose : ((words && words.purpose) || '');
             purposeLabel.textContent = multilingual()
-                ? t('privacy.languages.purposeIn', { language: langName(code) }) : t('privacy.languages.purpose');
-            hint.textContent = words === null ? t('privacy.languages.unread', { language: langName(code) })
-                : (isEdit ? 'Editing is live — no regenerate needed.' : 'A stable id is derived from the label; the label stays editable afterwards.');
+                ? QSPanelWords.t('privacy.languages.purposeIn', { language: langName(code) }) : QSPanelWords.t('privacy.languages.purpose');
+            hint.textContent = words === null ? QSPanelWords.t('privacy.languages.unread', { language: langName(code) })
+                : (isEdit ? QSPanelWords.t('privacy.collectedDialog.editHint') : QSPanelWords.t('privacy.collectedDialog.addHint'));
         }
         labelInput.addEventListener('input', remember);
         purposeInput.addEventListener('input', remember);
@@ -338,8 +335,8 @@
         if (multilingual() && _canRun('setCollectedDatum')) {
             picker = _mark(_renderLanguageSelect(shown), 'setCollectedDatum');
             picker.classList.add('privacy-dialog__lang');
-            picker.setAttribute('aria-label', t('privacy.languages.language'));
-            picker.title = t('privacy.languages.language');
+            picker.setAttribute('aria-label', QSPanelWords.t('privacy.languages.language'));
+            picker.title = QSPanelWords.t('privacy.languages.language');
             picker.addEventListener('change', function () {
                 remember();
                 showLanguage(picker.value);
@@ -349,7 +346,7 @@
         }
         labelRow.appendChild(labelInput);
         // The label's field holds the picker and the input on one row.
-        var labelField = _renderField(t('privacy.languages.label'), labelInput, labelRow);
+        var labelField = _renderField(QSPanelWords.t('privacy.languages.label'), labelInput, labelRow);
         showLanguage(shown);
 
         /** The writes a save makes, {lang, label, purpose} each, or a refusal's words. */
@@ -366,19 +363,23 @@
                 if (isEdit ? (label === String(words.label || '').trim() && purpose === String(words.purpose || '').trim())
                     : (label === '' && purpose === '')) continue;
                 if (label === '') {
-                    return { refused: multilingual() ? t('privacy.languages.labelRequiredIn', { language: langName(code) }) : 'A label is required.', lang: code };
+                    return {
+                        refused: multilingual() ? QSPanelWords.t('privacy.languages.labelRequiredIn', { language: langName(code) })
+                            : QSPanelWords.t('privacy.collectedDialog.labelRequired'),
+                        lang: code,
+                    };
                 }
                 writes.push({ lang: code, label: label, purpose: purpose });
             }
-            if (!isEdit && writes.length === 0) return { refused: 'A label is required.', lang: shown };
+            if (!isEdit && writes.length === 0) return { refused: QSPanelWords.t('privacy.collectedDialog.labelRequired'), lang: shown };
             // The default language first: a new datum's id comes from its label there when it has one.
             writes.sort(function (a, b) { return (a.lang === state.defaultLanguage ? 0 : 1) - (b.lang === state.defaultLanguage ? 0 : 1); });
             return { writes: writes };
         }
 
         _openDialog({
-            title: isEdit ? 'Edit data collected' : 'Add data collected',
-            action: isEdit ? 'Save' : 'Add',
+            title: isEdit ? QSPanelWords.t('privacy.collectedDialog.titleEdit') : QSPanelWords.t('privacy.collectedDialog.titleAdd'),
+            action: isEdit ? QSPanelWords.t('common.save') : QSPanelWords.t('common.add'),
             command: 'setCollectedDatum',
             body: [labelField, purposeField, hint],
             first: labelInput,
@@ -390,13 +391,13 @@
                     return false;
                 }
                 var id = isEdit ? datum.id : _slug(p.writes[0].label);
-                if (!id) { error('Could not derive an id from that label — use letters or numbers.'); return false; }
+                if (!id) { error(QSPanelWords.t('privacy.collectedDialog.noId')); return false; }
                 for (var i = 0; i < p.writes.length; i++) {
                     var w = p.writes[i];
                     var r = await api('setCollectedDatum', 'POST', { id: id, label: w.label, purpose: w.purpose, lang: w.lang });
                     if (!r || !r.ok) {
-                        var said = _serverWords(r, 'Save failed');
-                        error(multilingual() ? langName(w.lang) + ': ' + said : said);
+                        var said = _serverWords(r, QSPanelWords.t('common.saveFailed'));
+                        error(multilingual() ? QSPanelWords.t('privacy.collectedDialog.failedIn', { language: langName(w.lang), message: said }) : said);
                         if (i > 0) await refresh(true);
                         return false;
                     }
@@ -415,24 +416,24 @@
         if (kind === 'self') selfRadio.checked = true;
         var thirdRadio = QSDom.el('input', { type: 'radio', name: name, value: 'third-party' });
         if (kind === 'third-party') thirdRadio.checked = true;
-        var nameInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'Name, e.g. Mailchimp', value: h.name || '' });
+        var nameInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: QSPanelWords.t('privacy.hostDialog.namePlaceholder'), value: h.name || '' });
         var urlInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'https://…/privacy', value: h.privacyUrl || '' });
         var tpWrap = QSDom.el('div', { class: 'privacy-host-tp' }, [
-            _renderField('Third-party name', nameInput),
-            _renderField('Privacy-policy URL', urlInput),
+            _renderField(QSPanelWords.t('privacy.hostDialog.name'), nameInput),
+            _renderField(QSPanelWords.t('privacy.hostDialog.privacyUrl'), urlInput),
         ]);
         function syncTp() { tpWrap.style.display = thirdRadio.checked ? '' : 'none'; }
         selfRadio.addEventListener('change', syncTp);
         thirdRadio.addEventListener('change', syncTp);
         syncTp();
         _openDialog({
-            title: 'Classify host',
-            action: 'Save',
+            title: QSPanelWords.t('privacy.hostDialog.title'),
+            action: QSPanelWords.t('common.save'),
             command: 'setPrivacyHost',
             body: [
                 QSDom.el('code', { class: 'privacy-host__url', text: h.baseUrl }),
-                QSDom.el('label', { class: 'privacy-radio' }, [selfRadio, ' A server you operate']),
-                QSDom.el('label', { class: 'privacy-radio' }, [thirdRadio, ' A third party']),
+                QSDom.el('label', { class: 'privacy-radio' }, [selfRadio, ' ' + QSPanelWords.t('privacy.hostDialog.self')]),
+                QSDom.el('label', { class: 'privacy-radio' }, [thirdRadio, ' ' + QSPanelWords.t('privacy.hostDialog.thirdParty')]),
                 tpWrap,
             ],
             first: kind === 'third-party' ? thirdRadio : selfRadio,
@@ -441,7 +442,7 @@
                 var body = { baseUrl: h.baseUrl, kind: k };
                 if (k === 'third-party') { body.name = nameInput.value.trim(); body.privacyUrl = urlInput.value.trim(); }
                 var r = await api('setPrivacyHost', 'POST', body);
-                if (!r || !r.ok) { error(_serverWords(r, 'Save failed')); return false; }
+                if (!r || !r.ok) { error(_serverWords(r, QSPanelWords.t('common.saveFailed'))); return false; }
                 await refresh();
                 return true;
             },
@@ -450,13 +451,13 @@
 
     /** A datum's delete, asked first: a refusal stays in the dialog, and the cards are drawn again before it closes. */
     function onDeleteDatum(d) {
-        return QuickSiteUtils.confirm(t('privacy.dialogs.deleteDatumText'), {
-            title: t('privacy.dialogs.deleteDatum', { name: d.label || d.id }),
+        return QuickSiteUtils.confirm(QSPanelWords.t('privacy.dialogs.deleteDatumText'), {
+            title: QSPanelWords.t('privacy.dialogs.deleteDatum', { name: d.label || d.id }),
             type: 'danger',
-            confirmText: t('privacy.dialogs.delete'),
+            confirmText: QSPanelWords.t('privacy.dialogs.delete'),
             action: async function () {
                 var r = await api('deleteCollectedDatum', 'POST', { id: d.id });
-                if (!r || !r.ok) return { ok: false, message: _serverWords(r, t('privacy.errors.deleteFailed')) };
+                if (!r || !r.ok) return { ok: false, message: _serverWords(r, QSPanelWords.t('privacy.errors.deleteFailed')) };
                 await refresh();
                 return true;
             },
@@ -478,11 +479,11 @@
     function openAtomMenu(endpoint, field, currentDatum, anchorEl) {
         _closeAtomMenu();
         var menu = QSDom.el('div', { class: 'privacy-atom-menu' });
-        menu.appendChild(QSDom.el('div', { class: 'privacy-atom-menu__head', text: 'Map "' + field + '" to:' }));
+        menu.appendChild(QSDom.el('div', { class: 'privacy-atom-menu__head', text: QSPanelWords.t('privacy.mapping.title', { field: field }) }));
         var listing = QSDom.el('div', { class: 'privacy-atom-menu__list' });
         var data = (state.status && state.status.collectedData) || [];
         if (!data.length) {
-            listing.appendChild(QSDom.el('div', { class: 'privacy-atom-menu__empty', text: 'No data collected yet.' }));
+            listing.appendChild(QSDom.el('div', { class: 'privacy-atom-menu__empty', text: QSPanelWords.t('privacy.mapping.empty') }));
         }
         data.forEach(function (d) {
             listing.appendChild(QSDom.el('button', {
@@ -496,12 +497,12 @@
         if (currentDatum) {
             var unset = QSDom.el('button', { type: 'button', class: 'privacy-atom-menu__action privacy-atom-menu__action--delete', onclick: function () { _closeAtomMenu(); askUnset(endpoint, field, currentDatum); } });
             unset.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.trash, 14));
-            unset.appendChild(document.createTextNode(' ' + t('privacy.mapping.unset')));
+            unset.appendChild(document.createTextNode(' ' + QSPanelWords.t('privacy.mapping.unset')));
             menu.appendChild(unset);
         }
         menu.appendChild(_mark(QSDom.el('button', {
             type: 'button', class: 'privacy-atom-menu__action privacy-atom-menu__action--new',
-            text: '+ New data collected from this field',
+            text: QSPanelWords.t('privacy.mapping.newDatum'),
             onclick: function () { _closeAtomMenu(); openDatumModal(null, { prefillLabel: field, afterSave: function (id) { return setMapping(endpoint, field, id); } }); },
         }), 'setCollectedDatum'));
 
@@ -523,15 +524,15 @@
     function askUnset(endpoint, field, datumId) {
         var datum = (state.status && state.status.collectedData || []).filter(function (d) { return d.id === datumId; })[0];
         var name = datum ? ((storedWords(datum.id, state.lang) || {}).label || datum.id) : datumId;
-        return QuickSiteUtils.confirm(t('privacy.dialogs.unsetMappingText', { datum: name }), {
-            title: t('privacy.dialogs.unsetMapping', { field: field }),
+        return QuickSiteUtils.confirm(QSPanelWords.t('privacy.dialogs.unsetMappingText', { datum: name }), {
+            title: QSPanelWords.t('privacy.dialogs.unsetMapping', { field: field }),
             type: 'danger',
-            confirmText: t('privacy.mapping.unset'),
+            confirmText: QSPanelWords.t('privacy.mapping.unset'),
             // The menu that opened the question is gone: the focus goes back to the field's chip, drawn again after a save.
             returnFocus: function () { return QSDom.byFocusKey('atom:' + endpoint + '/' + field); },
             action: async function () {
                 var r = await api('setPrivacyMapping', 'POST', { endpoint: endpoint, field: field, datum: '__unset__' });
-                if (!r || !r.ok) return { ok: false, message: _serverWords(r, t('privacy.errors.mappingFailed')) };
+                if (!r || !r.ok) return { ok: false, message: _serverWords(r, QSPanelWords.t('privacy.errors.mappingFailed')) };
                 await refresh();
                 return true;
             },
@@ -541,34 +542,35 @@
     function setMapping(endpoint, field, datumId) {
         return api('setPrivacyMapping', 'POST', { endpoint: endpoint, field: field, datum: datumId || '__unset__' })
             .then(function (r) {
-                if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.mappingFailed')); return; }
+                if (!r || !r.ok) { showError((r && r.data && r.data.message) || QSPanelWords.t('privacy.errors.mappingFailed')); return; }
                 return refresh();
             })
-            .catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
+            .catch(function (e) { showError((e && e.message) || QSPanelWords.t('privacy.errors.network')); });
     }
 
     // ---- hosts ------------------------------------------------------------
 
     function _renderHosts(hosts) {
         if (!hosts.length) {
-            return QSDom.el('p', { class: 'privacy-empty', text: 'No API hosts in the registry.' });
+            return QSDom.el('p', { class: 'privacy-empty', text: QSPanelWords.t('privacy.hosts.empty') });
         }
         var wrap = QSDom.el('div', { class: 'privacy-hosts' });
         hosts.forEach(function (h) {
             var row = QSDom.el('div', { class: 'privacy-host' });
             var main = QSDom.el('div', { class: 'privacy-host__main' });
             main.appendChild(QSDom.el('code', { class: 'privacy-host__url', text: h.baseUrl }));
-            var kind = h.kind === 'third-party' ? _pill('third party' + (h.name ? ': ' + h.name : ''), 'third')
-                : h.kind === 'self' ? _pill('your server', 'self')
-                : _pill('unclassified', 'warn');
+            var kind = h.kind === 'third-party'
+                ? _pill(h.name ? QSPanelWords.t('privacy.hosts.thirdPartyNamed', { name: h.name }) : QSPanelWords.t('privacy.hosts.thirdParty'), 'third')
+                : h.kind === 'self' ? _pill(QSPanelWords.t('privacy.hosts.self'), 'self')
+                : _pill(QSPanelWords.t('privacy.hosts.unclassified'), 'warn');
             main.appendChild(kind);
-            main.appendChild(QSDom.el('span', { class: 'privacy-host__apis', text: (h.apiIds || []).join(', ') }));
+            main.appendChild(QSDom.el('span', { class: 'privacy-host__apis', text: QSPanelWords.list(h.apiIds || [], 'unit') }));
             row.appendChild(main);
             row.appendChild(h.kind
-                ? QSControls.edit(t('privacy.actions.editHost', { host: h.baseUrl }), function () { openHostModal(h); },
+                ? QSControls.edit(QSPanelWords.t('privacy.actions.editHost', { host: h.baseUrl }), function () { openHostModal(h); },
                     { command: 'setPrivacyHost', focusKey: 'host-edit:' + h.baseUrl, className: 'privacy-host__classify' })
                 : _mark(QSDom.el('button', {
-                    class: 'admin-btn admin-btn--ghost privacy-host__classify', type: 'button', text: 'Classify',
+                    class: 'admin-btn admin-btn--ghost privacy-host__classify', type: 'button', text: QSPanelWords.t('privacy.hosts.classify'),
                     'data-focus-key': 'host-edit:' + h.baseUrl, onclick: function () { openHostModal(h); },
                 }), 'setPrivacyHost'));
             wrap.appendChild(row);
@@ -580,7 +582,7 @@
 
     function _renderEndpoints(endpoints) {
         if (!endpoints.length) {
-            return QSDom.el('p', { class: 'privacy-empty', text: 'No endpoints in the API registry.' });
+            return QSDom.el('p', { class: 'privacy-empty', text: QSPanelWords.t('privacy.endpoints.empty') });
         }
         var wrap = QSDom.el('div', { class: 'privacy-endpoints' });
         endpoints.forEach(function (ep) {
@@ -588,7 +590,7 @@
             var head = QSDom.el('div', { class: 'privacy-endpoint__head' });
             head.appendChild(_pill(ep.method, 'method'));
             head.appendChild(QSDom.el('code', { class: 'privacy-endpoint__key', text: ep.key }));
-            if (ep.undeclaredBody) head.appendChild(_pill('no declared body', 'warn'));
+            if (ep.undeclaredBody) head.appendChild(_pill(QSPanelWords.t('privacy.endpoints.noDeclaredBody'), 'warn'));
             card.appendChild(head);
 
             if (ep.fields && ep.fields.length) {
@@ -598,17 +600,20 @@
                     var mapped = f.datum != null;
                     var cls = 'privacy-atom' + (mapped ? ' privacy-atom--mapped' : ' privacy-atom--unset');
                     var chip = mayMap
-                        ? QSDom.el('button', { type: 'button', class: cls, title: 'Click to map', 'data-focus-key': 'atom:' + ep.key + '/' + f.field })
+                        ? QSDom.el('button', { type: 'button', class: cls, title: QSPanelWords.t('privacy.endpoints.clickToMap'), 'data-focus-key': 'atom:' + ep.key + '/' + f.field })
                         : QSDom.el('span', { class: cls + ' privacy-atom--static' });
                     chip.appendChild(QSDom.el('span', { class: 'privacy-atom__field', text: f.field }));
-                    chip.appendChild(QSDom.el('span', { class: 'privacy-atom__datum', text: mapped ? '→ ' + f.datum : 'unset' }));
+                    chip.appendChild(QSDom.el('span', {
+                        class: 'privacy-atom__datum',
+                        text: mapped ? QSPanelWords.t('privacy.endpoints.mappedTo', { datum: f.datum }) : QSPanelWords.t('privacy.endpoints.unset'),
+                    }));
                     if (mayMap) chip.addEventListener('click', function () { openAtomMenu(ep.key, f.field, f.datum, chip); });
                     atoms.appendChild(chip);
                 });
                 card.appendChild(atoms);
             } else if (!ep.undeclaredBody) {
                 // (undeclared-body endpoints already carry the head pill)
-                card.appendChild(QSDom.el('span', { class: 'privacy-endpoint__nofields', text: 'no fields sent' }));
+                card.appendChild(QSDom.el('span', { class: 'privacy-endpoint__nofields', text: QSPanelWords.t('privacy.endpoints.noFields') }));
             }
             wrap.appendChild(card);
         });
@@ -619,19 +624,28 @@
 
     function _renderAuthSeed(seed) {
         if (!seed || (!seed.oauth.wired && !seed.magicLink.wired)) {
-            return QSDom.el('p', { class: 'privacy-empty', text: 'No sign-in flows detected (OAuth / magic-link). Nothing to auto-suggest.' });
+            return QSDom.el('p', { class: 'privacy-empty', text: QSPanelWords.t('privacy.signIn.none') });
         }
         var wrap = QSDom.el('div', { class: 'privacy-authseed' });
         if (seed.oauth.wired) {
             var o = QSDom.el('div', { class: 'privacy-authseed__row' });
-            o.appendChild(QSDom.el('span', { class: 'privacy-authseed__name', text: 'OAuth sign-in' }));
-            o.appendChild(QSDom.el('span', { class: 'privacy-authseed__detail', text: 'providers: ' + seed.oauth.providers.map(function (p) { return p.name; }).join(', ') + ' · collects: ' + seed.oauth.collectedSuggestions.join(', ') }));
+            o.appendChild(QSDom.el('span', { class: 'privacy-authseed__name', text: QSPanelWords.t('privacy.signIn.oauth') }));
+            o.appendChild(QSDom.el('span', {
+                class: 'privacy-authseed__detail',
+                text: QSPanelWords.t('privacy.signIn.oauthDetail', {
+                    providers: QSPanelWords.list(seed.oauth.providers.map(function (p) { return p.name; }), 'unit'),
+                    collects: QSPanelWords.list(seed.oauth.collectedSuggestions, 'unit'),
+                }),
+            }));
             wrap.appendChild(o);
         }
         if (seed.magicLink.wired) {
             var m = QSDom.el('div', { class: 'privacy-authseed__row' });
-            m.appendChild(QSDom.el('span', { class: 'privacy-authseed__name', text: 'Magic-link sign-in' }));
-            m.appendChild(QSDom.el('span', { class: 'privacy-authseed__detail', text: 'collects: ' + seed.magicLink.collectedSuggestions.join(', ') }));
+            m.appendChild(QSDom.el('span', { class: 'privacy-authseed__name', text: QSPanelWords.t('privacy.signIn.magicLink') }));
+            m.appendChild(QSDom.el('span', {
+                class: 'privacy-authseed__detail',
+                text: QSPanelWords.t('privacy.signIn.magicLinkDetail', { collects: QSPanelWords.list(seed.magicLink.collectedSuggestions, 'unit') }),
+            }));
             wrap.appendChild(m);
         }
         return wrap;
@@ -642,48 +656,57 @@
     function _renderCookieNote(s) {
         var note = QSDom.el('p', { class: 'admin-hint privacy-cookie-note' });
         if (s.cookieSection === 'omit') {
-            note.textContent = 'Cookie section: omitted (set by you). The privacy page will not mention cookies.';
+            note.textContent = QSPanelWords.t('privacy.cookies.omitted');
         } else if (s.cookie && s.cookie.policyRoute && s.cookie.policyRouteExists) {
-            note.textContent = 'Cookie policy detected at ' + s.cookie.policyRoute + ' — the privacy page will link to it.';
+            note.textContent = QSPanelWords.t('privacy.cookies.detected', { route: s.cookie.policyRoute });
         } else {
-            note.textContent = 'No cookie-policy page yet. You may want to generate one in Storage, or mark cookies as not applicable.';
+            note.textContent = QSPanelWords.t('privacy.cookies.none');
         }
         return note;
     }
 
     // ---- privacy page generation (Generate / Update / Delete) -------------
 
+    /** "Generated at /route": one word holding the route's <code>, its text drawn as the row's label. */
+    function _renderGeneratedAt(route) {
+        var row = QSDom.el('div', { class: 'privacy-page-gen' });
+        var code = QSDom.el('code', { class: 'privacy-host__url', text: route });
+        QSPanelWords.parts('privacy.page.generatedAt', { route: code }).forEach(function (part) {
+            if (typeof part !== 'string') { row.appendChild(part); return; }
+            var text = part.trim();
+            if (text) row.appendChild(QSDom.el('span', { class: 'admin-label', text: text }));
+        });
+        return row;
+    }
+
     function _renderPrivacyPageSection(s) {
         var sec = QSDom.el('section', { class: 'privacy-section' });
         var head = QSDom.el('div', { class: 'privacy-section__head' });
-        head.appendChild(QSDom.el('h2', { class: 'privacy-section__title', text: 'Privacy page' }));
+        head.appendChild(QSDom.el('h2', { class: 'privacy-section__title', text: QSPanelWords.t('privacy.page.title') }));
         sec.appendChild(head);
 
         var hasPage = !!(s.privacyRoute && s.privacyRouteExists);
         if (hasPage) {
-            var routeRow = QSDom.el('div', { class: 'privacy-page-gen' });
-            routeRow.appendChild(QSDom.el('span', { class: 'admin-label', text: 'Generated at' }));
-            routeRow.appendChild(QSDom.el('code', { class: 'privacy-host__url', text: s.privacyRoute }));
-            sec.appendChild(routeRow);
+            sec.appendChild(_renderGeneratedAt(s.privacyRoute));
             var acts = QSDom.el('div', { class: 'privacy-page-actions' });
-            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Update', onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }), 'generatePrivacyPolicy'));
-            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--danger', type: 'button', text: t('privacy.dialogs.delete'), onclick: onDeletePrivacy }), 'deletePrivacyPolicy'));
+            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: QSPanelWords.t('privacy.page.update'), onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }), 'generatePrivacyPolicy'));
+            acts.appendChild(_mark(QSDom.el('button', { class: 'admin-btn admin-btn--danger', type: 'button', text: QSPanelWords.t('privacy.dialogs.delete'), onclick: onDeletePrivacy }), 'deletePrivacyPolicy'));
             sec.appendChild(acts);
-            sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).' }));
+            sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: QSPanelWords.t('privacy.page.updateHint') }));
         } else {
-            var input = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'e.g. privacy', value: s.privacyRoute ? String(s.privacyRoute).replace(/^\/+/, '') : '' });
-            var gen = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate', onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { showError(t('privacy.errors.routeRequired')); return; } onGeneratePrivacy(r, false); } });
-            sec.appendChild(_mark(QSDom.el('label', { class: 'admin-label', text: 'Page route' }), 'generatePrivacyPolicy'));
+            var input = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: QSPanelWords.t('privacy.page.routePlaceholder'), value: s.privacyRoute ? String(s.privacyRoute).replace(/^\/+/, '') : '' });
+            var gen = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: QSPanelWords.t('privacy.page.generate'), onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { showError(QSPanelWords.t('privacy.errors.routeRequired')); return; } onGeneratePrivacy(r, false); } });
+            sec.appendChild(_mark(QSDom.el('label', { class: 'admin-label', text: QSPanelWords.t('privacy.page.route') }), 'generatePrivacyPolicy'));
             sec.appendChild(_mark(QSDom.el('div', { class: 'privacy-page-gen' }, [input, gen]), 'generatePrivacyPolicy'));
             if (s.privacyRoute && !s.privacyRouteExists) {
-                sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'The previous route "' + s.privacyRoute + '" no longer exists — generate to recreate it.' }));
+                sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: QSPanelWords.t('privacy.page.staleRoute', { route: s.privacyRoute }) }));
             }
         }
 
         var cb = QSDom.el('input', { type: 'checkbox' });
         if (s.cookieSection === 'omit') cb.checked = true;
         cb.addEventListener('change', function () { onToggleCookieSection(cb.checked); });
-        sec.appendChild(_mark(QSDom.el('label', { class: 'privacy-radio privacy-cookie-toggle' }, [cb, ' Don’t mention cookies on this page']), 'setPrivacyCookieSection'));
+        sec.appendChild(_mark(QSDom.el('label', { class: 'privacy-radio privacy-cookie-toggle' }, [cb, ' ' + QSPanelWords.t('privacy.page.omitCookies')]), 'setPrivacyCookieSection'));
         sec.appendChild(_renderCookieNote(s));
         return sec;
     }
@@ -693,36 +716,36 @@
         return api('generatePrivacyPolicy', 'POST', body).then(function (r) {
             var d = (r && r.data && (r.data.data || r.data)) || {};
             if (r && !r.ok && d.needsConfirm) {
-                return QuickSiteUtils.confirm(t('privacy.dialogs.overwritePage', { route: route }), {
-                    type: 'danger', confirmText: t('privacy.dialogs.overwrite'),
+                return QuickSiteUtils.confirm(QSPanelWords.t('privacy.dialogs.overwritePage', { route: route }), {
+                    type: 'danger', confirmText: QSPanelWords.t('privacy.dialogs.overwrite'),
                 }).then(function (ok) {
                     if (!ok) return;
                     return api('generatePrivacyPolicy', 'POST', { route: route, overwrite: true }).then(function (r2) {
-                        if (!r2 || !r2.ok) { showError((r2 && r2.data && r2.data.message) || t('privacy.errors.generateFailed')); return; }
+                        if (!r2 || !r2.ok) { showError((r2 && r2.data && r2.data.message) || QSPanelWords.t('privacy.errors.generateFailed')); return; }
                         return refresh();
                     });
                 });
             }
-            if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.generateFailed')); return; }
+            if (!r || !r.ok) { showError((r && r.data && r.data.message) || QSPanelWords.t('privacy.errors.generateFailed')); return; }
             return refresh();
-        }).catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
+        }).catch(function (e) { showError((e && e.message) || QSPanelWords.t('privacy.errors.network')); });
     }
 
     function onDeletePrivacy() {
-        return QuickSiteUtils.confirm(t('privacy.dialogs.deletePage'), { type: 'danger', confirmText: t('privacy.dialogs.delete') }).then(function (ok) {
+        return QuickSiteUtils.confirm(QSPanelWords.t('privacy.dialogs.deletePage'), { type: 'danger', confirmText: QSPanelWords.t('privacy.dialogs.delete') }).then(function (ok) {
             if (!ok) return;
             return api('deletePrivacyPolicy', 'POST', {}).then(function (r) {
-                if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.deleteFailed')); return; }
+                if (!r || !r.ok) { showError((r && r.data && r.data.message) || QSPanelWords.t('privacy.errors.deleteFailed')); return; }
                 return refresh();
             });
-        }).catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
+        }).catch(function (e) { showError((e && e.message) || QSPanelWords.t('privacy.errors.network')); });
     }
 
     function onToggleCookieSection(omit) {
         return api('setPrivacyCookieSection', 'POST', { cookieSection: omit ? 'omit' : 'auto' }).then(function (r) {
-            if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.cookieSectionFailed')); }
+            if (!r || !r.ok) { showError((r && r.data && r.data.message) || QSPanelWords.t('privacy.errors.cookieSectionFailed')); }
             return refresh();
-        }).catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
+        }).catch(function (e) { showError((e && e.message) || QSPanelWords.t('privacy.errors.network')); });
     }
 
     /** The hint above the page: what a language's words are and where they show (multilingual projects only). */
@@ -731,7 +754,7 @@
         if (!host) return;
         if (!multilingual()) { host.hidden = true; host.textContent = ''; return; }
         host.hidden = false;
-        host.textContent = t('privacy.languages.hint');
+        host.textContent = QSPanelWords.t('privacy.languages.hint');
     }
 
     function render() {
@@ -748,15 +771,15 @@
         root.className = 'privacy-root';
         var s = state.status;
         if (!s) {
-            root.appendChild(QSDom.el('p', { class: 'privacy-empty', text: 'Could not load privacy status.' }));
+            root.appendChild(QSDom.el('p', { class: 'privacy-empty', text: QSPanelWords.t('privacy.errors.loadFailed') }));
             return;
         }
         root.appendChild(_renderCoverage(s.coverage));
         root.appendChild(_renderPrivacyPageSection(s));
         root.appendChild(_renderCollectedSection(s.collectedData));
-        root.appendChild(_section('API hosts', String(s.hosts.length), _renderHosts(s.hosts)));
-        root.appendChild(_section('Detected sign-in', null, _renderAuthSeed(s.authSeed)));
-        root.appendChild(_section('Endpoints sending data', String(s.endpoints.length), _renderEndpoints(s.endpoints)));
+        root.appendChild(_section(QSPanelWords.t('privacy.hosts.title'), QSPanelWords.number(s.hosts.length), _renderHosts(s.hosts)));
+        root.appendChild(_section(QSPanelWords.t('privacy.signIn.title'), null, _renderAuthSeed(s.authSeed)));
+        root.appendChild(_section(QSPanelWords.t('privacy.endpoints.title'), QSPanelWords.number(s.endpoints.length), _renderEndpoints(s.endpoints)));
         _filterControls(root);
     }
 

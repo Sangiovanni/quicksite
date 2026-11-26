@@ -16,7 +16,14 @@
  * other gets English. A new language is a new file. The commands that generate a whole page or the
  * consent layer write trees of these words (qs_starting_words_seed()).
  *
- * Authoring only: nothing here travels into a build.
+ * The same files hold the words QuickSite itself shows a site's visitor (the `visitor` tree: a
+ * call's toasts, the theme switch's labels, a build's 404 and fatal pages), read per page by the
+ * runtime handoff (qs_visitor_words(), runtimeHandoff.php), the words Fresh Start writes into a
+ * site (`freshStart`, through a workflow step's {{startingWord:<key>}}, WorkflowManager) and a new
+ * component's starter text (`component.starter`, the visual editor).
+ *
+ * Authoring only: this file never travels into a build. A build carries the visitor words it
+ * answers, resolved for each of its site's languages (qs-site.php).
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {
@@ -80,6 +87,76 @@ function qs_starting_word(string $lang, string $key, array $params = []): ?strin
         }
     }
     return null;
+}
+
+/**
+ * The keys the English word file holds under $tree (a dot path: `consent.banner`), each a whole dot
+ * path, in the file's order: the list of a tree's words, which no code holds. [] when the English
+ * file holds no such tree.
+ *
+ * @return list<string>
+ */
+function qs_starting_words_keys(string $tree): array
+{
+    $node = qs_starting_words_file('en');
+    foreach (explode('.', $tree) as $part) {
+        $node = is_array($node) ? ($node[$part] ?? null) : null;
+    }
+    if (!is_array($node)) {
+        return [];
+    }
+    $keys = [];
+    $walk = static function (array $node, string $path) use (&$walk, &$keys): void {
+        foreach ($node as $name => $value) {
+            if (is_array($value)) {
+                $walk($value, $path . '.' . $name);
+            } else {
+                $keys[] = $path . '.' . $name;
+            }
+        }
+    };
+    $walk($node, $tree);
+    return $keys;
+}
+
+/**
+ * The words of $tree in $lang, as a tree shaped like the English file's (qs_starting_words_keys()):
+ * each read by qs_starting_word(), so a language takes its own file's word, else its base
+ * language's, else English's. Its {{name}} markers are left as written, for whoever shows the word
+ * to fill.
+ */
+function qs_starting_words_tree(string $lang, string $tree): array
+{
+    $out = [];
+    foreach (qs_starting_words_keys($tree) as $key) {
+        $word = qs_starting_word($lang, $key);
+        if ($word !== null) {
+            qs_starting_text_set($out, substr($key, strlen($tree) + 1), $word);
+        }
+    }
+    return $out;
+}
+
+/**
+ * The word $key in each of $langs and in English, keyed by language: what a page hands a script
+ * that writes the word in a language it chooses. English is the word of any language the list does
+ * not name (qs_starting_word()'s last file): one the site gains after the page was written.
+ *
+ * @param list<string> $langs
+ * @return array<string, string>
+ */
+function qs_starting_word_by_language(string $key, array $langs): array
+{
+    $out = [];
+    foreach (array_merge($langs, ['en']) as $lang) {
+        if (is_string($lang) && $lang !== '' && !isset($out[$lang])) {
+            $word = qs_starting_word($lang, $key);
+            if ($word !== null) {
+                $out[$lang] = $word;
+            }
+        }
+    }
+    return $out;
 }
 
 /**
@@ -234,22 +311,9 @@ function qs_starting_texts_write(array $plan): array
 function qs_starting_words_seed(array $trees, array $others = []): array
 {
     $entries = $others;
-    $walk = static function (array $node, string $path) use (&$walk, &$entries): void {
-        foreach ($node as $name => $value) {
-            if (is_array($value)) {
-                $walk($value, $path . '.' . $name);
-            } else {
-                $entries[] = ['key' => $path . '.' . $name, 'word' => $path . '.' . $name];
-            }
-        }
-    };
     foreach ($trees as $tree) {
-        $node = qs_starting_words_file('en');
-        foreach (explode('.', $tree) as $part) {
-            $node = is_array($node) ? ($node[$part] ?? null) : null;
-        }
-        if (is_array($node)) {
-            $walk($node, $tree);
+        foreach (qs_starting_words_keys($tree) as $key) {
+            $entries[] = ['key' => $key, 'word' => $key];
         }
     }
     $plan = qs_starting_texts_plan($entries);

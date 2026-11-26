@@ -1,14 +1,13 @@
 /**
- * Dashboard memberships card — fills the six stat values whenever
- * core/members-badge.js publishes fresh counts (the
+ * Dashboard memberships card — fills the six stat values, as figures in the
+ * panel's language, whenever core/members-badge.js publishes fresh counts (the
  * 'quicksite:membership-counts-updated' event).
  *
  * Purely event-driven: this script parses BEFORE members-badge.js (template
  * vs bottom-of-body), so the badge module's first computation always finds
  * this listener registered — no load-order race.
  *
- * Deliberately its OWN file: dashboard.js predates the HTML-in-JS hygiene
- * rule and must not grow; this card's static structure lives in
+ * Its own file: this card's static structure lives in
  * templates/pages/dashboard.php, so this script only sets text values.
  */
 (function () {
@@ -17,7 +16,7 @@
     function setStat(id, value, highlight) {
         var elValue = document.getElementById(id);
         if (!elValue) return;
-        elValue.textContent = String(value);
+        elValue.textContent = QSPanelWords.number(value);
         var stat = document.getElementById(id + '-stat');
         if (stat) stat.classList.toggle('dashboard-memberships__stat--attention', !!highlight && value > 0);
     }

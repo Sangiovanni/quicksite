@@ -9,20 +9,20 @@
  *
  * Built with QSDom.el + named _render* helpers (one Element each) per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing.
- * Static structure lives in templates/pages/account.php.
+ * Static structure lives in templates/pages/account.php, which hands the words
+ * this file reads (QSPanelWords, each by its key's whole path).
  */
 (function () {
     'use strict';
 
     var CFG = window.QS_ACCOUNT_CONFIG || {};
-    var T = window.QS_ACCOUNT_I18N || {};
     var el = window.QSDom.el;
     var clearNode = window.QSDom.clear;
 
     function api(cmd, body) {
         var admin = window.QuickSiteAdmin;
         if (!admin || typeof admin.apiRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return admin.apiRequest(cmd, 'POST', body);
     }
@@ -33,7 +33,7 @@
     function account(route, body) {
         var admin = window.QuickSiteAdmin;
         if (!admin || typeof admin.accountRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return admin.accountRequest(route, 'POST', body);
     }
@@ -44,8 +44,9 @@
         }
     }
 
-    function serverMessage(res, fallback) {
-        return (res && res.data && (res.data.message || res.data.error)) || fallback || T.error || 'Error';
+    /** The server's own words for a refusal, else the panel's Error. */
+    function serverMessage(res) {
+        return (res && res.data && (res.data.message || res.data.error)) || QSPanelWords.t('common.error');
     }
 
     /**
@@ -59,8 +60,7 @@
         var envelope = (res && res.data) || {};
         var wait = Number((envelope.data && envelope.data.retry_after) || 0);
         var waitText = wait > 0
-            ? (T.throttled || 'Too many failed attempts — try again in :duration')
-                .split(':duration').join(window.QuickSiteAdmin.durationText(wait))
+            ? QSPanelWords.t('login.throttled', { duration: window.QuickSiteAdmin.durationText(wait) })
             : '';
         if (status === 401 && envelope.code === 'auth.invalid_credentials') {
             return waitText !== '' ? wrong + ' ' + waitText : wrong;
@@ -98,7 +98,7 @@
     /** One project standing between the caller and deleting their account. */
     function _renderBlockerRow(project) {
         var count = (typeof project.member_count === 'number')
-            ? (project.member_count + ' ' + (T.members || 'members'))
+            ? QSPanelWords.count('account.delete.membersCount', project.member_count)
             : null;
         return el('li', { class: 'account-blocker' }, [
             el('strong', { text: window.QuickSiteAdmin.projectLabel(project.project || '?', project.name) }),
@@ -111,9 +111,9 @@
         var list = el('ul', { class: 'account-blocker-list' });
         projects.forEach(function (p) { list.appendChild(_renderBlockerRow(p)); });
         return el('div', { class: 'admin-alert admin-alert--warning' }, [
-            el('strong', { text: T.soleOwnerTitle || 'You still own these projects' }),
+            el('strong', { text: QSPanelWords.t('account.delete.soleOwnerTitle') }),
             list,
-            el('p', { class: 'admin-hint', text: T.soleOwnerHint || '' }),
+            el('p', { class: 'admin-hint', text: QSPanelWords.t('account.delete.soleOwnerHint') }),
         ]);
     }
 
@@ -143,19 +143,19 @@
             var repeat = confirmEl ? confirmEl.value : '';
 
             if (current === '' || next === '') {
-                toast(T.passwordRequired || 'Fill in both fields.', 'warning');
+                toast(QSPanelWords.t('account.password.required'), 'warning');
                 return;
             }
             if (next !== repeat) {
-                toast(T.passwordMismatch || 'The two new passwords do not match.', 'warning');
+                toast(QSPanelWords.t('account.password.mismatch'), 'warning');
                 return;
             }
             if (next.length < (CFG.minPasswordLength || 12)) {
-                toast(T.passwordTooShort || 'The new password is too short.', 'warning');
+                toast(QSPanelWords.t('account.password.tooShort'), 'warning');
                 return;
             }
             if (next === current) {
-                toast(T.passwordSameAsOld || 'The new password is the same as the current one.', 'warning');
+                toast(QSPanelWords.t('account.password.sameAsOld'), 'warning');
                 return;
             }
 
@@ -166,13 +166,13 @@
                     if (currentEl) currentEl.value = '';
                     if (newEl) newEl.value = '';
                     if (confirmEl) confirmEl.value = '';
-                    toast(T.passwordChanged || 'Password changed.', 'success');
+                    toast(QSPanelWords.t('account.password.changedMsg'), 'success');
                     return;
                 }
                 // A wrong current password is answered 401 auth.invalid_credentials,
                 // which api.js deliberately does NOT treat as a dead session — the
                 // user stays on this page and simply sees the refusal.
-                toast(credentialRefusal(res, T.wrongCurrent || 'Your current password is not correct.'),
+                toast(credentialRefusal(res, QSPanelWords.t('account.password.wrongCurrent')),
                     (res && res.status === 429) ? 'warning' : 'error');
             }).catch(function (err) {
                 btn.disabled = false;
@@ -191,9 +191,9 @@
 
         btn.addEventListener('click', function () {
             ask(
-                T.everywhereTitle || 'Sign out everywhere?',
-                [el('p', { text: T.everywhereBody || '' })],
-                T.everywhereBtn || 'Sign out everywhere', false,
+                QSPanelWords.t('account.sessions.confirmTitle'),
+                [el('p', { text: QSPanelWords.t('account.sessions.confirmBody') })],
+                QSPanelWords.t('account.sessions.submit'), false,
                 async function () {
                     var res;
                     try {
@@ -205,7 +205,7 @@
                         return true;
                     }
                     if (!res || !res.ok) return { ok: false, message: serverMessage(res) };
-                    toast(T.everywhereDone || 'Signed out everywhere.', 'success');
+                    toast(QSPanelWords.t('account.sessions.doneMsg'), 'success');
                     toLogin();
                     return true;
                 }
@@ -228,7 +228,7 @@
             var typed = typedEl ? typedEl.value.trim() : '';
 
             if (password === '') {
-                toast(T.deleteNeedsPassword || 'Enter your current password.', 'warning');
+                toast(QSPanelWords.t('account.delete.needsPassword'), 'warning');
                 return;
             }
             // The typed confirmation is the USERNAME — the one string only this
@@ -237,18 +237,18 @@
             // checks something was typed: the server compares it, together with
             // the password, and a wrong one of either is refused the same way.
             if (typed === '') {
-                toast(T.deleteNeedsTyped || 'Type your username exactly to confirm.', 'warning');
+                toast(QSPanelWords.t('account.delete.needsTyped'), 'warning');
                 return;
             }
 
             ask(
-                T.deleteTitle || 'Delete your account — final confirmation',
-                [el('p', { text: T.deleteBody || '' })],
-                T.deleteBtn || 'Delete my account', true,
+                QSPanelWords.t('account.delete.confirmTitle'),
+                [el('p', { text: QSPanelWords.t('account.delete.confirmBody') })],
+                QSPanelWords.t('account.delete.submit'), true,
                 async function () {
                     var res = await account('delete', { current_password: password, username: typed, confirm: true });
                     if (res && res.ok) {
-                        toast(T.deleteDone || 'Your account has been deleted.', 'success');
+                        toast(QSPanelWords.t('account.delete.doneMsg'), 'success');
                         toLogin();
                         return true;
                     }
@@ -258,7 +258,7 @@
                     if (res && res.status === 409 && Array.isArray(data.owned_projects)) {
                         showBlockers(data.owned_projects);
                     }
-                    return { ok: false, message: credentialRefusal(res, T.wrongCredentials || 'Your current password or your username is not correct.') };
+                    return { ok: false, message: credentialRefusal(res, QSPanelWords.t('account.delete.wrongCredentials')) };
                 }
             );
         });

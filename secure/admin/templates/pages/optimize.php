@@ -29,19 +29,18 @@ $libFiles = [
 
 $libReady = file_exists($libPath . '/css-parser.js');
 
-// The sub-trees optimize.js renders from, verbatim and under the same dot
-// paths PHP uses, so the JS asks for the path PHP would.
-$qsOptimizeI18n = [];
-foreach (['optimize', 'common'] as $qsSubtree) {
-    $qsOptimizeI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
-}
+// The CSS Refiner's words, its suggestions' (optimize.cssRefiner.tools) among them: optimize.js and the library
+// read each by its key's whole path; `common` comes with every page.
 ?>
+<?= __adminWords(['optimize.cssRefiner']) ?>
 
 <?php if ($libReady): ?>
-    <!-- Bootstrap: provide CSSRefiner.t stub (analyzer description strings are passthrough) -->
+    <!-- The library's two word callers, set before its files capture them: a word under optimize.cssRefiner, and a
+         counted one (QSPanelWords.count: .one / .other). -->
     <script>
     window.CSSRefiner = window.CSSRefiner || {};
-    CSSRefiner.t = function(key) { return key; };
+    CSSRefiner.t = function (key, params) { return QSPanelWords.t('optimize.cssRefiner.' + key, params); };
+    CSSRefiner.count = function (key, n, params) { return QSPanelWords.count('optimize.cssRefiner.' + key, n, params); };
     </script>
     <?php foreach ($libFiles as $file): ?>
         <?php $fullPath = $libPath . '/' . $file; ?>
@@ -51,9 +50,6 @@ foreach (['optimize', 'common'] as $qsSubtree) {
     <?php endforeach; ?>
 <?php endif; ?>
 
-<script>
-window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-</script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/optimize.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/optimize.js') ?>"></script>
 
 <div class="optimize-page" data-lib-ready="<?= $libReady ? 'true' : 'false' ?>">
@@ -64,9 +60,9 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
             <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
-            <?= __admin('optimize.title') ?>
+            <?= adminEscape(__admin('optimize.title')) ?>
         </h1>
-        <p class="admin-page-header__subtitle"><?= __admin('optimize.subtitle') ?></p>
+        <p class="admin-page-header__subtitle"><?= adminEscape(__admin('optimize.subtitle')) ?></p>
     </div>
 
     <div class="optimize-layout">
@@ -74,14 +70,14 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
         <!-- Tool Sidebar -->
         <aside class="optimize-sidebar admin-card">
             <div class="admin-card__header">
-                <h2 class="admin-card__title"><?= __admin('optimize.tools') ?></h2>
+                <h2 class="admin-card__title"><?= adminEscape(__admin('optimize.tools')) ?></h2>
             </div>
             <nav class="optimize-tool-nav">
                 <button type="button" class="optimize-tool-nav__item optimize-tool-nav__item--active" data-tool="css-refiner">
                     <svg class="optimize-tool-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                     </svg>
-                    <span><?= __admin('optimize.cssRefiner.title') ?></span>
+                    <span><?= adminEscape(__admin('optimize.cssRefiner.title')) ?></span>
                 </button>
                 <!-- Future tools inserted here -->
             </nav>
@@ -97,9 +93,9 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
                         <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                         </svg>
-                        <?= __admin('optimize.cssRefiner.title') ?>
+                        <?= adminEscape(__admin('optimize.cssRefiner.title')) ?>
                     </h2>
-                    <p class="admin-card__subtitle"><?= __admin('optimize.cssRefiner.subtitle') ?></p>
+                    <p class="admin-card__subtitle"><?= adminEscape(__admin('optimize.cssRefiner.subtitle')) ?></p>
                 </div>
 
                 <?php if (!$libReady): ?>
@@ -109,7 +105,7 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="32" height="32">
                             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                         </svg>
-                        <p><?= __admin('optimize.cssRefiner.libNotReady') ?></p>
+                        <p><?= adminEscape(__admin('optimize.cssRefiner.libNotReady')) ?></p>
                     </div>
                 </div>
                 <?php else: ?>
@@ -120,16 +116,16 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                             </svg>
-                            <?= __admin('optimize.cssRefiner.autoRefine') ?>
+                            <?= adminEscape(__admin('optimize.cssRefiner.autoRefine')) ?>
                         </button>
                         <button type="button" class="admin-btn" id="optimize-btn-analyze">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                             </svg>
-                            <?= __admin('optimize.cssRefiner.analyze') ?>
+                            <?= adminEscape(__admin('optimize.cssRefiner.analyze')) ?>
                         </button>
                         <button type="button" class="admin-btn admin-btn--ghost" id="optimize-btn-reset" style="display:none">
-                            <?= __admin('optimize.cssRefiner.reset') ?>
+                            <?= adminEscape(__admin('optimize.cssRefiner.reset')) ?>
                         </button>
                         <span class="optimize-toolbar__status" id="optimize-status"></span>
                     </div>
@@ -144,14 +140,14 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                         </svg>
-                        <p><?= __admin('optimize.cssRefiner.emptyState') ?></p>
+                        <p><?= adminEscape(__admin('optimize.cssRefiner.emptyState')) ?></p>
                     </div>
 
                     <!-- Apply bar (shown when suggestions are checked) -->
                     <div id="optimize-apply-bar" class="optimize-apply-bar" style="display:none">
                         <span id="optimize-selected-count"></span>
                         <button type="button" class="admin-btn admin-btn--primary" id="optimize-btn-apply-selected">
-                            <?= __admin('optimize.cssRefiner.applySelected') ?>
+                            <?= adminEscape(__admin('optimize.cssRefiner.applySelected')) ?>
                         </button>
                     </div>
                 </div>
@@ -166,16 +162,16 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
         <div class="admin-modal__backdrop"></div>
         <div class="admin-modal__content optimize-modal">
             <div class="admin-modal__header">
-                <h3 class="admin-modal__title"><?= __admin('optimize.cssRefiner.autoRefineModal.title') ?></h3>
+                <h3 class="admin-modal__title"><?= adminEscape(__admin('optimize.cssRefiner.autoRefineModal.title')) ?></h3>
                 <button type="button" class="admin-modal__close" id="optimize-modal-close" data-qs-icon="close" aria-label="<?= adminAttr(__admin('common.close')) ?>" title="<?= adminAttr(__admin('common.close')) ?>"></button>
             </div>
             <div class="admin-modal__body" id="optimize-modal-body">
                 <!-- Summary list populated by JS -->
             </div>
             <div class="admin-modal__footer">
-                <p class="optimize-modal__note"><?= __admin('optimize.cssRefiner.autoRefineModal.backupNote') ?></p>
+                <p class="optimize-modal__note"><?= adminEscape(__admin('optimize.cssRefiner.autoRefineModal.backupNote')) ?></p>
                 <button type="button" class="admin-btn" id="optimize-modal-cancel">
-                    <?= __admin('common.cancel') ?>
+                    <?= adminEscape(__admin('common.cancel')) ?>
                 </button>
                 <button type="button" class="admin-btn admin-btn--primary" id="optimize-modal-confirm">
                     <!-- Label set by JS with count -->

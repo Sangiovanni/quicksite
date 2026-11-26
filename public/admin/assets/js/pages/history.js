@@ -44,30 +44,11 @@
     let clearBefore, clearPreview;
     let setClearReady = () => {};
 
-    /**
-     * Dotted-path lookup over the page's own i18n bundle, then the layout's
-     * subset, then the English literal.
-     *
-     * QS_HISTORY_I18N is emitted by history.php. The layout's
-     * QUICKSITE_CONFIG.translations carries only a few branches (common,
-     * dashboard, …) and does not carry `history`, so without the page bundle every
-     * JS-built label here would resolve to its fallback — a French panel would
-     * show English rows.
-     * The layout lookup is kept second so `common.*` still resolves if the page
-     * bundle ever stops carrying it.
-     */
-    function t(path, fallback) {
-        const parts = path.split('.');
-        for (const root of [window.QS_HISTORY_I18N, window.QUICKSITE_CONFIG?.translations]) {
-            let node = root;
-            let ok = true;
-            for (const p of parts) {
-                if (!node || typeof node !== 'object') { ok = false; break; }
-                node = node[p];
-            }
-            if (ok && typeof node === 'string' && node !== '') return node;
-        }
-        return fallback;
+    /** A record's duration as the history shows it, in milliseconds ("?" when the record has none). */
+    function msText(ms) {
+        return QSPanelWords.t('history.durationMs', {
+            ms: (ms === null || ms === undefined) ? '?' : QSPanelWords.number(ms)
+        });
     }
 
     // =======================================================================
@@ -131,7 +112,7 @@
         historyContent.appendChild(
             el('div', { class: 'admin-loading' }, [
                 el('span', { class: 'admin-spinner' }),
-                el('span', { text: t('common.loading', 'Loading...') })
+                el('span', { text: QSPanelWords.t('common.loading') })
             ])
         );
 
@@ -154,7 +135,7 @@
                 updatePagination();
             } else {
                 loadedEntries = [];
-                renderError(result.data?.message || 'Unknown error');
+                renderError(result.data?.message || QSPanelWords.t('common.unknownError'));
             }
         } catch (error) {
             loadedEntries = [];
@@ -170,11 +151,11 @@
             el('div', { class: 'admin-empty' }, [
                 el('p', {
                     class: 'admin-empty__title',
-                    text: t('history.noHistory', 'No commands have been executed yet')
+                    text: QSPanelWords.t('history.noHistory')
                 }),
                 el('p', {
                     class: 'admin-empty__text',
-                    text: t('history.noHistoryFiltered', 'No command history found for the selected filters.')
+                    text: QSPanelWords.t('history.noHistoryFiltered')
                 })
             ])
         );
@@ -185,10 +166,10 @@
     function renderError(message) {
         clearNode(historyContent);
         historyContent.appendChild(
-            el('div', { class: 'admin-alert admin-alert--error' }, [
-                t('history.errors.loadFailed', 'Failed to load history:') + ' ',
-                String(message)
-            ])
+            el('div', {
+                class: 'admin-alert admin-alert--error',
+                text: QSPanelWords.t('history.errors.loadFailed', { error: String(message) })
+            })
         );
         pagination.style.display = 'none';
     }
@@ -213,22 +194,22 @@
             : nameNode;
 
         return el('tr', null, [
-            el('td', null, [el('small', { text: new Date(entry.timestamp).toLocaleString() })]),
+            el('td', null, [el('small', { text: QSPanelWords.date(entry.timestamp) })]),
             el('td', null, [commandCell]),
             el('td', null, [methodBadge(entry.method)]),
             el('td', null, [renderPublisherCell(entry)]),
             el('td', null, [
                 el('span', {
                     class: 'badge ' + (ok ? 'badge--success' : 'badge--error'),
-                    text: ok ? t('history.filters.success', 'Success') : t('history.filters.error', 'Error')
+                    text: ok ? QSPanelWords.t('history.filters.success') : QSPanelWords.t('history.filters.error')
                 })
             ]),
-            el('td', { text: (entry.duration_ms ?? '?') + 'ms' }),
+            el('td', { text: msText(entry.duration_ms) }),
             el('td', null, [
                 el('button', {
                     class: 'admin-btn admin-btn--ghost',
                     type: 'button',
-                    title: t('history.columns.details', 'Details'),
+                    title: QSPanelWords.t('history.columns.details'),
                     dataset: { action: 'show-detail', entryId: String(entry.id) }
                 }, [
                     window.QSDom.svgIcon('M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 16)
@@ -247,13 +228,13 @@
 
         const head = el('thead', null, [
             el('tr', null, [
-                el('th', { text: t('history.columns.timestamp', 'Timestamp') }),
-                el('th', { text: t('history.columns.command', 'Command') }),
-                el('th', { text: t('history.columns.method', 'Method') }),
-                el('th', { text: t('history.columns.user', 'User') }),
-                el('th', { text: t('history.columns.status', 'Status') }),
-                el('th', { text: t('history.columns.duration', 'Duration') }),
-                el('th', { text: t('history.columns.details', 'Details') })
+                el('th', { text: QSPanelWords.t('history.columns.timestamp') }),
+                el('th', { text: QSPanelWords.t('history.columns.command') }),
+                el('th', { text: QSPanelWords.t('history.columns.method') }),
+                el('th', { text: QSPanelWords.t('history.columns.user') }),
+                el('th', { text: QSPanelWords.t('history.columns.status') }),
+                el('th', { text: QSPanelWords.t('history.columns.duration') }),
+                el('th', { text: QSPanelWords.t('history.columns.details') })
             ])
         ]);
 
@@ -272,8 +253,10 @@
     function updatePagination() {
         if (totalPages <= 1) { pagination.style.display = 'none'; return; }
         pagination.style.display = 'flex';
-        pageInfo.textContent = 'Page ' + currentPage + ' of ' + totalPages
-            + ' (' + totalEntries + ' entries)';
+        pageInfo.textContent = QSPanelWords.count('history.pagination.info', totalEntries, {
+            page: QSPanelWords.number(currentPage),
+            total: QSPanelWords.number(totalPages)
+        });
         prevBtn.disabled = currentPage <= 1;
         nextBtn.disabled = currentPage >= totalPages;
     }
@@ -299,18 +282,18 @@
         const id = publisherId(entry);
 
         const grid = el('div', { class: 'admin-detail-grid' }, [
-            detailRow(t('history.detail.id', 'ID'), el('code', { text: String(entry.id ?? '') })),
-            detailRow(t('history.detail.timestamp', 'Timestamp'),
-                el('span', { text: new Date(entry.timestamp).toLocaleString() })),
-            detailRow(t('history.detail.command', 'Command'), el('code', { text: entry.command })),
-            detailRow(t('history.detail.method', 'Method'), methodBadge(entry.method)),
-            detailRow(t('history.detail.duration', 'Duration'),
-                el('span', { text: (entry.duration_ms ?? '?') + 'ms' })),
+            detailRow(QSPanelWords.t('history.detail.id'), el('code', { text: String(entry.id ?? '') })),
+            detailRow(QSPanelWords.t('history.detail.timestamp'),
+                el('span', { text: QSPanelWords.date(entry.timestamp) })),
+            detailRow(QSPanelWords.t('history.detail.command'), el('code', { text: entry.command })),
+            detailRow(QSPanelWords.t('history.detail.method'), methodBadge(entry.method)),
+            detailRow(QSPanelWords.t('history.detail.duration'),
+                el('span', { text: msText(entry.duration_ms) })),
             // Both halves, separately labelled: the display name is what a person
             // recognises, the user id is what survives a rename.
-            detailRow(t('history.detail.publisher', 'Publisher'),
+            detailRow(QSPanelWords.t('history.detail.publisher'),
                 el('span', { text: name || '—' })),
-            detailRow(t('history.detail.userId', 'User ID'),
+            detailRow(QSPanelWords.t('history.detail.userId'),
                 id ? el('code', { text: id }) : el('span', { text: '—' }))
         ]);
 
@@ -325,7 +308,7 @@
         // when there is something to show, so a body-only command does not grow
         // an empty section.
         if (entry.params && (entry.params.url || entry.params.query)) {
-            detailContent.appendChild(el('h4', { text: t('history.detail.params', 'Parameters') }));
+            detailContent.appendChild(el('h4', { text: QSPanelWords.t('history.detail.params') }));
             detailContent.appendChild(
                 el('div', { class: 'admin-code' }, [
                     el('pre', { text: JSON.stringify(entry.params, null, 2) })
@@ -333,13 +316,13 @@
             );
         }
 
-        detailContent.appendChild(el('h4', { text: t('history.detail.requestBody', 'Request Body') }));
+        detailContent.appendChild(el('h4', { text: QSPanelWords.t('history.detail.requestBody') }));
         detailContent.appendChild(
             el('div', { class: 'admin-code' }, [
                 el('pre', { text: JSON.stringify(entry.body, null, 2) })
             ])
         );
-        detailContent.appendChild(el('h4', { text: t('history.detail.response', 'Response') }));
+        detailContent.appendChild(el('h4', { text: QSPanelWords.t('history.detail.response') }));
         detailContent.appendChild(
             el('div', { class: 'admin-code admin-code--response' }, [
                 el('pre', { text: JSON.stringify(entry.result, null, 2) })
@@ -418,7 +401,7 @@
 
     function exportCsv() {
         if (!loadedEntries.length) {
-            QuickSiteAdmin.showToast(t('history.exportEmpty', 'Nothing to export'), 'warning');
+            QuickSiteAdmin.showToast(QSPanelWords.t('history.exportEmpty'), 'warning');
             return;
         }
         const blob = new Blob([buildCsv(loadedEntries)], { type: 'text/csv;charset=utf-8' });
@@ -459,9 +442,9 @@
         clearBefore.value = new Date().toISOString().split('T')[0];
         clearBefore.addEventListener('change', previewClear);
         const cleared = await QuickSiteUtils.confirm('', {
-            title: t('history.clear.title', 'Delete this project\'s command history?'),
+            title: QSPanelWords.t('history.clear.title'),
             type: 'danger',
-            confirmText: t('history.clear.confirmButton', 'Delete permanently'),
+            confirmText: QSPanelWords.t('history.clear.confirmButton'),
             body: body,
             focus: clearBefore,
             onOpen: (dialog) => {
@@ -473,7 +456,7 @@
         });
         setClearReady = () => {};
         if (!cleared) return;
-        QuickSiteAdmin.showToast(t('history.clear.done', 'Command history cleared'), 'success');
+        QuickSiteAdmin.showToast(QSPanelWords.t('history.clear.done'), 'success');
         currentPage = 1;
         loadHistory();
     }
@@ -494,10 +477,10 @@
         const before = clearBefore.value;
         setClearReady(false);
         if (!before) {
-            setPreviewText(t('history.clear.pickDate', 'Choose a date to see what would be deleted.'), 'info');
+            setPreviewText(QSPanelWords.t('history.clear.pickDate'), 'info');
             return;
         }
-        setPreviewText(t('common.loading', 'Loading...'), 'info');
+        setPreviewText(QSPanelWords.t('common.loading'), 'info');
         try {
             const result = await QuickSiteAdmin.apiRequest(
                 'clearCommandHistory', 'POST', { before: before }
@@ -505,7 +488,7 @@
             const data = result.data?.data;
             const d = data?.would_delete;
             if (!result.ok || !d) {
-                setPreviewText(result.data?.message || t('history.clear.previewFailed', 'Could not read what would be deleted.'), 'warning');
+                setPreviewText(result.data?.message || QSPanelWords.t('history.clear.previewFailed'), 'warning');
                 return;
             }
             if (!d.files) {
@@ -519,9 +502,11 @@
                 renderNothingToDelete(data?.stored_days || []);
                 return;
             }
-            setPreviewText(t('history.clear.preview', ':entries entries in :days day(s), :size KB will be permanently deleted.')
-                .split(':entries').join(String(d.entries)).split(':days').join(String(d.files))
-                .split(':size').join(String(d.size_kb)), 'warning');
+            // Two counts in one sentence: the entries choose the sentence's form, the days are a counted word of their own.
+            setPreviewText(QSPanelWords.count('history.clear.preview', d.entries, {
+                days: QSPanelWords.count('history.clear.dayCount', d.files),
+                size: QuickSiteUtils.formatSize(Math.round((Number(d.size_kb) || 0) * 1024))
+            }), 'warning');
             setClearReady(true);
         } catch (e) {
             setPreviewText(String(e.message || e), 'error');
@@ -533,41 +518,38 @@
         clearNode(clearPreview);
         clearPreview.className = 'admin-alert admin-alert--info';
         clearPreview.appendChild(el('div', {
-            text: t('history.clear.nothing', 'Nothing to delete before that date.')
+            text: QSPanelWords.t('history.clear.nothing')
         }));
         if (!days.length) {
             clearPreview.appendChild(el('div', {
-                text: t('history.clear.noDays', 'This project has no stored history at all.')
+                text: QSPanelWords.t('history.clear.noDays')
             }));
             return;
         }
         clearPreview.appendChild(el('div', {
-            text: t('history.clear.storedDays', 'Days currently stored:')
+            text: QSPanelWords.t('history.clear.storedDays')
         }));
         const list = el('ul');
         days.forEach(d => {
             list.appendChild(el('li', {
-                text: d.date + ' — ' + d.entries + ' entries'
+                text: QSPanelWords.count('history.clear.storedDay', d.entries, { date: d.date })
             }));
         });
         clearPreview.appendChild(list);
         clearPreview.appendChild(el('div', {
-            text: t('history.clear.dayGranularHint',
-                'History is stored one file per day and is deleted a whole day at a time, '
-                + 'so a day only disappears once the date you pick is after it. '
-                + 'Today cannot be cleared.')
+            text: QSPanelWords.t('history.clear.dayGranularHint')
         }));
     }
 
     /** The Clear question's action: the delete itself, or the server's words kept in the question. */
     async function doClear() {
         const before = clearBefore.value;
-        if (!before) return { ok: false, message: t('history.clear.pickDate', 'Choose a date to see what would be deleted.') };
+        if (!before) return { ok: false, message: QSPanelWords.t('history.clear.pickDate') };
         const result = await QuickSiteAdmin.apiRequest(
             'clearCommandHistory', 'POST', { before: before, confirm: true }
         );
         if (result.ok) return true;
-        return { ok: false, message: result.data?.message || t('history.clear.failed', 'The history could not be deleted.') };
+        return { ok: false, message: result.data?.message || QSPanelWords.t('history.clear.failed') };
     }
 
     // =======================================================================

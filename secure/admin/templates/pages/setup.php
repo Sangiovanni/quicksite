@@ -100,56 +100,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              The CSS rule still wins when it loads, so nothing changes on a healthy
              install. -->
         <img class="admin-login__mark" src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="" width="69" height="64">
-        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= __admin('common.appName') ?>" width="140" height="44">
-        <h1 class="admin-login__title"><?= __admin('setup.title', 'Create your first account') ?></h1>
-        <p class="admin-login__subtitle"><?= __admin('setup.subtitle', 'This installation has no accounts yet.') ?></p>
+        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= adminAttr(__admin('common.appName')) ?>" width="140" height="44">
+        <h1 class="admin-login__title"><?= adminEscape(__admin('setup.title')) ?></h1>
+        <p class="admin-login__subtitle"><?= adminEscape(__admin('setup.subtitle')) ?></p>
     </div>
 
     <div class="admin-card">
         <div class="admin-card__body">
             <?php if (!$tokenWritable): ?>
             <div class="admin-alert admin-alert--error">
-                <strong><?= __admin('setup.tokenWriteFailed.title', 'The setup token could not be created') ?></strong>
-                <p><?= __admin('setup.tokenWriteFailed.body', 'QuickSite needs to write this file inside your QuickSite folder, and the web server user cannot:') ?></p>
+                <strong><?= adminEscape(__admin('setup.tokenWriteFailed.title')) ?></strong>
+                <p><?= adminEscape(__admin('setup.tokenWriteFailed.body')) ?></p>
                 <p><code><?= adminAttr($tokenPath) ?></code></p>
-                <p><?= __admin('setup.tokenWriteFailed.fix', 'Give the web server user write access to that folder and reload this page. On Linux this usually means chown to www-data, nginx or your site user.') ?></p>
+                <p><?= adminEscape(__admin('setup.tokenWriteFailed.fix')) ?></p>
             </div>
             <?php endif; ?>
 
             <?php if ($setupError === 'csrf'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('login.csrfFailed')) ?></div>
             <?php elseif ($setupError === 'throttled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.throttled', ['duration' => __adminDuration($setupRetryAfter)]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.throttled', ['duration' => __adminDuration($setupRetryAfter)])) ?></div>
             <?php elseif ($setupError === 'invalid_token'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidToken', 'That setup token is not valid. Open the file named below and copy the whole line.') ?><?php if ($setupRetryAfter > 0): ?><br><?= __admin('setup.throttled', ['duration' => __adminDuration($setupRetryAfter)]) ?><?php endif; ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.invalidToken')) ?><?php if ($setupRetryAfter > 0): ?><br><?= adminEscape(__admin('setup.throttled', ['duration' => __adminDuration($setupRetryAfter)])) ?><?php endif; ?></div>
             <?php elseif ($setupError === 'password_too_short'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.passwordTooShort', ['min' => $setupMinLength]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.passwordTooShort', ['min' => $setupMinLength])) ?></div>
             <?php elseif ($setupError === 'password_mismatch'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.passwordMismatch') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.passwordMismatch')) ?></div>
             <?php elseif ($setupError === 'invalid_username'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidUsername', 'Use 3-32 characters: lowercase letters, digits, dash or underscore.') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.invalidUsername')) ?></div>
             <?php elseif ($setupError === 'name_equals_username'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.nameEqualsUsername', 'Your display name must be different from your username — the username is private.') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.nameEqualsUsername')) ?></div>
             <?php elseif ($setupError === 'setup_complete'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.alreadyDone', 'An account already exists on this installation. Sign in instead.') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.alreadyDone')) ?></div>
             <?php elseif ($setupError === 'missing_fields'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.missingFields', 'Every field is required.') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.missingFields')) ?></div>
             <?php elseif ($setupError !== null): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.serverError', 'The account could not be created.') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('setup.serverError')) ?></div>
             <?php endif; ?>
 
             <div class="admin-alert admin-alert--info">
-                <strong><?= __admin('setup.tokenWhere.title', 'Step 1 — read the setup token') ?></strong>
-                <p><?= __admin('setup.tokenWhere.body', 'It was written on the server, inside your QuickSite folder. Open this file and copy its single line:') ?></p>
+                <strong><?= adminEscape(__admin('setup.tokenWhere.title')) ?></strong>
+                <p><?= adminEscape(__admin('setup.tokenWhere.body')) ?></p>
                 <p><code><?= adminAttr($tokenPath) ?></code></p>
-                <p class="admin-hint"><?= __admin('setup.tokenWhere.why', 'Being able to read that file is what proves you own this installation. The token is used once and then destroyed.') ?></p>
+                <p class="admin-hint"><?= adminEscape(__admin('setup.tokenWhere.why')) ?></p>
             </div>
 
             <form id="admin-setup-form" method="POST" action="">
                 <input type="hidden" name="form_token" value="<?= adminAttr($router->formToken()) ?>">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="setup_token">
-                        <?= __admin('setup.tokenLabel', 'Setup token') ?>
+                        <?= adminEscape(__admin('setup.tokenLabel')) ?>
                     </label>
                     <input
                         type="text"
@@ -166,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="name">
-                        <?= __admin('setup.nameLabel', 'Display name') ?>
+                        <?= adminEscape(__admin('setup.nameLabel')) ?>
                     </label>
                     <input
                         type="text"
@@ -178,12 +178,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         autocomplete="name"
                         required
                     >
-                    <p class="admin-hint"><?= __admin('setup.nameHint', 'Shown to other users. Must differ from your username.') ?></p>
+                    <p class="admin-hint"><?= adminEscape(__admin('setup.nameHint')) ?></p>
                 </div>
 
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="username">
-                        <?= __admin('setup.usernameLabel', 'Username') ?>
+                        <?= adminEscape(__admin('setup.usernameLabel')) ?>
                     </label>
                     <input
                         type="text"
@@ -207,8 +207,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         spellcheck="false"
                         required
                     >
-                    <p class="admin-hint"><?= __admin('setup.usernameHint', 'Private — you sign in with it and nobody else sees it. 3-32 characters: letters, digits, dash or underscore.') ?></p>
-                    <p class="admin-hint"><?= __admin('setup.usernameSuggested', 'One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.') ?></p>
+                    <p class="admin-hint"><?= adminEscape(__admin('setup.usernameHint')) ?></p>
+                    <p class="admin-hint"><?= adminEscape(__admin('setup.usernameSuggested')) ?></p>
                 </div>
 
                 <?php /* The password twice, as on the register form: typed once, a slip
@@ -216,13 +216,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          two before the gate, so a mismatch costs no throttle budget. Both
                          fields share this markup and the toggle script below. */
                 $passwordFields = [
-                    ['id' => 'password',         'label' => __admin('setup.passwordLabel', 'Password'), 'hint' => __admin('setup.passwordHint', ['min' => $passwordMinLength])],
+                    ['id' => 'password',         'label' => __admin('setup.passwordLabel'), 'hint' => __admin('setup.passwordHint', ['min' => $passwordMinLength])],
                     ['id' => 'password_confirm', 'label' => __admin('setup.passwordConfirmLabel'),      'hint' => null],
                 ];
                 foreach ($passwordFields as $field): ?>
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="<?= $field['id'] ?>">
-                        <?= $field['label'] ?>
+                        <?= adminEscape($field['label']) ?>
                     </label>
                     <div style="position: relative;">
                         <input
@@ -254,32 +254,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </button>
                     </div>
                     <?php if ($field['hint'] !== null): ?>
-                    <p class="admin-hint"><?= $field['hint'] ?></p>
+                    <p class="admin-hint"><?= adminEscape($field['hint']) ?></p>
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">
-                    <?= __admin('setup.submit', 'Create account') ?>
+                    <?= adminEscape(__admin('setup.submit')) ?>
                 </button>
             </form>
         </div>
     </div>
 
     <div class="admin-login__help">
-        <div class="admin-login__help-title"><?= __admin('setup.help.title', 'Why a token?') ?></div>
-        <p class="admin-login__help-text"><?= __admin('setup.help.text', 'This page can create an account without anyone signing in first, so it must be proven that you are the person who installed QuickSite — not a passer-by who found the address. Reading a file on the server is that proof. This page disappears for good once the first account exists.') ?></p>
+        <div class="admin-login__help-title"><?= adminEscape(__admin('setup.help.title')) ?></div>
+        <p class="admin-login__help-text"><?= adminEscape(__admin('setup.help.text')) ?></p>
     </div>
 </div>
 
+<?= __adminWords(['login.showPassword', 'login.hidePassword']) ?>
 <script>
 // Password visibility toggles — same behaviour as the login page, one per field:
 // each button names the input it reveals.
 (function () {
-    var labels = {
-        show: <?= json_encode(__admin('login.showPassword')) ?>,
-        hide: <?= json_encode(__admin('login.hidePassword')) ?>
-    };
     document.querySelectorAll('[data-password-toggle]').forEach(function (btn) {
         var input = document.getElementById(btn.getAttribute('data-password-toggle'));
         var eye = btn.querySelector('[data-eye="show"]');
@@ -287,11 +284,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!input || !eye || !eyeOff) return;
         btn.addEventListener('click', function () {
             var reveal = input.type === 'password';
+            var label = QSPanelWords.t(reveal ? 'login.hidePassword' : 'login.showPassword');
             input.type = reveal ? 'text' : 'password';
             eye.style.display = reveal ? 'none' : '';
             eyeOff.style.display = reveal ? '' : 'none';
-            btn.setAttribute('aria-label', reveal ? labels.hide : labels.show);
-            btn.setAttribute('title', reveal ? labels.hide : labels.show);
+            btn.setAttribute('aria-label', label);
+            btn.setAttribute('title', label);
             input.focus();
         });
     });

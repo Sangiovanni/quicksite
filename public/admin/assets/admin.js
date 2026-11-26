@@ -121,7 +121,7 @@ const QuickSiteAdmin = {
 
         const role = this.permissions.role;
         if (role) {
-            roleEl.textContent = role;
+            roleEl.textContent = QuickSiteUtils.roleName(role);
             roleEl.setAttribute('data-role', role);
         } else {
             roleEl.textContent = this.t('nav.noProject');
@@ -275,7 +275,6 @@ const QuickSiteAdmin = {
         this.applyMenuGroups();
         this.initCategoryToggles();
         this.initForms();
-        this.initCopyButtons();
         this.initKeyboardShortcuts();
         this.checkPendingMessage();
         this.initWriteRate();
@@ -312,19 +311,20 @@ const QuickSiteAdmin = {
                 (a.remaining / a.max) - (b.remaining / b.max) || b.resetAt - a.resetAt)[0];
             el.hidden = false;
             el.classList.toggle('admin-write-rate--low', tightest.remaining <= Math.max(1, Math.floor(tightest.max * 0.1)));
-            figure.textContent = api.rateText('figure', '{remaining} / {max}', {
-                remaining: tightest.remaining, max: tightest.max, period: api.periodText(tightest.period)
+            figure.textContent = QSPanelWords.count('writeRate.figure', tightest.remaining, {
+                max: QSPanelWords.number(tightest.max), period: api.periodText(tightest.period)
             });
             // What a phone's row shows in its place: what is left, alone.
             if (left) left.textContent = String(tightest.remaining);
-            el.title = [api.rateText('titleHead', 'Changes you can still make on this server:')]
+            el.title = [QSPanelWords.t('writeRate.titleHead')]
                 .concat(state.windows.map(w => w.remaining >= w.max
                     // A whole window has not opened yet: nothing to wait for.
-                    ? api.rateText('titleWindowFull', '{remaining} of {max} per {period}', {
-                        remaining: w.remaining, max: w.max, period: api.periodText(w.period)
+                    ? QSPanelWords.t('writeRate.titleWindowFull', {
+                        remaining: QSPanelWords.number(w.remaining), max: QSPanelWords.number(w.max), period: api.periodText(w.period)
                     })
-                    : api.rateText('titleWindow', '{remaining} of {max} per {period} · full again at {time}', {
-                        remaining: w.remaining, max: w.max, period: api.periodText(w.period), time: api.clockText(w.resetAt)
+                    : QSPanelWords.t('writeRate.titleWindow', {
+                        remaining: QSPanelWords.number(w.remaining), max: QSPanelWords.number(w.max),
+                        period: api.periodText(w.period), time: api.clockText(w.resetAt)
                     }))).join('\n');
             el.setAttribute('aria-label', el.title);
             // Redraw when the next window refills.
@@ -579,7 +579,7 @@ const QuickSiteAdmin = {
      * hour in minutes, under a day in hours, then in days, the unit chosen after
      * rounding. 'up' (a wait: nobody is told to try again too early) or 'nearest'
      * (an "about"). Anything under a second counts as one. The words are
-     * common.duration.*, which layout.php ships on every page; the two must keep
+     * common.duration.<unit> (counted: .one / .other), which layout.php hands on every page; the two must keep
      * the same rule.
      *
      * @param {number} seconds
@@ -602,10 +602,7 @@ const QuickSiteAdmin = {
             n = count(86400);
             unit = 'day';
         }
-        const key = unit + (n === 1 ? '' : 's');
-        const words = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.translations
-            && window.QUICKSITE_CONFIG.translations.duration) || {};
-        return (words[key] || ':count ' + key).split(':count').join(String(n));
+        return QSPanelWords.count('common.duration.' + unit, n);
     },
 
     /**
@@ -684,28 +681,15 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Look up a translation by dot path.
+     * A panel word by its key's whole path, its {name} parts filled: QSPanelWords.t() (core/panel-words.js), the
+     * panel's one lookup. A word nothing hands shows its path.
      *
-     * Reads the same QUICKSITE_CONFIG.translations object layout.php emits, so
-     * a key missing from a language renders as its own dot path — which is how
-     * an unset string stays visible and findable instead of hiding behind an
-     * English fallback.
-     *
-     * @param {string} path        e.g. 'commands.execute'
-     * @param {*} [fallback]       returned only when the path is absent
-     * @returns {*} the value, or `fallback`, or the path itself
+     * @param {string} path   e.g. 'commands.execute'
+     * @param {Object} [params]
+     * @returns {string}
      */
-    t(path, fallback) {
-        const parts = path.split('.');
-        let current = window.QUICKSITE_CONFIG?.translations || {};
-        for (const part of parts) {
-            if (current && typeof current === 'object' && part in current) {
-                current = current[part];
-            } else {
-                return fallback !== undefined ? fallback : path;
-            }
-        }
-        return current === undefined || current === '' ? (fallback !== undefined ? fallback : path) : current;
+    t(path, params) {
+        return QSPanelWords.t(path, params);
     },
 
     /**
@@ -851,7 +835,7 @@ const QuickSiteAdmin = {
             button.disabled = true;
             const res = await this.setProjectStar(id, !this.isProjectStarred(id));
             if (!res || !res.ok) {
-                this.showToast(this.t('common.starFailed') + ((res && res.data && res.data.message) || ''), 'error');
+                this.showToast(this.t('common.starFailed', { message: (res && res.data && res.data.message) || '' }), 'error');
             }
             this.syncStarToggle(button, current());
         });
@@ -911,7 +895,7 @@ const QuickSiteAdmin = {
         if (!this.isDestructiveCommand(command, form)) return true;
         // A danger, as every question before a change that cannot be taken back: Cancel takes the focus, the verb is red.
         return this.confirm(this.t('commands.confirmDestructive.text'), {
-            title: String(this.t('commands.confirmDestructive.question')).split(':command').join(command),
+            title: this.t('commands.confirmDestructive.question', { command: command }),
             type: 'danger',
             confirmText: this.t('common.execute')
         });
@@ -981,7 +965,7 @@ const QuickSiteAdmin = {
                     status: 0,
                     data: { error: error.message }
                 });
-                this.showToast(this.t('commands.errorPrefix') + error.message, 'error');
+                this.showToast(this.t('common.errorDetail', { message: error.message }), 'error');
             }
             
             submitBtn.disabled = false;
@@ -1047,7 +1031,7 @@ const QuickSiteAdmin = {
                 if (result.ok) {
                     this.showToast(
                         result.filename
-                            ? this.t('commands.downloadedPrefix') + result.filename
+                            ? this.t('commands.downloaded', { file: result.filename })
                             : this.t('commands.executedMsg'),
                         'success'
                     );
@@ -1066,7 +1050,7 @@ const QuickSiteAdmin = {
                     status: 0,
                     data: { error: error.message }
                 });
-                this.showToast(this.t('commands.errorPrefix') + error.message, 'error');
+                this.showToast(this.t('common.errorDetail', { message: error.message }), 'error');
             }
             
             submitBtn.disabled = false;
@@ -1081,7 +1065,7 @@ const QuickSiteAdmin = {
         if (!container) return;
         
         const statusClass = result.ok ? 'admin-alert--success' : 'admin-alert--error';
-        const statusText = this.t(result.ok ? 'common.success' : 'common.error');
+        const statusText = this.t(result.ok ? 'common.status.success' : 'common.status.error');
         const responseJson = JSON.stringify(result.data, null, 2);
 
         QSDom.clear(container);
@@ -1095,7 +1079,7 @@ const QuickSiteAdmin = {
     _renderResponseAlert(statusClass, statusText, status) {
         return QSDom.el('div', { class: 'admin-alert ' + statusClass }, [
             QSDom.el('strong', { text: statusText }),
-            ' (' + this.t('commands.responseStatus') + ': ' + status + ')'
+            ' ' + this.t('commands.responseStatus', { status: status })
         ]);
     },
 
@@ -1127,24 +1111,6 @@ const QuickSiteAdmin = {
         if (pre && window.QuickSiteUtils) {
             window.QuickSiteUtils.copyToClipboard(pre.textContent, this.t('commands.responseCopied'));
         }
-    },
-
-    /**
-     * Initialize copy to clipboard buttons
-     */
-    initCopyButtons() {
-        document.querySelectorAll('[data-copy]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = document.querySelector(btn.dataset.copy);
-                if (target) {
-                    navigator.clipboard.writeText(target.textContent).then(() => {
-                        const originalText = btn.textContent;
-                        btn.textContent = 'Copied!';
-                        setTimeout(() => btn.textContent = originalText, 2000);
-                    });
-                }
-            });
-        });
     },
 
     /**
@@ -1193,7 +1159,7 @@ const QuickSiteAdmin = {
         } catch (error) {
             console.error('Failed to populate select:', error);
             const errorMsg = error.message || this.t('commands.errorLoadingOptions');
-            QSDom.setSelectPlaceholder(selectElement, this.t('common.error') + ': ' + errorMsg);
+            QSDom.setSelectPlaceholder(selectElement, this.t('common.errorDetail', { message: errorMsg }));
         }
         
         selectElement.disabled = false;
@@ -1290,7 +1256,7 @@ const QuickSiteAdmin = {
                 this.setJsonStatus(statusEl, this.t('commands.jsonEditor.valid'), 'success');
             } catch (e) {
                 this.setJsonStatus(statusEl,
-                    String(this.t('commands.jsonEditor.invalid')).replace(':message', e.message), 'error');
+                    this.t('commands.jsonEditor.invalid', { message: e.message }), 'error');
             }
         });
 
@@ -1302,7 +1268,7 @@ const QuickSiteAdmin = {
                 this.setJsonStatus(statusEl, this.t('commands.jsonEditor.valid'), 'success');
             } catch (e) {
                 this.setJsonStatus(statusEl,
-                    String(this.t('commands.jsonEditor.invalidShort')).replace(':message', e.message), 'error');
+                    this.t('commands.jsonEditor.invalidShort', { message: e.message }), 'error');
             }
         });
 

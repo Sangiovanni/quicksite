@@ -7,16 +7,17 @@
  * are facts about the INSTALLATION rather than about any project's content, so
  * they live here and are served by /admin/self.
  *
- * These were `findUser` (users.lookup) and `listRoles` (roles.read). Both
- * categories were `scope: global`, `access: 'any'` — so the only thing
- * hasPermission() contributed was "is the caller authenticated", which
- * qs_admin_json_boot() establishes before either of these runs.
+ * Two lookups: a person by name, and the role catalogue. The check before them is
+ * that the caller is authenticated, which qs_admin_json_boot() establishes.
  *
  * Must be required AFTER init.php — it depends on SECURE_FOLDER_PATH.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+// Every answer here is said in the panel's words (answers.directory), in the
+// language of the panel that asked (qs_admin_json_boot()).
+require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
 
 /**
  * EXACT public-name lookup — the primitive behind "invite someone".
@@ -41,8 +42,8 @@ function qs_directory_find_user(array $params): ApiResponse {
     $name = trim((string)($params['name'] ?? ''));
     if ($name === '') {
         return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('name is required')
-            ->withErrors(['name' => 'Required field']);
+            ->withMessage(__admin('answers.common.nameRequired'))
+            ->withErrors(['name' => __admin('answers.common.requiredField')]);
     }
 
     $needle = mb_strtolower($name);
@@ -57,7 +58,7 @@ function qs_directory_find_user(array $params): ApiResponse {
     // Zero matches is a successful search, not an error — names are public
     // display data and their existence is the feature (unlike usernames).
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage(count($matches) === 1 ? '1 user found' : count($matches) . ' users found')
+        ->withMessage(__admin('answers.directory.lookupDone'))
         ->withData([
             'query'   => $name,
             'matches' => $matches,
@@ -84,7 +85,7 @@ function qs_directory_list_roles(array $user): ApiResponse {
 
     if (empty($roles)) {
         return ApiResponse::create(200, 'operation.success')
-            ->withMessage('No roles configured')
+            ->withMessage(__admin('answers.directory.noRoles'))
             ->withData([
                 'roles' => [],
                 'count' => 0,
@@ -117,7 +118,7 @@ function qs_directory_list_roles(array $user): ApiResponse {
     }
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Roles retrieved successfully')
+        ->withMessage(__admin('answers.directory.rolesRetrieved'))
         ->withData([
             'roles'             => $rolesList,
             'count'             => count($rolesList),

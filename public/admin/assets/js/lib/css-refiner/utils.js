@@ -9,19 +9,6 @@
     /* ── General helpers ── */
 
     /**
-     * Debounce a function call.
-     */
-    function debounce(fn, ms) {
-        var timer;
-        return function () {
-            var ctx  = this;
-            var args = arguments;
-            clearTimeout(timer);
-            timer = setTimeout(function () { fn.apply(ctx, args); }, ms);
-        };
-    }
-
-    /**
      * Simple djb2-style string hash → unsigned 32-bit integer.
      */
     function hashString(str) {
@@ -30,15 +17,6 @@
             hash = ((hash << 5) + hash + str.charCodeAt(i)) >>> 0;
         }
         return hash;
-    }
-
-    /**
-     * Format a byte count for display.
-     */
-    function formatBytes(bytes) {
-        if (bytes < 1024) { return bytes + ' B'; }
-        if (bytes < 1048576) { return (bytes / 1024).toFixed(1) + ' KB'; }
-        return (bytes / 1048576).toFixed(2) + ' MB';
     }
 
     /**
@@ -118,9 +96,7 @@
 
     /* ── Public API ── */
     CSSRefiner.Utils = {
-        debounce:              debounce,
         hashString:            hashString,
-        formatBytes:           formatBytes,
         normalizeValue:        normalizeValue,
         normalizeDeclarations: normalizeDeclarations,
         parseNumericValue:     parseNumericValue,

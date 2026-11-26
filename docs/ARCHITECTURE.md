@@ -1345,6 +1345,7 @@ PHP and the browser runtime:
 | `qs-api-config.js` | `window.QS_API_ENDPOINTS` |
 | `qs-enums.js` | `window.QS_ENUMS` |
 | `window.QS_COUNT_STRINGS` | count-sentence strings, resolved for **this page's** language |
+| `window.QS_VISITOR_WORDS` | QuickSite's own words for this page's visitor, resolved for **this page's** language: the toasts `qs.js` shows after a call and, when the theme switch is wired, its two labels |
 | `window.QS_STATE_STORES` | this route's stores |
 | `window.QS_RESOLVED` | store-keyed resolver values, so a hydrated store skips its first fetch |
 | `window.QS_RESOLVED_BY_INDEX` | the same values under the `r0` / `r1` addresses templates use |
@@ -1372,6 +1373,16 @@ bilingual site would answer in whichever language last wrote the file — on the
 live surface and in a build alike. The keys are language-independent and stay in
 the compiled config; the sentences are not, and ride the page instead. PHP
 remains the only translation engine either way.
+
+`window.QS_VISITOR_WORDS` rides the page for the same reason. QuickSite's own
+words for a visitor (the `visitor` words of `<secure>/src/translations/<lang>.json`;
+a language with no file of its own takes its base language's words, else
+English) differ by language, and the runtime shows them where no text of the
+page does: the default toasts after a call, the theme switch's label after a
+press. A page carries the words its runtime shows and no others, and a page that
+carries none shows no default toast. A built site carries no word file of
+QuickSite's: the build resolves these words for each of the site's languages into
+`qs-site.php` (§11.1), and every page reads its language's set from there.
 
 `window.QS_CONSENT` is the block where absence is meaningful rather than
 neutral: `qs.js` reads a missing value as "this project has no consent layer"
@@ -1430,7 +1441,8 @@ long as it exists, and reaches the public as a build with its own deployment.
 your-server/
 ├── <public>/[<space>/]        document root — the site answers from here
 │   ├── index.php              the front controller
-│   ├── qs-site.php            its four parameters (project id, folder names, space)
+│   ├── qs-site.php            its parameters (project id, folder names, space, the
+│   │                          `?v=` number, the icon, the visitor's words)
 │   ├── .htaccess              funnels every non-file request into index.php
 │   └── style/  assets/  scripts/  sitemap.txt
 └── <secure>/                  sibling, never web-accessible
@@ -1586,7 +1598,10 @@ Then:
    reads — among them the `?v=` number every page writes after the files it
    links (the time of this build), and the icon, recorded only when the copy
    just made carries its file. A built page makes no check of its own; an icon
-   added to a deployed site by hand is linked after the next build.
+   added to a deployed site by hand is linked after the next build. They also
+   hold QuickSite's own words for the site's visitor, one set per language of
+   the site (the toasts, the theme switch's labels, the 404 page of a site that
+   has none, the fatal page), so the build carries no word file of QuickSite's.
 9. Copy `LICENSE`, and `sitemap.txt` when the project has one.
 10. Copy `routes.php` and `config.php`, the runtime classes and function files
     (§11.2), the translations (all languages when the project is multilingual,

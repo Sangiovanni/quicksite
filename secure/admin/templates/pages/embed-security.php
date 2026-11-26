@@ -10,10 +10,6 @@
 
 $baseUrl = rtrim(BASE_URL, '/');
 
-// The embedSecurity sub-tree, verbatim and under the same dot paths PHP uses,
-// so the JS asks for the path PHP would.
-$qsEmbedSecurityI18n = ['embedSecurity' => AdminTranslation::getInstance()->getRaw('embedSecurity') ?: new stdClass()];
-
 // An installation can decline to show this page (setup item 11, embed-security.php;
 // ABSENT MEANS SHOWN, see embedSecurityPolicy.php). Hidden, it says so plainly, as
 // the console's page does, rather than answer a 404 that would send the next person
@@ -26,7 +22,7 @@ if (!$router->isEmbedSecurityShown()):
         <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
-        <?= __admin('embedSecurity.title') ?>
+        <?= adminEscape(__admin('embedSecurity.title')) ?>
     </h1>
 </div>
 <div class="admin-empty">
@@ -34,8 +30,8 @@ if (!$router->isEmbedSecurityShown()):
         <circle cx="12" cy="12" r="10"/>
         <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
     </svg>
-    <h2 class="admin-empty__title"><?= __admin('embedSecurity.disabled.title', 'The Embed Security page is turned off') ?></h2>
-    <p class="admin-empty__text"><?= __admin('embedSecurity.disabled.text') ?></p>
+    <h2 class="admin-empty__title"><?= adminEscape(__admin('embedSecurity.disabled.title')) ?></h2>
+    <p class="admin-empty__text"><?= adminEscape(__admin('embedSecurity.disabled.text')) ?></p>
 </div>
 <?php
     return;
@@ -45,8 +41,9 @@ endif;
 <script>
 window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
 window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
-window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
+<?php // The words embed-security.js draws: the load failure, an empty token list, no allowed host. ?>
+<?= __adminWords(['embedSecurity.errors', 'embedSecurity.blockEverything', 'embedSecurity.noRules']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/embed-security.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/embed-security.js') ?>"></script>
 
 <div class="admin-page-header">
@@ -54,17 +51,17 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
         <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
-        <?= __admin('embedSecurity.title') ?>
+        <?= adminEscape(__admin('embedSecurity.title')) ?>
     </h1>
-    <p class="admin-page-header__subtitle"><?= __admin('embedSecurity.subtitle') ?></p>
+    <p class="admin-page-header__subtitle"><?= adminEscape(__admin('embedSecurity.subtitle')) ?></p>
 </div>
 
 <!-- Read-only notice: where the policy lives and who can change it -->
 <div class="admin-card">
     <div class="admin-card__body">
-        <p><strong><?= __admin('embedSecurity.readonlyNotice') ?></strong></p>
-        <p class="admin-hint"><?= str_replace(':path', '<code>' . htmlspecialchars('<secure>/management/config/embed-policy.json', ENT_QUOTES, 'UTF-8') . '</code>', __admin('embedSecurity.policyLocation')) ?></p>
-        <p class="admin-hint"><?= __admin('embedSecurity.howToChange') ?></p>
+        <p><strong><?= adminEscape(__admin('embedSecurity.readonlyNotice')) ?></strong></p>
+        <p class="admin-hint"><?= str_replace('{path}', '<code>' . htmlspecialchars('<secure>/management/config/embed-policy.json', ENT_QUOTES, 'UTF-8') . '</code>', adminEscape(__admin('embedSecurity.policyLocation'))) ?></p>
+        <p class="admin-hint"><?= adminEscape(__admin('embedSecurity.howToChange')) ?></p>
     </div>
 </div>
 
@@ -77,17 +74,17 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
                 <line x1="3" y1="9" x2="21" y2="9"/>
                 <line x1="9" y1="21" x2="9" y2="9"/>
             </svg>
-            <?= __admin('embedSecurity.sandboxRules') ?>
+            <?= adminEscape(__admin('embedSecurity.sandboxRules')) ?>
         </h2>
     </div>
     <div class="admin-card__body">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            <?= __admin('embedSecurity.intro') ?>
+            <?= adminEscape(__admin('embedSecurity.intro')) ?>
         </p>
         <div id="rules-container">
             <div class="admin-loading">
                 <span class="admin-spinner"></span>
-                <?= __admin('embedSecurity.loadingRules') ?>
+                <?= adminEscape(__admin('embedSecurity.loadingRules')) ?>
             </div>
         </div>
     </div>
@@ -100,15 +97,15 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
             <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
-            <?= __admin('embedSecurity.defaultPolicy') ?>
+            <?= adminEscape(__admin('embedSecurity.defaultPolicy')) ?>
         </h2>
     </div>
     <div class="admin-card__body">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            <?= __admin('embedSecurity.defaultPolicyHint') ?>
+            <?= adminEscape(__admin('embedSecurity.defaultPolicyHint')) ?>
         </p>
         <div id="default-policy-value"></div>
-        <p class="admin-hint"><?= __admin('embedSecurity.emptySandboxHint') ?></p>
+        <p class="admin-hint"><?= adminEscape(__admin('embedSecurity.emptySandboxHint')) ?></p>
     </div>
 </div>
 
@@ -120,12 +117,12 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
-            <?= __admin('embedSecurity.neverAllowed') ?>
+            <?= adminEscape(__admin('embedSecurity.neverAllowed')) ?>
         </h2>
     </div>
     <div class="admin-card__body">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            <?= __admin('embedSecurity.neverAllowedHint') ?>
+            <?= adminEscape(__admin('embedSecurity.neverAllowedHint')) ?>
         </p>
         <div id="never-allowed-list"></div>
     </div>

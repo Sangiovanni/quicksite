@@ -158,7 +158,7 @@
             }
         },
         {
-            "comment": "=== 6. SET MINIMAL TRANSLATIONS (default language - REPLACE, keeping the words the consent layer and the storage and privacy registries own: they outlive the pages) ===",
+            "comment": "=== 6. SET MINIMAL TRANSLATIONS (default language - REPLACE, keeping the words the consent layer and the storage and privacy registries own: they outlive the pages; QuickSite's own starting words, in the default language) ===",
             "condition": "param.keepAssets !== true",
             "command": "setTranslationKeys",
             "params": {
@@ -167,18 +167,17 @@
                 "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy"],
                 "translations": {
                     "site": {
-                        "name": "My Website"
+                        "name": "{{startingWord:freshStart.siteName}}"
                     },
                     "page": {
                         "titles": {
-                            "home": "Home",
-                            "404": "Not Found"
+                            "home": "{{startingWord:freshStart.homeTitle}}",
+                            "404": "{{startingWord:freshStart.notFoundTitle}}"
                         }
                     },
                     "404": {
-                        "pageNotFound": "Page Not Found",
-                        "message": "The page you are looking for does not exist.",
-                        "backHome": "Back to Home"
+                        "pageNotFound": "{{startingWord:freshStart.pageNotFound}}",
+                        "message": "{{startingWord:freshStart.notFoundMessage}}"
                     }
                 }
             }
@@ -193,24 +192,23 @@
                 "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy", "alt", "photos"],
                 "translations": {
                     "site": {
-                        "name": "My Website"
+                        "name": "{{startingWord:freshStart.siteName}}"
                     },
                     "page": {
                         "titles": {
-                            "home": "Home",
-                            "404": "Not Found"
+                            "home": "{{startingWord:freshStart.homeTitle}}",
+                            "404": "{{startingWord:freshStart.notFoundTitle}}"
                         }
                     },
                     "404": {
-                        "pageNotFound": "Page Not Found",
-                        "message": "The page you are looking for does not exist.",
-                        "backHome": "Back to Home"
+                        "pageNotFound": "{{startingWord:freshStart.pageNotFound}}",
+                        "message": "{{startingWord:freshStart.notFoundMessage}}"
                     }
                 }
             }
         },
         {
-            "comment": "=== 6b. SET MINIMAL TRANSLATIONS (default.json - REPLACE, keeping the same words) ===",
+            "comment": "=== 6b. SET MINIMAL TRANSLATIONS (default.json - REPLACE, keeping the same words; its starting words in the default language) ===",
             "condition": "param.keepAssets !== true",
             "command": "setTranslationKeys",
             "params": {
@@ -219,18 +217,17 @@
                 "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy"],
                 "translations": {
                     "site": {
-                        "name": "My Website"
+                        "name": "{{startingWord:freshStart.siteName}}"
                     },
                     "page": {
                         "titles": {
-                            "home": "Home",
-                            "404": "Not Found"
+                            "home": "{{startingWord:freshStart.homeTitle}}",
+                            "404": "{{startingWord:freshStart.notFoundTitle}}"
                         }
                     },
                     "404": {
-                        "pageNotFound": "Page Not Found",
-                        "message": "The page you are looking for does not exist.",
-                        "backHome": "Back to Home"
+                        "pageNotFound": "{{startingWord:freshStart.pageNotFound}}",
+                        "message": "{{startingWord:freshStart.notFoundMessage}}"
                     }
                 }
             }
@@ -245,18 +242,42 @@
                 "keep": ["consent", "storage.desc", "privacy.collected", "privacy.policy", "alt", "photos"],
                 "translations": {
                     "site": {
-                        "name": "My Website"
+                        "name": "{{startingWord:freshStart.siteName}}"
                     },
                     "page": {
                         "titles": {
-                            "home": "Home",
-                            "404": "Not Found"
+                            "home": "{{startingWord:freshStart.homeTitle}}",
+                            "404": "{{startingWord:freshStart.notFoundTitle}}"
                         }
                     },
                     "404": {
-                        "pageNotFound": "Page Not Found",
-                        "message": "The page you are looking for does not exist.",
-                        "backHome": "Back to Home"
+                        "pageNotFound": "{{startingWord:freshStart.pageNotFound}}",
+                        "message": "{{startingWord:freshStart.notFoundMessage}}"
+                    }
+                }
+            }
+        },
+        {
+            "comment": "=== 6c. (KEEPING THE LANGUAGES) THE SAME FIVE WORDS IN EACH OTHER LANGUAGE, each in its own words (MERGED: the language keeps its other words) ===",
+            "condition": "param.keepLanguages === true",
+            "forEach": "langData.languages",
+            "filter": "{{$value}} !== {{langData.default_language}}",
+            "command": "setTranslationKeys",
+            "params": {
+                "language": "{{$value}}",
+                "translations": {
+                    "site": {
+                        "name": "{{startingWord:freshStart.siteName}}"
+                    },
+                    "page": {
+                        "titles": {
+                            "home": "{{startingWord:freshStart.homeTitle}}",
+                            "404": "{{startingWord:freshStart.notFoundTitle}}"
+                        }
+                    },
+                    "404": {
+                        "pageNotFound": "{{startingWord:freshStart.pageNotFound}}",
+                        "message": "{{startingWord:freshStart.notFoundMessage}}"
                     }
                 }
             }

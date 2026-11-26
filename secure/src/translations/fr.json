@@ -4,6 +4,9 @@
             "label": "Se connecter avec {{provider}}"
         }
     },
+    "component": {
+        "starter": "Composant {{name}}"
+    },
     "consent": {
         "banner": {
             "message": "Nous utilisons des cookies pour améliorer votre expérience. Vous pouvez accepter, refuser ou personnaliser vos choix.",
@@ -57,6 +60,13 @@
             "disclaimer": "Ce résumé est généré à partir du registre de stockage du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique."
         }
     },
+    "freshStart": {
+        "siteName": "Mon site web",
+        "homeTitle": "Accueil",
+        "notFoundTitle": "Page introuvable",
+        "pageNotFound": "Page introuvable",
+        "notFoundMessage": "La page que vous cherchez n'existe pas."
+    },
     "privacy": {
         "policy": {
             "title": "Politique de confidentialité",
@@ -74,6 +84,29 @@
             "cookie_link": "politique des cookies",
             "cookie_hint": "Ce site peut utiliser des cookies. Envisagez de publier une politique des cookies qui les répertorie.",
             "disclaimer": "Ce résumé est généré à partir de la configuration du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique pour votre juridiction."
+        }
+    },
+    "visitor": {
+        "toast": {
+            "success": "Succès",
+            "requestFailed": "La requête a échoué",
+            "httpStatus": "Erreur HTTP {{status}}"
+        },
+        "themeSwitch": {
+            "dark": "Mode sombre",
+            "light": "Mode clair"
+        },
+        "aria": {
+            "themeSwitch": "Basculer entre le thème clair et le thème sombre",
+            "breadcrumb": "Fil d'Ariane"
+        },
+        "notFound": "404 — Page introuvable",
+        "fatal": {
+            "title": "Page indisponible",
+            "heading": "Cette page est momentanément indisponible",
+            "message": "Une erreur s'est produite lors de la génération de cette page. Vous n'y êtes pour rien.",
+            "retry": "Veuillez réessayer dans un instant, ou revenir à la {{home}}.",
+            "homeLink": "page d'accueil"
         }
     }
 }

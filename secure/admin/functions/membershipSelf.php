@@ -6,22 +6,18 @@
  * into a project, or out of one, is not project development, so these live here
  * and are served by /admin/self.
  *
- * These were the eight `membership.self` commands: listMyInvitations,
- * acceptInvitation, declineInvitation, leaveProject, dismissProjectNotice,
- * requestToJoin, withdrawJoinRequest and listMyProposals.
+ * Eight operations: listing one's invitations, accepting or declining one,
+ * leaving a project, dismissing a project notice, asking to join, withdrawing a
+ * request, and listing one's proposals.
  *
- * WHY THE MOVE CHANGES NOTHING ABOUT AUTHORIZATION. That category was
- * `scope: global`, `access: 'any'` — deliberately, because an invitee or a
- * petitioner is NOT a member, so the '/p/<id>/' marker gate would have refused
- * them before the command could run. hasPermission() therefore contributed
- * exactly one thing to these: "is the caller authenticated". qs_admin_json_boot()
- * establishes the same fact, with the same credential, before any of these run.
- *
- * Every real gate was always inside the function body and still is: `project`
- * is an F1-validated DATA parameter, each of these touches only entries keyed by
- * or authored by the caller, accept-time re-validation still refuses a grant
- * from dead authority, and the uniform-404 posture that keeps a nonexistent
- * project indistinguishable from "nothing here for you" is unchanged.
+ * AUTHORIZATION. An invitee or a petitioner is NOT a member, so no project gate
+ * can stand in front of these: the one check before they run is that the caller
+ * is authenticated, which qs_admin_json_boot() establishes with the session
+ * cookie and the per-session token. Every real gate is inside the function body:
+ * `project` is a validated DATA parameter, each operation touches only entries
+ * keyed by or authored by the caller, accepting re-validates the invitation so a
+ * grant from authority that has since gone is refused, and a project that does
+ * not exist answers the same uniform 404 as "nothing here for you".
  *
  * Must be required AFTER init.php — it depends on SECURE_FOLDER_PATH.
  */
@@ -34,6 +30,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 // REACH A PROJECT; withdrawing a request, dismissing a notice and asking to join
 // are queue management and grant nothing, so they are deliberately not recorded.
 require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
+// Every answer here is said in the panel's words (answers.membership), in the
+// language of the panel that asked (qs_admin_json_boot()).
+require_once SECURE_FOLDER_PATH . '/admin/functions/AdminTranslation.php';
 
 /**
  * Shared preamble: the caller's id, plus an F1-validated `project` parameter.
@@ -51,22 +50,42 @@ function qs_membership_resolve(array $params, ?string &$project, ?string &$userI
     $project = qs_project_id_from_input((string)($params['project'] ?? ''));
     if ($project === '') {
         return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('project is required')
-            ->withErrors(['project' => 'Required field']);
+            ->withMessage(__admin('answers.common.projectRequired'))
+            ->withErrors(['project' => __admin('answers.common.requiredField')]);
     }
     // The project-name shape check — the value becomes a directory selector downstream.
     if (!is_valid_project_name($project)) {
         return ApiResponse::create(400, 'project.invalid')
-            ->withMessage('Invalid project identifier');
+            ->withMessage(__admin('answers.common.invalidProject'));
     }
 
     $user = getCurrentUser();
     $userId = $user['id'] ?? null;
     if ($userId === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
     return null;
+}
+
+/**
+ * The refusal of a roster write that failed (qs_members_mutate()'s $failure): the
+ * status and the code qs_members_failure_http() maps it to, said in the panel's
+ * words for that code. The commands that call that function answer its own
+ * English message; these routes are the panel's, so they answer in its language.
+ * The match names every code the function returns.
+ *
+ * @param string|null $failure
+ * @return ApiResponse
+ */
+function qs_membership_roster_failure(?string $failure): ApiResponse {
+    [$status, $code] = qs_members_failure_http($failure);
+    return ApiResponse::create($status, $code)->withMessage(match ($code) {
+        'project.invalid'          => __admin('answers.common.invalidProject'),
+        'members.integrity'        => __admin('answers.membership.rosterUnsound'),
+        'validation.unencodable'   => __admin('answers.membership.valueUnencodable'),
+        'server.file_write_failed' => __admin('answers.membership.changeNotSaved'),
+    });
 }
 
 /**
@@ -99,7 +118,7 @@ function qs_membership_list_invitations(): ApiResponse {
     $userId = $user['id'] ?? null;
     if ($userId === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
 
     $usersCfg = loadUsersConfig();
@@ -268,7 +287,7 @@ function qs_membership_list_invitations(): ApiResponse {
     }
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Invitations listed successfully')
+        ->withMessage(__admin('answers.membership.invitationsListed'))
         ->withData([
             'invitations'      => $invitations,
             'requests'         => $requests,
@@ -343,7 +362,7 @@ function qs_membership_accept(array $params): ApiResponse {
     // answers exactly like "no invitation here" — no existence oracle.
     if ($failure === 'missing' || $failure === 'invalid_project' || $error === 'invitation.not_found') {
         return ApiResponse::create(404, 'invitation.not_found')
-            ->withMessage('No pending invitation for you on this project');
+            ->withMessage(__admin('answers.membership.noInvitation'));
     }
     if ($error === 'invitation.void') {
         // Mirror prune is best-effort; the authority prune already committed.
@@ -351,11 +370,11 @@ function qs_membership_accept(array $params): ApiResponse {
             error_log("membership accept: void-prune mirror removal failed for '{$userId}' on '{$project}'");
         }
         return ApiResponse::create(409, 'invitation.void')
-            ->withMessage('This invitation is no longer valid (the inviter no longer holds the authority that offered it)');
+            ->withMessage(__admin('answers.membership.invitationVoid'));
     }
     if ($error === 'already_member') {
         return ApiResponse::create(200, 'operation.success')
-            ->withMessage('You are already a member of this project')
+            ->withMessage(__admin('answers.membership.alreadyMember'))
             ->withData([
                 'project'        => $project,
                 'role'           => $joinedRole,
@@ -364,8 +383,7 @@ function qs_membership_accept(array $params): ApiResponse {
             ]);
     }
     if ($written !== true) {
-        [$status, $code, $message] = qs_members_failure_http($failure);
-        return ApiResponse::create($status, $code)->withMessage($message);
+        return qs_membership_roster_failure($failure);
     }
 
     // Status mirror: the caller is now a real member.
@@ -377,7 +395,7 @@ function qs_membership_accept(array $params): ApiResponse {
     qs_security_log(QS_SEC_MEMBERSHIP, ['action' => 'accepted_invitation', 'project' => $project], $userId);
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Invitation accepted — welcome aboard')
+        ->withMessage(__admin('answers.membership.invitationAccepted'))
         ->withData([
             'project' => $project,
             'role'    => $joinedRole,
@@ -415,11 +433,10 @@ function qs_membership_decline(array $params): ApiResponse {
 
     if ($failure === 'missing' || $failure === 'invalid_project' || $error === 'invitation.not_found') {
         return ApiResponse::create(404, 'invitation.not_found')
-            ->withMessage('No pending invitation for you on this project');
+            ->withMessage(__admin('answers.membership.noInvitation'));
     }
     if ($written !== true) {
-        [$status, $code, $message] = qs_members_failure_http($failure);
-        return ApiResponse::create($status, $code)->withMessage($message);
+        return qs_membership_roster_failure($failure);
     }
 
     // Mirror: plain removal — declining is the caller's own decision.
@@ -430,7 +447,7 @@ function qs_membership_decline(array $params): ApiResponse {
     qs_security_log(QS_SEC_MEMBERSHIP, ['action' => 'declined_invitation', 'project' => $project], $userId);
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Invitation declined')
+        ->withMessage(__admin('answers.membership.invitationDeclined'))
         ->withData([
             'project'  => $project,
             'declined' => true,
@@ -472,15 +489,14 @@ function qs_membership_leave(array $params): ApiResponse {
 
     if ($failure === 'missing' || $failure === 'invalid_project' || $error === 'member.not_found') {
         return ApiResponse::create(404, 'member.not_found')
-            ->withMessage('You are not a member of this project');
+            ->withMessage(__admin('answers.common.notMember'));
     }
     if ($error === 'member.owner_immutable') {
         return ApiResponse::create(400, 'member.owner_immutable')
-            ->withMessage('The owner cannot leave the project — transfer ownership first (or delete the project)');
+            ->withMessage(__admin('answers.membership.ownerCannotLeave'));
     }
     if ($written !== true) {
-        [$status, $code, $message] = qs_members_failure_http($failure);
-        return ApiResponse::create($status, $code)->withMessage($message);
+        return qs_membership_roster_failure($failure);
     }
 
     // Mirror: plain removal — leaving is the caller's own decision.
@@ -491,7 +507,7 @@ function qs_membership_leave(array $params): ApiResponse {
     qs_security_log(QS_SEC_MEMBERSHIP, ['action' => 'left_project', 'project' => $project], $userId);
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('You left the project')
+        ->withMessage(__admin('answers.membership.leftProject'))
         ->withData([
             'project' => $project,
             'left'    => true,
@@ -529,8 +545,8 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
     $kinds = array_merge(QS_MEMBERSHIP_NOTICES, [QS_MEMBERSHIP_APPROVED, QS_MEMBERSHIP_ROLE_CHANGED]);
     if ($kind !== null && (!is_string($kind) || !in_array($kind, $kinds, true))) {
         return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('notice must be one of: ' . implode(', ', $kinds))
-            ->withErrors(['notice' => 'Unknown notice']);
+            ->withMessage(__admin('answers.membership.noticeKinds', ['kinds' => implode(', ', $kinds)]))
+            ->withErrors(['notice' => __admin('answers.membership.unknownNotice')]);
     }
 
     $error = null;
@@ -580,20 +596,20 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
 
     if ($error === 'notice.not_found') {
         return ApiResponse::create(404, 'notice.not_found')
-            ->withMessage('No notice for this project');
+            ->withMessage(__admin('answers.membership.noNotice'));
     }
     if ($error === 'notice.not_dismissable') {
         return ApiResponse::create(400, 'notice.not_dismissable')
-            ->withMessage('Only a notice can be dismissed — end a membership by leaving the project, and a pending invitation by declining it')
+            ->withMessage(__admin('answers.membership.notDismissable'))
             ->withData(['status' => $status]);
     }
     if ($written !== true) {
         return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to persist the dismissal');
+            ->withMessage(__admin('answers.membership.dismissalNotSaved'));
     }
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Notice dismissed')
+        ->withMessage(__admin('answers.membership.noticeDismissed'))
         ->withData([
             'project'   => $project,
             'dismissed' => true,
@@ -640,30 +656,30 @@ function qs_membership_request_join(array $params): ApiResponse {
     // reach the roster writer (which refuses it too, as a backstop).
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
         return ApiResponse::create(400, 'validation.unencodable')
-            ->withMessage('The note is not valid UTF-8 text')
-            ->withErrors(['note' => 'Must be valid UTF-8 text']);
+            ->withMessage(__admin('answers.membership.noteNotUtf8'))
+            ->withErrors(['note' => __admin('answers.membership.mustBeUtf8')]);
     }
     $note = qs_clean_note($params['note'] ?? null);
 
     if ($project === '' || $note === null) {
         return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('project and note are required — a join request always carries its reason')
+            ->withMessage(__admin('answers.membership.requestFieldsRequired'))
             ->withErrors([
-                'project' => $project === '' ? 'Required field' : null,
-                'note'    => $note === null ? 'Required field' : null,
+                'project' => $project === '' ? __admin('answers.common.requiredField') : null,
+                'note'    => $note === null ? __admin('answers.common.requiredField') : null,
             ]);
     }
     // The project-name shape check — the value becomes a directory selector downstream.
     if (!is_valid_project_name($project)) {
         return ApiResponse::create(400, 'project.invalid')
-            ->withMessage('Invalid project identifier');
+            ->withMessage(__admin('answers.common.invalidProject'));
     }
 
     $user = getCurrentUser();
     $userId = $user['id'] ?? null;
     if ($userId === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
 
     // Acknowledgment gate (own cache only — no oracle): a standing refused/
@@ -672,7 +688,7 @@ function qs_membership_request_join(array $params): ApiResponse {
     $ownStatus = is_array($ownEntry) ? ($ownEntry['status'] ?? 'member') : null;
     if ($ownStatus === 'refused' || $ownStatus === 'removed') {
         return ApiResponse::create(409, 'request.notice_pending')
-            ->withMessage('A notice for this project is still in your inbox — dismiss it on your memberships page before requesting again');
+            ->withMessage(__admin('answers.membership.noticeWaiting'));
     }
 
     $today = date('Y-m-d');
@@ -725,23 +741,22 @@ function qs_membership_request_join(array $params): ApiResponse {
     // project whose request lane is closed — no existence oracle.
     if ($failure === 'missing' || $failure === 'invalid_project' || $error === 'unavailable') {
         return ApiResponse::create(404, 'join.unavailable')
-            ->withMessage('This project does not accept join requests');
+            ->withMessage(__admin('answers.membership.joinUnavailable'));
     }
     if ($error === 'member.already_exists') {
         return ApiResponse::create(409, 'member.already_exists')
-            ->withMessage('You are already a member of this project');
+            ->withMessage(__admin('answers.membership.alreadyMember'));
     }
     if ($error === 'invitation.already_pending') {
         return ApiResponse::create(409, 'invitation.already_pending')
-            ->withMessage('You already have a pending invitation for this project — accept or decline it instead');
+            ->withMessage(__admin('answers.membership.invitationWaiting'));
     }
     if ($error === 'request.already_pending') {
         return ApiResponse::create(409, 'request.already_pending')
-            ->withMessage('You already have a pending join request for this project — withdraw it to re-ask');
+            ->withMessage(__admin('answers.membership.requestWaiting'));
     }
     if ($written !== true) {
-        [$status, $code, $message] = qs_members_failure_http($failure);
-        return ApiResponse::create($status, $code)->withMessage($message);
+        return qs_membership_roster_failure($failure);
     }
 
     // Status mirror (secondary write, silent-failure by ruling). No name: the
@@ -752,7 +767,7 @@ function qs_membership_request_join(array $params): ApiResponse {
     }
 
     return ApiResponse::create(201, 'resource.created')
-        ->withMessage('Join request sent — a project admin or the owner will answer it')
+        ->withMessage(__admin('answers.membership.requestSent'))
         ->withData([
             'project'   => $project,
             'role'      => 'viewer',
@@ -803,11 +818,10 @@ function qs_membership_withdraw_request(array $params): ApiResponse {
 
     if ($failure === 'missing' || $failure === 'invalid_project' || $error === 'request.not_found') {
         return ApiResponse::create(404, 'request.not_found')
-            ->withMessage('No join request of yours on this project');
+            ->withMessage(__admin('answers.membership.noRequest'));
     }
     if ($written !== true) {
-        [$status, $code, $message] = qs_members_failure_http($failure);
-        return ApiResponse::create($status, $code)->withMessage($message);
+        return qs_membership_roster_failure($failure);
     }
 
     // Mirror: my own request had a pending_request entry in MY cache — plain
@@ -820,7 +834,7 @@ function qs_membership_withdraw_request(array $params): ApiResponse {
     }
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Join request withdrawn')
+        ->withMessage(__admin('answers.membership.requestWithdrawn'))
         ->withData([
             'project'   => $project,
             'user_id'   => $targetId,
@@ -854,7 +868,7 @@ function qs_membership_list_proposals(): ApiResponse {
     $userId = $user['id'] ?? null;
     if ($userId === null) {
         return ApiResponse::create(401, 'auth.required')
-            ->withMessage('Authentication required');
+            ->withMessage(__admin('answers.common.authRequired'));
     }
 
     $usersCfg = loadUsersConfig();
@@ -896,7 +910,7 @@ function qs_membership_list_proposals(): ApiResponse {
     }
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Proposals listed successfully')
+        ->withMessage(__admin('answers.membership.proposalsListed'))
         ->withData([
             'proposals'      => $proposals,
             'proposal_count' => count($proposals),

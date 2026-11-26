@@ -21,13 +21,14 @@
  * QuickSiteAdmin.canRun('setSocialPreview'), and carry the role mark the panel's filter reads. A viewer gets the same
  * values as text. A value emptied is sent empty, which removes it.
  *
- * Built with QSDom.el and named _render* helpers, each returning one element (the CLAUDE.md HTML-in-JS rule).
+ * Built with QSDom.el and named _render* helpers, each returning one element (the CLAUDE.md HTML-in-JS rule). Its words
+ * are the socialPreviews section the page hands, read through t() below; numbers, dates, lists and names of territories
+ * in the panel's language (QSPanelWords).
  */
 (function () {
     'use strict';
 
     var CFG = window.QS_SOCIAL_CONFIG || {};
-    var T = window.QS_SOCIAL_I18N || {};
     var el = window.QSDom.el;
     var F = window.QSSocialFigures;
     var DEVICE_KEY = window.QuickSiteStorageKeys && window.QuickSiteStorageKeys.socialPreviewDevice;
@@ -65,11 +66,8 @@
 
     // ── small helpers ─────────────────────────────────────────────────────────────────────────────────
 
-    function fmt(text, vars) {
-        return String(text == null ? '' : text).replace(/\{(\w+)\}/g, function (m, k) {
-            return vars && vars[k] != null ? String(vars[k]) : m;
-        });
-    }
+    /** A word of this page (socialPreviews), its {name} parts filled. */
+    function t(name, params) { return QSPanelWords.t('socialPreviews.' + name, params); }
 
     function toast(message, type) {
         window.QuickSiteAdmin.showToast(message, type || 'info');
@@ -79,32 +77,25 @@
         return (res && res.data && (res.data.message || res.data.error)) || String(res && res.status || '');
     }
 
-    /** A list joined in the panel's language ("a, b and c"). */
-    function joinList(items) {
-        try {
-            return new Intl.ListFormat(CFG.panelLang || 'en', { style: 'long', type: 'conjunction' }).format(items);
-        } catch (e) {
-            return items.join(', ');
-        }
-    }
-
+    /**
+     * A platform's name: the panel's word where it has one (socialPreviews.platformName.x-large and .x-small, X's two
+     * cards), else the table's own name for it.
+     */
     function platformName(id, row) {
-        return (T.platformName && T.platformName[id]) || row.name || id;
+        var word = 'socialPreviews.platformName.' + id;
+        return QSPanelWords.has(word) ? QSPanelWords.t(word) : (row.name || id);
     }
 
-    function unitWord(unit) {
-        return unit === 'bytes' ? T.unitBytes : T.unitCharacters;
+    /** The unit a platform counts a text's length in, its word chosen by the count it follows. */
+    function unitWord(unit, n) {
+        return QSPanelWords.count(unit === 'bytes' ? 'socialPreviews.unitBytes' : 'socialPreviews.unitCharacters', Number(n));
     }
 
     /** A table date (YYYY-MM-DD) in the panel's language. */
     function dateWord(iso) {
         var d = new Date(String(iso) + 'T00:00:00Z');
         if (isNaN(d.getTime())) return String(iso || '');
-        try {
-            return d.toLocaleDateString(CFG.panelLang || 'en', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-        } catch (e) {
-            return String(iso);
-        }
+        return QSPanelWords.date(d, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
     }
 
     function tagOf(tags, name) {
@@ -205,7 +196,7 @@
             state.colourPicker.destroy();
             state.colourPicker = null;
         }
-        if (title) title.textContent = state.target ? fmt(T.pageValuesTitle, { page: state.target }) : T.siteTitle;
+        if (title) title.textContent = state.target ? t('pageValuesTitle', { page: state.target }) : t('siteTitle');
         if (!state.target) {
             host.replaceChildren(state.canWrite ? _renderSiteForm() : _renderSiteValues());
             putBack(kept);
@@ -246,7 +237,7 @@
     }
 
     function _renderLoadFailed(message) {
-        return el('p', { class: 'admin-alert admin-alert--error', text: fmt(T.loadFailed, { error: message }) });
+        return el('p', { class: 'admin-alert admin-alert--error', text: t('loadFailed', { error: message }) });
     }
 
     /** A field: its label, its control, a line saying every language shares it (`shared`, several languages), its hint. */
@@ -254,7 +245,7 @@
         return el('div', { class: 'admin-form-group' }, [
             el('label', { class: 'admin-label', for: forId, text: label }),
             control,
-            shared && manyLanguages() ? el('p', { class: 'admin-hint social-previews__shared', text: T.sameEveryLanguage }) : null,
+            shared && manyLanguages() ? el('p', { class: 'admin-hint social-previews__shared', text: t('sameEveryLanguage') }) : null,
             hint ? el('p', { class: 'admin-hint', text: hint }) : null
         ]);
     }
@@ -275,7 +266,7 @@
         // Media's list unread (null): the current picture is offered as it is, never called missing.
         var known = state.pictures !== null;
         if (current && (!known || pictureNames().indexOf(current) < 0)) {
-            select.appendChild(_renderOption(current, known ? fmt(T.pictureMissingOption, { name: current }) : current, true));
+            select.appendChild(_renderOption(current, known ? t('pictureMissingOption', { name: current }) : current, true));
         }
         (state.pictures || []).forEach(function (p) {
             select.appendChild(_renderOption(p.value, p.label, p.value === current));
@@ -286,18 +277,18 @@
     function _renderCardTypeSelect(id, current, firstLabel) {
         return el('select', { id: id, class: 'admin-select' }, [
             _renderOption('', firstLabel, !current),
-            _renderOption('large', T.cardLarge, current === 'large'),
-            _renderOption('small', T.cardSmall, current === 'small')
+            _renderOption('large', t('cardLarge'), current === 'large'),
+            _renderOption('small', t('cardSmall'), current === 'small')
         ]);
     }
 
     function _renderMissing(name, selectId) {
         return el('div', { class: 'admin-alert admin-alert--warning social-previews__missing' }, [
-            el('span', { text: fmt(T.pictureMissing, { name: name }) }),
+            el('span', { text: t('pictureMissing', { name: name }) }),
             selectId ? el('button', {
                 type: 'button',
                 class: 'admin-btn admin-btn--outline',
-                text: T.pickAnother,
+                text: t('pickAnother'),
                 onclick: function () {
                     var s = document.getElementById(selectId);
                     if (s && s._qsPicker) s._qsPicker.open();
@@ -310,7 +301,7 @@
     /** A territory's name in the panel's language, from the browser (no table of names here), with its code. */
     function territoryName(code) {
         try {
-            var name = new Intl.DisplayNames([CFG.panelLang || 'en'], { type: 'region' }).of(code);
+            var name = new Intl.DisplayNames([QSPanelWords.lang], { type: 'region' }).of(code);
             return name && name !== code ? name + ' (' + code + ')' : code;
         } catch (e) {
             return code;
@@ -326,20 +317,20 @@
     /** The first choice of a language's territory: none, which announces the language's usual one when it has one. */
     function noTerritoryLabel(code) {
         var usual = territoriesOf(code).usual;
-        return usual ? fmt(T.territoryUsual, { territory: territoryName(usual) }) : T.noTerritory;
+        return usual ? t('territoryUsual', { territory: territoryName(usual) }) : t('noTerritory');
     }
 
     /**
      * The territory of the language shown: none (its usual one), then the language's territories, named in the panel's
-     * language and in the order of their names. Its language is `data-territory-for`: the panel's own language menu
-     * answers any click on an element carrying `data-lang`, anywhere in the page (layout.php).
+     * language and in the order of their names. Its language is `data-territory-for`. The panel's own language switch
+     * (layout.php) answers only the account menu's own language buttons, never another element carrying `data-lang`.
      */
     function _renderTerritorySelect(code, current) {
         var codes = territoriesOf(code).codes;
         var select = el('select', { id: 'social-territory', class: 'admin-select social-previews__territory', 'data-territory-for': code });
         select.appendChild(_renderOption('', noTerritoryLabel(code), !current));
         var named = codes.map(function (t) { return [t, territoryName(t)]; });
-        named.sort(function (a, b) { return a[1].localeCompare(b[1], CFG.panelLang || 'en'); });
+        named.sort(function (a, b) { return a[1].localeCompare(b[1], QSPanelWords.lang); });
         named.forEach(function (pair) { select.appendChild(_renderOption(pair[0], pair[1], pair[0] === current)); });
         if (!codes.length) select.disabled = true;
         return select;
@@ -348,33 +339,33 @@
     /** The territory's field, for the language shown (its code in the label when there are several). */
     function _renderTerritoryField(current) {
         var none = territoriesOf(state.lang).codes.length === 0;
-        return _renderField('social-territory', territoryLabel(), _renderTerritorySelect(state.lang, current), none ? T.territoryNone : T.territoryHint);
+        return _renderField('social-territory', territoryLabel(), _renderTerritorySelect(state.lang, current), none ? t('territoryNone') : t('territoryHint'));
     }
 
     function territoryLabel() {
-        return T.territory + (manyLanguages() ? ' (' + state.lang.toUpperCase() + ')' : '');
+        return t('territory') + (manyLanguages() ? ' (' + state.lang.toUpperCase() + ')' : '');
     }
 
     function _renderSaveRow(id) {
         return el('div', { class: 'social-previews__save' }, [
-            el('button', { type: 'button', id: id, class: 'admin-btn admin-btn--primary', text: T.save })
+            el('button', { type: 'button', id: id, class: 'admin-btn admin-btn--primary', text: t('save') })
         ]);
     }
 
     function _renderSiteForm() {
         var site = siteValues();
         var form = el('div', { class: 'social-previews__form', id: 'social-site-form', 'data-requires-command': 'setSocialPreview' });
-        form.appendChild(el('p', { class: 'admin-hint', text: T.siteHint }));
+        form.appendChild(el('p', { class: 'admin-hint', text: t('siteHint') }));
         if (sitePictureMissing()) form.appendChild(_renderMissing(site.picture, 'social-site-picture'));
         var grid = el('div', { class: 'social-previews__grid' }, [
-            _renderField('social-site-picture', T.picture, _renderPictureSelect('social-site-picture', site.picture || '', T.pictureNone), T.pictureHint, true),
-            _renderField('social-site-card', T.cardType, _renderCardTypeSelect('social-site-card', site.cardType || '', T.cardTypeDerived), T.cardTypeHint, true),
-            _renderField('social-site-x', T.xAccount, el('input', {
+            _renderField('social-site-picture', t('picture'), _renderPictureSelect('social-site-picture', site.picture || '', t('pictureNone')), t('pictureHint'), true),
+            _renderField('social-site-card', t('cardType'), _renderCardTypeSelect('social-site-card', site.cardType || '', t('cardTypeDerived')), t('cardTypeHint'), true),
+            _renderField('social-site-x', t('xAccount'), el('input', {
                 type: 'text', id: 'social-site-x', class: 'admin-input', autocomplete: 'off', placeholder: '@', value: site.xAccount || ''
-            }), T.xAccountHint, true),
-            _renderField('social-site-theme', T.themeColor, el('input', {
+            }), t('xAccountHint'), true),
+            _renderField('social-site-theme', t('themeColor'), el('input', {
                 type: 'text', id: 'social-site-theme', class: 'admin-input social-previews__colour', autocomplete: 'off', placeholder: '#', value: site.themeColor || ''
-            }), T.themeColorHint, true),
+            }), t('themeColorHint'), true),
             _renderTerritoryField((site.locales || {})[state.lang] || '')
         ]);
         form.appendChild(grid);
@@ -393,10 +384,10 @@
         var site = siteValues();
         var chosen = (site.locales || {})[state.lang];
         var list = el('dl', { class: 'social-previews__values', id: 'social-site-values' }, [
-            _renderValueRow(T.picture, site.picture ? (sitePictureMissing() ? fmt(T.pictureMissingOption, { name: site.picture }) : site.picture) : T.pictureNone),
-            _renderValueRow(T.cardType, site.cardType ? (site.cardType === 'large' ? T.cardLarge : T.cardSmall) : T.cardTypeDerived),
-            _renderValueRow(T.xAccount, site.xAccount || T.notSet),
-            _renderValueRow(T.themeColor, site.themeColor || T.notSet),
+            _renderValueRow(t('picture'), site.picture ? (sitePictureMissing() ? t('pictureMissingOption', { name: site.picture }) : site.picture) : t('pictureNone')),
+            _renderValueRow(t('cardType'), site.cardType ? (site.cardType === 'large' ? t('cardLarge') : t('cardSmall')) : t('cardTypeDerived')),
+            _renderValueRow(t('xAccount'), site.xAccount || t('notSet')),
+            _renderValueRow(t('themeColor'), site.themeColor || t('notSet')),
             _renderValueRow(territoryLabel(), chosen ? territoryName(chosen) : noTerritoryLabel(state.lang))
         ]);
         return list;
@@ -410,15 +401,15 @@
         if (!select || !window.QSSearchableSelect || select._qsPicker) return;
         select._qsPicker = new window.QSSearchableSelect(select, {
             placeholder: placeholder,
-            searchPlaceholder: T.search,
-            emptyText: T.noResults,
+            searchPlaceholder: QSPanelWords.t('common.search'),
+            emptyText: QSPanelWords.t('common.noResults'),
             emptyChoice: true
         });
     }
 
     function mountSiteForm(host) {
         window.QuickSiteAdmin.filterByPermissions(host);
-        makeSearchable(document.getElementById('social-site-picture'), T.pictureNone);
+        makeSearchable(document.getElementById('social-site-picture'), t('pictureNone'));
         makeSearchable(document.getElementById('social-territory'), noTerritoryLabel(state.lang));
         var theme = document.getElementById('social-site-theme');
         if (theme && window.QSColorPicker) {
@@ -455,7 +446,7 @@
     async function saveSite() {
         var body = siteChanges();
         if (!Object.keys(body).length) {
-            toast(T.nothingChanged, 'info');
+            toast(t('nothingChanged'), 'info');
             return;
         }
         await send(body);
@@ -468,10 +459,10 @@
         var res = await window.QuickSiteAdmin.apiRequest('setSocialPreview', 'POST', body);
         if (button) button.disabled = false;
         if (!res.ok) {
-            toast(fmt(T.saveFailed, { error: serverMessage(res) }), 'error');
+            toast(t('saveFailed', { error: serverMessage(res) }), 'error');
             return false;
         }
-        toast(T.saved, 'success');
+        toast(t('saved'), 'success');
         if (await load()) drawAll();
         return true;
     }
@@ -481,7 +472,7 @@
     function drawPickers() {
         var targetSelect = document.getElementById('social-target');
         if (targetSelect) {
-            targetSelect.replaceChildren.apply(targetSelect, [_renderOption('', T.siteTitle, state.target === '')].concat(routesInOrder().map(function (r) {
+            targetSelect.replaceChildren.apply(targetSelect, [_renderOption('', t('siteTitle'), state.target === '')].concat(routesInOrder().map(function (r) {
                 return _renderOption(r, r, r === state.target);
             })));
             if (!targetSelect._qsBound) {
@@ -492,7 +483,7 @@
                     drawValues();
                     drawCards();
                 });
-                makeSearchable(targetSelect, T.siteTitle);
+                makeSearchable(targetSelect, t('siteTitle'));
             }
             if (targetSelect._qsPicker) targetSelect._qsPicker.refresh();
         }
@@ -524,20 +515,20 @@
 
     function siteChoiceLabel() {
         var site = siteValues();
-        return site.picture ? fmt(T.pictureSite, { name: site.picture }) : T.pictureSiteNone;
+        return site.picture ? t('pictureSite', { name: site.picture }) : t('pictureSiteNone');
     }
 
     function siteCardLabel() {
         var site = siteValues();
-        if (!site.cardType) return T.cardTypeDerived;
-        return fmt(T.cardTypeSite, { type: site.cardType === 'large' ? T.cardLarge : T.cardSmall });
+        if (!site.cardType) return t('cardTypeDerived');
+        return t('cardTypeSite', { type: site.cardType === 'large' ? t('cardLarge') : t('cardSmall') });
     }
 
     function _renderTitleShown(title) {
         return el('div', { class: 'admin-form-group' }, [
-            el('p', { class: 'admin-label', text: T.titleShown + (manyLanguages() ? ' (' + state.lang.toUpperCase() + ')' : '') }),
+            el('p', { class: 'admin-label', text: t('titleShown') + (manyLanguages() ? ' (' + state.lang.toUpperCase() + ')' : '') }),
             el('p', { class: 'social-previews__title-shown', text: title }),
-            el('p', { class: 'admin-hint', text: T.titleShownHint })
+            el('p', { class: 'admin-hint', text: t('titleShownHint') })
         ]);
     }
 
@@ -550,11 +541,11 @@
     function _renderPageForm() {
         var parts = pageParts(), p = parts.p, values = parts.values, lang = parts.lang;
         var form = el('div', { class: 'social-previews__form', id: 'social-page-form', 'data-requires-command': 'setSocialPreview' });
-        form.appendChild(el('p', { class: 'admin-hint', text: T.pageHint }));
+        form.appendChild(el('p', { class: 'admin-hint', text: t('pageHint') }));
         if (pagePictureMissing()) form.appendChild(_renderMissing(p.picture.key, 'social-page-picture'));
         form.appendChild(el('div', { class: 'social-previews__grid' }, [
-            _renderField('social-page-picture', T.picture, _renderPictureSelect('social-page-picture', values.picture || '', siteChoiceLabel()), T.pictureHint, true),
-            _renderField('social-page-card', T.cardType, _renderCardTypeSelect('social-page-card', values.cardType || '', siteCardLabel()), T.cardTypeHint, true)
+            _renderField('social-page-picture', t('picture'), _renderPictureSelect('social-page-picture', values.picture || '', siteChoiceLabel()), t('pictureHint'), true),
+            _renderField('social-page-card', t('cardType'), _renderCardTypeSelect('social-page-card', values.cardType || '', siteCardLabel()), t('cardTypeHint'), true)
         ]));
         form.appendChild(_renderTitleShown(lang.title || ''));
         var area = el('textarea', {
@@ -565,7 +556,7 @@
         // The engine's longest description (QS_SOCIAL_DESCRIPTION_MAX), from the template; none written here.
         if (CFG.descriptionMax) area.maxLength = Number(CFG.descriptionMax);
         area.value = lang.description || '';
-        form.appendChild(_renderField('social-page-description', T.description + (manyLanguages() ? ' (' + state.lang.toUpperCase() + ')' : ''), area, T.descriptionHint));
+        form.appendChild(_renderField('social-page-description', t('description') + (manyLanguages() ? ' (' + state.lang.toUpperCase() + ')' : ''), area, t('descriptionHint')));
         form.appendChild(el('p', { class: 'social-previews__cut', id: 'social-page-description-cut', hidden: '' }));
         form.appendChild(_renderSaveRow('social-save'));
         return form;
@@ -574,21 +565,21 @@
     function _renderPageValues() {
         var parts = pageParts(), values = parts.values, lang = parts.lang;
         var picture = values.picture
-            ? (pagePictureMissing() ? fmt(T.pictureMissingOption, { name: values.picture }) : values.picture)
+            ? (pagePictureMissing() ? t('pictureMissingOption', { name: values.picture }) : values.picture)
             : siteChoiceLabel();
         return el('dl', { class: 'social-previews__values', id: 'social-page-values' }, [
-            _renderValueRow(T.picture, picture),
-            _renderValueRow(T.cardType, values.cardType ? (values.cardType === 'large' ? T.cardLarge : T.cardSmall) : siteCardLabel()),
-            _renderValueRow(T.titleShown, lang.title || ''),
-            _renderValueRow(T.description, lang.description || T.notSet)
+            _renderValueRow(t('picture'), picture),
+            _renderValueRow(t('cardType'), values.cardType ? (values.cardType === 'large' ? t('cardLarge') : t('cardSmall')) : siteCardLabel()),
+            _renderValueRow(t('titleShown'), lang.title || ''),
+            _renderValueRow(t('description'), lang.description || t('notSet'))
         ]);
     }
 
     /** The platforms a description is longer than, judged by the table's figures as it is typed (its words, descriptionWords()). */
     function _renderCutList(warnings) {
-        return el('span', { text: fmt(T.cutBy, {
-            list: joinList(warnings.map(function (w) {
-                return fmt(T.cutItem, { platform: platformName(w.platform, w), limit: w.limit, unit: unitWord(w.unit) });
+        return el('span', { text: t('cutBy', {
+            list: QSPanelWords.list(warnings.map(function (w) {
+                return t('cutItem', { platform: platformName(w.platform, w), limit: w.limit, unit: unitWord(w.unit, w.limit) });
             }))
         }) });
     }
@@ -634,7 +625,7 @@
             body.lang = state.lang;
         }
         if (Object.keys(body).length === 1) {
-            toast(T.nothingChanged, 'info');
+            toast(t('nothingChanged'), 'info');
             return;
         }
         await send(body);
@@ -753,17 +744,17 @@
         var name = platformName(w.platform, row);
         var size = function (pair) {
             return Array.isArray(pair) && typeof pair[1] === 'number'
-                ? fmt(T.sizeWh, { w: pair[0], h: pair[1] })
-                : fmt(T.sizeW, { w: Array.isArray(pair) ? pair[0] : pair });
+                ? t('sizeWh', { w: pair[0], h: pair[1] })
+                : QSPanelWords.count('socialPreviews.sizeW', Number(Array.isArray(pair) ? pair[0] : pair), { w: Array.isArray(pair) ? pair[0] : pair });
         };
         var text;
         switch (w.code) {
-            case 'picture.too_small': text = fmt(T.wTooSmall, { platform: name, size: size(w.limit) }); break;
-            case 'picture.small': text = fmt(T.wSmall, { platform: name, size: size(w.limit) }); break;
-            case 'picture.too_large': text = fmt(showsSmall(row, 'maxBytes') ? T.wTooLargeSmall : T.wTooLarge, { platform: name, bytes: window.QuickSiteUtils.formatSize(Number(w.limit) || 0) }); break;
-            case 'picture.format': text = fmt(T.wFormat, { platform: name, formats: joinList([].concat(w.limit || [])), format: w.actual }); break;
-            case 'title.cut': text = fmt(T.wTitleCut, { platform: name, limit: w.limit, unit: unitWord(row.title && row.title.unit) }); break;
-            case 'description.cut': text = fmt(T.wDescriptionCut, { platform: name, limit: w.limit, unit: unitWord(row.description && row.description.unit) }); break;
+            case 'picture.too_small': text = t('wTooSmall', { platform: name, size: size(w.limit) }); break;
+            case 'picture.small': text = t('wSmall', { platform: name, size: size(w.limit) }); break;
+            case 'picture.too_large': text = t(showsSmall(row, 'maxBytes') ? 'wTooLargeSmall' : 'wTooLarge', { platform: name, bytes: window.QuickSiteUtils.formatSize(Number(w.limit) || 0) }); break;
+            case 'picture.format': text = t('wFormat', { platform: name, formats: QSPanelWords.list([].concat(w.limit || [])), format: w.actual }); break;
+            case 'title.cut': text = t('wTitleCut', { platform: name, limit: w.limit, unit: unitWord(row.title && row.title.unit, w.limit) }); break;
+            case 'description.cut': text = t('wDescriptionCut', { platform: name, limit: w.limit, unit: unitWord(row.description && row.description.unit, w.limit) }); break;
             default: text = w.message || w.code;
         }
         return el('li', { class: 'social-card__warning', 'data-code': w.code, text: text });
@@ -786,25 +777,25 @@
         var arrangement = ARRANGEMENT[id] || DEFAULT_ARRANGEMENT;
         var parts = [];
         var shape = row.picture && row.picture.shape;
-        if (!(shape && shape.published && typeof shape.value === 'number')) parts.push(T.npCrop);
+        if (!(shape && shape.published && typeof shape.value === 'number')) parts.push(t('npCrop'));
         var draws = function (kind) { return arrangement.texts.indexOf(kind) >= 0; };
         ['title', 'description'].forEach(function (kind) {
             var f = row[kind];
-            if (draws(kind) && !(f && f.published && typeof f.value === 'number')) parts.push(kind === 'title' ? T.npTitle : T.npDescription);
+            if (draws(kind) && !(f && f.published && typeof f.value === 'number')) parts.push(kind === 'title' ? t('npTitle') : t('npDescription'));
         });
         var lines = row.lines || {};
         var linesKnown = ['title', 'description'].some(function (k) { return draws(k) && lines[k] && lines[k].published; });
-        if (!linesKnown) parts.push(T.npLines);
+        if (!linesKnown) parts.push(t('npLines'));
         if (!parts.length) return null;
-        return el('p', { class: 'social-card__not-published', text: fmt(T.notPublished, { platform: platformName(id, row), parts: joinList(parts) }) });
+        return el('p', { class: 'social-card__not-published', text: t('notPublished', { platform: platformName(id, row), parts: QSPanelWords.list(parts) }) });
     }
 
     function _renderChecker(id, row) {
         var name = platformName(id, row);
-        if (!row.checker || !row.checker.url) return el('span', { class: 'social-card__checker', text: fmt(T.noChecker, { platform: name }) });
-        var link = el('a', { class: 'social-card__checker', href: row.checker.url, target: '_blank', rel: 'noopener noreferrer', text: fmt(T.checker, { platform: name }) });
+        if (!row.checker || !row.checker.url) return el('span', { class: 'social-card__checker', text: t('noChecker', { platform: name }) });
+        var link = el('a', { class: 'social-card__checker', href: row.checker.url, target: '_blank', rel: 'noopener noreferrer', text: t('checker', { platform: name }) });
         if (!row.checker.refreshes) return link;
-        return el('span', { class: 'social-card__checker' }, [link, ' · ' + T.checkerRefreshes]);
+        return el('span', { class: 'social-card__checker' }, [link, ' · ' + t('checkerRefreshes')]);
     }
 
     function _renderCard(id, row, page, lang) {
@@ -815,7 +806,7 @@
             _renderWarnings(id, row, lang.warnings),
             _renderNotPublished(id, row),
             el('p', { class: 'social-card__meta' }, [
-                el('span', { class: 'social-card__checked', text: fmt(T.checked, { date: dateWord(row.checked) }) }),
+                el('span', { class: 'social-card__checked', text: t('checked', { date: dateWord(row.checked) }) }),
                 ' · ',
                 _renderChecker(id, row)
             ])
@@ -837,7 +828,7 @@
             // For the whole site, the home page's cards: as a page that sets no picture or card type of its own draws them,
             // unless the home page sets one (then said so).
             var own = !state.target && page.values && (page.values.picture || page.values.cardType);
-            of.textContent = (state.target ? fmt(T.cardsOf, { page: state.route }) : T.cardsOfSite + (own ? ' ' + T.cardsOfSiteOwn : ''))
+            of.textContent = (state.target ? t('cardsOf', { page: state.route }) : t('cardsOfSite') + (own ? ' ' + t('cardsOfSiteOwn') : ''))
                 + (state.report.multilingual ? ' · ' + state.lang.toUpperCase() : '');
         }
         var platforms = state.report.platforms || {};
@@ -846,7 +837,7 @@
         host.replaceChildren.apply(host, rows.map(function (pair) { return _renderCard(pair[0], pair[1], page, lang); }));
         var ig = Object.keys(platforms).filter(function (id) { return platforms[id].drawsCard === false; })[0];
         if (insta) {
-            insta.textContent = ig ? fmt(T.instagram, { date: dateWord(platforms[ig].checked) }) : '';
+            insta.textContent = ig ? t('instagram', { date: dateWord(platforms[ig].checked) }) : '';
             insta.hidden = !ig;
         }
         syncDeviceButtons();

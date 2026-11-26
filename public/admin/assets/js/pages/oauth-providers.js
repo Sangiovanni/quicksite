@@ -11,13 +11,12 @@
  *            the project's owner and admin, so only they see this form.
  * A secret is never shown, only whether one is stored.
  *
- * Styling lives in public/admin/assets/css/oauth-admin.css; strings come from the page
- * (window.QS_OAUTH_I18N). Built with createElement + textContent + named _render* helpers.
+ * Styling lives in public/admin/assets/css/oauth-admin.css; its words are the oauthProviders section
+ * the page hands, read through t() below. Built with createElement + textContent + named _render* helpers.
  */
 (function () {
     'use strict';
 
-    const T = window.QS_OAUTH_I18N || {};
     const state = { providers: [], canManage: false, failed: false };
 
     const ICON_CHECK = 'M5 12l5 5L20 7';
@@ -28,17 +27,13 @@
     function api(cmd, method, body) {
         const adminApi = window.QuickSiteAdmin;
         if (!adminApi || typeof adminApi.apiRequest !== 'function') {
-            return Promise.reject(new Error('QuickSiteAdmin not available'));
+            return Promise.reject(new Error(QSPanelWords.t('common.adminUnavailable')));
         }
         return adminApi.apiRequest(cmd, method, body);
     }
 
-    /** A page string with its {name} placeholders filled. */
-    function t(key, vars) {
-        let s = typeof T[key] === 'string' ? T[key] : '';
-        Object.keys(vars || {}).forEach(function (k) { s = s.split('{' + k + '}').join(String(vars[k])); });
-        return s;
-    }
+    /** A word of this page (oauthProviders), its {name} parts filled. */
+    function t(name, params) { return QSPanelWords.t('oauthProviders.' + name, params); }
 
     function _renderPill(text, kind, iconD) {
         const p = QSDom.el('span', { class: 'oauth-pill oauth-pill--' + kind });
@@ -69,7 +64,7 @@
         }
         pills.appendChild(_renderRoutesPill(p.setup || {}));
         if (p.resolver_count > 0) {
-            pills.appendChild(_renderPill(p.resolver_count === 1 ? t('usedByOne') : t('usedByMany', { count: p.resolver_count }), 'warning'));
+            pills.appendChild(_renderPill(QSPanelWords.count('oauthProviders.usedBy', p.resolver_count), 'warning'));
         }
         return pills;
     }
@@ -79,8 +74,8 @@
         const copyBtn = QSDom.el('button', {
             type: 'button',
             class: 'admin-btn admin-btn--ghost oauth-address__copy',
-            'aria-label': t('copy'),
-            title: t('copy'),
+            'aria-label': QSPanelWords.t('common.copy'),
+            title: QSPanelWords.t('common.copy'),
             onclick: function () {
                 const utils = window.QuickSiteUtils;
                 if (utils && typeof utils.copyToClipboard === 'function') utils.copyToClipboard(text, t('copied'));
@@ -120,8 +115,9 @@
             QSDom.el('summary', { class: 'oauth-howto__summary', text: t('howTo') }),
             steps,
         ]);
-        const note = T.notes && typeof T.notes[p.id] === 'string' ? T.notes[p.id] : '';
-        if (note !== '') details.appendChild(QSDom.el('p', { class: 'oauth-howto__note', text: note }));
+        // A provider's own rules, for the providers the word files hold a note for (oauthProviders.notes.<id>).
+        const note = 'oauthProviders.notes.' + p.id;
+        if (QSPanelWords.has(note)) details.appendChild(QSDom.el('p', { class: 'oauth-howto__note', text: QSPanelWords.t(note) }));
         return details;
     }
 
@@ -135,7 +131,7 @@
         if (!state.canManage) {
             section.appendChild(QSDom.el('p', { class: 'oauth-keyset__readonly' }, [
                 QSDom.el('strong', { text: current.secret_set ? t('statusSet') : t('statusMissing') }),
-                current.client_id ? ' · ' + t('clientId') + ': ' + current.client_id : '',
+                current.client_id ? ' · ' + t('clientIdValue', { id: current.client_id }) : '',
             ]));
             return section;
         }

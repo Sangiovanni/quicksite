@@ -4,6 +4,9 @@
             "label": "Sign in with {{provider}}"
         }
     },
+    "component": {
+        "starter": "{{name}} component"
+    },
     "consent": {
         "banner": {
             "message": "We use cookies to improve your experience. You can accept, refuse, or customize your choices.",
@@ -57,6 +60,13 @@
             "disclaimer": "This summary is generated from the site's storage registry and is provided for transparency. It is not legal advice — obtain your own legal review."
         }
     },
+    "freshStart": {
+        "siteName": "My Website",
+        "homeTitle": "Home",
+        "notFoundTitle": "Not Found",
+        "pageNotFound": "Page Not Found",
+        "notFoundMessage": "The page you are looking for does not exist."
+    },
     "privacy": {
         "policy": {
             "title": "Privacy policy",
@@ -74,6 +84,29 @@
             "cookie_link": "cookie policy",
             "cookie_hint": "This site may use cookies. Consider publishing a cookie policy that lists them.",
             "disclaimer": "This summary is generated from the site's configuration and provided for transparency. It is not legal advice — obtain your own legal review for your jurisdiction."
+        }
+    },
+    "visitor": {
+        "toast": {
+            "success": "Success",
+            "requestFailed": "Request failed",
+            "httpStatus": "HTTP {{status}}"
+        },
+        "themeSwitch": {
+            "dark": "Dark mode",
+            "light": "Light mode"
+        },
+        "aria": {
+            "themeSwitch": "Toggle light/dark theme",
+            "breadcrumb": "Breadcrumb"
+        },
+        "notFound": "404 — Page Not Found",
+        "fatal": {
+            "title": "Page unavailable",
+            "heading": "This page is temporarily unavailable",
+            "message": "Something went wrong while building this page. Nothing you did caused it.",
+            "retry": "Please try again in a moment, or return to the {{home}}.",
+            "homeLink": "home page"
         }
     }
 }

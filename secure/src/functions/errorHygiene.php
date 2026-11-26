@@ -219,6 +219,15 @@ function qs_fatal_html_page(?array $debug): string
  * (logging the path, printing none), this one answers a site that booted and
  * then died.
  *
+ * Its words are QuickSite's, in the visitor's language as far as it is known
+ * when the request died: the address's when it names one of the site's
+ * languages, else the site's default (qs_resolve_project_language(), once the
+ * front controller has bound the site's settings), else English. The build
+ * resolved them for each of its site's languages (QS_BUILD_WORDS, defined from
+ * its parameters before this handler is registered), so reading them loads
+ * nothing. The development note below is the deployer's and stays English, as
+ * the front controller's own pages for a deployer do.
+ *
  * @param array|null $debug type/message/file/line, or null in production.
  */
 function qs_fatal_site_page(?array $debug): string
@@ -233,10 +242,50 @@ function qs_fatal_site_page(?array $debug): string
         'UTF-8'
     );
 
-    $page = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+    $lang = 'en';
+    $words = null;
+    try {
+        if (function_exists('qs_resolve_project_language')) {
+            $lang = qs_resolve_project_language();
+        }
+        $set = (defined('QS_BUILD_WORDS') && is_array(QS_BUILD_WORDS)) ? (QS_BUILD_WORDS[$lang]['fatal'] ?? null) : null;
+        if (is_array($set)) {
+            $words = $set;
+            foreach (['title', 'heading', 'message', 'retry', 'homeLink'] as $name) {
+                if (!is_string($set[$name] ?? null) || $set[$name] === '') {
+                    $words = null;
+                    break;
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        $words = null;
+    }
+    // The page must never fail. When the words cannot be read (the request died
+    // before the site's parameters were read, or the build carries none for the
+    // language), it is this English, the one copy of these words in code, and
+    // the page says it is English.
+    if ($words === null) {
+        $lang = 'en';
+        $words = [
+            'title'    => 'Page unavailable',
+            'heading'  => 'This page is temporarily unavailable',
+            'message'  => 'Something went wrong while building this page. Nothing you did caused it.',
+            'retry'    => 'Please try again in a moment, or return to the {{home}}.',
+            'homeLink' => 'home page',
+        ];
+    }
+    $text = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    $retry = str_replace(
+        '{{home}}',
+        '<a href="' . $home . '">' . $text($words['homeLink']) . '</a>',
+        $text($words['retry'])
+    );
+
+    $page = '<!DOCTYPE html><html lang="' . $text($lang) . '"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width, initial-scale=1">'
         . '<meta name="robots" content="noindex, nofollow">'
-        . '<title>Page unavailable</title>'
+        . '<title>' . $text($words['title']) . '</title>'
         . '<style>body{margin:0;padding:4rem 1.5rem;background:#fff;color:#1c1e24;'
         . 'font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}'
         . 'main{max-width:34rem;margin:0 auto}h1{font-size:1.5rem;margin:0 0 .75rem}'
@@ -244,10 +293,9 @@ function qs_fatal_site_page(?array $debug): string
         . 'pre{white-space:pre-wrap;word-break:break-all;background:#f4f5f8;'
         . 'border:1px solid #dfe2ea;border-radius:6px;padding:1rem;font-size:.85rem;'
         . 'color:#1c1e24}</style></head><body><main>'
-        . '<h1>This page is temporarily unavailable</h1>'
-        . '<p>Something went wrong while building this page. Nothing you did caused it.</p>'
-        . '<p>Please try again in a moment, or return to the'
-        . ' <a href="' . $home . '">home page</a>.</p>';
+        . '<h1>' . $text($words['heading']) . '</h1>'
+        . '<p>' . $text($words['message']) . '</p>'
+        . '<p>' . $retry . '</p>';
 
     if ($debug !== null) {
         $page .= '<p><strong>Development mode</strong> — details below are shown because this'

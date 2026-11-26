@@ -27,20 +27,18 @@
     }
 
     /**
-     * Get translation string with fallback
+     * How long ago a backup was made, from its time in seconds (listBackups' `created`), in the panel's language: just
+     * now, then minutes, hours and days ago, then its date once it is a week old.
      */
-    function t(path, fallback) {
-        const translations = window.QUICKSITE_CONFIG?.translations || {};
-        const parts = path.split('.');
-        let current = translations;
-        for (const part of parts) {
-            if (current && typeof current === 'object' && part in current) {
-                current = current[part];
-            } else {
-                return fallback;
-            }
-        }
-        return current || fallback;
+    function backupAge(created) {
+        const at = Number(created) || 0;
+        const seconds = Math.floor(Date.now() / 1000) - at;
+        if (seconds < 60) return QSPanelWords.t('dashboard.projects.justNow');
+        const ago = new Intl.RelativeTimeFormat(QSPanelWords.lang, { numeric: 'always' });
+        if (seconds < 3600) return ago.format(-Math.floor(seconds / 60), 'minute');
+        if (seconds < 86400) return ago.format(-Math.floor(seconds / 3600), 'hour');
+        if (seconds < 604800) return ago.format(-Math.floor(seconds / 86400), 'day');
+        return QSPanelWords.date(at * 1000, { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
     /**
@@ -68,15 +66,6 @@
             'lt': '🇱🇹'
         };
         return flags[langCode.toLowerCase()] || '🌐';
-    }
-
-    /**
-     * Format bytes to human readable size
-     */
-    // The builds page needed the same formatting, so the implementation moved to
-    // QuickSiteUtils rather than being copied. Same output, one definition.
-    function formatSize(bytes) {
-        return window.QuickSiteUtils.formatSize(bytes);
     }
 
     /**
@@ -141,7 +130,7 @@
         entries.sort(([a], [b]) => {
             if (a === 'home') return -1;
             if (b === 'home') return 1;
-            return a.localeCompare(b);
+            return a.localeCompare(b, QSPanelWords.lang);
         });
 
         entries.forEach(([name, node]) => {
@@ -160,7 +149,7 @@
                 const toggle = QSDom.el('button', {
                     class: 'sitemap__tree-toggle',
                     type: 'button',
-                    'aria-label': 'Toggle'
+                    'aria-label': QSPanelWords.t('dashboard.sitemap.toggle')
                 }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 12)]);
 
                 const header = QSDom.el('div', { class: 'sitemap__tree-header' }, [
@@ -194,23 +183,23 @@
      * count or the "single language" badge.
      * @returns {HTMLElement}
      */
-    function _renderSitemapSummary(data, routes, languages, multilingual, sitemap) {
+    function _renderSitemapSummary(data, routes, languages, multilingual) {
         const dot = () => QSDom.el('span', { class: 'sitemap__divider', text: '\u2022' });
         const children = [
             QSDom.el('span', {
                 class: 'sitemap__total',
-                text: data.totalUrls + ' ' + (sitemap.urls || 'URLs')
+                text: QSPanelWords.count('dashboard.sitemap.urlCount', data.totalUrls)
             }),
             dot(),
-            QSDom.el('span', { text: routes.length + ' ' + (sitemap.routes || 'routes') }),
+            QSDom.el('span', { text: QSPanelWords.count('dashboard.sitemap.routeCount', routes.length) }),
             dot(),
             multilingual
                 ? QSDom.el('span', {
-                    text: languages.length + ' ' + (sitemap.languages || 'languages')
+                    text: QSPanelWords.count('dashboard.sitemap.languageCount', languages.length)
                 })
                 : QSDom.el('span', {
                     class: 'badge',
-                    text: sitemap.monolingual || 'Single language'
+                    text: QSPanelWords.t('dashboard.sitemap.monolingual')
                 })
         ];
         return QSDom.el('div', { class: 'sitemap__summary' }, children);
@@ -221,7 +210,7 @@
      * default badge, page count, coverage) and its route tree.
      * @returns {HTMLElement}
      */
-    function _renderSitemapLanguage(lang, isDefault, languageNames, coverage, routeTree, routes, sitemap) {
+    function _renderSitemapLanguage(lang, isDefault, languageNames, coverage, routeTree, routes) {
         const langName = languageNames[lang] || lang.toUpperCase();
         const coveragePercent = coverage[lang]?.coverage_percent ?? null;
 
@@ -233,16 +222,16 @@
             QSDom.el('span', { text: getFlagEmoji(lang) }),
             QSDom.el('span', { text: langName }),
             isDefault
-                ? QSDom.el('span', { class: 'badge', text: sitemap.default || 'Default' })
+                ? QSDom.el('span', { class: 'badge', text: QSPanelWords.t('dashboard.sitemap.default') })
                 : null,
             QSDom.el('span', {
                 class: 'sitemap__lang-count',
-                text: routes.length + ' ' + (sitemap.pages || 'pages')
+                text: QSPanelWords.count('dashboard.sitemap.pageCount', routes.length)
             }),
             coveragePercent !== null
                 ? QSDom.el('span', {
                     class: getCoverageClass(coveragePercent),
-                    text: coveragePercent + '%'
+                    text: QSPanelWords.number(coveragePercent / 100, { style: 'percent', maximumFractionDigits: 2 })
                 })
                 : null
         ]);
@@ -280,28 +269,28 @@
             if (hp('getRoutes')) {
                 const routesResult = await QuickSiteAdmin.apiRequest('getRoutes');
                 if (routesResult.ok) {
-                    document.getElementById('stat-routes').textContent = routesResult.data.data?.count || 0;
+                    document.getElementById('stat-routes').textContent = QSPanelWords.number(routesResult.data.data?.count || 0);
                 }
             }
 
             if (hp('listPages')) {
                 const pagesResult = await QuickSiteAdmin.apiRequest('listPages');
                 if (pagesResult.ok) {
-                    document.getElementById('stat-pages').textContent = pagesResult.data.data?.count || 0;
+                    document.getElementById('stat-pages').textContent = QSPanelWords.number(pagesResult.data.data?.count || 0);
                 }
             }
-            
+
             if (hp('listComponents')) {
                 const componentsResult = await QuickSiteAdmin.apiRequest('listComponents');
                 if (componentsResult.ok) {
-                    document.getElementById('stat-components').textContent = componentsResult.data.data?.count || 0;
+                    document.getElementById('stat-components').textContent = QSPanelWords.number(componentsResult.data.data?.count || 0);
                 }
             }
-            
+
             if (hp('getLangList')) {
                 const langResult = await QuickSiteAdmin.apiRequest('getLangList');
                 if (langResult.ok) {
-                    document.getElementById('stat-languages').textContent = langResult.data.data?.languages?.length || 1;
+                    document.getElementById('stat-languages').textContent = QSPanelWords.number(langResult.data.data?.languages?.length || 1);
                 }
             }
         } catch (error) {
@@ -315,8 +304,7 @@
 
     async function loadSiteMap() {
         const container = document.getElementById('sitemap-container');
-        const sitemap = t('dashboard.sitemap', {});
-        
+
         try {
             const [sitemapResult, validationResult] = await Promise.all([
                 QuickSiteAdmin.apiRequest('getSiteMap'),
@@ -338,21 +326,21 @@
             const routeTree = buildRouteTree(routes);
 
             const root = QSDom.el('div', { class: 'sitemap' }, [
-                _renderSitemapSummary(data, routes, languages, multilingual, sitemap)
+                _renderSitemapSummary(data, routes, languages, multilingual)
             ]);
 
             if (multilingual) {
                 const sortedLangs = [...languages].sort((a, b) => {
                     if (a === defaultLang) return -1;
                     if (b === defaultLang) return 1;
-                    return a.localeCompare(b);
+                    return a.localeCompare(b, QSPanelWords.lang);
                 });
 
                 const langsBox = QSDom.el('div', { class: 'sitemap__languages' });
                 sortedLangs.forEach((lang) => {
                     langsBox.appendChild(_renderSitemapLanguage(
                         lang, lang === defaultLang, languageNames, coverage,
-                        routeTree, routes, sitemap
+                        routeTree, routes
                     ));
                 });
                 root.appendChild(langsBox);
@@ -391,80 +379,7 @@
         } catch (error) {
             console.error('Failed to load sitemap:', error);
             QSDom.clear(container);
-            container.appendChild(_renderEmpty(sitemap.error || 'Failed to load site map', true));
-        }
-    }
-
-    // ========================================================================
-    // Recent Commands
-    // ========================================================================
-
-    /**
-     * One row of the recent-commands table.
-     * @returns {HTMLElement}
-     */
-    function _renderRecentCommandRow(entry, common) {
-        const httpStatus = entry.result?.http_status || entry.result?.status;
-        const isSuccess = typeof httpStatus === 'number'
-            ? httpStatus >= 200 && httpStatus < 300
-            : httpStatus === 'success';
-
-        return QSDom.el('tr', null, [
-            QSDom.el('td', null, [QSDom.el('code', { text: entry.command })]),
-            QSDom.el('td', null, [
-                QSDom.el('span', {
-                    class: 'badge ' + (isSuccess ? 'badge--success' : 'badge--error'),
-                    text: isSuccess ? (common.success || 'Success') : (common.error || 'Error')
-                })
-            ]),
-            QSDom.el('td', { text: entry.duration_ms + 'ms' }),
-            QSDom.el('td', { text: new Date(entry.timestamp).toLocaleString() })
-        ]);
-    }
-
-    /**
-     * The recent-commands table: header row plus one row per entry.
-     * @returns {HTMLElement}
-     */
-    function _renderRecentCommandsTable(entries, cols, common) {
-        const head = QSDom.el('thead', null, [
-            QSDom.el('tr', null, [
-                QSDom.el('th', { text: cols.command || 'Command' }),
-                QSDom.el('th', { text: cols.status || 'Status' }),
-                QSDom.el('th', { text: cols.duration || 'Duration' }),
-                QSDom.el('th', { text: cols.time || 'Time' })
-            ])
-        ]);
-
-        const body = QSDom.el('tbody');
-        entries.forEach(entry => body.appendChild(_renderRecentCommandRow(entry, common)));
-
-        return QSDom.tableWrapper(QSDom.el('table', { class: 'admin-table' }, [head, body]));
-    }
-
-    async function loadRecentCommands() {
-        const container = document.getElementById('recent-commands');
-        const cols = t('dashboard.history.columns', {});
-        const common = t('common', {});
-        const noHistoryText = t('dashboard.noHistory', 'No recent commands');
-
-        const showEmpty = () => {
-            QSDom.clear(container);
-            container.appendChild(_renderEmpty(noHistoryText, true));
-        };
-
-        try {
-            const result = await QuickSiteAdmin.apiRequest('getCommandHistory', 'GET', null, []);
-
-            if (result.ok && result.data.data?.entries?.length > 0) {
-                const entries = result.data.data.entries.slice(0, 5);
-                QSDom.clear(container);
-                container.appendChild(_renderRecentCommandsTable(entries, cols, common));
-            } else {
-                showEmpty();
-            }
-        } catch (error) {
-            showEmpty();
+            container.appendChild(_renderEmpty(QSPanelWords.t('dashboard.sitemap.error'), true));
         }
     }
 
@@ -512,7 +427,6 @@
 
     async function loadProjectManager() {
         const infoContainer = document.getElementById('current-project-info');
-        const proj = t('dashboard.projects', {});
 
         // The dashboard reflects the project you are EDITING (selected_project).
         // listProjects is membership-filtered (my_role) and lists no privileged project.
@@ -531,7 +445,7 @@
 
         // 0-membership empty state — no doomed project-scoped calls (they'd 400/403).
         if (allProjects.length === 0) {
-            infoContainer.appendChild(_renderProjectManagerEmpty(proj));
+            infoContainer.appendChild(_renderProjectManagerEmpty());
             _setProjectActionsEnabled(false);
             _syncRenameButton();
             return;
@@ -542,44 +456,45 @@
             currentProject = allProjects[0].project;
         }
         const edited = projectById(currentProject) || allProjects[0];
-        infoContainer.appendChild(_renderProjectChip(edited, proj));
+        infoContainer.appendChild(_renderProjectChip(edited));
 
         _setProjectActionsEnabled(true);
         _syncRenameButton();
     }
 
     /** The page's first line: the edited project's star, its name, that you edit it, and your role on it. @returns {HTMLElement} */
-    function _renderProjectChip(edited, proj) {
+    function _renderProjectChip(edited) {
         const star = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--ghost admin-project-star', id: 'btn-star-project' });
         QuickSiteAdmin.syncStarToggle(star, edited.project);
         QuickSiteAdmin.bindStarToggle(star);
         return QSDom.el('div', { class: 'dashboard-current__line' }, [
             star,
             QSDom.el('span', { class: 'dashboard-current__name', text: QuickSiteAdmin.projectLabel(edited.project, edited.name) }),
-            _renderCopyIdButton(edited.project, proj),
-            QSDom.el('span', { class: 'badge', text: proj.editing || 'Editing' }),
-            edited.my_role ? QSDom.el('span', { class: 'members-role-chip members-role-chip--' + edited.my_role, text: edited.my_role }) : null,
+            _renderCopyIdButton(edited.project),
+            QSDom.el('span', { class: 'badge', text: QSPanelWords.t('dashboard.projects.editing') }),
+            edited.my_role ? QSDom.el('span', { class: 'members-role-chip members-role-chip--' + edited.my_role, text: QuickSiteUtils.roleName(edited.my_role) }) : null,
         ]);
     }
 
     /** A button copying the project's id: what someone types to ask to join it. @returns {HTMLElement} */
-    function _renderCopyIdButton(projectId, proj) {
+    function _renderCopyIdButton(projectId) {
+        const label = QSPanelWords.t('nav.copyProjectId');
         return QSDom.el('button', {
             type: 'button',
             class: 'admin-btn admin-btn--ghost admin-btn--icon-only',
-            title: proj.copyId,
-            'aria-label': proj.copyId,
+            title: label,
+            'aria-label': label,
             onClick: function () {
-                window.QuickSiteUtils.copyToClipboard(projectId, proj.idCopied);
+                window.QuickSiteUtils.copyToClipboard(projectId, QSPanelWords.t('nav.projectIdCopied'));
             },
         }, [QSDom.svgIcon('M8 8h12v12H8zM16 8V4H4v12h4', 14)]);
     }
 
     /** The same line for an account in no project yet. @returns {HTMLElement} */
-    function _renderProjectManagerEmpty(proj) {
+    function _renderProjectManagerEmpty() {
         return QSDom.el('div', {}, [
-            QSDom.el('div', { class: 'dashboard-current__line', text: proj.noProjects || 'You are not a member of any project yet.' }),
-            QSDom.el('div', { class: 'dashboard-current__hint', text: proj.noProjectsHint || 'Create a project to get started.' }),
+            QSDom.el('div', { class: 'dashboard-current__line', text: QSPanelWords.t('dashboard.projects.noProjects') }),
+            QSDom.el('div', { class: 'dashboard-current__hint', text: QSPanelWords.t('dashboard.projects.noProjectsHint') }),
         ]);
     }
 
@@ -607,21 +522,19 @@
      * @returns {HTMLElement}
      */
     function _renderDeleteProjectButton(project) {
-        const proj = t('dashboard.projects', {});
         const label = QuickSiteAdmin.projectLabel(project.project, project.name);
-        const title = t('dashboard.projects.deleteTitle', 'Delete Project');
-        const button = QSControls.bin(title + ': ' + label, null, { focusKey: 'project-delete:' + project.project });
+        const button = QSControls.bin(QSPanelWords.t('dashboard.projects.deleteNamed', { name: label }), null,
+            { focusKey: 'project-delete:' + project.project });
 
         button.addEventListener('click', async function () {
-            // A function, so a project's name is taken as it is: a string would read `$&` in it as a pattern.
-            let question = t('dashboard.projects.deleteConfirmNamed', 'dashboard.projects.deleteConfirmNamed').replace(':name', () => label);
+            let question = QSPanelWords.t('dashboard.projects.deleteConfirmNamed', { name: label });
             if (project.project === editedProjectId()) {
-                question += '\n\n' + t('dashboard.projects.deleteConfirmEditing', 'This is the project you are editing.');
+                question += '\n\n' + QSPanelWords.t('dashboard.projects.deleteConfirmEditing');
             }
             const confirmed = await QuickSiteAdmin.confirm(question, {
-                title: title,
+                title: QSPanelWords.t('dashboard.projects.deleteTitle'),
                 type: 'danger',
-                confirmText: t('dashboard.projects.deleteBtn', 'Delete Project'),
+                confirmText: QSPanelWords.t('dashboard.projects.deleteBtn'),
                 confirmClass: 'danger'
             });
             if (!confirmed) return;
@@ -635,12 +548,12 @@
                     confirm: true
                 }, [], {}, { project: project.project });
                 if (result.ok) {
-                    reloadWithMessage(proj.deleted || 'Project deleted');
+                    reloadWithMessage(QSPanelWords.t('dashboard.projects.deleted'));
                     return;
                 }
-                QuickSiteAdmin.showToast(result.data?.message || 'Failed to delete project', 'error');
+                QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('dashboard.projects.deleteFailed'), 'error');
             } catch (error) {
-                QuickSiteAdmin.showToast('Failed to delete project', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.deleteFailed'), 'error');
             }
             this.disabled = false;
         });
@@ -658,30 +571,28 @@
         if (project.project === editedProjectId()) {
             return QSDom.el('span', { class: 'owner-space__project-name', text: label, title: label });
         }
-        const title = t('dashboard.projects.switch', 'Switch Project');
         const name = QSDom.el('button', {
             type: 'button',
             class: 'owner-space__project-name owner-space__project-switch',
             text: label,
-            title: title + ': ' + label,
+            title: QSPanelWords.t('dashboard.projects.switchNamed', { name: label }),
         });
         name.addEventListener('click', async function () {
-            const proj = t('dashboard.projects', {});
             const confirmed = await QuickSiteAdmin.confirm(
-                t('dashboard.projects.switchConfirmNamed', 'Switch to ":name"? Every page of the panel then works on this project.').replace(':name', () => label),
-                { title: title, confirmText: t('dashboard.projects.switchBtn', 'Switch') }
+                QSPanelWords.t('dashboard.projects.switchConfirmNamed', { name: label }),
+                { title: QSPanelWords.t('dashboard.projects.switch'), confirmText: QSPanelWords.t('dashboard.projects.switchBtn') }
             );
             if (!confirmed) return;
             this.disabled = true;
             try {
                 const result = await QuickSiteAdmin.setSelectedProject(project.project);
                 if (result.ok) {
-                    reloadWithMessage((proj.switched || 'Switched to project') + ': ' + label);
+                    reloadWithMessage(QSPanelWords.t('dashboard.projects.switched', { name: label }));
                     return;
                 }
-                QuickSiteAdmin.showToast(result.data?.message || 'Failed to switch project', 'error');
+                QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('dashboard.projects.switchFailed'), 'error');
             } catch (error) {
-                QuickSiteAdmin.showToast('Failed to switch project', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.switchFailed'), 'error');
             }
             this.disabled = false;
         });
@@ -709,17 +620,17 @@
 
         const size = document.createElement('span');
         size.className = 'owner-space__project-size';
-        size.textContent = project.total_formatted || formatSize(project.total || 0);
+        size.textContent = QuickSiteUtils.formatSize(project.total);
         row.appendChild(size);
         row.appendChild(_renderDeleteProjectButton(project));
 
         // Backup/export counts only when there is something to say.
         const extras = [];
         if (project.backups?.count) {
-            extras.push(project.backups.count + ' ' + t('dashboard.storage.backups', 'Backups').toLowerCase());
+            extras.push(QSPanelWords.count('dashboard.storage.backupCount', project.backups.count));
         }
         if (project.exports?.count) {
-            extras.push(project.exports.count + ' ' + t('dashboard.storage.exports', 'Exports').toLowerCase());
+            extras.push(QSPanelWords.count('dashboard.storage.exportCount', project.exports.count));
         }
         if (extras.length) {
             const meta = document.createElement('span');
@@ -763,13 +674,13 @@
         if (noMatch) {
             noMatch.hidden = !(query !== '' && shown.length === 0);
             noMatch.textContent = noMatch.hidden ? ''
-                : t('dashboard.storage.noMatch', 'dashboard.storage.noMatch').replace('{query}', typed);
+                : QSPanelWords.t('dashboard.storage.noMatch', { query: typed });
         }
         if (more) {
             more.hidden = !many || query !== '';
             more.textContent = ownerSpaceExpanded
-                ? t('dashboard.storage.showTop', 'dashboard.storage.showTop').replace('{n}', OWNER_SPACE_TOP)
-                : t('dashboard.storage.showAll', 'dashboard.storage.showAll').replace('{n}', ownerSpaceRows.length);
+                ? QSPanelWords.t('dashboard.storage.showTop', { n: QSPanelWords.number(OWNER_SPACE_TOP) })
+                : QSPanelWords.t('dashboard.storage.showAll', { n: QSPanelWords.number(ownerSpaceRows.length) });
             more.setAttribute('aria-expanded', ownerSpaceExpanded ? 'true' : 'false');
         }
     }
@@ -815,13 +726,10 @@
             showOwnerSpace(section, true);
 
             const total = data.total?.size || 0;
-            document.getElementById('owner-space-total').textContent =
-                data.total?.size_formatted || formatSize(total);
+            document.getElementById('owner-space-total').textContent = QuickSiteUtils.formatSize(total);
 
             const count = document.getElementById('owner-space-count');
-            count.textContent = data.project_count === 1
-                ? t('dashboard.storage.ownerOneProject', '1 project')
-                : t('dashboard.storage.ownerProjects', '{n} projects').replace('{n}', data.project_count);
+            count.textContent = QSPanelWords.count('dashboard.storage.ownerProjects', data.project_count);
 
             const cats = data.by_category || {};
             const quota = data.quota || {};
@@ -845,7 +753,7 @@
                     const pct = denom > 0 ? (bytes / denom) * 100 : 0;
                     seg.style.width = pct > 0 ? Math.max(pct, 1) + '%' : '0%';
                 }
-                if (val) val.textContent = cats[cat]?.size_formatted || formatSize(bytes);
+                if (val) val.textContent = QuickSiteUtils.formatSize(bytes);
             });
 
             // Free space: shown only when a quota is actually configured. On the
@@ -855,11 +763,10 @@
             const freeVal = document.getElementById('owner-space-val-free');
             if (freeRow) freeRow.style.display = quota.configured ? '' : 'none';
             if (freeVal && quota.configured) {
+                const limit = QuickSiteUtils.formatSize(quota.limit);
                 freeVal.textContent = quota.over
-                    ? t('dashboard.storage.overQuota', 'none — over the {limit} limit')
-                        .replace('{limit}', quota.limit_formatted || formatSize(quota.limit || 0))
-                    : (quota.free_formatted || formatSize(quota.free || 0))
-                        + ' / ' + (quota.limit_formatted || formatSize(quota.limit || 0));
+                    ? QSPanelWords.t('dashboard.storage.overQuota', { limit: limit })
+                    : QSPanelWords.t('dashboard.storage.freeOfLimit', { free: QuickSiteUtils.formatSize(quota.free), limit: limit });
             }
 
             // Over the quota: a warning that says what is refused and how to get room back.
@@ -874,7 +781,7 @@
             const hint = document.getElementById('owner-space-hint');
             if (hint) {
                 hint.textContent = data.cache?.from_cache
-                    ? t('dashboard.storage.cachedHint', 'Cached — refresh to recalculate')
+                    ? QSPanelWords.t('dashboard.storage.cachedHint')
                     : '';
             }
         } catch (error) {
@@ -946,10 +853,10 @@
         const count = document.getElementById('manage-builds-count');
         if (!list) return;
 
-        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: t('dashboard.storage.noItems', 'No items') });
+        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: QSPanelWords.t('dashboard.storage.noItems') });
 
         QSDom.clear(list);
-        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: t('common.loading', 'Loading...') }));
+        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: QSPanelWords.t('common.loading') }));
 
         try {
             const result = await QuickSiteAdmin.apiRequest('getBuild');
@@ -962,20 +869,21 @@
             list.appendChild(_renderManageSpaceBuild(build, list, count, emptyRow));
         } catch (error) {
             QSDom.clear(list);
-            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: t('common.error', 'Error loading data') }));
+            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: QSPanelWords.t('dashboard.storage.loadError') }));
         }
     }
 
     function _renderManageSpaceBuild(build, list, count, emptyRow) {
-        const sizeMb = build.size_mb || 0;
-        const sizeStr = sizeMb < 1 ? (sizeMb * 1024).toFixed(0) + ' KB' : sizeMb.toFixed(2) + ' MB';
-        const date = build.created ? new Date(build.created).toLocaleDateString() : '--';
+        const sizeStr = QuickSiteUtils.formatSize(build.size_bytes);
+        const date = build.created
+            ? QSPanelWords.date(build.created, { year: 'numeric', month: 'numeric', day: 'numeric' })
+            : '--';
 
         const nameChildren = [build.name];
         if (build.complete === false) {
             nameChildren.push(QSDom.el('span', {
                 class: 'manage-space__item-badge',
-                text: t('dashboard.storage.incomplete', 'incomplete')
+                text: QSPanelWords.t('dashboard.storage.incomplete')
             }));
         }
 
@@ -989,12 +897,12 @@
         const dlBtn = (build.complete === false || outOfReach) ? null : QSDom.el('button', {
             type: 'button',
             class: 'admin-btn admin-btn--ghost admin-action manage-space__download-btn',
-            title: t('dashboard.storage.download', 'Download'),
-            'aria-label': t('dashboard.storage.download', 'Download')
+            title: QSPanelWords.t('dashboard.storage.download'),
+            'aria-label': QSPanelWords.t('dashboard.storage.download')
         }, [QSDom.svgIcon('M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 14)]);
 
         const delBtn = outOfReach ? null : QSControls.bin(
-            t('dashboard.storage.deleteBuild', 'dashboard.storage.deleteBuild').replace(':name', () => build.name), null,
+            QSPanelWords.t('dashboard.storage.deleteBuild', { name: build.name }), null,
             { focusKey: 'build-delete:' + build.name });
 
         const item = QSDom.el('div', { class: 'manage-space__item', dataset: { build: build.name } }, [
@@ -1015,10 +923,10 @@
                     // with the header and hands the blob to the browser.
                     const res = await QuickSiteAdmin.downloadFile('downloadBuild');
                     if (!res.ok) {
-                        QuickSiteAdmin.showToast(res.data?.message || 'Download failed', 'error');
+                        QuickSiteAdmin.showToast(res.data?.message || QSPanelWords.t('dashboard.storage.downloadFailed'), 'error');
                     }
                 } catch (e) {
-                    QuickSiteAdmin.showToast('Download failed', 'error');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.storage.downloadFailed'), 'error');
                 }
                 this.disabled = false;
             });
@@ -1027,9 +935,9 @@
         if (delBtn) {
             delBtn.addEventListener('click', async function () {
                 if (!(await QuickSiteUtils.confirm('', {
-                    title: t('dashboard.storage.deleteBuildTitle', 'dashboard.storage.deleteBuildTitle').replace(':name', () => build.name),
+                    title: QSPanelWords.t('dashboard.storage.deleteBuildTitle', { name: build.name }),
                     type: 'danger',
-                    confirmText: t('dashboard.storage.delete', 'dashboard.storage.delete')
+                    confirmText: QSPanelWords.t('dashboard.storage.delete')
                 }))) return;
                 this.disabled = true;
                 try {
@@ -1041,13 +949,13 @@
                         list.appendChild(emptyRow());
                         _focusAfterRemoval(focusBack);
                         refreshSpaceFigures();
-                        QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + build.name, 'success');
+                        QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.storage.deleted', { name: build.name }), 'success');
                     } else {
-                        QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+                        QuickSiteAdmin.showToast(res.data?.message || QSPanelWords.t('dashboard.storage.deleteFailed'), 'error');
                         this.disabled = false;
                     }
                 } catch (e) {
-                    QuickSiteAdmin.showToast('Delete failed', 'error');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.storage.deleteFailed'), 'error');
                     this.disabled = false;
                 }
             });
@@ -1074,7 +982,7 @@
         const row = canRun('clearExports') ? ownerSpaceRows.find(p => p.project === edited) : null;
         const fileCount = row?.exports?.count || 0;
         const totalBytes = row?.exports?.size || 0;
-        count.textContent = fileCount;
+        count.textContent = QSPanelWords.number(fileCount);
 
         QSDom.clear(list);
         if (fileCount === 0) { section.style.display = 'none'; return; }
@@ -1088,25 +996,25 @@
             type: 'button',
             class: 'admin-btn admin-btn--danger admin-btn--xs',
             id: 'clear-exports-btn',
-            text: t('dashboard.storage.clearAll', 'Clear All')
+            text: QSPanelWords.t('dashboard.storage.clearAll')
         });
 
         const item = QSDom.el('div', { class: 'manage-space__item' }, [
             QSDom.el('div', { class: 'manage-space__item-info' }, [
                 QSDom.el('span', {
                     class: 'manage-space__item-name',
-                    text: fileCount + ' ' + t('dashboard.storage.exportFiles', 'export file(s)')
+                    text: QSPanelWords.count('dashboard.storage.exportFileCount', fileCount)
                 }),
-                QSDom.el('span', { class: 'manage-space__item-meta', text: formatSize(totalBytes) }),
+                QSDom.el('span', { class: 'manage-space__item-meta', text: QuickSiteUtils.formatSize(totalBytes) }),
             ]),
             clearBtn,
         ]);
 
         clearBtn.addEventListener('click', async function () {
             if (!(await QuickSiteUtils.confirm('', {
-                title: t('dashboard.storage.confirmClearExports', 'Clear all export files?'),
+                title: QSPanelWords.t('dashboard.storage.confirmClearExports'),
                 type: 'danger',
-                confirmText: t('dashboard.storage.clearAll', 'Clear All')
+                confirmText: QSPanelWords.t('dashboard.storage.clearAll')
             }))) return;
             this.disabled = true;
             try {
@@ -1117,13 +1025,13 @@
                     item.remove();
                     _focusAfterRemoval(focusBack);
                     refreshSpaceFigures();
-                    QuickSiteAdmin.showToast(t('dashboard.storage.exportsCleared', 'Exports cleared'), 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.storage.exportsCleared'), 'success');
                 } else {
-                    QuickSiteAdmin.showToast(res.data?.message || 'Clear failed', 'error');
+                    QuickSiteAdmin.showToast(res.data?.message || QSPanelWords.t('dashboard.storage.clearFailed'), 'error');
                     this.disabled = false;
                 }
             } catch (e) {
-                QuickSiteAdmin.showToast('Clear failed', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.storage.clearFailed'), 'error');
                 this.disabled = false;
             }
         });
@@ -1142,20 +1050,20 @@
             projectLabel.textContent = '(' + labelOf(currentProject) + ')';
         }
         if (tip) {
-            tip.textContent = t('dashboard.storage.backupsTip', 'Switch project to manage other projects\u2019 backups.');
+            tip.textContent = QSPanelWords.t('dashboard.storage.backupsTip');
         }
 
         QSDom.clear(list);
-        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: t('common.loading', 'Loading...') }));
+        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: QSPanelWords.t('common.loading') }));
 
         // The manage-space backups list is scoped to the EDITED project.
         const managed = currentProject;
-        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: t('dashboard.storage.noItems', 'No items') });
+        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: QSPanelWords.t('dashboard.storage.noItems') });
 
         try {
             const result = await QuickSiteAdmin.apiRequest('listBackups', 'GET', null, [], {}, { project: managed });
             const backups = result.data?.data?.backups || [];
-            count.textContent = backups.length;
+            count.textContent = QSPanelWords.number(backups.length);
 
             QSDom.clear(list);
             if (backups.length === 0) { list.appendChild(emptyRow()); return; }
@@ -1163,17 +1071,20 @@
             backups.forEach(b => list.appendChild(_renderManageSpaceItem(b, managed, list, count, emptyRow)));
         } catch (error) {
             QSDom.clear(list);
-            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: t('common.error', 'Error loading data') }));
+            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: QSPanelWords.t('dashboard.storage.loadError') }));
         }
     }
 
     function _renderManageSpaceItem(b, managed, list, count, emptyRow) {
-        const date = b.created_relative || b.created_formatted || '--';
-        const size = b.size_formatted || '--';
+        const date = b.created ? backupAge(b.created) : '--';
+        const size = QuickSiteUtils.formatSize(b.size);
         const nameChildren = [b.name];
-        if (b.type !== 'manual') nameChildren.push(QSDom.el('span', { class: 'manage-space__item-badge', text: b.type }));
+        // listBackups names two kinds: 'manual', and the snapshot a restore takes first.
+        if (b.type === 'pre-restore') {
+            nameChildren.push(QSDom.el('span', { class: 'manage-space__item-badge', text: QSPanelWords.t('dashboard.projects.pre_restore') }));
+        }
 
-        const delBtn = QSControls.bin(t('dashboard.storage.deleteBackup', 'dashboard.storage.deleteBackup').replace(':name', () => b.name), null,
+        const delBtn = QSControls.bin(QSPanelWords.t('dashboard.storage.deleteBackup', { name: b.name }), null,
             { focusKey: 'backup-delete:' + b.name });
         const item = QSDom.el('div', { class: 'manage-space__item', dataset: { backup: b.name } }, [
             QSDom.el('div', { class: 'manage-space__item-info' }, [
@@ -1184,9 +1095,9 @@
         ]);
         delBtn.addEventListener('click', async function () {
             if (!(await QuickSiteUtils.confirm('', {
-                title: t('dashboard.storage.deleteBackupTitle', 'dashboard.storage.deleteBackupTitle').replace(':name', () => b.name),
+                title: QSPanelWords.t('dashboard.storage.deleteBackupTitle', { name: b.name }),
                 type: 'danger',
-                confirmText: t('dashboard.storage.delete', 'dashboard.storage.delete')
+                confirmText: QSPanelWords.t('dashboard.storage.delete')
             }))) return;
             this.disabled = true;
             try {
@@ -1195,17 +1106,17 @@
                     const focusBack = QSDom.rememberFocus(this);
                     item.remove();
                     const remaining = list.querySelectorAll('.manage-space__item').length;
-                    count.textContent = remaining;
+                    count.textContent = QSPanelWords.number(remaining);
                     if (remaining === 0) list.appendChild(emptyRow());
                     _focusAfterRemoval(focusBack);
                     refreshSpaceFigures();
-                    QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + b.name, 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.storage.deleted', { name: b.name }), 'success');
                 } else {
-                    QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+                    QuickSiteAdmin.showToast(res.data?.message || QSPanelWords.t('dashboard.storage.deleteFailed'), 'error');
                     this.disabled = false;
                 }
             } catch (e) {
-                QuickSiteAdmin.showToast('Delete failed', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.storage.deleteFailed'), 'error');
                 this.disabled = false;
             }
         });
@@ -1310,9 +1221,6 @@
     }
 
     function setupProjectManagerEvents() {
-        const proj = t('dashboard.projects', {});
-        const common = t('common', {});
-        
         // The project's first language, offered from the installation's language
         // list with the installation's default language preselected — the one
         // createProject uses when none is sent. getLanguageList returns both, and
@@ -1323,7 +1231,8 @@
         async function fillCreateLanguageSelect() {
             const select = document.getElementById('create-project-language');
             if (!select) return;
-            QSDom.setSelectPlaceholder(select, select.dataset.placeholder);
+            const placeholder = QSPanelWords.t('dashboard.projects.languagePlaceholder');
+            QSDom.setSelectPlaceholder(select, placeholder);
             try {
                 const res = await QuickSiteAdmin.apiRequest('getLanguageList', 'GET');
                 const data = (res && res.ok && res.data && res.data.data) || {};
@@ -1343,9 +1252,9 @@
             }
             if (window.QSSearchableSelect && !select._qsPicker) {
                 select._qsPicker = new window.QSSearchableSelect(select, {
-                    placeholder: select.dataset.placeholder,
-                    searchPlaceholder: select.dataset.searchPlaceholder,
-                    emptyText: select.dataset.emptyText
+                    placeholder: placeholder,
+                    searchPlaceholder: QSPanelWords.t('common.search'),
+                    emptyText: QSPanelWords.t('common.noResults')
                 });
             }
         }
@@ -1401,10 +1310,10 @@
             const target = currentProject;
             const name = cleanProjectName(document.getElementById('rename-project-name').value);
             if (!name) {
-                QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.nameRequired'), 'error');
                 return;
             }
-            const originalText = QSDom.setButtonBusy(this, proj.renaming || 'Renaming...');
+            const originalText = QSDom.setButtonBusy(this, QSPanelWords.t('dashboard.projects.renaming'));
             let result = null;
             try {
                 result = await QuickSiteAdmin.apiRequest('renameProject', 'POST', { name: name }, [], {}, { project: target });
@@ -1415,10 +1324,12 @@
                 // Full reload: the name shows in the header picker, which the
                 // server renders, as well as on this page.
                 const d = result.data?.data || {};
-                reloadWithMessage((proj.renamed || 'Project renamed') + ': ' + QuickSiteAdmin.projectLabel(d.project || target, d.name || name));
+                reloadWithMessage(QSPanelWords.t('dashboard.projects.renamed', {
+                    name: QuickSiteAdmin.projectLabel(d.project || target, d.name || name)
+                }));
                 return;
             }
-            QuickSiteAdmin.showToast(result?.data?.message || 'Failed to rename project', 'error');
+            QuickSiteAdmin.showToast(result?.data?.message || QSPanelWords.t('dashboard.projects.renameFailed'), 'error');
             this.disabled = false;
             this.textContent = originalText;
         });
@@ -1430,11 +1341,13 @@
             const name = cleanProjectName(nameInput.value);
             
             if (!name) {
-                QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.nameRequired'), 'error');
                 return;
             }
-            
-            QSDom.setButtonBusy(this, proj.cloning || 'Cloning...');
+
+            // The button's icon and words, put back as they were when the page stays.
+            const restore = Array.from(this.childNodes);
+            QSDom.setButtonBusy(this, QSPanelWords.t('dashboard.projects.cloning'));
             try {
                 // Source = the selected target project (bound to the URL marker
                 // server-side); body carries only the new name + switch_to.
@@ -1443,39 +1356,41 @@
                     name: name,
                     switch_to: activateCheckbox.checked
                 }, [], {}, { project: target });
-                
+
                 if (result.ok) {
                     const d = result.data?.data || {};
-                    const filesCopied = d.files_copied || '';
-                    const msg = (proj.cloned || 'Project cloned') + ': ' + QuickSiteAdmin.projectLabel(d.project, d.name || name)
-                        + (filesCopied ? ' (' + filesCopied + ' files)' : '');
+                    const label = QuickSiteAdmin.projectLabel(d.project, d.name || name);
+                    const msg = d.files_copied
+                        ? QSPanelWords.count('dashboard.projects.clonedFiles', d.files_copied, { name: label })
+                        : QSPanelWords.t('dashboard.projects.cloned', { name: label });
                     // A clone never carries the source's OAuth keys: say which to create again.
-                    // The warning stays until closed, and survives the reload. Its words come
-                    // with the clone dialog (dashboard.php), as the template hands its others.
+                    // The warning stays until closed, and survives the reload.
                     const keysLeft = Array.isArray(d.oauth_keys_not_copied) ? d.oauth_keys_not_copied : [];
-                    const keysWords = document.getElementById('modal-clone-project')?.dataset.oauthKeysText || '';
                     const keysMsg = keysLeft.length
-                        ? keysWords.split('{providers}').join(keysLeft.join(', ')) : '';
+                        ? QSPanelWords.t('dashboard.projects.cloneOAuthKeys', { providers: QSPanelWords.list(keysLeft) }) : '';
                     closeAllModals();
                     if (activateCheckbox.checked) {
-                        if (keysMsg) reloadWithMessage(msg + '. ' + keysMsg, 'warning', 0);
-                        else reloadWithMessage(msg);
+                        if (keysMsg) {
+                            reloadWithMessage(QSPanelWords.t('dashboard.projects.clonedKeysLeft', { cloned: msg, keys: keysMsg }), 'warning', 0);
+                        } else {
+                            reloadWithMessage(msg);
+                        }
                     } else {
                         QuickSiteAdmin.showToast(msg, 'success');
                         if (keysMsg) QuickSiteAdmin.showToast(keysMsg, 'warning', 0);
                         loadProjectManager();
                         this.disabled = false;
-                        this.textContent = proj.cloneBtn || 'Clone Project';
+                        this.replaceChildren(...restore);
                     }
                 } else {
-                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to clone project', 'error');
+                    QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('dashboard.projects.cloneFailed'), 'error');
                     this.disabled = false;
-                    this.textContent = proj.cloneBtn || 'Clone Project';
+                    this.replaceChildren(...restore);
                 }
             } catch (error) {
-                QuickSiteAdmin.showToast('Failed to clone project', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.cloneFailed'), 'error');
                 this.disabled = false;
-                this.textContent = proj.cloneBtn || 'Clone Project';
+                this.replaceChildren(...restore);
             }
         });
         
@@ -1486,11 +1401,11 @@
             const name = cleanProjectName(nameInput.value);
             
             if (!name) {
-                QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.nameRequired'), 'error');
                 return;
             }
-            
-            QSDom.setButtonBusy(this, common.loading || 'Creating...');
+
+            const originalText = QSDom.setButtonBusy(this, QSPanelWords.t('dashboard.projects.creating'));
             try {
                 const body = { name: name, switch_to: activateCheckbox.checked };
                 const languageSelect = document.getElementById('create-project-language');
@@ -1498,10 +1413,12 @@
                     body.language = languageSelect.value;
                 }
                 const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', body);
-                
+
                 if (result.ok) {
                     const d = result.data?.data || {};
-                    const msg = (proj.created || 'Project created') + ': ' + QuickSiteAdmin.projectLabel(d.project, d.name || name);
+                    const msg = QSPanelWords.t('dashboard.projects.created', {
+                        name: QuickSiteAdmin.projectLabel(d.project, d.name || name)
+                    });
                     closeAllModals();
                     if (activateCheckbox.checked) {
                         reloadWithMessage(msg);
@@ -1509,17 +1426,17 @@
                         QuickSiteAdmin.showToast(msg, 'success');
                         loadProjectManager();
                         this.disabled = false;
-                        this.textContent = proj.createModal?.submit || 'Create Project';
+                        this.textContent = originalText;
                     }
                 } else {
-                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to create project', 'error');
+                    QuickSiteAdmin.showToast(result.data?.message || QSPanelWords.t('dashboard.projects.createFailed'), 'error');
                     this.disabled = false;
-                    this.textContent = proj.createModal?.submit || 'Create Project';
+                    this.textContent = originalText;
                 }
             } catch (error) {
-                QuickSiteAdmin.showToast('Failed to create project', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.createFailed'), 'error');
                 this.disabled = false;
-                this.textContent = proj.createModal?.submit || 'Create Project';
+                this.textContent = originalText;
             }
         });
         
@@ -1534,7 +1451,7 @@
         document.getElementById('btn-confirm-export').addEventListener('click', async function() {
             // The button's icon and words, put back as they were once the export is done.
             const restore = Array.from(this.childNodes);
-            QSDom.setButtonBusy(this, proj.exporting || 'Exporting...');
+            QSDom.setButtonBusy(this, QSPanelWords.t('dashboard.projects.exporting'));
 
             try {
                 // exportProject streams a binary ZIP: the client's download path
@@ -1549,13 +1466,13 @@
 
                 if (res.ok) {
                     closeAllModals();
-                    QuickSiteAdmin.showToast(proj.exported || 'Project exported', 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.exported'), 'success');
                 } else {
-                    QuickSiteAdmin.showToast((res.data && res.data.message) || 'Failed to export project', 'error');
+                    QuickSiteAdmin.showToast((res.data && res.data.message) || QSPanelWords.t('dashboard.projects.exportFailed'), 'error');
                 }
             } catch (error) {
                 console.error('Export error:', error);
-                QuickSiteAdmin.showToast('Failed to export project', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.exportFailed'), 'error');
             }
             
             this.disabled = false;
@@ -1594,7 +1511,7 @@
             if (!importFile) return;
             const name = cleanProjectName(document.getElementById('import-project-name').value);
             if (!name) {
-                QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.nameRequired'), 'error');
                 return;
             }
 
@@ -1603,7 +1520,7 @@
             formData.append('name', name);
             formData.append('switch_to', document.getElementById('import-project-activate').checked ? 'true' : 'false');
 
-            const originalText = QSDom.setButtonBusy(this, proj.importing || 'Importing project...');
+            const originalText = QSDom.setButtonBusy(this, QSPanelWords.t('dashboard.projects.importing'));
             // importProject is a GLOBAL command, so upload() sends it to the global
             // endpoint with no project marker. It reads the body without assuming
             // JSON: an archive is the biggest upload QuickSite accepts, so it is the
@@ -1619,34 +1536,35 @@
             if (result && result.ok) {
                 // Full reload: a new project changes the header picker, the nav
                 // permission set and the storage totals — not just this card.
-                reloadWithMessage(result.data?.message || proj.imported || 'Project imported successfully');
+                reloadWithMessage(result.data?.message || QSPanelWords.t('dashboard.projects.imported'));
                 return;
             }
-            QuickSiteAdmin.showToast(result?.data?.message || 'Failed to import project', 'error');
+            QuickSiteAdmin.showToast(result?.data?.message || QSPanelWords.t('dashboard.projects.importFailed'), 'error');
             this.disabled = false;
             this.textContent = originalText;
         });
         
         // Backup project
         document.getElementById('btn-backup-project').addEventListener('click', async function() {
-            const originalText = QSDom.setButtonBusy(this, proj.backing_up || 'Creating backup...');
-            
+            // The button's icon and words, put back as they were once the backup is done.
+            const restore = Array.from(this.childNodes);
+            QSDom.setButtonBusy(this, QSPanelWords.t('dashboard.projects.backing_up'));
+
             try {
                 const result = await QuickSiteAdmin.apiRequest('backupProject', 'GET', null, [], {}, { project: currentProject });
 
                 if (result.ok && result.data?.data?.backup) {
-                    const data = result.data.data;
+                    const backup = result.data.data.backup;
                     QuickSiteAdmin.showToast(
-                        t('dashboard.projects.backup_created', 'dashboard.projects.backup_created') + ': ' + data.backup.name + ' (' + data.backup.size_formatted + ')',
+                        QSPanelWords.t('dashboard.projects.backup_created', { name: backup.name, size: QuickSiteUtils.formatSize(backup.size) }),
                         'success'
                     );
                     afterBackupsChanged();
                 } else if (result.data?.code === 'backup.incomplete') {
                     // Nothing was kept, so nothing on the page changed: a red message that
                     // stays until it is closed, naming what could not be copied.
-                    const items = (result.data.data?.failed_items || []).join(', ');
                     QuickSiteAdmin.showToast(
-                        t('dashboard.projects.backup_incomplete', 'dashboard.projects.backup_incomplete').replace(':items', items),
+                        QSPanelWords.t('dashboard.projects.backup_incomplete', { items: QSPanelWords.list(result.data.data?.failed_items || []) }),
                         'error',
                         0
                     );
@@ -1654,18 +1572,18 @@
                     // The server's own words: a quota refusal carries the figures and the
                     // way out, so it stays until it is closed too.
                     QuickSiteAdmin.showToast(
-                        result.data?.message || t('dashboard.projects.backup_failed', 'dashboard.projects.backup_failed'),
+                        result.data?.message || QSPanelWords.t('dashboard.projects.backup_failed'),
                         'error',
                         result.data?.code === 'quota.storage_exceeded' ? 0 : undefined
                     );
                 }
             } catch (error) {
                 console.error('Backup error:', error);
-                QuickSiteAdmin.showToast(t('dashboard.projects.backup_failed', 'dashboard.projects.backup_failed'), 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.backup_failed'), 'error');
             }
 
             this.disabled = false;
-            this.textContent = originalText;
+            this.replaceChildren(...restore);
         });
         
         // Restore backup modal — pin the target project the modal operates on.
@@ -1710,13 +1628,12 @@
         const deleteBackup = body.querySelector('#restore-delete-backup');
         createBackup.addEventListener('change', () => updateRestoreWarning(body));
         updateRestoreWarning(body);
-        const restoreFailed = t('dashboard.projects.restore_failed', 'dashboard.projects.restore_failed');
 
         return QuickSiteUtils.confirm('', {
-            title: t('dashboard.projects.restoreQuestion', 'dashboard.projects.restoreQuestion').replace(':name', () => backupName),
+            title: QSPanelWords.t('dashboard.projects.restoreQuestion', { name: backupName }),
             body: body,
             type: 'danger',
-            confirmText: t('dashboard.projects.restoreBtn', 'dashboard.projects.restoreBtn'),
+            confirmText: QSPanelWords.t('dashboard.projects.restoreBtn'),
             action: async function () {
                 const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', {
                     backup: backupName,
@@ -1725,17 +1642,16 @@
                 }, [], {}, { project: restoreTargetProject || currentProject });
                 if (result.ok) {
                     closeAllModals();
-                    reloadWithMessage(t('dashboard.projects.restore_success', 'dashboard.projects.restore_success'));
+                    reloadWithMessage(QSPanelWords.t('dashboard.projects.restore_success'));
                     return true;
                 }
                 if (result.data?.code === 'restore.incomplete') {
                     // Part of the backup came back, so the project has changed: the page
                     // reloads to show it as it now is, with a message that stays until
                     // it is closed and names what the restore could not bring back.
-                    const items = (result.data.data?.failed_items || []).join(', ');
                     closeAllModals();
                     reloadWithMessage(
-                        t('dashboard.projects.restore_incomplete', 'dashboard.projects.restore_incomplete').replace(':items', items),
+                        QSPanelWords.t('dashboard.projects.restore_incomplete', { items: QSPanelWords.list(result.data.data?.failed_items || []) }),
                         'error',
                         0
                     );
@@ -1743,20 +1659,19 @@
                 }
                 // A quota refusal names the way out (free space, or delete this backup
                 // once it is restored): it stays in the question.
-                return { ok: false, message: result.data?.message || restoreFailed };
+                return { ok: false, message: result.data?.message || QSPanelWords.t('dashboard.projects.restore_failed') };
             }
         });
     }
 
     function updateRestoreWarning(body) {
-        const proj = t('dashboard.projects', {});
         const checkbox = body.querySelector('#restore-create-backup');
         const warningText = body.querySelector('#restore-warning-text');
-                
+
         if (checkbox.checked) {
-            warningText.textContent = proj.restoreWarningWithBackup || 'A backup of your current project will be created before restoring.';
+            warningText.textContent = QSPanelWords.t('dashboard.projects.restoreWarningWithBackup');
         } else {
-            warningText.textContent = proj.restoreWarningNoBackup || 'Your current project state will be lost! Make sure you have a backup if needed.';
+            warningText.textContent = QSPanelWords.t('dashboard.projects.restoreWarningNoBackup');
         }
     }
 
@@ -1766,12 +1681,10 @@
 
     async function loadBackupList() {
         const container = document.getElementById('backup-list-container');
-        const proj = t('dashboard.projects', {});
-        const common = t('common', {});
         const target = restoreTargetProject || currentProject;
 
         QSDom.clear(container);
-        container.appendChild(_renderLoading(common.loading || 'Loading...'));
+        container.appendChild(_renderLoading(QSPanelWords.t('common.loading')));
 
         let result;
         try {
@@ -1779,12 +1692,12 @@
         } catch (error) {
             console.error('Failed to load backups:', error);
             QSDom.clear(container);
-            container.appendChild(QSDom.el('p', { text: 'Failed to load backups' }));
+            container.appendChild(QSDom.el('p', { text: QSPanelWords.t('dashboard.projects.loadBackupsFailed') }));
             return;
         }
         if (!result.ok) {
             QSDom.clear(container);
-            container.appendChild(QSDom.el('p', { text: result.data?.message || 'Failed to load backups' }));
+            container.appendChild(QSDom.el('p', { text: result.data?.message || QSPanelWords.t('dashboard.projects.loadBackupsFailed') }));
             return;
         }
 
@@ -1795,56 +1708,58 @@
         if (backups.length === 0) {
             container.appendChild(QSDom.el('div', { class: 'backup-empty' }, [
                 QSDom.svgIcon('M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z', 48),
-                QSDom.el('p', { text: proj.no_backups || 'No backups yet' }),
-                QSDom.el('p', { text: proj.backup_hint || 'Click "Backup" to create your first backup' }),
+                QSDom.el('p', { text: QSPanelWords.t('dashboard.projects.no_backups') }),
+                QSDom.el('p', { text: QSPanelWords.t('dashboard.projects.backup_hint') }),
             ]));
             return;
         }
 
         container.appendChild(QSDom.el('div', { class: 'backup-summary' }, [
-            QSDom.el('span', { text: data.count + ' ' + (proj.backups_count || 'backup(s)') }),
+            QSDom.el('span', { text: QSPanelWords.count('dashboard.storage.backupCount', data.count) }),
             QSDom.el('span', { class: 'backup-summary__divider', text: '•' }),
-            QSDom.el('span', { text: data.total_size_formatted + ' ' + (proj.total_size || 'total') }),
+            QSDom.el('span', { text: QSPanelWords.t('dashboard.projects.total_size', { size: QuickSiteUtils.formatSize(data.total_size) }) }),
         ]));
         const listEl = QSDom.el('div', { class: 'backup-list' });
-        backups.forEach(b => listEl.appendChild(_renderBackupItem(b, proj, target)));
+        backups.forEach(b => listEl.appendChild(_renderBackupItem(b, target)));
         container.appendChild(listEl);
     }
 
-    function _renderBackupItem(backup, proj, target) {
+    function _renderBackupItem(backup, target) {
         let typeBadge = null;
-        if (backup.type === 'pre-restore') typeBadge = QSDom.el('span', { class: 'badge badge--warning', text: proj.pre_restore || 'Pre-restore' });
+        if (backup.type === 'pre-restore') {
+            typeBadge = QSDom.el('span', { class: 'badge badge--warning', text: QSPanelWords.t('dashboard.projects.pre_restore') });
+        }
 
         const restoreBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--primary' }, [
             QSDom.svgIcon('M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15', 14),
-            ' ' + (proj.restore_btn || 'Restore'),
+            ' ' + QSPanelWords.t('dashboard.projects.restore_btn'),
         ]);
-        const delBtn = QSControls.bin(t('dashboard.storage.deleteBackup', 'dashboard.storage.deleteBackup').replace(':name', () => backup.name), null,
+        const delBtn = QSControls.bin(QSPanelWords.t('dashboard.storage.deleteBackup', { name: backup.name }), null,
             { focusKey: 'backup-restore-delete:' + backup.name });
 
         restoreBtn.addEventListener('click', () => openRestoreConfirmModal(backup.name));
         delBtn.addEventListener('click', async function () {
             if (!(await QuickSiteUtils.confirm('', {
-                title: t('dashboard.storage.deleteBackupTitle', 'dashboard.storage.deleteBackupTitle').replace(':name', () => backup.name),
+                title: QSPanelWords.t('dashboard.storage.deleteBackupTitle', { name: backup.name }),
                 type: 'danger',
-                confirmText: t('dashboard.storage.delete', 'dashboard.storage.delete')
+                confirmText: QSPanelWords.t('dashboard.storage.delete')
             }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: backup.name }, [], {}, { project: target });
                 if (res.ok) {
-                    QuickSiteAdmin.showToast(proj.backup_deleted || 'Backup deleted', 'success');
+                    QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.backup_deleted'), 'success');
                     // The list is drawn again: the focus goes to the next backup's bin, else to the list's ×.
                     const focusBack = QSDom.rememberFocus(this);
                     await loadBackupList();
                     if (!focusBack.restore()) document.querySelector('#modal-restore-backup .admin-modal__close')?.focus();
                     afterBackupsChanged();
                 } else {
-                    QuickSiteAdmin.showToast(res.data?.message || 'Failed to delete backup', 'error');
+                    QuickSiteAdmin.showToast(res.data?.message || QSPanelWords.t('dashboard.projects.deleteBackupFailed'), 'error');
                     this.disabled = false;
                 }
             } catch (error) {
-                QuickSiteAdmin.showToast('Failed to delete backup', 'error');
+                QuickSiteAdmin.showToast(QSPanelWords.t('dashboard.projects.deleteBackupFailed'), 'error');
                 this.disabled = false;
             }
         });
@@ -1857,11 +1772,11 @@
                     typeBadge,
                 ]),
                 QSDom.el('div', { class: 'backup-item__meta' }, [
-                    QSDom.el('span', { text: backup.size_formatted }),
+                    QSDom.el('span', { text: QuickSiteUtils.formatSize(backup.size) }),
                     QSDom.el('span', { class: 'backup-item__divider', text: '•' }),
-                    QSDom.el('span', { text: backup.files + ' ' + (proj.files || 'files') }),
+                    QSDom.el('span', { text: QSPanelWords.count('dashboard.projects.fileCount', backup.files) }),
                     QSDom.el('span', { class: 'backup-item__divider', text: '•' }),
-                    QSDom.el('span', { text: backup.created_relative }),
+                    QSDom.el('span', { text: backupAge(backup.created) }),
                 ]),
             ]),
             QSDom.el('div', { class: 'backup-item__actions' }, [restoreBtn, delBtn]),
@@ -1885,7 +1800,6 @@
         await Promise.all([
             loadDashboardStats(),
             hp('getSiteMap')         ? loadSiteMap()         : Promise.resolve(),
-            hp('getCommandHistory')  ? loadRecentCommands()  : Promise.resolve(),
             hp('listProjects')       ? loadProjectManager()  : Promise.resolve(),
             // Owner-wide usage walks every owned project, so it loads alongside
             // rather than gating anything; when you own nothing it keeps only Manage

@@ -14,14 +14,11 @@
  * An apiKey in the query maps to nothing: QuickSite does not send a key in a URL, where it would land
  * in every log on the way. The scheme's note says so and what the author can do.
  *
- * Exposes window.QSApiImport.{detectOpenApi, convertOpenApi}. convertOpenApi takes the page's t(),
- * which holds the notes' words.
+ * Exposes window.QSApiImport.{detectOpenApi, convertOpenApi}. The notes' words are the APIs page's
+ * (apis.importModal.converter, which apis.php hands), read by their whole path through QSPanelWords.
  */
 (function () {
     'use strict';
-
-    // The page's translator, for the notes. Set by convertOpenApi().
-    let _t = (path) => path;
 
     const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'];
     const QS_PARAM_TYPES = ['string', 'number', 'integer', 'boolean'];
@@ -133,7 +130,7 @@
             }
             taken[id] = true;
             if (n > 1) {
-                notes.push(_t('apis.importModal.converter.idSuffixed', { base: baseId, id: id }));
+                notes.push(QSPanelWords.t('apis.importModal.converter.idSuffixed', { base: baseId, id: id }));
             }
             return id;
         };
@@ -162,42 +159,43 @@
 
     function _summariseStats(stats, notes) {
         if (stats.headerParamsDropped > 0) {
-            notes.push(_t('apis.importModal.converter.headerParamsDropped', { count: stats.headerParamsDropped }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.headerParamsDropped', stats.headerParamsDropped));
         }
         if (stats.refParamsResolved > 0) {
-            notes.push(_t('apis.importModal.converter.refParamsResolved', { count: stats.refParamsResolved }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.refParamsResolved', stats.refParamsResolved));
         }
         if (stats.refParamsUnresolved > 0) {
-            notes.push(_t('apis.importModal.converter.refParamsUnresolved', { count: stats.refParamsUnresolved }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.refParamsUnresolved', stats.refParamsUnresolved));
         }
         if (stats.examplesKept || stats.examplesStripped) {
             const parts = [];
-            if (stats.examplesKept) parts.push(_t('apis.importModal.converter.examplesCopied', { count: stats.examplesKept }));
-            if (stats.examplesStripped) parts.push(_t('apis.importModal.converter.examplesStripped', { count: stats.examplesStripped }));
-            notes.push(_t('apis.importModal.converter.examples', { list: parts.join(', ') }));
+            if (stats.examplesKept) parts.push(QSPanelWords.count('apis.importModal.converter.examplesCopied', stats.examplesKept));
+            if (stats.examplesStripped) parts.push(QSPanelWords.count('apis.importModal.converter.examplesStripped', stats.examplesStripped));
+            notes.push(QSPanelWords.t('apis.importModal.converter.examples', { list: QSPanelWords.list(parts, 'unit') }));
         }
         if (stats.compositionsSkipped > 0) {
-            notes.push(_t('apis.importModal.converter.compositionsSkipped', { count: stats.compositionsSkipped }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.compositionsSkipped', stats.compositionsSkipped));
         }
         if (stats.refsExternal > 0) {
-            notes.push(_t('apis.importModal.converter.refsExternal', { count: stats.refsExternal }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.refsExternal', stats.refsExternal));
         }
         if (stats.refsCycle > 0) {
-            notes.push(_t('apis.importModal.converter.refsCycle', { count: stats.refsCycle }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.refsCycle', stats.refsCycle));
         }
         if (stats.refsUnresolved > 0) {
-            notes.push(_t('apis.importModal.converter.refsUnresolved', { count: stats.refsUnresolved }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.refsUnresolved', stats.refsUnresolved));
         }
         if (stats.depthExceeded > 0) {
-            notes.push(_t('apis.importModal.converter.depthExceeded', { count: stats.depthExceeded, max: MAX_REF_DEPTH }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.depthExceeded', stats.depthExceeded, { max: MAX_REF_DEPTH }));
         }
         if (stats.schemasDropped > 0) {
-            notes.push(_t('apis.importModal.converter.schemasDropped', { count: stats.schemasDropped }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.schemasDropped', stats.schemasDropped));
         }
         const altNames = Object.keys(stats.altSchemeUsage);
         if (altNames.length > 0) {
+            // Each scheme's name, with how many operations use it.
             const parts = altNames.map(n => n + ' (' + stats.altSchemeUsage[n] + ')');
-            notes.push(_t(stats.apiHasAuth ? 'apis.importModal.converter.altSchemes' : 'apis.importModal.converter.altSchemesNoAuth', { list: parts.join(', ') }));
+            notes.push(QSPanelWords.t(stats.apiHasAuth ? 'apis.importModal.converter.altSchemes' : 'apis.importModal.converter.altSchemesNoAuth', { list: QSPanelWords.list(parts, 'unit') }));
         }
     }
 
@@ -390,11 +388,11 @@
                 // By design: best-effort map + warning. QuickSite's cookie
                 // auth assumes Pattern X (same-origin session cookie owned
                 // by the browser); not all "cookie security" specs match.
-                notes.push(_t('apis.importModal.converter.apiKeyInCookie', { scheme: schemeName, cookie: keyName }));
+                notes.push(QSPanelWords.t('apis.importModal.converter.apiKeyInCookie', { scheme: schemeName, cookie: keyName }));
                 return { type: 'cookie' };
             }
             if (where === 'query') {
-                notes.push(_t('apis.importModal.converter.apiKeyInQuery', { scheme: schemeName, param: keyName }));
+                notes.push(QSPanelWords.t('apis.importModal.converter.apiKeyInQuery', { scheme: schemeName, param: keyName }));
                 return null;
             }
             return { type: 'apiKey', tokenSource: 'header:' + keyName };
@@ -408,12 +406,12 @@
         }
 
         if (t === 'oauth2') {
-            notes.push(_t('apis.importModal.converter.oauth2', { scheme: schemeName }));
+            notes.push(QSPanelWords.t('apis.importModal.converter.oauth2', { scheme: schemeName }));
             return { type: 'bearer', tokenSource: 'localStorage:token' };
         }
 
         if (t === 'openIdConnect') {
-            notes.push(_t('apis.importModal.converter.openIdConnect', { scheme: schemeName }));
+            notes.push(QSPanelWords.t('apis.importModal.converter.openIdConnect', { scheme: schemeName }));
             return { type: 'bearer', tokenSource: 'localStorage:token' };
         }
 
@@ -466,13 +464,13 @@
             const mapped = _mapSecurityScheme(securitySchemes[name], name, notes);
             if (mapped) {
                 if (schemeNames.length > 1) {
-                    notes.push(_t('apis.importModal.converter.severalSchemes', { count: schemeNames.length, list: schemeNames.join(', '), name: name }));
+                    notes.push(QSPanelWords.count('apis.importModal.converter.severalSchemes', schemeNames.length, { list: QSPanelWords.list(schemeNames, 'unit'), name: name }));
                 }
                 return { auth: mapped, pickedName: name };
             }
         }
 
-        notes.push(_t('apis.importModal.converter.noScheme'));
+        notes.push(QSPanelWords.t('apis.importModal.converter.noScheme'));
         return { auth: { type: 'none' }, pickedName: null };
     }
 
@@ -517,8 +515,7 @@
      * the native import shape ({ apis: { <apiId>: {...} } }) and `notes`
      * is a list of human-readable strings the preview can surface.
      */
-    function convertOpenApi(spec, t) {
-        if (typeof t === 'function') _t = t;
+    function convertOpenApi(spec) {
         const notes = [];
         const stats = _makeStats();
 
@@ -529,10 +526,10 @@
         const servers = Array.isArray(spec && spec.servers) ? spec.servers : [];
         const baseUrl = (servers[0] && typeof servers[0].url === 'string') ? servers[0].url : '/';
         if (servers.length > 1) {
-            notes.push(_t('apis.importModal.converter.severalServers', { count: servers.length, url: baseUrl }));
+            notes.push(QSPanelWords.count('apis.importModal.converter.severalServers', servers.length, { url: baseUrl }));
         }
         if (baseUrl && baseUrl.charAt(0) === '/') {
-            notes.push(_t('apis.importModal.converter.relativeBase', { url: baseUrl }));
+            notes.push(QSPanelWords.t('apis.importModal.converter.relativeBase', { url: baseUrl }));
         }
 
         const allocateId = _makeSlugAllocator(notes);

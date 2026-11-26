@@ -56,7 +56,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     echo json_encode([
         'status'  => 405,
         'code'    => 'validation.method_not_allowed',
-        'message' => 'This endpoint only accepts POST',
+        'message' => __admin('answers.state.postOnly'),
     ]);
     exit;
 }
@@ -86,7 +86,7 @@ switch ($key) {
         echo json_encode([
             'status'  => 404,
             'code'    => 'resource.not_found',
-            'message' => 'Unknown panel state key',
+            'message' => __admin('answers.state.unknownKey'),
         ]);
         break;
 }

@@ -6,13 +6,15 @@ The component already exists, with this structure (for styling reference):
 ```json
 {
   "tag": "button",
-  "params": { "class": "theme-switch", "data-theme-toggle": "true", "type": "button", "aria-label": "Toggle light/dark theme", "aria-pressed": "false" },
+  "params": { "class": "theme-switch", "data-theme-toggle": "true", "type": "button", "aria-label": "themeSwitch.toggle", "aria-pressed": "false" },
   "children": [
     { "tag": "span", "params": { "class": "theme-switch-icon", "aria-hidden": "true" }, "children": [{ "textKey": "__RAW__🌙" }] },
-    { "tag": "span", "params": { "class": "theme-switch-label" }, "children": [{ "textKey": "__RAW__Dark mode" }] }
+    { "tag": "span", "params": { "class": "theme-switch-label" }, "children": [{ "textKey": "themeSwitch.dark" }] }
   ]
 }
 ```
+
+Its two words, `themeSwitch.toggle` (the button's name) and `themeSwitch.dark` (its label), are already written in every language of the site: leave them as they are.
 
 **To place it, add this child element where you want it:**
 ```json

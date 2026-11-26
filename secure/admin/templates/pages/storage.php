@@ -15,10 +15,8 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
-<script>
-// The words of the page's dialogs and error toasts (`storage` in the panel's translations).
-window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslation::getInstance()->getRaw('storage') ?: new stdClass()]) ?>;
-</script>
+<!-- The page's words (QSPanelWords), before its script: its own section; common and nav come from the layout -->
+<?= __adminWords(['storage']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/storage.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/storage.js') ?>"></script>
 
 <div class="admin-page-header">
@@ -26,9 +24,9 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
         <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
         </svg>
-        Storage registry
+        <?= adminEscape(__admin('storage.title')) ?>
     </h1>
-    <p class="admin-page-header__subtitle">Every browser-storage key the site uses (localStorage / sessionStorage / cookie). The GDPR / cookie-consent data layer and the storageKey picker source.</p>
+    <p class="admin-page-header__subtitle"><?= adminEscape(__admin('storage.subtitle')) ?></p>
 </div>
 
 <!-- What a language's description is and where it shows (multilingual projects only): storage.js writes it. -->
@@ -40,26 +38,26 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Add storage key
+            <?= adminEscape(__admin('storage.toolbar.add')) ?>
         </button>
         <button type="button" class="admin-btn admin-btn--ghost" id="btn-scan-storage" data-requires-command="scanStorageUsage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            Scan / reconcile
+            <?= adminEscape(__admin('storage.toolbar.scan')) ?>
         </button>
         <button type="button" class="admin-btn admin-btn--ghost" id="btn-generate-consent" data-requires-command="generateConsentLayer">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
             </svg>
-            Generate consent layer
+            <?= adminEscape(__admin('storage.toolbar.generateConsent')) ?>
         </button>
         <button type="button" class="admin-btn admin-btn--ghost" id="btn-refresh-storage">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M23 4v6h-6M1 20v-6h6"/>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
             </svg>
-            Refresh
+            <?= adminEscape(__admin('common.refresh')) ?>
         </button>
     </div>
     <div>
@@ -69,8 +67,8 @@ window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslatio
     </div>
 </div>
 
-<div id="storage-scan-panel" class="storage-scan" role="region" aria-label="Storage scan results" hidden></div>
+<div id="storage-scan-panel" class="storage-scan" role="region" aria-label="<?= adminAttr(__admin('storage.scan.label')) ?>" hidden></div>
 
-<div id="storage-list" class="storage-list" role="region" aria-label="Storage registry list">
-    <div style="padding: 24px; color: var(--admin-text-muted, #555);">Loading storage registry…</div>
+<div id="storage-list" class="storage-list" role="region" aria-label="<?= adminAttr(__admin('storage.list.label')) ?>">
+    <div style="padding: 24px; color: var(--admin-text-muted, #555);"><?= adminEscape(__admin('storage.loading')) ?></div>
 </div>

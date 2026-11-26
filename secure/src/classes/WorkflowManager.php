@@ -577,6 +577,7 @@ class WorkflowManager {
                     // Single step - resolve params
                     $resolvedParams = $this->resolveStepParams($step['params'] ?? [], $context);
                     $resolvedParams = $this->resolveEachLoops($resolvedParams, $context);
+                    $resolvedParams = $this->resolveStartingWords($resolvedParams);
                     $resolvedStep = [
                         'command' => $step['command'],
                         'method' => $step['method'] ?? 'POST',
@@ -840,8 +841,8 @@ class WorkflowManager {
 
     /**
      * Whether a sub-workflow entry reads its parent's data: a path in its condition, its forEach or its
-     * filter, or a placeholder in its parameters, that is not a param.x (a system placeholder {{__x}} and
-     * a loop's {{$value}} are not).
+     * filter, or a placeholder in its parameters, that is not a param.x (a system placeholder {{__x}}, a
+     * loop's {{$value}} and a starting word {{startingWord:x}} are not).
      */
     private function entryReadsData(?string $condition, array $subParams, ?string $forEach = null, ?string $filter = null): bool {
         $paths = $forEach !== null ? [$forEach] : [];
@@ -852,7 +853,8 @@ class WorkflowManager {
         }
         preg_match_all('/\{\{\s*([^{}|\s]+)/', (string) json_encode($subParams), $m);
         foreach (array_merge($paths, $m[1]) as $path) {
-            if (in_array($path, ['true', 'false', 'null', 'in', 'not_in'], true) || str_starts_with($path, '__') || str_starts_with($path, '$')) continue;
+            if (in_array($path, ['true', 'false', 'null', 'in', 'not_in'], true) || str_starts_with($path, '__') || str_starts_with($path, '$')
+                || str_starts_with($path, 'startingWord:')) continue;
             if (!str_starts_with($path, 'param.')) return true;
         }
         return false;
@@ -1236,6 +1238,7 @@ class WorkflowManager {
             
             $resolvedParams = $this->resolveStepParams($step['params'] ?? [], $itemContext);
             $resolvedParams = $this->resolveEachLoops($resolvedParams, $itemContext);
+            $resolvedParams = $this->resolveStartingWords($resolvedParams);
             $resolvedStep = [
                 'command' => $step['command'],
                 'method' => $step['method'] ?? 'POST',
@@ -1611,8 +1614,9 @@ class WorkflowManager {
             // Handle {{placeholder}} syntax (full value is a placeholder)
             if (preg_match('/^\{\{([^{}]+)\}\}$/', $value, $matches)) {
                 $path = trim($matches[1]);
-                // Preserve system placeholders (e.g. {{__current_page;lang=en}}) — they're resolved at render time
-                if (str_starts_with($path, '__')) {
+                // Preserve system placeholders (e.g. {{__current_page;lang=en}}) — they're resolved at render time —
+                // and starting words, resolved once the step's language is (resolveStartingWords())
+                if (str_starts_with($path, '__') || str_starts_with($path, 'startingWord:')) {
                     return $value;
                 }
                 // Use empty string as fallback for missing params (not the raw template)
@@ -1624,8 +1628,9 @@ class WorkflowManager {
             // Handle inline {{placeholders}} in strings (not containing nested braces)
             return preg_replace_callback('/\{\{([^{}]+)\}\}/', function($matches) use ($context) {
                 $path = trim($matches[1]);
-                // Preserve system placeholders — resolved at render time, not workflow time
-                if (str_starts_with($path, '__')) {
+                // Preserve system placeholders — resolved at render time, not workflow time — and starting words,
+                // resolved once the step's language is (resolveStartingWords())
+                if (str_starts_with($path, '__') || str_starts_with($path, 'startingWord:')) {
                     return $matches[0];
                 }
                 $resolved = $this->resolvePathWithFilters($path, $context, '');
@@ -1647,6 +1652,41 @@ class WorkflowManager {
         return $value;
     }
     
+    /**
+     * A step's starting words: {{startingWord:<key>}} in any of its resolved parameters is the word <key> of
+     * QuickSite's word files (<secure>/src/translations/<lang>.json, read by qs_starting_word(): the language's own
+     * file, its base language's, else English), its {{name}} markers left as written. The word is in the step's
+     * language: its own `language` parameter as the other placeholders resolved it (a loop's {{$value}}, a fetched
+     * {{langData.default_language}}), `default` or no such parameter meaning the project's default language. So a
+     * step writing a site's words writes them in the language it writes to. A key no word file holds stays as
+     * written, where the result shows it.
+     */
+    private function resolveStartingWords(array $params): array {
+        if (strpos((string) json_encode($params, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE), '{{startingWord:') === false) {
+            return $params;
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php';
+        $language = is_string($params['language'] ?? null) ? trim($params['language']) : '';
+        if ($language === '' || $language === 'default') {
+            $language = qs_project_default_language();
+        }
+        $fill = function (array $values) use (&$fill, $language): array {
+            foreach ($values as $name => $value) {
+                if (is_array($value)) {
+                    $values[$name] = $fill($value);
+                } elseif (is_string($value) && strpos($value, '{{startingWord:') !== false) {
+                    $values[$name] = preg_replace_callback(
+                        '/\{\{\s*startingWord:([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)\s*\}\}/',
+                        static fn(array $m): string => qs_starting_word($language, $m[1]) ?? $m[0],
+                        $value
+                    );
+                }
+            }
+            return $values;
+        };
+        return $fill($params);
+    }
+
     /**
      * Resolve a path with optional filters (e.g., {{$value | uppercase}})
      * 

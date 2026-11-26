@@ -10,42 +10,20 @@
  *   { default: [token,...], hosts: [{name, parameters:[token,...]}, ...],
  *     valid_permissions: [...], never_allowed: [...] }
  *
- * Strings come from window.QS_EMBED_SECURITY_I18N (the `embedSecurity` sub-tree),
- * emitted by embed-security.php under the same dot paths PHP uses; read through
- * t(), never directly. DOM is built with QSDom (createElement + textContent).
+ * Its words: embed-security.php hands the ones it draws (embedSecurity.errors, .blockEverything,
+ * .noRules), each read by its key's whole path through QSPanelWords. DOM is built with QSDom
+ * (createElement + textContent).
  */
 
 (function() {
     'use strict';
-
-    /**
-     * Resolve one admin string by its FULL dot path; a path that resolves to
-     * nothing returns THE PATH ITSELF, so a string no word file holds is visible
-     * on screen rather than hidden behind an English fallback here (a word a
-     * language lacks arrives in English, laid under it by the server).
-     */
-    function t(path, params) {
-        let node = window.QS_EMBED_SECURITY_I18N || {};
-        for (const part of String(path).split('.')) {
-            if (node === null || typeof node !== 'object' || !(part in node)) return path;
-            node = node[part];
-        }
-        if (typeof node !== 'string') return path;
-        let value = node;
-        if (params) {
-            for (const name of Object.keys(params)) {
-                value = value.split(':' + name).join(String(params[name]));
-            }
-        }
-        return value;
-    }
 
     // ── API ──────────────────────────────────────────────────
 
     async function loadConfig() {
         const res = await QuickSiteAdmin.apiRequest('getIframeSandbox', 'GET');
         if (!res.ok) {
-            showError(document.getElementById('rules-container'), res.data?.error || t('embedSecurity.errors.loadFailed'));
+            showError(document.getElementById('rules-container'), res.data?.error || QSPanelWords.t('embedSecurity.errors.loadFailed'));
             return null;
         }
         return res.data?.data || res.data;
@@ -63,7 +41,7 @@
             });
         } else {
             box.appendChild(QSDom.el('span', {
-                text: t('embedSecurity.blockEverything')
+                text: QSPanelWords.t('embedSecurity.blockEverything')
             }));
         }
         return box;
@@ -100,7 +78,7 @@
 
         if (hosts.length === 0) {
             container.appendChild(QSDom.el('p', {
-                text: t('embedSecurity.noRules')
+                text: QSPanelWords.t('embedSecurity.noRules')
             }));
             return;
         }

@@ -8,6 +8,8 @@
  *  - Applying selected edits and saving via editStyles / setRootVariables
  *
  * Depends on: window.CSSRefiner (css-parser.js, utils.js, analyzers/*.js, ui/diff-view.js)
+ *
+ * Its words: the optimize.cssRefiner section optimize.php hands, each read by its key's whole path through QSPanelWords.
  */
 
 (function () {
@@ -21,36 +23,9 @@
     // Analyzers that carry a review-only warning (not auto-applied)
     const REVIEW_ONLY = new Set(['near-duplicates', 'fuzzy-values']);
 
-    /**
-     * Resolve one admin string by its FULL dot path, from the sub-trees
-     * optimize.php emits. A path that resolves to nothing returns THE PATH
-     * ITSELF, so an unset string shows on screen instead of English.
-     *
-     * @param {string} path      e.g. 'optimize.cssRefiner.selectAll'
-     * @param {Object} [params]  :name markers, as PHP's t() does
-     * @returns {string}
-     */
-    function t(path, params) {
-        let node = window.QS_OPTIMIZE_I18N || {};
-        for (const part of String(path).split('.')) {
-            if (node === null || typeof node !== 'object' || !(part in node)) return path;
-            node = node[part];
-        }
-        if (typeof node !== 'string') return path;
-        let value = node;
-        if (params) {
-            for (const name of Object.keys(params)) {
-                value = value.split(':' + name).join(String(params[name]));
-            }
-        }
-        return value;
-    }
-
-    /** Human-readable label for an analyzer id. */
+    /** An analyzer's name in words: optimize.cssRefiner.analyzers.<id>, for each of the seven analyze() runs. */
     function analyzerLabel(analyzerId) {
-        const key = 'optimize.cssRefiner.analyzers.' + analyzerId;
-        const label = t(key);
-        return label === key ? analyzerId : label;
+        return QSPanelWords.t('optimize.cssRefiner.analyzers.' + analyzerId);
     }
 
     // ── State ────────────────────────────────────────────────────────────────
@@ -113,28 +88,28 @@
 
     async function loadStyles() {
         const res = await QuickSiteAPI.request('getStyles', 'GET');
-        if (!res.ok) throw new Error(t('optimize.cssRefiner.errGetStyles', { error: res.data?.error || res.status }));
+        if (!res.ok) throw new Error(QSPanelWords.t('optimize.cssRefiner.errGetStyles', { error: res.data?.error || res.status }));
         const content = res.data?.data?.content;
-        if (!content && content !== '') throw new Error(t('optimize.cssRefiner.errGetStylesEmpty'));
+        if (!content && content !== '') throw new Error(QSPanelWords.t('optimize.cssRefiner.errGetStylesEmpty'));
         return content;
     }
 
     async function saveStyles(css) {
         const res = await QuickSiteAPI.request('editStyles', 'POST', { content: css });
-        if (!res.ok) throw new Error(t('optimize.cssRefiner.errEditStyles', { error: res.data?.error || res.status }));
+        if (!res.ok) throw new Error(QSPanelWords.t('optimize.cssRefiner.errEditStyles', { error: res.data?.error || res.status }));
         return res.data;
     }
 
     async function saveRootVariable(name, value) {
         const res = await QuickSiteAPI.request('setRootVariables', 'POST', { variables: { [name]: value } });
-        if (!res.ok) throw new Error(t('optimize.cssRefiner.errSetRootVariables', { name: name, error: res.data?.error || res.status }));
+        if (!res.ok) throw new Error(QSPanelWords.t('optimize.cssRefiner.errSetRootVariables', { name: name, error: res.data?.error || res.status }));
         return res.data;
     }
 
     // ── Analysis ──────────────────────────────────────────────────────────────
 
     async function runFullAnalysis() {
-        setStatus('loading', t('optimize.cssRefiner.statusAnalyzing'));
+        setStatus('loading', QSPanelWords.t('optimize.cssRefiner.statusAnalyzing'));
         _btnAnalyze.disabled = true;
         _btnAutoRefine.disabled = true;
 
@@ -143,11 +118,10 @@
             _workingCss = _rawCss;
             _results = analyze(_workingCss, null);
             renderResults(_results);
-            setStatus('ok', t('optimize.cssRefiner.statusSuggestions',
-                { count: totalSuggestions(_results) }));
+            setStatus('ok', QSPanelWords.count('optimize.cssRefiner.statusSuggestions', totalSuggestions(_results)));
             _btnReset.style.display = '';
         } catch (err) {
-            setStatus('error', t('optimize.cssRefiner.statusAnalysisFailed',
+            setStatus('error', QSPanelWords.t('optimize.cssRefiner.statusAnalysisFailed',
                 { message: err.message }));
             console.error('[Optimize]', err);
         } finally {
@@ -190,7 +164,7 @@
     // ── Auto-Refine Safe ──────────────────────────────────────────────────────
 
     async function runAutoRefine() {
-        setStatus('loading', t('optimize.cssRefiner.statusPreparing'));
+        setStatus('loading', QSPanelWords.t('optimize.cssRefiner.statusPreparing'));
         _btnAnalyze.disabled = true;
         _btnAutoRefine.disabled = true;
 
@@ -200,14 +174,14 @@
             const safeResults = analyze(_workingCss, SAFE_ANALYZERS);
 
             if (totalSuggestions(safeResults) === 0) {
-                setStatus('ok', t('optimize.cssRefiner.statusNoSafeChanges'));
+                setStatus('ok', QSPanelWords.t('optimize.cssRefiner.statusNoSafeChanges'));
                 return;
             }
 
             _autoRefinePending = safeResults;
             showAutoRefineModal(safeResults);
         } catch (err) {
-            setStatus('error', t('optimize.cssRefiner.statusFailed', { message: err.message }));
+            setStatus('error', QSPanelWords.t('optimize.cssRefiner.statusFailed', { message: err.message }));
         } finally {
             _btnAnalyze.disabled = false;
             _btnAutoRefine.disabled = false;
@@ -219,7 +193,7 @@
         const pendingResults = _autoRefinePending;
         _modal.style.display = 'none';
         _autoRefinePending = null;
-        setStatus('loading', t('optimize.cssRefiner.statusApplying'));
+        setStatus('loading', QSPanelWords.t('optimize.cssRefiner.statusApplying'));
 
         try {
             const applicableSuggestions = pendingResults
@@ -228,11 +202,9 @@
             const { edits: allEdits, dropped } = collectNonOverlappingEdits(applicableSuggestions);
 
             if (!allEdits.length) {
-                setStatus('ok', t('optimize.cssRefiner.statusNoNonOverlapping'));
+                setStatus('ok', QSPanelWords.t('optimize.cssRefiner.statusNoNonOverlapping'));
                 if (dropped > 0) {
-                    showToast(t(dropped !== 1
-                        ? 'optimize.cssRefiner.toastSkippedMany'
-                        : 'optimize.cssRefiner.toastSkippedOne', { count: dropped }), 'warning');
+                    showToast(QSPanelWords.count('optimize.cssRefiner.toastSkipped', dropped), 'warning');
                 }
                 return;
             }
@@ -246,18 +218,14 @@
             _results = analyze(_workingCss, null);
             renderResults(_results);
             const remaining = totalSuggestions(_results);
-            setStatus('ok', t(remaining !== 1
-                ? 'optimize.cssRefiner.statusAppliedMany'
-                : 'optimize.cssRefiner.statusAppliedOne', { count: remaining }));
+            setStatus('ok', QSPanelWords.count('optimize.cssRefiner.statusApplied', remaining));
             if (dropped > 0) {
-                showToast(t(dropped !== 1
-                        ? 'optimize.cssRefiner.toastSkippedSafeMany'
-                        : 'optimize.cssRefiner.toastSkippedSafeOne', { count: dropped }), 'warning');
+                showToast(QSPanelWords.count('optimize.cssRefiner.toastSkippedSafe', dropped), 'warning');
             }
-            showToast(t('optimize.cssRefiner.toastAutoApplied'), 'success');
+            showToast(QSPanelWords.t('optimize.cssRefiner.toastAutoApplied'), 'success');
         } catch (err) {
-            setStatus('error', t('optimize.cssRefiner.statusApplyFailed', { message: err.message }));
-            showToast(t('optimize.cssRefiner.toastApplyFailed', { message: err.message }), 'error');
+            setStatus('error', QSPanelWords.t('optimize.cssRefiner.statusApplyFailed', { message: err.message }));
+            showToast(QSPanelWords.t('optimize.cssRefiner.toastApplyFailed', { message: err.message }), 'error');
         }
     }
 
@@ -270,7 +238,7 @@
         const tokenSuggestions = checked.filter(s => s._analyzerId === 'design-tokens');
         const editSuggestions = checked.filter(s => Array.isArray(s.edits) && s.edits.length > 0);
 
-        setStatus('loading', t('optimize.cssRefiner.statusApplying'));
+        setStatus('loading', QSPanelWords.t('optimize.cssRefiner.statusApplying'));
         _btnApplySelected.disabled = true;
 
         try {
@@ -278,7 +246,7 @@
             if (editSuggestions.length) {
                 const { edits: allEdits, dropped } = collectNonOverlappingEdits(editSuggestions);
                 if (!allEdits.length && dropped > 0) {
-                    throw new Error(t('optimize.cssRefiner.statusAllConflicted'));
+                    throw new Error(QSPanelWords.t('optimize.cssRefiner.statusAllConflicted'));
                 }
 
                 const newCss = CSSRefiner.Utils.applyEdits(_workingCss, allEdits);
@@ -287,9 +255,7 @@
                 _rawCss = _workingCss;
 
                 if (dropped > 0) {
-                    showToast(t(dropped !== 1
-                        ? 'optimize.cssRefiner.toastSkippedMany'
-                        : 'optimize.cssRefiner.toastSkippedOne', { count: dropped }), 'warning');
+                    showToast(QSPanelWords.count('optimize.cssRefiner.toastSkipped', dropped), 'warning');
                 }
             }
 
@@ -313,13 +279,11 @@
             _results = analyze(_workingCss, null);
             renderResults(_results);
             const remaining = totalSuggestions(_results);
-            setStatus('ok', t(remaining !== 1
-                ? 'optimize.cssRefiner.statusAppliedMany'
-                : 'optimize.cssRefiner.statusAppliedOne', { count: remaining }));
-            showToast(t('optimize.cssRefiner.toastApplied'), 'success');
+            setStatus('ok', QSPanelWords.count('optimize.cssRefiner.statusApplied', remaining));
+            showToast(QSPanelWords.t('optimize.cssRefiner.toastApplied'), 'success');
         } catch (err) {
-            setStatus('error', t('optimize.cssRefiner.statusApplyFailed', { message: err.message }));
-            showToast(t('optimize.cssRefiner.toastApplyFailed', { message: err.message }), 'error');
+            setStatus('error', QSPanelWords.t('optimize.cssRefiner.statusApplyFailed', { message: err.message }));
+            showToast(QSPanelWords.t('optimize.cssRefiner.toastApplyFailed', { message: err.message }), 'error');
         } finally {
             _btnApplySelected.disabled = false;
         }
@@ -348,7 +312,7 @@
         const hasAny = results.some(r => r.suggestions.length > 0);
         if (!hasAny) {
             _emptyEl.style.display = '';
-            _emptyEl.querySelector('p').textContent = t('optimize.cssRefiner.noIssues');
+            _emptyEl.querySelector('p').textContent = QSPanelWords.t('optimize.cssRefiner.noIssues');
             _resultsEl.style.display = 'none';
             hideApplyBar();
             return;
@@ -390,7 +354,7 @@
             }),
             isReviewOnly ? QSDom.el('span', {
                 class: 'optimize-analyzer-badge optimize-analyzer-badge--warn',
-                text: t('optimize.cssRefiner.reviewBadge')
+                text: QSPanelWords.t('optimize.cssRefiner.reviewBadge')
             }) : null
         ]));
         header.appendChild(QSDom.el('div', { class: 'optimize-analyzer-actions' }, [
@@ -398,13 +362,13 @@
                 type: 'button',
                 class: 'admin-btn admin-btn--ghost optimize-btn-select-all',
                 'data-analyzer': analyzerId,
-                text: t('optimize.cssRefiner.selectAll')
+                text: QSPanelWords.t('optimize.cssRefiner.selectAll')
             }),
             QSDom.el('button', {
                 type: 'button',
                 class: 'admin-btn admin-btn--ghost optimize-btn-skip-all',
                 'data-analyzer': analyzerId,
-                text: t('optimize.cssRefiner.skipAll')
+                text: QSPanelWords.t('optimize.cssRefiner.skipAll')
             })
         ]));
 
@@ -457,7 +421,7 @@
         item.appendChild(QSDom.el('button', {
             type: 'button',
             class: 'admin-btn admin-btn--ghost optimize-btn-diff',
-            text: t('optimize.cssRefiner.diff')
+            text: QSPanelWords.t('optimize.cssRefiner.diff')
         }));
         item.appendChild(QSDom.el('div', {
             class: 'admin-table-wrapper optimize-suggestion__diff', tabindex: '0', style: 'display:none'
@@ -485,18 +449,18 @@
                 const value = nameInput?.dataset?.rawValue;
                 if (!name || !value) return;
                 writeBtn.disabled = true;
-                writeBtn.textContent = t('optimize.cssRefiner.writing');
+                writeBtn.textContent = QSPanelWords.t('optimize.cssRefiner.writing');
                 try {
                     await saveRootVariable(name, value);
                     _workingCss = await loadStyles();
                     _rawCss = _workingCss;
-                    writeBtn.textContent = t('optimize.cssRefiner.written');
+                    writeBtn.textContent = QSPanelWords.t('optimize.cssRefiner.written');
                     writeBtn.classList.add('admin-btn--success');
-                    showToast(t('optimize.cssRefiner.tokenWritten', { name: name }), 'success');
+                    showToast(QSPanelWords.t('optimize.cssRefiner.tokenWritten', { name: name }), 'success');
                 } catch (err) {
                     writeBtn.disabled = false;
-                    writeBtn.textContent = t('optimize.cssRefiner.writeToRoot');
-                    showToast(t('optimize.cssRefiner.writeFailed', { message: err.message }), 'error');
+                    writeBtn.textContent = QSPanelWords.t('optimize.cssRefiner.writeToRoot');
+                    showToast(QSPanelWords.t('optimize.cssRefiner.writeFailed', { message: err.message }), 'error');
                 }
             });
         }
@@ -524,13 +488,13 @@
                 type: 'text',
                 class: 'admin-input optimize-design-token-name',
                 value: varName,
-                placeholder: t('optimize.cssRefiner.tokenNamePlaceholder'),
+                placeholder: QSPanelWords.t('optimize.cssRefiner.tokenNamePlaceholder'),
                 dataset: { rawValue: rawValue }
             }),
             QSDom.el('button', {
                 type: 'button',
                 class: 'admin-btn optimize-btn-write-token',
-                text: t('optimize.cssRefiner.writeToRoot')
+                text: QSPanelWords.t('optimize.cssRefiner.writeToRoot')
             })
         ]);
     }
@@ -540,11 +504,9 @@
     function updateApplyBar() {
         const count = $$('.optimize-suggestion__check:checked', _resultsEl).length;
         if (count > 0) {
-            _selectedCountEl.textContent = t(count !== 1
-                ? 'optimize.cssRefiner.selectedMany'
-                : 'optimize.cssRefiner.selectedOne', { count: count });
+            _selectedCountEl.textContent = QSPanelWords.count('optimize.cssRefiner.selected', count);
             _applyBar.style.display = '';
-            _btnApplySelected.textContent = t('optimize.cssRefiner.applySelectedCount', { count: count });
+            _btnApplySelected.textContent = QSPanelWords.t('optimize.cssRefiner.applySelectedCount', { count: count });
         } else {
             hideApplyBar();
         }
@@ -563,14 +525,13 @@
             if (!suggestions.length) return;
             const row = QSDom.el('div', { class: 'optimize-modal-row' }, [
                 QSDom.el('strong', { text: String(suggestions.length) }),
-                ' ' + t('optimize.cssRefiner.modalRow', { label: analyzerLabel(analyzerId) })
+                // The count in bold, then what it counts: a phrase chosen by the count (.one / .other).
+                ' ' + QSPanelWords.count('optimize.cssRefiner.modalRow', suggestions.length, { label: analyzerLabel(analyzerId) })
             ]);
             _modalBody.appendChild(row);
             total += suggestions.length;
         });
-        _modalConfirm.textContent = t(total !== 1
-            ? 'optimize.cssRefiner.applyTotalMany'
-            : 'optimize.cssRefiner.applyTotalOne', { count: total });
+        _modalConfirm.textContent = QSPanelWords.count('optimize.cssRefiner.applyTotal', total);
         _modal.style.display = '';
         setStatus('', '');
     }
@@ -631,7 +592,7 @@
         QSDom.clear(_resultsEl);
         _resultsEl.style.display = 'none';
         _emptyEl.style.display = '';
-        _emptyEl.querySelector('p').textContent = t('optimize.cssRefiner.emptyState');
+        _emptyEl.querySelector('p').textContent = QSPanelWords.t('optimize.cssRefiner.emptyState');
         _btnReset.style.display = 'none';
         hideApplyBar();
         setStatus('', '');
@@ -643,12 +604,9 @@
         _statusEl.className = 'optimize-toolbar__status' + (type ? ' optimize-toolbar__status--' + type : '');
     }
 
+    /** A toast, the panel's own (QuickSiteAdmin.showToast). */
     function showToast(msg, type = 'success') {
-        if (window.AdminToast?.show) {
-            window.AdminToast.show(msg, type);
-        } else if (window.showAdminToast) {
-            window.showAdminToast(msg, type);
-        }
+        QuickSiteAdmin.showToast(msg, type);
     }
 
     // ── Boot ──────────────────────────────────────────────────────────────────

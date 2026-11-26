@@ -58,36 +58,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              takes its own 1025 pixel width and pushes the form below the fold. The CSS
              rule still wins when it loads, so nothing changes on a healthy install. -->
         <img class="admin-login__mark" src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="" width="69" height="64">
-        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= __admin('common.appName') ?>" width="140" height="44">
-        <h1 class="admin-login__title"><?= __admin('register.title') ?></h1>
-        <p class="admin-login__subtitle"><?= __admin('register.subtitle') ?></p>
+        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= adminAttr(__admin('common.appName')) ?>" width="140" height="44">
+        <h1 class="admin-login__title"><?= adminEscape(__admin('register.title')) ?></h1>
+        <p class="admin-login__subtitle"><?= adminEscape(__admin('register.subtitle')) ?></p>
     </div>
 
     <div class="admin-card">
         <div class="admin-card__body">
             <?php if ($registerError === 'csrf'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('login.csrfFailed')) ?></div>
             <?php elseif ($registerError === 'throttled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.throttled', ['duration' => __adminDuration($registerRetryAfter)]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('register.throttled', ['duration' => __adminDuration($registerRetryAfter)])) ?></div>
             <?php elseif ($registerError === 'password_too_short'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.passwordTooShort', ['min' => $registerMinLength]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('register.passwordTooShort', ['min' => $registerMinLength])) ?></div>
             <?php elseif ($registerError === 'password_mismatch'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.passwordMismatch') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('register.passwordMismatch')) ?></div>
             <?php elseif ($registerError === 'registration_closed'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.closed') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('register.closed')) ?></div>
             <?php elseif ($registerError === 'registration_disabled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.disabled') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('register.disabled')) ?></div>
             <?php elseif ($registerError === 'missing_fields'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.missingFields') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('register.missingFields')) ?></div>
             <?php elseif ($registerError !== null): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.serverError') ?></div>
+            <div class="admin-alert admin-alert--error"><?= adminEscape(__admin('register.serverError')) ?></div>
             <?php endif; ?>
 
             <form id="admin-register-form" method="POST" action="">
                 <input type="hidden" name="form_token" value="<?= adminAttr($router->formToken()) ?>">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="name">
-                        <?= __admin('register.nameLabel') ?>
+                        <?= adminEscape(__admin('register.nameLabel')) ?>
                     </label>
                     <input
                         type="text"
@@ -100,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         autocomplete="name"
                         required
                     >
-                    <p class="admin-hint"><?= __admin('register.nameHint') ?></p>
+                    <p class="admin-hint"><?= adminEscape(__admin('register.nameHint')) ?></p>
                 </div>
 
                 <?php /* The password twice: typed once, a slip would only surface at the
@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($passwordFields as $field): ?>
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="<?= $field['id'] ?>">
-                        <?= $field['label'] ?>
+                        <?= adminEscape($field['label']) ?>
                     </label>
                     <div style="position: relative;">
                         <input
@@ -145,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </button>
                     </div>
                     <?php if ($field['hint'] !== null): ?>
-                    <p class="admin-hint"><?= $field['hint'] ?></p>
+                    <p class="admin-hint"><?= adminEscape($field['hint']) ?></p>
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
@@ -154,30 +154,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          username is not asked for here, and the next page is where it is
                          shown. */ ?>
                 <div class="admin-alert admin-alert--warning">
-                    <strong><?= __admin('register.usernameNotice.title') ?></strong>
-                    <p><?= __admin('register.usernameNotice.body', ['hours' => intdiv(QS_REGISTER_FLASH_TTL, 3600)]) ?></p>
+                    <strong><?= adminEscape(__admin('register.usernameNotice.title')) ?></strong>
+                    <p><?= adminEscape(__admin('register.usernameNotice.body', ['hours' => intdiv(QS_REGISTER_FLASH_TTL, 3600)])) ?></p>
                 </div>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">
-                    <?= __admin('register.submit') ?>
+                    <?= adminEscape(__admin('register.submit')) ?>
                 </button>
 
                 <p class="admin-hint" style="margin-top: var(--space-md); text-align: center;">
-                    <a href="<?= adminAttr($router->url('login')) ?>"><?= __admin('register.backToLogin') ?></a>
+                    <a href="<?= adminAttr($router->url('login')) ?>"><?= adminEscape(__admin('register.backToLogin')) ?></a>
                 </p>
             </form>
         </div>
     </div>
 </div>
 
+<?= __adminWords(['login.showPassword', 'login.hidePassword']) ?>
 <script>
 // Password visibility toggles — same behaviour as the login page, one per field:
 // each button names the input it reveals.
 (function () {
-    var labels = {
-        show: <?= json_encode(__admin('login.showPassword')) ?>,
-        hide: <?= json_encode(__admin('login.hidePassword')) ?>
-    };
     document.querySelectorAll('[data-password-toggle]').forEach(function (btn) {
         var input = document.getElementById(btn.getAttribute('data-password-toggle'));
         var eye = btn.querySelector('[data-eye="show"]');
@@ -185,11 +182,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!input || !eye || !eyeOff) return;
         btn.addEventListener('click', function () {
             var reveal = input.type === 'password';
+            var label = QSPanelWords.t(reveal ? 'login.hidePassword' : 'login.showPassword');
             input.type = reveal ? 'text' : 'password';
             eye.style.display = reveal ? 'none' : '';
             eyeOff.style.display = reveal ? '' : 'none';
-            btn.setAttribute('aria-label', reveal ? labels.hide : labels.show);
-            btn.setAttribute('title', reveal ? labels.hide : labels.show);
+            btn.setAttribute('aria-label', label);
+            btn.setAttribute('title', label);
             input.focus();
         });
     });

@@ -4,9 +4,8 @@
  * Handles loading and displaying system info, config, routes, languages,
  * preferences, permissions, and AI configuration status.
  *
- * Strings come from window.QS_SETTINGS_I18N, emitted by settings.php: the
- * `settings` and `common` translation sub-trees under the same dot paths PHP
- * uses. Read it through t() below, never directly.
+ * Its words are the ones settings.php hands (QSPanelWords), each read by its
+ * key's whole path.
  *
  * DOM is built with createElement + textContent through QSDom and named
  * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
@@ -17,36 +16,7 @@
 
     // Get config from PHP
     const config = window.QUICKSITE_CONFIG || {};
-    const commandUrl = config.commandUrl || '';
     const aiSettingsUrl = config.aiSettingsUrl || '';
-
-    /**
-     * Resolve one admin string by its FULL dot path.
-     *
-     * A path that resolves to nothing returns THE PATH ITSELF, so a string
-     * no word file holds is visible on screen and findable by a scan instead
-     * of being hidden behind an English fallback here (a word a language
-     * lacks arrives in English, laid under it by the server).
-     *
-     * @param {string} path       e.g. 'settings.ai.configured'
-     * @param {Object} [params]   :name markers to substitute, as PHP's t() does
-     * @returns {string}
-     */
-    function t(path, params) {
-        let node = window.QS_SETTINGS_I18N || {};
-        for (const part of String(path).split('.')) {
-            if (node === null || typeof node !== 'object' || !(part in node)) return path;
-            node = node[part];
-        }
-        if (typeof node !== 'string') return path;
-        let value = node;
-        if (params) {
-            for (const name of Object.keys(params)) {
-                value = value.split(':' + name).join(String(params[name]));
-            }
-        }
-        return value;
-    }
 
     // AI Storage Keys
     const AI_STORAGE_KEYS = {
@@ -99,7 +69,7 @@
         return QSDom.el('details', { style: 'margin-top: var(--space-md);' }, [
             QSDom.el('summary', {
                 style: 'cursor: pointer;',
-                text: t('settings.permissions.viewAccessible')
+                text: QSPanelWords.t('settings.permissions.viewAccessible')
             }),
             QSDom.el('div', {
                 style: 'margin-top: var(--space-sm); max-height: 200px; overflow-y: auto;'
@@ -117,7 +87,7 @@
 
     function showError(container, error) {
         _replace(container, QSDom.el('p', {
-            text: t('settings.errors.generic', { message: error.message })
+            text: QSPanelWords.t('common.errorDetail', { message: error.message })
         }));
     }
     function showMuted(container, text) {
@@ -160,22 +130,20 @@
                 const defaultName = providers[defaultProvider]?.name || defaultProvider;
                 
                 _replace(container, _renderDefinitionList([
-                    [t('settings.ai.status'), _renderBadge(t('settings.ai.configured'), 'success')],
-                    [t('settings.ai.providers'), t(providerCount > 1
-                        ? 'settings.ai.providersCount'
-                        : 'settings.ai.providersCountOne', { count: providerCount })],
-                    [t('settings.ai.defaultProvider'), defaultName],
-                    [t('settings.ai.storage'), persist
-                        ? t('settings.ai.storagePersistent')
-                        : t('settings.ai.storageSession')]
+                    [QSPanelWords.t('settings.ai.status'), _renderBadge(QSPanelWords.t('settings.ai.configured'), 'success')],
+                    [QSPanelWords.t('settings.ai.providers'), QSPanelWords.count('settings.ai.providersConfiguredCount', providerCount)],
+                    [QSPanelWords.t('settings.ai.defaultProvider'), defaultName],
+                    [QSPanelWords.t('settings.ai.storage'), QSPanelWords.t(persist
+                        ? 'settings.ai.storagePersistent'
+                        : 'settings.ai.storageSession')]
                 ]));
             } catch (e) {
-                showMuted(container, t('settings.ai.noneConfigured'));
+                showMuted(container, QSPanelWords.t('settings.ai.noneConfigured'));
             }
         } else {
             QSDom.clear(container);
             container.appendChild(QSDom.el('p', {
-                text: t('settings.ai.noneConfigured')
+                text: QSPanelWords.t('settings.ai.noneConfigured')
             }));
             container.appendChild(QSDom.el('a', {
                 href: aiSettingsUrl,
@@ -183,7 +151,7 @@
                 style: 'margin-top: var(--space-sm);'
             }, [
                 QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 16),
-                ' ' + t('settings.ai.addApiKey')
+                ' ' + QSPanelWords.t('settings.ai.addApiKey')
             ]));
         }
     }
@@ -194,7 +162,7 @@
     window.updateAiAutomation = function(setting, value) {
         if (setting !== 'autoExecute') return;
         localStorage.setItem(AI_STORAGE_KEYS.autoExecute, value);
-        QuickSiteAdmin.showToast(t(value
+        QuickSiteAdmin.showToast(QSPanelWords.t(value
             ? 'settings.ai.runWithoutStoppingOn'
             : 'settings.ai.runWithoutStoppingOff'), 'success');
     };
@@ -232,23 +200,23 @@
                     'editor': 'settings.permissions.role.editor',
                     'viewer': 'settings.permissions.role.viewer'
                 };
+                // A role the table does not name is a custom role.
+                const accessKey = ROLE_KEYS[role] || 'settings.permissions.customRole';
 
                 QSDom.clear(container);
                 container.appendChild(_renderDefinitionList([
-                    [t('settings.permissions.yourRole'), _renderBadge(
-                        isSuperAdmin ? t('settings.permissions.superadmin') : role, badgeClass)],
-                    [t('settings.permissions.accessLevel'), ROLE_KEYS[role]
-                        ? t(ROLE_KEYS[role])
-                        : t('settings.permissions.customRole')],
-                    [t('settings.permissions.availableCommands'), isSuperAdmin
-                        ? t('settings.permissions.allCommands', { count: commandCount })
-                        : t('settings.permissions.commandCount', { count: commandCount })]
+                    [QSPanelWords.t('settings.permissions.yourRole'), _renderBadge(
+                        isSuperAdmin ? QSPanelWords.t('settings.permissions.superadmin') : QuickSiteUtils.roleName(role), badgeClass)],
+                    [QSPanelWords.t('settings.permissions.accessLevel'), QSPanelWords.t(accessKey)],
+                    [QSPanelWords.t('settings.permissions.availableCommands'), QSPanelWords.count(isSuperAdmin
+                        ? 'settings.permissions.allCommandsCount'
+                        : 'settings.permissions.commandsCount', commandCount)]
                 ]));
                 if (!isSuperAdmin) {
                     container.appendChild(_renderCommandList(data.commands || []));
                 }
             } else {
-                showMuted(container, t('settings.errors.permissionsFailed'));
+                showMuted(container, QSPanelWords.t('settings.errors.permissionsFailed'));
             }
         } catch (error) {
             showError(container, error);
@@ -267,15 +235,17 @@
             
             if (result.ok && result.data.data) {
                 const info = result.data.data;
-                const version = config.quicksiteVersion || 'unknown';
+                const version = typeof config.quicksiteVersion === 'string'
+                    ? config.quicksiteVersion
+                    : QSPanelWords.t('settings.sysInfo.versionUnknown');
                 const totalCommands = info.total || Object.keys(info.commands || {}).length || 0;
 
                 _replace(container, _renderDefinitionList([
-                    [t('settings.sysInfo.version'), QSDom.el('code', { text: version })],
-                    [t('settings.sysInfo.totalCommands'), String(totalCommands)]
+                    [QSPanelWords.t('settings.sysInfo.version'), QSDom.el('code', { text: version })],
+                    [QSPanelWords.t('settings.sysInfo.totalCommands'), String(totalCommands)]
                 ]));
             } else {
-                showMuted(container, t('settings.errors.sysInfoFailed'));
+                showMuted(container, QSPanelWords.t('settings.errors.sysInfoFailed'));
             }
         } catch (error) {
             showError(container, error);
@@ -311,7 +281,7 @@
         QuickSiteUtils.setPref('toastDuration',
             document.getElementById('pref-toast-duration')?.value || '4000');
 
-        QuickSiteAdmin.showToast(t('settings.toast.preferencesSaved'), 'success');
+        QuickSiteAdmin.showToast(QSPanelWords.t('settings.toast.preferencesSaved'), 'success');
     };
     
     // Initialize on DOM ready

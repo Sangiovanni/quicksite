@@ -101,7 +101,6 @@
                             valueB:    entryB.decl.value,
                             selectorB: entryB.rule.selectorText || '@-rule'
                         }),
-                        meta:           t('tools.fuzzyValues.diff', { diff: diff + unit }),
                         enabled:        true,
                         edits:          edits,
                         suggestedValue: suggestedStr,

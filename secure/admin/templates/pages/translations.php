@@ -20,67 +20,36 @@
  * table scrolls in .admin-table-wrapper at every width, and everything else wraps.
  */
 
-$__trProject = (string) ($router->getCurrentProject() ?: '');
-
-$__trWords = [];
-foreach (['loadFailed', 'loadFailedNone', 'retry', 'noProject',
-          'languageDefault', 'languageWords', 'languageUnset', 'languageSame', 'languageFile', 'languageEditing',
-          'makeDefault', 'removeLanguage', 'removeLanguageNamed', 'addLanguageButton', 'addLanguageNone',
-          'addLanguageTitle', 'addLanguageCopy', 'addLanguageEmpty', 'addLanguageSwitch', 'addLanguageAddresses',
-          'addLanguageDone', 'removeLanguageTitle', 'removeLanguageText', 'removeLanguageDone',
-          'removeLanguageToOne', 'removeLanguageLinks', 'removeLanguageLinksNone', 'removeLanguageLinksUnread',
-          'makeDefaultTitle', 'makeDefaultText', 'makeDefaultDone',
-          'makeDefaultOneTitle', 'makeDefaultOneText', 'makeDefaultOneDone', 'languageFailed',
-          'scopeAll', 'groupPages', 'groupLayout', 'groupComponents', 'groupSite',
-          'count',
-          'columnKey', 'columnActions', 'gapUnset', 'gapAbsent', 'unusedMark', 'unusedMarkHint', 'sameMark',
-          'editIn', 'saved', 'saveFailed', 'emptyWordHint',
-          'keyInvalid', 'wordRequired', 'keyExists', 'keyClash', 'unread', 'created', 'createFailed',
-          'deleteKey', 'deleteTitle', 'deleteOne', 'deleteAll', 'deleteText', 'deleted', 'deleteFailed',
-          'noKeys', 'noMatches'] as $__trKey) {
-    $__trWords[$__trKey] = __admin('translations.' . $__trKey);
-}
-foreach (['consent', 'media', 'api', 'link-previews', 'storage', 'privacy'] as $__trSource) {
-    $__trWords['source.' . $__trSource] = __admin('translations.source.' . $__trSource);
-}
-foreach (['save', 'cancel', 'loading', 'edit', 'delete'] as $__trKey) {
-    $__trWords['common.' . $__trKey] = __admin('common.' . $__trKey);
-}
+// The page's words, translations.js reading each by its key's whole path; `common` comes with every page.
 ?>
-
-<script>
-window.QS_TRANSLATIONS_CONFIG = <?= json_encode([
-    'project' => $__trProject,
-], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES) ?>;
-window.QS_TRANSLATIONS_I18N = <?= json_encode($__trWords, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-</script>
+<?= __adminWords(['translations']) ?>
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/>
         </svg>
-        <?= __admin('translations.title') ?>
+        <?= adminEscape(__admin('translations.title')) ?>
     </h1>
-    <p class="admin-page-header__subtitle"><?= __admin('translations.subtitle') ?></p>
+    <p class="admin-page-header__subtitle"><?= adminEscape(__admin('translations.subtitle')) ?></p>
 </div>
 
-<p class="admin-alert admin-alert--info" id="translations-readonly" hidden><?= __admin('translations.readOnly') ?></p>
+<p class="admin-alert admin-alert--info" id="translations-readonly" hidden><?= adminEscape(__admin('translations.readOnly')) ?></p>
 <p class="admin-alert admin-alert--warning translations-notice" id="translations-notice" role="status" hidden></p>
 
 <section class="admin-card translations-languages" aria-labelledby="translations-languages-title">
     <div class="admin-card__header">
-        <h2 class="admin-card__title" id="translations-languages-title"><?= __admin('translations.languagesTitle') ?></h2>
+        <h2 class="admin-card__title" id="translations-languages-title"><?= adminEscape(__admin('translations.languagesTitle')) ?></h2>
     </div>
     <div class="admin-card__body">
-    <p class="admin-hint" id="translations-languages-hint" hidden><?= __admin('translations.languagesHint') ?></p>
+    <p class="admin-hint" id="translations-languages-hint" hidden><?= adminEscape(__admin('translations.languagesHint')) ?></p>
     <div class="translations-languages__list" id="translations-languages"></div>
     <div class="translations-languages__add" id="translations-language-add" data-requires-command="addLang" hidden>
-        <label class="admin-label" for="translations-language-pick"><?= __admin('translations.addLanguage') ?></label>
+        <label class="admin-label" for="translations-language-pick"><?= adminEscape(__admin('translations.addLanguage')) ?></label>
         <div class="translations-languages__add-row">
             <select class="admin-input translations-languages__pick" id="translations-language-pick"></select>
-            <button type="button" class="admin-btn admin-btn--primary" id="translations-language-add-btn"><?= __admin('translations.addLanguageButton') ?></button>
-            <button type="button" class="admin-btn admin-btn--ghost" id="translations-language-default-btn" data-requires-command="setDefaultLang" hidden><?= __admin('translations.makeDefault') ?></button>
+            <button type="button" class="admin-btn admin-btn--primary" id="translations-language-add-btn"><?= adminEscape(__admin('translations.addLanguageButton')) ?></button>
+            <button type="button" class="admin-btn admin-btn--ghost" id="translations-language-default-btn" data-requires-command="setDefaultLang" hidden><?= adminEscape(__admin('translations.makeDefault')) ?></button>
         </div>
     </div>
     </div>
@@ -88,61 +57,61 @@ window.QS_TRANSLATIONS_I18N = <?= json_encode($__trWords, JSON_HEX_TAG | JSON_HE
 
 <section class="admin-card translations-words" aria-labelledby="translations-words-title">
     <div class="admin-card__header">
-        <h2 class="admin-card__title" id="translations-words-title"><?= __admin('translations.wordsTitle') ?></h2>
+        <h2 class="admin-card__title" id="translations-words-title"><?= adminEscape(__admin('translations.wordsTitle')) ?></h2>
     </div>
     <div class="admin-card__body">
 
     <div class="translations-toolbar">
         <input type="search" class="admin-input translations-toolbar__search" id="translations-search" autocomplete="off"
-               placeholder="<?= adminEscape(__admin('translations.search')) ?>" aria-label="<?= adminEscape(__admin('translations.search')) ?>">
+               placeholder="<?= adminAttr(__admin('translations.search')) ?>" aria-label="<?= adminAttr(__admin('translations.search')) ?>">
         <label class="translations-toolbar__scope">
-            <span class="translations-toolbar__label"><?= __admin('translations.filterWhere') ?></span>
+            <span class="translations-toolbar__label"><?= adminEscape(__admin('translations.filterWhere')) ?></span>
             <select class="admin-input" id="translations-scope"></select>
         </label>
     </div>
 
-    <div class="translations-filters" role="group" aria-label="<?= adminEscape(__admin('translations.filterStates')) ?>">
-        <label class="translations-chip translations-chip--used" title="<?= adminEscape(__admin('translations.stateUsedHint')) ?>">
+    <div class="translations-filters" role="group" aria-label="<?= adminAttr(__admin('translations.filterStates')) ?>">
+        <label class="translations-chip translations-chip--used" title="<?= adminAttr(__admin('translations.stateUsedHint')) ?>">
             <input type="checkbox" data-state="used" checked>
-            <span><?= __admin('translations.stateUsed') ?></span>
+            <span><?= adminEscape(__admin('translations.stateUsed')) ?></span>
             <span class="translations-chip__count" id="translations-count-used">0</span>
         </label>
-        <label class="translations-chip translations-chip--unset" title="<?= adminEscape(__admin('translations.stateUnsetHint')) ?>">
+        <label class="translations-chip translations-chip--unset" title="<?= adminAttr(__admin('translations.stateUnsetHint')) ?>">
             <input type="checkbox" data-state="unset" checked>
-            <span><?= __admin('translations.stateUnset') ?></span>
+            <span><?= adminEscape(__admin('translations.stateUnset')) ?></span>
             <span class="translations-chip__count" id="translations-count-unset">0</span>
         </label>
-        <label class="translations-chip translations-chip--unused" title="<?= adminEscape(__admin('translations.stateUnusedHint')) ?>">
+        <label class="translations-chip translations-chip--unused" title="<?= adminAttr(__admin('translations.stateUnusedHint')) ?>">
             <input type="checkbox" data-state="unused" checked>
-            <span><?= __admin('translations.stateUnused') ?></span>
+            <span><?= adminEscape(__admin('translations.stateUnused')) ?></span>
             <span class="translations-chip__count" id="translations-count-unused">0</span>
         </label>
-        <label class="translations-chip translations-chip--same" id="translations-same-chip" title="<?= adminEscape(__admin('translations.sameAsDefaultHint')) ?>" hidden>
+        <label class="translations-chip translations-chip--same" id="translations-same-chip" title="<?= adminAttr(__admin('translations.sameAsDefaultHint')) ?>" hidden>
             <input type="checkbox" data-state="same">
-            <span><?= __admin('translations.sameAsDefault') ?></span>
+            <span><?= adminEscape(__admin('translations.sameAsDefault')) ?></span>
             <span class="translations-chip__count" id="translations-count-same">0</span>
         </label>
     </div>
 
     <details class="translations-add" id="translations-add" data-requires-command="setTranslationKeys">
-        <summary class="translations-add__summary"><?= __admin('translations.addKey') ?></summary>
+        <summary class="translations-add__summary"><?= adminEscape(__admin('translations.addKey')) ?></summary>
         <form class="translations-add__form" id="translations-add-form" novalidate>
             <div class="admin-form-group">
-                <label class="admin-label" for="translations-add-key"><?= __admin('translations.addKeyName') ?></label>
+                <label class="admin-label" for="translations-add-key"><?= adminEscape(__admin('translations.addKeyName')) ?></label>
                 <input type="text" class="admin-input" id="translations-add-key" autocomplete="off" spellcheck="false"
-                       placeholder="<?= adminEscape(__admin('translations.addKeyNamePlaceholder')) ?>">
+                       placeholder="<?= adminAttr(__admin('translations.addKeyNamePlaceholder')) ?>">
             </div>
             <div class="admin-form-group">
-                <label class="admin-label" for="translations-add-language"><?= __admin('translations.addKeyLanguage') ?></label>
+                <label class="admin-label" for="translations-add-language"><?= adminEscape(__admin('translations.addKeyLanguage')) ?></label>
                 <select class="admin-input" id="translations-add-language"></select>
             </div>
             <div class="admin-form-group translations-add__word">
-                <label class="admin-label" for="translations-add-word"><?= __admin('translations.addKeyWord') ?></label>
+                <label class="admin-label" for="translations-add-word"><?= adminEscape(__admin('translations.addKeyWord')) ?></label>
                 <textarea class="admin-input" id="translations-add-word" rows="2"></textarea>
-                <p class="admin-hint"><?= __admin('translations.addKeyHint') ?></p>
+                <p class="admin-hint"><?= adminEscape(__admin('translations.addKeyHint')) ?></p>
             </div>
             <div class="translations-add__actions">
-                <button type="submit" class="admin-btn admin-btn--primary" id="translations-add-create"><?= __admin('translations.addKeyCreate') ?></button>
+                <button type="submit" class="admin-btn admin-btn--primary" id="translations-add-create"><?= adminEscape(__admin('translations.addKeyCreate')) ?></button>
                 <span class="translations-add__error" id="translations-add-error" role="alert"></span>
             </div>
         </form>
@@ -150,7 +119,7 @@ window.QS_TRANSLATIONS_I18N = <?= json_encode($__trWords, JSON_HEX_TAG | JSON_HE
 
     <p class="translations-count" id="translations-count" aria-live="polite"></p>
     <div class="translations-table" id="translations-table">
-        <p class="admin-loading"><span class="admin-spinner"></span> <?= __admin('common.loading') ?></p>
+        <p class="admin-loading"><span class="admin-spinner"></span> <?= adminEscape(__admin('common.loading')) ?></p>
     </div>
     </div>
 </section>

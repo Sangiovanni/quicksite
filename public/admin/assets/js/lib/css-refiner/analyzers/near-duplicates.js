@@ -65,8 +65,6 @@
                         { start: ruleA.startIdx, end: ruleA.endIdx, replacement: mergedRaw }
                     ];
 
-                    var diffLines = buildDiffDescription(ruleA, ruleB, sim);
-
                     suggestions.push({
                         id:          U.generateId('near'),
                         type:        NODE.TOOL_NEAR_DUPLICATES,
@@ -75,7 +73,6 @@
                             selectorB: ruleB.selectorText,
                             percent:   sim.percent
                         }),
-                        meta:        diffLines,
                         enabled:     true,
                         edits:       edits,
                         diff: {
@@ -99,7 +96,6 @@
         var allProps = mergeKeys(mapA, mapB);
         var total    = 0;
         var matching = 0;
-        var diffs    = [];
 
         for (var i = 0; i < allProps.length; i++) {
             var prop = allProps[i];
@@ -110,14 +106,11 @@
 
             if (vA && vB && U.normalizeValue(vA) === U.normalizeValue(vB)) {
                 matching++;
-            } else {
-                diffs.push({ property: prop, valueA: vA || null, valueB: vB || null });
             }
         }
 
         return {
-            percent: total === 0 ? 0 : Math.round((matching / total) * 100),
-            diffs:   diffs
+            percent: total === 0 ? 0 : Math.round((matching / total) * 100)
         };
     }
 
@@ -179,29 +172,6 @@
             lines.push('    ' + declarations[i].property + ': ' + declarations[i].value + ';');
         }
         lines.push('}');
-        return lines.join('\n');
-    }
-
-    function buildDiffDescription(ruleA, ruleB, sim) {
-        var lines = [];
-        for (var i = 0; i < sim.diffs.length; i++) {
-            var d = sim.diffs[i];
-            if (d.valueA && d.valueB) {
-                lines.push(t('tools.nearDuplicates.diffValues', {
-                    property: d.property,
-                    valueA:   d.valueA,
-                    valueB:   d.valueB
-                }));
-            } else if (d.valueA) {
-                lines.push(t('tools.nearDuplicates.onlyInA', {
-                    selector: ruleA.selectorText
-                }) + ': ' + d.property + ': ' + d.valueA);
-            } else {
-                lines.push(t('tools.nearDuplicates.onlyInB', {
-                    selector: ruleB.selectorText
-                }) + ': ' + d.property + ': ' + d.valueB);
-            }
-        }
         return lines.join('\n');
     }
 

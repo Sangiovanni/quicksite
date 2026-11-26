@@ -4,21 +4,17 @@
         "loading": "Chargement...",
         "saving": "Enregistrement...",
         "error": "Erreur",
-        "success": "Succès",
-        "warning": "Attention",
         "confirm": "Confirmer",
         "cancel": "Annuler",
         "save": "Enregistrer",
         "delete": "Supprimer",
         "edit": "Modifier",
-        "view": "Voir",
         "back": "Retour",
         "next": "Suivant",
         "previous": "Précédent",
         "close": "Fermer",
         "refresh": "Actualiser",
         "yes": "Oui",
-        "no": "Non",
         "search": "Rechercher...",
         "noResults": "Aucun résultat trouvé",
         "required": "Requis",
@@ -29,45 +25,66 @@
         "copied": "Copié !",
         "backToSite": "Retour au site",
         "clearAll": "Tout effacer",
-        "notApplicable": "N/A",
         "validate": "Valider",
-        "preview": "Aperçu",
-        "load": "Charger",
         "add": "Ajouter",
         "remove": "Retirer",
         "format": "Formater",
-        "enabled": "Activé",
-        "default": "Par défaut",
         "status": {
             "success": "Succès",
             "error": "Erreur"
         },
         "duration": {
-            "second": ":count seconde",
-            "seconds": ":count secondes",
-            "minute": ":count minute",
-            "minutes": ":count minutes",
-            "hour": ":count heure",
-            "hours": ":count heures",
-            "day": ":count jour",
-            "days": ":count jours"
-        }
+            "second": {
+                "one": "{count} seconde",
+                "other": "{count} secondes"
+            },
+            "minute": {
+                "one": "{count} minute",
+                "other": "{count} minutes"
+            },
+            "hour": {
+                "one": "{count} heure",
+                "other": "{count} heures"
+            },
+            "day": {
+                "one": "{count} jour",
+                "other": "{count} jours"
+            }
+        },
+        "activeProject": "Projet actuel"
     },
     "writeRate": {
-        "refused": "Ce serveur autorise {max} modifications par {period}. Elles sont \u00e9puis\u00e9es jusqu\u2019\u00e0 {time} (dans {wait}).",
-        "figure": "{remaining} modifications restantes",
         "titleHead": "Modifications encore possibles sur ce serveur\u00a0:",
         "titleWindow": "{remaining} sur {max} par {period} \u00b7 de nouveau complet \u00e0 {time}",
         "titleWindowFull": "{remaining} sur {max} par {period}",
-        "period_day": "jour",
-        "period_days": "{n} jours",
-        "period_hour": "heure",
-        "period_hours": "{n} heures",
-        "period_minute": "minute",
-        "period_minutes": "{n} minutes",
-        "period_seconds": "{n} secondes",
         "waitSeconds": "{n} s",
-        "waitMinutes": "{n} min"
+        "waitMinutes": "{n} min",
+        "figure": {
+            "one": "{count} modification restante",
+            "other": "{count} modifications restantes"
+        },
+        "refused": {
+            "one": "Ce serveur autorise {count} modification par {period}. Elle est épuisée jusqu’à {time} (dans {wait}).",
+            "other": "Ce serveur autorise {count} modifications par {period}. Elles sont épuisées jusqu’à {time} (dans {wait})."
+        },
+        "period": {
+            "day": {
+                "one": "jour",
+                "other": "{count} jours"
+            },
+            "hour": {
+                "one": "heure",
+                "other": "{count} heures"
+            },
+            "minute": {
+                "one": "minute",
+                "other": "{count} minutes"
+            },
+            "second": {
+                "one": "seconde",
+                "other": "{count} secondes"
+            }
+        }
     },
     "login": {
         "title": "Connexion Admin",
@@ -82,11 +99,10 @@
         "invalidCredentials": "Nom d'utilisateur ou mot de passe invalide",
         "missingFields": "Le formulaire est arrivé sans nom d'utilisateur ou mot de passe — rechargez la page (Ctrl+F5) et réessayez",
         "csrfFailed": "Votre session n'a pas pu être vérifiée — le formulaire était trop ancien, ou il provenait d'un autre site. Rechargez cette page et réessayez.",
-        "throttled": "Trop de tentatives échouées — réessayez dans :duration",
+        "throttled": "Trop de tentatives échouées — réessayez dans {duration}",
         "serverError": "Impossible de créer la session — réessayez",
         "showPassword": "Afficher le mot de passe",
         "hidePassword": "Masquer le mot de passe",
-        "connectionError": "Impossible de se connecter à l'API",
         "privacyNote": "En cochant 'Rester connecté', vous consentez à un cookie d'authentification persistant sur cet appareil.",
         "registerLink": "Pas encore de compte ? Créez-en un",
         "registerSuccess": "Compte créé — connectez-vous avec votre nom d'utilisateur et votre mot de passe",
@@ -102,16 +118,10 @@
         "nameLabel": "Nom public",
         "namePlaceholder": "Votre nom (visible par les autres utilisateurs)",
         "nameHint": "La façon dont les autres utilisateurs vous voient et vous trouvent. Doit être différent de votre nom d'utilisateur.",
-        "usernameLabel": "Nom d'utilisateur",
-        "usernamePlaceholder": "votre-identifiant",
-        "usernameHint": "3 à 32 caractères : lettres minuscules, chiffres, tirets ou underscores. C'est votre identifiant de connexion privé — les autres utilisateurs vous connaissent par votre nom public.",
-        "usernameSuggested": "Un identifiant vous est proposé. Gardez-le ou saisissez le vôtre — notez-le dans les deux cas, c'est avec lui que vous vous connecterez.",
         "passwordLabel": "Mot de passe",
         "passwordHint": "Au moins :min caractères — la longueur compte plus que les symboles.",
         "submit": "Créer le compte",
         "backToLogin": "Déjà un compte ? Connectez-vous",
-        "invalidUsername": "Ce nom d'utilisateur n'est pas valide — 3 à 32 caractères : lettres minuscules, chiffres, tirets ou underscores",
-        "nameEqualsUsername": "Votre nom public doit être différent de votre nom d'utilisateur (votre nom d'utilisateur reste privé)",
         "passwordTooShort": "Mot de passe trop court — au moins :min caractères",
         "missingFields": "Le formulaire est arrivé incomplet — rechargez la page (Ctrl+F5) et réessayez",
         "throttled": "Trop de tentatives — réessayez dans :duration",
@@ -156,17 +166,11 @@
     },
     "updateNotice": {
         "label": "Mise à jour QuickSite :",
-        "available": "la version",
-        "availableSuffix": "est disponible.",
-        "youHave": "est disponible — vous avez la",
         "howTo": "Mettez à jour sur le serveur avec git pull, puis rechargez cette page.",
         "releaseNotes": "Notes de version",
-        "dismiss": "Fermer"
-    },
-    "logout": {
-        "title": "Déconnexion",
-        "message": "Vous avez été déconnecté avec succès",
-        "redirect": "Redirection vers la page de connexion..."
+        "dismiss": "Fermer",
+        "availableWithCurrent": "la version {latest} est disponible — vous avez la {current}.",
+        "availableOnly": "la version {latest} est disponible."
     },
     "memberships": {
         "title": "Mes adhésions",
@@ -174,12 +178,10 @@
         "myProjects": {
             "title": "Mes projets",
             "empty": "Vous n'êtes membre d'aucun projet pour l'instant. Acceptez une invitation ou envoyez une demande ci-dessous.",
-            "roleChip": "rôle",
             "ownedChip": "PROPRIÉTAIRE",
             "editingChip": "en édition",
             "editBtn": "Éditer ce projet",
             "buildsBtn": "Compilations",
-            "buildsTitle": "Compiler, télécharger ou supprimer la compilation de ce projet",
             "leaveBtn": "Quitter",
             "leaveTitle": "Quitter le projet",
             "leaveConfirm": "Vous êtes sur le point de quitter {project}. Il faudra une nouvelle invitation pour revenir.",
@@ -188,9 +190,9 @@
         "inbox": {
             "title": "Invitations reçues",
             "empty": "Aucune invitation en attente.",
-            "invitedBy": "Invité par",
-            "proposedBy": "proposé par",
-            "offeredRole": "rôle proposé",
+            "invitedBy": "Invité par {name}",
+            "proposedBy": "proposé par {name}",
+            "offeredRole": "rôle proposé : {role}",
             "accept": "Accepter",
             "decline": "Refuser",
             "acceptedMsg": "Invitation acceptée — bienvenue à bord",
@@ -206,7 +208,7 @@
             "title": "Mes propositions",
             "hint": "Les personnes pour qui vous vous êtes porté garant sur vos projets. Une proposition qui disparaît sans adhésion a été refusée, ou la personne a répondu.",
             "empty": "Aucune proposition en cours.",
-            "for": "pour",
+            "for": "pour {project}",
             "pendingValidation": "en attente de validation",
             "awaitingAnswer": "invitation envoyée — en attente de réponse",
             "withdrawnMsg": "Proposition retirée"
@@ -220,10 +222,8 @@
             "statusRemoved": "Retiré du projet",
             "statusDeleted": "Projet supprimé",
             "statusRoleChanged": "Rôle modifié",
-            "roleFrom": "de",
-            "roleTo": "à",
-            "changedBy": "Modifié par",
-            "reason": "Motif"
+            "changedBy": "Modifié par {name}",
+            "reason": "Motif :"
         },
         "request": {
             "title": "Demander à rejoindre un projet",
@@ -251,12 +251,12 @@
             "title": "Effectif",
             "empty": "Aucun membre (anormal — un projet a toujours son propriétaire).",
             "you": "vous",
-            "changeRoleTitle": "Changer le rôle",
+            "changeRoleTitle": "Changer le rôle — {name}",
             "newRoleLabel": "Nouveau rôle",
             "apply": "Appliquer",
             "roleChangedMsg": "Rôle mis à jour",
             "remove": "Retirer",
-            "removeTitle": "Retirer le membre",
+            "removeTitle": "Retirer le membre — {name}",
             "removeNoteLabel": "Motif (facultatif — il leur sera montré)",
             "removedMsg": "Membre retiré"
         },
@@ -266,16 +266,16 @@
             "chipInvite": "invitation",
             "chipRequest": "demande",
             "chipProposal": "proposition",
-            "invitedBy": "invité par",
-            "askedBy": "demandé par",
-            "proposedBy": "proposé par",
+            "invitedBy": "invité par {name}",
+            "askedBy": "demandé par {name}",
+            "proposedBy": "proposé par {name}",
             "approve": "Approuver",
             "deny": "Refuser",
             "approveTitle": "Approuver cette demande ?",
             "approveRoleLabel": "Rôle à accorder",
             "approvedMsg": "Approuvé — la personne est maintenant membre",
             "convertedMsg": "Proposition approuvée — invitation envoyée, en attente de réponse",
-            "denyTitle": "Refuser cette demande",
+            "denyTitle": "Refuser cette demande — {name}",
             "denyNoteLabel": "Motif (obligatoire — montré au demandeur)",
             "denyNoteRequired": "Le motif du refus est obligatoire.",
             "deniedMsg": "Demande refusée",
@@ -353,12 +353,7 @@
             "queue": "En attente de votre validation"
         },
         "title": "Tableau de bord",
-        "welcome": "Bienvenue sur QuickSite Admin",
         "subtitle": "Gérez votre site via une interface conviviale",
-        "quickActions": "Actions rapides",
-        "recentCommands": "Commandes récentes",
-        "noHistory": "Aucun historique de commandes",
-        "viewAllHistory": "Voir tout l'historique",
         "stats": {
             "title": "Statistiques du site",
             "routes": "Routes",
@@ -368,17 +363,9 @@
         },
         "sitemap": {
             "title": "Plan du site",
-            "urls": "URLs",
-            "routes": "routes",
-            "languages": "langues",
-            "pages": "pages",
             "default": "Par défaut",
             "monolingual": "Monolingue",
-            "coverage": "Couverture des traductions",
             "error": "Échec du chargement du plan du site"
-        },
-        "categories": {
-            "title": "Commandes par catégorie"
         },
         "storage": {
             "backups": "Sauvegardes",
@@ -387,8 +374,6 @@
             "manageSpace": "Gérer l'espace",
             "buildsPage": "Ouvrir la page des compilations",
             "noItems": "Aucun élément",
-            "deleted": "Supprimé",
-            "exportFiles": "fichier(s) d'export",
             "clearAll": "Tout supprimer",
             "confirmClearExports": "Supprimer tous les fichiers d'export ?",
             "exportsCleared": "Exports supprimés",
@@ -396,28 +381,16 @@
             "ownerTitle": "Mon espace total",
             "free": "Espace libre",
             "overQuota": "aucun — au-delà de la limite de {limit}",
-            "ownerProjects": "{n} projets",
-            "ownerOneProject": "1 projet",
             "content": "Contenu",
             "refresh": "Actualiser",
             "cachedHint": "En cache \u2014 actualiser pour recalculer",
-            "personalSnippets": "Snippets personnels"
-        },
-        "structure": {
-            "viewFull": "Voir la Structure Complète",
-            "routes": "Routes",
-            "languages": "Langues"
-        },
-        "history": {
-            "columns": {
-                "command": "Commande",
-                "status": "Statut",
-                "duration": "Durée",
-                "time": "Heure"
+            "personalSnippets": "Snippets personnels",
+            "ownerProjects": {
+                "other": "{count} projets",
+                "one": "{count} projet"
             }
         },
         "projects": {
-            "current": "Projet actuel",
             "switch": "Changer de projet",
             "create": "Créer un projet",
             "export": "Exporter",
@@ -427,15 +400,12 @@
             "backup": "Sauvegarder",
             "backupTooltip": "Créer une sauvegarde instantanée (interne, restauration rapide)",
             "backing_up": "Sauvegarde en cours...",
-            "backup_created": "Sauvegarde créée",
             "restore": "Restaurer",
             "restoreTooltip": "Restaurer depuis une sauvegarde précédente",
             "restoreTitle": "Restaurer une sauvegarde",
             "restore_btn": "Restaurer",
             "restoreBtn": "Restaurer",
             "restore_success": "Sauvegarde restaurée avec succès",
-            "restore_warning": "Une sauvegarde de pré-restauration sera créée automatiquement.",
-            "confirm_restore": "Restaurer depuis la sauvegarde",
             "restoreFrom": "Restaurer depuis la sauvegarde",
             "restoreWarningTitle": "Attention",
             "restoreWarningWithBackup": "Une sauvegarde de votre projet actuel sera créée avant la restauration.",
@@ -443,9 +413,6 @@
             "createBackupBeforeRestore": "Créer une sauvegarde du projet actuel avant de restaurer",
             "no_backups": "Aucune sauvegarde",
             "backup_hint": "Cliquez sur \"Sauvegarder\" pour créer votre première sauvegarde",
-            "backups_count": "sauvegarde(s)",
-            "total_size": "total",
-            "files": "fichiers",
             "pre_restore": "Pré-restauration",
             "backup_deleted": "Sauvegarde supprimée",
             "clone": "Dupliquer",
@@ -454,60 +421,31 @@
             "cloneTooltip": "Créer une copie de ce projet avec un nouveau nom",
             "cloneFrom": "Dupliquer depuis",
             "cloneNameLabel": "Nom de la copie",
-            "cloned": "Projet dupliqué avec succès",
             "cloning": "Duplication en cours...",
             "activateAfterClone": "Basculer vers le projet dupliqué",
-            "confirmDelete": "Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.",
             "createTitle": "Créer un nouveau projet",
             "nameLabel": "Nom du projet",
             "nameHelp": "Texte libre, 60 caractères au plus. Le projet reçoit un identifiant qui lui est propre : deux projets peuvent porter le même nom.",
             "nameRequired": "Le nom du projet est requis",
             "activateAfterCreate": "Activer ce projet après la création",
             "createBtn": "Créer le projet",
-            "createModal": {
-                "title": "Créer un nouveau projet",
-                "name": "Nom du projet",
-                "namePlaceholder": "mon-nouveau-projet",
-                "nameHelp": "Minuscules, chiffres et tirets uniquement",
-                "activate": "Activer immédiatement",
-                "submit": "Créer le projet"
-            },
-            "importModal": {
-                "title": "Importer un projet",
-                "file": "Fichier ZIP du projet",
-                "activate": "Activer après l'import",
-                "submit": "Importer le projet"
-            },
-            "deleteModal": {
-                "title": "Supprimer le projet",
-                "warning": "Cette action supprimera définitivement le projet et tous ses fichiers.",
-                "confirm": "Tapez DELETE pour confirmer",
-                "submit": "Supprimer définitivement"
-            },
-            "messages": {
-                "switched": "Basculé vers le projet",
-                "created": "Projet créé avec succès",
-                "deleted": "Projet supprimé avec succès",
-                "exported": "Export du projet démarré",
-                "imported": "Projet importé avec succès"
-            }
+            "activateAfterImport": "Activer après l'import",
+            "importBtn": "Importer le projet",
+            "importTitle": "Importer un projet",
+            "deleteBtn": "Supprimer définitivement",
+            "deleteTitle": "Supprimer le projet",
+            "deleted": "Projet supprimé avec succès",
+            "imported": "Projet importé avec succès"
         }
     },
     "commands": {
         "title": "Commandes",
         "subtitle": "Parcourir et exécuter les commandes API",
-        "tabs": {
-            "commands": "Commandes",
-            "history": "Historique"
-        },
         "disabled": {
             "title": "La console de commandes est désactivée",
             "text": "L'opérateur de cette installation a choisi de ne pas la proposer. Cela retire une page, pas une permission : chaque commande répond toujours sur l'API de gestion à tout appelant dont le rôle l'autorise, et les autres pages du panneau ne sont pas affectées."
         },
         "searchPlaceholder": "Rechercher des commandes...",
-        "allCategories": "Toutes les catégories",
-        "method": "Méthode",
-        "parameters": "Paramètres",
         "noParameters": "Aucun paramètre requis",
         "requiredParams": "Paramètres requis",
         "optionalParams": "Paramètres optionnels",
@@ -518,20 +456,12 @@
         "example": "Exemple",
         "notes": "Notes",
         "successResponse": "Réponse de succès",
-        "errorResponses": "Réponses d'erreur",
-        "paramTypes": {
-            "string": "Chaîne",
-            "number": "Nombre",
-            "boolean": "Booléen",
-            "array": "Tableau",
-            "object": "Objet",
-            "file": "Fichier"
-        }
+        "errorResponses": "Réponses d'erreur"
     },
     "commandForm": {
         "errors": {
             "docNotFound": "Documentation de la commande introuvable",
-            "docLoadFailed": "Échec du chargement de la documentation :"
+            "docLoadFailed": "Échec du chargement de la documentation : {message}"
         },
         "select": {
             "storageItem": "Choisir un élément de stockage",
@@ -544,7 +474,7 @@
             "mediaPicture": "Choisir une image de Media…"
         },
         "setRouteResolver": {
-            "sitemapNote": "Le plan du site a un éditeur pour le résolveur d'une route :",
+            "sitemapNote": "Le plan du site a un éditeur pour le résolveur d'une route : {link}",
             "sitemapLink": "ouvrir le plan du site"
         }
     },
@@ -563,8 +493,7 @@
             "showAllDates": "Afficher toutes les dates (7 derniers jours)"
         },
         "columns": {
-            "id": "ID",
-            "timestamp": "Horodatage",
+            "timestamp": "Date",
             "command": "Commande",
             "method": "Méthode",
             "user": "Utilisateur",
@@ -574,7 +503,7 @@
         },
         "detail": {
             "id": "ID",
-            "timestamp": "Horodatage",
+            "timestamp": "Date",
             "command": "Commande",
             "method": "Méthode",
             "duration": "Durée",
@@ -584,12 +513,7 @@
             "requestBody": "Corps de la requête",
             "response": "Réponse"
         },
-        "pagination": {
-            "info": "Page :page sur :total (:count entrées)"
-        },
         "clearHistory": "Effacer l'historique",
-        "clearConfirm": "Êtes-vous sûr de vouloir effacer l'historique des commandes ?",
-        "export": "Exporter",
         "exportCsv": "Exporter en CSV",
         "exportEmpty": "Rien à exporter",
         "clear": {
@@ -605,7 +529,13 @@
             "done": "Historique des commandes effacé"
         },
         "errors": {
-            "loadFailed": "Échec du chargement de l'historique :"
+            "loadFailed": "Échec du chargement de l'historique : {error}"
+        },
+        "pagination": {
+            "info": {
+                "one": "Page {page} sur {total} ({count} entrée)",
+                "other": "Page {page} sur {total} ({count} entrées)"
+            }
         }
     },
     "errors": {
@@ -613,27 +543,6 @@
             "title": "Page non trouvée",
             "message": "La page que vous recherchez n'existe pas.",
             "backToDashboard": "Retour au tableau de bord"
-        },
-        "500": {
-            "title": "Erreur serveur",
-            "message": "Une erreur s'est produite. Veuillez réessayer.",
-            "retry": "Réessayer"
-        },
-        "apiError": "Erreur API",
-        "networkError": "Erreur réseau. Veuillez vérifier votre connexion."
-    },
-    "form": {
-        "validation": {
-            "required": "Ce champ est requis",
-            "invalidFormat": "Format invalide",
-            "minLength": "Minimum :min caractères requis",
-            "maxLength": "Maximum :max caractères autorisés",
-            "invalidJson": "Format JSON invalide"
-        },
-        "placeholders": {
-            "selectOption": "Sélectionnez une option...",
-            "enterValue": "Entrez une valeur...",
-            "jsonInput": "Entrez des données JSON..."
         }
     },
     "account": {
@@ -644,8 +553,6 @@
         "identity": {
             "title": "Identité",
             "name": "Nom d'affichage",
-            "username": "Nom d'utilisateur",
-            "usernameHint": "privé — sert uniquement à se connecter",
             "userId": "Identifiant du compte",
             "role": "Rôle sur le projet que vous éditez"
         },
@@ -683,8 +590,7 @@
             "needsTyped": "Tapez exactement votre nom d'utilisateur pour confirmer.",
             "doneMsg": "Votre compte a été supprimé.",
             "soleOwnerTitle": "Vous possédez encore ces projets",
-            "soleOwnerHint": "Transférez la propriété depuis la page Membres du projet, ou supprimez le projet, puis revenez.",
-            "memberCount": "membres"
+            "soleOwnerHint": "Transférez la propriété depuis la page Membres du projet, ou supprimez le projet, puis revenez."
         }
     },
     "builds": {
@@ -697,7 +603,6 @@
         "building": "Compilation en cours… cela peut prendre du temps sur un gros projet.",
         "builtMsg": "Compilation terminée",
         "downloadBtn": "Télécharger",
-        "downloading": "Préparation de l'archive…",
         "downloadFailed": "Échec du téléchargement",
         "deleteBtn": "Supprimer",
         "deletedMsg": "Compilation supprimée",
@@ -716,7 +621,6 @@
         "fieldFiles": "Fichiers",
         "fieldPages": "Pages",
         "fieldLanguages": "Langues",
-        "fieldSiteName": "Identité du site",
         "fieldPublic": "Dossier public",
         "fieldSecure": "Dossier sécurisé",
         "fieldSpace": "Espace d'URL",
@@ -737,8 +641,6 @@
         "spaceWarnTitle": "Une compilation risque bientôt de ne plus tenir",
         "spaceWarnBody": "Une compilation pèse à peu près le poids du contenu du projet — environ {need} aujourd'hui — et il vous reste {free} de quota disponible pour elle. Au-delà de la moitié, la croissance commence à chasser la compilation elle-même. Libérez de l'espace, ou demandez un quota plus large, avant que ça n'arrive.",
         "refresh": "Re-mesurer",
-        "deployDocRoot": "la racine de documents",
-        "deployOutside": "doit rester HORS de la racine de documents",
         "optTitle": "Noms de dossiers et espace d'URL",
         "optPublicLabel": "Nom du dossier public",
         "optPublicHint": "La racine de documents du site déployé. Ne la changez que si le serveur de destination impose un nom — certains hébergeurs exigent htdocs ou public_html.",
@@ -748,7 +650,9 @@
         "optSpaceHint": "Servir le site depuis un sous-répertoire plutôt que la racine du domaine : shop le fait répondre sur /shop/. Laissez vide pour la racine.",
         "optPreview": "La compilation contiendra",
         "optSpaceServes": "le site lui-même — il répond sur /{space}/, et un simple / n'EST PAS ce site",
-        "optUnlock": "Je veux le modifier"
+        "optUnlock": "Je veux le modifier",
+        "optPublicNote": "la racine de documents",
+        "optSecureNote": "doit rester HORS de la racine de documents"
     },
     "oauthProviders": {
         "title": "Fournisseurs OAuth",
@@ -766,8 +670,6 @@
         "routesReady": "routes de connexion prêtes",
         "routesPartial": "routes de connexion en partie créées",
         "routesNone": "aucune route de connexion",
-        "usedByOne": "utilisé par 1 route",
-        "usedByMany": "utilisé par {count} routes",
         "clientId": "Identifiant client",
         "clientSecret": "Secret client",
         "secretKeep": "Enregistré — laissez vide pour le conserver",
@@ -786,10 +688,16 @@
         "howStep3Example": "https://votre-site.example{path}",
         "howStep4": "Copiez l'identifiant client et le secret de l'application dans les clés correspondantes ci-dessous.",
         "copied": "Copié",
-        "noteGoogle": "Google n'accepte une adresse http simple que sur localhost ; ailleurs, l'adresse doit utiliser https sur un domaine public. Tant que l'application est en mode Test, ajoutez votre propre compte comme utilisateur de test.",
-        "noteGithub": "Une application OAuth GitHub ne contient qu'une adresse de rappel : créez une application pour les clés d'aperçu et une autre pour les clés de compilation.",
-        "noteAmazon": "Login with Amazon demande l'adresse d'une politique de confidentialité et attend des adresses de retour en https.",
-        "noteMeta": "Ajoutez l'autorisation email et laissez l'application en mode Développement pendant vos tests : seuls les comptes ayant un rôle sur l'application peuvent se connecter."
+        "usedBy": {
+            "one": "utilisé par {count} route",
+            "other": "utilisé par {count} routes"
+        },
+        "notes": {
+            "google": "Google n'accepte une adresse http simple que sur localhost ; ailleurs, l'adresse doit utiliser https sur un domaine public. Tant que l'application est en mode Test, ajoutez votre propre compte comme utilisateur de test.",
+            "github": "Une application OAuth GitHub ne contient qu'une adresse de rappel : créez une application pour les clés d'aperçu et une autre pour les clés de compilation.",
+            "amazon": "Login with Amazon demande l'adresse d'une politique de confidentialité et attend des adresses de retour en https.",
+            "meta": "Ajoutez l'autorisation email et laissez l'application en mode Développement pendant vos tests : seuls les comptes ayant un rôle sur l'application peuvent se connecter."
+        }
     },
     "panelMode": {
         "bubble": "Vous pouvez passer de Simple à Avancé ici, à tout moment.",
@@ -815,7 +723,6 @@
         "authentication": "Authentification",
         "oauth-providers": "Fournisseurs OAuth",
         "members": "Membres",
-        "myMemberships": "Mes adhésions",
         "projectMembers": "Membres du projet",
         "login": "Connexion",
         "dashboard": "Tableau de bord",
@@ -827,11 +734,7 @@
         "settings": "Paramètres",
         "projectSettings": "Paramètres du projet",
         "apiEndpoints": "Points d'accès API",
-        "aiApiKeys": "Clés API IA",
         "ai": "IA",
-        "embedSecurity": "Sécurité d'intégration",
-        "structure": "Structure",
-        "workflows": "Workflows",
         "visualEditor": "Éditeur visuel",
         "preview": "Éditeur visuel",
         "logout": "Déconnexion",
@@ -839,8 +742,6 @@
         "logoutEverywhereHint": "Vous déconnecte de ce navigateur et met fin à toutes les autres sessions de votre compte.",
         "build": "Construire",
         "builds": "Compilations",
-        "inspect": "Inspecter",
-        "interactions": "Interactions",
         "site": "Site",
         "sitemap": "Plan du site",
         "social-previews": "Aperçus de partage",
@@ -848,7 +749,9 @@
         "optimize": "Optimiser",
         "mode": "Mode",
         "modeSimple": "Simple",
-        "modeAdvanced": "Avancé"
+        "modeAdvanced": "Avancé",
+        "memberships": "Mes adhésions",
+        "embed-security": "Sécurité d'intégration"
     },
     "optimize": {
         "title": "Outils d'optimisation",
@@ -876,7 +779,7 @@
         "siteHint": "Toute page qui n'a pas les siennes utilise celles-ci.",
         "target": "Site ou page",
         "pageValuesTitle": "La page {page}",
-        "cardsOfSite": "Les cartes de la page d'accueil, telles que toute page sans image ni type de carte à elle les dessine",
+        "cardsOfSite": "Les cartes de la page d'accueil, telles que toute page sans image ni type de carte à elle les dessine.",
         "cardsOfSiteOwn": "La page d'accueil a sa propre image ou son propre type de carte : ces cartes montrent les siens.",
         "noTerritory": "Aucun territoire",
         "pageHint": "Les valeurs propres d'une page l'emportent sur celles du site.",
@@ -940,13 +843,22 @@
         "wTitleCut": "{platform} affiche environ {limit} {unit} d'un titre",
         "wDescriptionCut": "{platform} affiche environ {limit} {unit} d'une description",
         "sizeWh": "{w} × {h}",
-        "sizeW": "{w} pixels de large",
-        "unitCharacters": "caractères",
-        "unitBytes": "octets",
         "instagram": "Instagram ne dessine aucune carte pour un lien : un lien dans une publication est du texte simple, les liens vont donc dans les liens d'un profil ou dans l'autocollant lien d'une story. Lu le {date}.",
         "platformName": {
             "x-large": "X (grande carte)",
             "x-small": "X (petite carte)"
+        },
+        "unitBytes": {
+            "one": "octet",
+            "other": "octets"
+        },
+        "unitCharacters": {
+            "one": "caractère",
+            "other": "caractères"
+        },
+        "sizeW": {
+            "one": "{w} pixel de large",
+            "other": "{w} pixels de large"
         }
     },
     "translations": {
@@ -971,12 +883,10 @@
         "addLanguageButton": "Ajouter",
         "addLanguageNone": "Toutes les langues de la liste sont déjà là",
         "addLanguageTitle": "Ajouter {language} ?",
-        "addLanguageCopy": "Ses textes commencent comme une copie des {n} textes de {default}, la langue par défaut, à traduire ici.",
         "addLanguageEmpty": "Ses textes commencent vides : la langue par défaut n'en a pas encore.",
         "addLanguageSwitch": "Ce site a une seule langue. En ajouter une deuxième le rend multilingue : chaque page a alors une adresse par langue.",
         "addLanguageDone": "{language} ajoutée.",
         "removeLanguageTitle": "Supprimer {language} ?",
-        "removeLanguageText": "Ses {n} textes partent avec elle et rien n'est conservé : le fichier de la langue est supprimé. C'est irréversible.",
         "removeLanguageDone": "{language} supprimée.",
         "makeDefaultTitle": "Faire de {language} la langue par défaut ?",
         "makeDefaultText": "Une adresse sans langue affiche le site en {language}, et une langue ajoutée ensuite commence par une copie de ses textes. Les textes restent tels quels.",
@@ -999,7 +909,6 @@
         "stateUnusedHint": "Les clés qu'une langue contient et que rien sur le site ne nomme : ni page, composant, menu, pied de page, titre ou description de page, bandeau de consentement, image de Media, phrase d'API, ni texte de Stockage ou de Confidentialité.",
         "sameAsDefault": "Identique à la langue par défaut",
         "sameAsDefaultHint": "Seulement les clés dont le texte dans une langue est encore celui de la langue par défaut, comme commence une langue ajoutée.",
-        "count": "{shown} clés sur {total}",
         "columnKey": "Clé",
         "columnActions": "Actions",
         "gapUnset": "Non défini",
@@ -1041,6 +950,18 @@
             "link-previews": "Aperçus de lien",
             "storage": "Descriptions du Stockage",
             "privacy": "Textes de Confidentialité"
+        },
+        "count": {
+            "one": "{shown} clé sur {count}",
+            "other": "{shown} clés sur {count}"
+        },
+        "addLanguageCopy": {
+            "one": "Ses textes commencent comme une copie de {default}, la langue par défaut ({count} texte), à traduire ici.",
+            "other": "Ses textes commencent comme une copie des {count} textes de {default}, la langue par défaut, à traduire ici."
+        },
+        "removeLanguageText": {
+            "one": "{count} texte part avec elle et rien n'est conservé : le fichier de la langue est supprimé. C'est irréversible.",
+            "other": "Ses {count} textes partent avec elle et rien n'est conservé : le fichier de la langue est supprimé. C'est irréversible."
         }
     },
     "sitemapPage": {
@@ -1048,17 +969,11 @@
         "subtitle": "Gérer les routes et la structure de navigation de votre site",
         "addRootRoute": "Ajouter une route racine",
         "addChild": "Ajouter enfant",
-        "routeName": "Nom de la route",
         "create": "Créer",
         "cancel": "Annuler",
-        "newChildOf": "Nouvel enfant de",
-        "newRoute": "Nouvelle route",
         "routeNameNested": "nom-route ou parent/enfant",
-        "paramSingular": "paramètre",
-        "paramPlural": "paramètres",
         "deleteRoute": "Supprimer la route",
         "deleteConfirm": "Supprimer la route /{route} ?",
-        "deleteConfirmChildren": "La route /{route} a {count} enfants. Tout supprimer ?",
         "viewInEditor": "Voir dans l'éditeur",
         "openPage": "Ouvrir la page",
         "menuOn": "Menu : visible",
@@ -1067,13 +982,10 @@
         "footerOff": "Pied de page : masqué",
         "reachability": "Accessibilité",
         "allReachable": "Toutes les routes sont accessibles depuis l'accueil",
-        "orphansFound": "{count} route(s) orpheline(s) trouvée(s)",
         "totalRoutes": "Routes totales",
         "reachable": "Accessibles",
         "orphans": "Orphelines",
         "globalNav": "Liens de navigation globaux",
-        "menu": "Menu",
-        "footer": "Pied de page",
         "linkGraph": "Graphe de liens",
         "linkGraphDesc": "Chaque route et les routes vers lesquelles elle pointe (via le contenu, menu et pied de page).",
         "route": "Route",
@@ -1082,7 +994,6 @@
         "unreachableRoutes": "Routes inaccessibles",
         "unreachableHint": "Ces routes n'ont aucun chemin de navigation depuis la page d'accueil. Ajoutez des liens vers elles dans une page, le menu ou le pied de page.",
         "cannotDeleteHome": "Impossible de supprimer la route d'accueil",
-        "maxDepth": "Profondeur d'imbrication maximale atteinte",
         "emptyHint": "Ajoutez votre première route pour commencer à construire la structure de votre site",
         "error": "Échec du chargement des données du plan du site",
         "routeCreated": "Route créée avec succès",
@@ -1096,93 +1007,7 @@
         "customUrls": "URLs personnalisées",
         "customUrlsHint": "Ajoutez des URLs supplémentaires non générées par les routes (une par ligne)",
         "toggleInclude": "Inclure/exclure",
-        "langs": "langues",
-        "languageCoverage": "Couverture linguistique",
         "none": "aucun"
-    },
-    "interactions": {
-        "title": "Interactions",
-        "subtitle": "Gérer les schémas d'interaction et les interactions du projet",
-        "refresh": "Actualiser",
-        "build": "Compiler",
-        "building": "Compilation...",
-        "buildSuccess": "Interactions compilées avec succès",
-        "refreshed": "Données actualisées",
-        "deleted": "Supprimé avec succès",
-        "instancesLabel": "interactions",
-        "status": {
-            "loading": "Chargement...",
-            "noInteractions": "Aucune interaction définie",
-            "ready": "Prêt à compiler"
-        },
-        "schemas": {
-            "title": "Schémas d'interaction",
-            "core": "Base",
-            "custom": "Personnalisé",
-            "create": "Nouveau schéma",
-            "searchPlaceholder": "Rechercher des schémas...",
-            "noCoreSchemas": "Aucun schéma de base trouvé",
-            "noCustomSchemas": "Aucun schéma personnalisé",
-            "noCustomSchemasHint": "Créez des schémas personnalisés pour étendre le système d'interaction",
-            "params": "paramètres",
-            "noParams": "Aucun paramètre",
-            "noDescription": "Aucune description fournie",
-            "description": "Description",
-            "parameters": "Paramètres",
-            "paramName": "Nom",
-            "paramType": "Type",
-            "paramRequired": "Requis",
-            "paramDesc": "Description",
-            "handler": "Code du gestionnaire",
-            "viewTitle": "Détails du schéma",
-            "createTitle": "Créer un schéma",
-            "editTitle": "Modifier le schéma",
-            "created": "Schéma créé avec succès",
-            "updated": "Schéma mis à jour avec succès",
-            "form": {
-                "id": "ID du schéma",
-                "idHint": "Identifiant unique (camelCase, commence par une lettre)",
-                "description": "Description",
-                "descPlaceholder": "Décrivez ce que fait ce schéma...",
-                "params": "Paramètres",
-                "addParam": "Ajouter un paramètre",
-                "paramName": "Nom",
-                "paramDescPlaceholder": "Description",
-                "handler": "Fonction gestionnaire",
-                "handlerHint": "Code JavaScript à exécuter. L'objet 'params' contient les valeurs des paramètres."
-            }
-        },
-        "instances": {
-            "title": "Interactions du projet",
-            "create": "Nouvelle interaction",
-            "searchPlaceholder": "Rechercher des interactions...",
-            "noInteractions": "Aucune interaction définie",
-            "noInteractionsHint": "Créez des interactions pour ajouter du comportement à votre site",
-            "createTitle": "Créer une interaction",
-            "editTitle": "Modifier l'interaction",
-            "created": "Interaction créée avec succès",
-            "updated": "Interaction mise à jour avec succès",
-            "form": {
-                "id": "ID de l'interaction",
-                "idHint": "Identifiant unique pour cette interaction",
-                "schema": "Schéma",
-                "selectSchema": "Sélectionner un schéma...",
-                "trigger": "Déclencheur",
-                "triggerHint": "Sélecteur CSS et événement (ex: #monBtn click, .carte hover)",
-                "params": "Paramètres",
-                "onSuccess": "En cas de succès",
-                "onSuccessHint": "Enchaîner une autre interaction en cas de succès",
-                "onFailed": "En cas d'échec",
-                "onFailedHint": "Enchaîner une autre interaction en cas d'échec",
-                "noChain": "Aucun"
-            }
-        },
-        "deleteConfirm": {
-            "title": "Confirmer la suppression",
-            "message": "Êtes-vous sûr de vouloir supprimer cet élément ?",
-            "schemaMessage": "Êtes-vous sûr de vouloir supprimer le schéma '{id}' ? Cette action est irréversible.",
-            "interactionMessage": "Êtes-vous sûr de vouloir supprimer l'interaction '{id}' ? Cette action est irréversible."
-        }
     },
     "embedSecurity": {
         "title": "S\u00e9curit\u00e9 d'int\u00e9gration",
@@ -1196,22 +1021,13 @@
         "title": "Paramètres",
         "subtitle": "Voir la configuration et gérer les préférences",
         "systemInfo": "Informations système",
-        "configuration": "Configuration",
-        "routes": "Routes actives",
-        "languages": "Langues",
         "preferences": "Préférences admin",
         "keyboardShortcuts": "Raccourcis clavier",
-        "confirmDestructive": "Confirmation des actions destructives",
         "toastDuration": "Durée des notifications",
-        "addRoute": "Ajouter une route",
-        "loadingRoutes": "Chargement des routes...",
-        "addLanguage": "Ajouter une langue",
-        "loadingLanguages": "Chargement des langues...",
         "savePreferences": "Enregistrer les préférences",
         "pref": {
             "enableShortcuts": "Activer les raccourcis clavier",
-            "shortcutsHint": "Appuyez sur ? pour voir tous les raccourcis",
-            "confirmDestructive": "Afficher la confirmation pour les actions destructives",
+            "shortcutsHint": "Appuyez sur {key} pour voir tous les raccourcis",
             "duration": {
                 "2s": "2 secondes",
                 "4s": "4 secondes",
@@ -1220,100 +1036,13 @@
             }
         },
         "sysInfo": {
-            "apiVersion": "Version API",
             "totalCommands": "Total des commandes"
         },
-        "config": {
-            "multilingualMode": "Mode multilingue",
-            "enabled": "Activé",
-            "singleLanguage": "Langue unique",
-            "languages": "Langues",
-            "configured": "configurées",
-            "routes": "Routes",
-            "active": "actives",
-            "stylesStatus": "État des styles",
-            "loaded": "Chargé",
-            "error": "Erreur"
-        },
-        "routesList": {
-            "none": "Aucune route configurée",
-            "delete": "Supprimer la route"
-        },
-        "languagesList": {
-            "none": "Aucune langue configurée",
-            "setDefault": "Définir par défaut",
-            "setDefaultTitle": "Définir comme langue par défaut"
-        },
         "toast": {
-            "preferencesSaved": "Préférences enregistrées",
-            "defaultLangUpdated": "Langue par défaut mise à jour"
+            "preferencesSaved": "Préférences enregistrées"
         },
         "errors": {
-            "sysInfoFailed": "Impossible de charger les infos système",
-            "routesFailed": "Impossible de charger les routes",
-            "languagesFailed": "Impossible de charger les langues",
-            "defaultLangFailed": "Échec de la mise à jour de la langue par défaut"
-        }
-    },
-    "structure": {
-        "title": "Visualiseur de structure",
-        "subtitle": "Vue arborescente des structures de pages et composants",
-        "selectStructure": "Sélectionner une structure",
-        "tree": {
-            "title": "Arborescence",
-            "expandAll": "Tout déplier",
-            "collapseAll": "Tout replier",
-            "copyJson": "Copier JSON",
-            "structurePrefix": "Structure :"
-        },
-        "nodeDetails": {
-            "title": "Détails du nœud",
-            "nodeId": "ID du nœud",
-            "element": "Élément",
-            "textContent": "Contenu texte",
-            "translationKey": "Clé de traduction",
-            "component": "Composant",
-            "attributes": "Attributs",
-            "children": "Enfants",
-            "childNodes": "nœud(s) enfant(s)",
-            "editNode": "Modifier ce nœud",
-            "editFull": "Modifier la structure complète"
-        },
-        "errors": {
-            "loadOptions": "Erreur lors du chargement des options"
-        },
-        "mode": {
-            "content": "Contenu",
-            "components": "Composants"
-        },
-        "componentList": {
-            "title": "Composants",
-            "subtitle": "Modifier les structures de composants réutilisables",
-            "searchPlaceholder": "Rechercher des composants...",
-            "newComponent": "Nouveau composant",
-            "loading": "Chargement des composants...",
-            "empty": "Aucun composant",
-            "emptyHint": "Créez votre premier composant réutilisable",
-            "usages": "utilisations",
-            "usage": "utilisation",
-            "variables": "variables",
-            "slots": "slots",
-            "actions": {
-                "edit": "Modifier la structure",
-                "duplicate": "Dupliquer",
-                "rename": "Renommer",
-                "delete": "Supprimer",
-                "whereUsed": "Où utilisé"
-            },
-            "confirm": {
-                "deleteTitle": "Supprimer le composant",
-                "deleteMessage": "Êtes-vous sûr de vouloir supprimer ':name' ? Ce composant est utilisé à :count endroit(s)."
-            },
-            "toast": {
-                "deleted": "Composant ':name' supprimé",
-                "duplicated": "Composant dupliqué sous ':name'",
-                "renamed": "Composant renommé en ':name'"
-            }
+            "sysInfoFailed": "Impossible de charger les infos système"
         }
     },
     "workflows": {
@@ -2601,15 +2330,11 @@
             "description": "Description",
             "authentication": "Authentification",
             "authType": "Type d'auth",
-            "tokenSource": "Source du token",
-            "tokenSourceHint": "Où récupérer le token d'authentification au runtime",
             "storageLocation": "Emplacement de stockage",
             "storageKeyName": "Nom de la clé de stockage",
             "storageKeyHint": "Au runtime, le token sera lu depuis cet emplacement (ex: authToken)",
             "storageLocalStorage": "localStorage (persistant)",
             "storageSessionStorage": "sessionStorage (session seulement)",
-            "storageConfig": "Variables de config (visible dans le JS public !)",
-            "configWarning": "Attention : Les variables de config sont visibles dans le JavaScript public. Utilisez uniquement pour les clés publiques (comme Stripe publishable key).",
             "endpointId": "ID de l'endpoint",
             "endpointName": "Nom de l'endpoint",
             "method": "Méthode",
@@ -2647,7 +2372,7 @@
             "refreshTokenKey": "Nom de la clé du refresh token",
             "refreshTokenKeyHint": "Emplacement où le refresh token est stocké à l'exécution. Limité au stockage navigateur.",
             "refreshBodyField": "Nom du champ du body pour le refresh token",
-            "refreshBodyFieldHint": "Le champ du body POST de l'endpoint de rafraîchissement qui transporte le refresh token (envoyé comme <code>{&lt;champ&gt;: &lt;valeur&gt;}</code>).",
+            "refreshBodyFieldHint": "Le champ du body POST de l'endpoint de rafraîchissement qui transporte le refresh token (envoyé comme <code>{<champ>: <valeur>}</code>).",
             "refreshResponseTokenPath": "Chemin réponse : nouveau token d'accès",
             "refreshResponseTokenPathHint": "Chemin pointé dans la réponse de rafraîchissement où se trouve le nouveau token d'accès (ex. <code>token</code> ou <code>data.access_token</code>).",
             "refreshResponseRefreshTokenPath": "Chemin réponse : nouveau refresh token (optionnel)",
@@ -2664,9 +2389,6 @@
             "request": "Requête",
             "response": "Réponse",
             "run": "Lancer le test",
-            "authToken": "Token d'auth",
-            "authTokenPlaceholder": "Entrez le token ou laissez vide",
-            "authTokenHint": "Cliquez sauvegarder pour mémoriser pour cette API",
             "saveToken": "Sauvegarder le token pour cette API",
             "showHide": "Afficher/Masquer le token",
             "rawJson": "Avancé : JSON brut",
@@ -2682,7 +2404,6 @@
             "baseUrlFixer": "Définir une URL de base absolue (doit commencer par http:// ou https://)",
             "treeLabel": "Endpoints à importer (décocher pour exclure)",
             "advancedJson": "Avancé : JSON brut",
-            "previewJson": "JSON converti (modifier avant l'import si nécessaire)",
             "previewJsonHint": "Les modifications ici prennent effet à l'import. Utilisez ce champ pour ajuster les schémas ou les descriptions avant l'enregistrement."
         }
     },
@@ -2692,12 +2413,12 @@
         "altLanguage": "Langue",
         "altHint": "Ce que montre l'image, lu par les lecteurs d'écran et les moteurs de recherche. Un par langue.",
         "altHintOne": "Ce que montre l'image, lu par les lecteurs d'écran et les moteurs de recherche.",
-        "altMissing": "Pas de texte alternatif : :langs",
+        "altMissing": "Pas de texte alternatif : {langs}",
         "altMissingOne": "Pas de texte alternatif",
-        "altRefused": "Le texte alternatif en :lang n'a pas été enregistré : :message",
-        "altNotTakenBack": "Ce qui était déjà écrit n'a pas pu être retiré : les fichiers de traduction le gardent sous :key (:langs).",
-        "altUnreadable": "Les textes alternatifs n'ont pas pu être lus, ils ne peuvent donc pas être modifiés pour l'instant : :message",
-        "view": "Voir :name"
+        "altRefused": "Le texte alternatif en {lang} n'a pas été enregistré : {message}",
+        "altNotTakenBack": "Ce qui était déjà écrit n'a pas pu être retiré : les fichiers de traduction le gardent sous {key} ({langs}).",
+        "altUnreadable": "Les textes alternatifs n'ont pas pu être lus, ils ne peuvent donc pas être modifiés pour l'instant : {message}",
+        "view": "Voir {name}"
     },
     "complexWizard": {
         "textKeyPicker": {

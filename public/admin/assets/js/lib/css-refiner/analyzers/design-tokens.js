@@ -8,6 +8,7 @@
     window.CSSRefiner = window.CSSRefiner || {};
 
     var t    = CSSRefiner.t;
+    var tc   = CSSRefiner.count;
     var U    = CSSRefiner.Utils;
     var NODE = CSSRefiner.CONST;
 
@@ -341,19 +342,16 @@
 
             var rootLine = varName + ': ' + displayValue + ';';
 
+            /* The category in words: tools.designTokens.category.color, .size, .font, .shadow or .other. */
             var categoryLabel = t('tools.designTokens.category.' + group.category);
 
             suggestions.push({
                 id:          U.generateId('token'),
                 type:        NODE.TOOL_DESIGN_TOKENS,
-                description: t('tools.designTokens.found', {
+                description: tc('tools.designTokens.found', group.entries.length, {
                     value: displayValue,
-                    count: group.entries.length,
                     category: categoryLabel
                 }),
-                meta: t('tools.designTokens.varName', { name: varName }) +
-                    '\n' + locations.join('\n') +
-                    (group.entries.length > 5 ? '\n… ' + t('tools.designTokens.andMore', { count: group.entries.length - 5 }) : ''),
                 enabled:        false,
                 edits:          edits,
                 suggestedValue: varName,

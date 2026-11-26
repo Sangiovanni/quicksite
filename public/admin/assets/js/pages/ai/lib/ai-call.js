@@ -18,6 +18,9 @@
  *
  * On HTTP error, throws a typed error with .category from
  * QSProviderCatalog.categorizeError plus .status, .body and .message.
+ *
+ * A message a screen shows (a probe's line, the AI tools' failed send) is a panel word, aiConnections.call, which
+ * every page loading this file hands; the provider's own message and 'HTTP <status>' pass through as they come.
  */
 (function () {
     'use strict';
@@ -74,8 +77,8 @@
                 credentials: 'omit'
             });
         } catch (e) {
-            if (e && e.name === 'AbortError') throw err('aborted', 'Request aborted');
-            throw err('network', e.message || 'Network error', { cause: e });
+            if (e && e.name === 'AbortError') throw err('aborted', QSPanelWords.t('aiConnections.call.requestAborted'));
+            throw err('network', e.message || QSPanelWords.t('aiConnections.call.networkError'), { cause: e });
         }
 
         if (!response.ok) {
@@ -172,7 +175,7 @@
                 }
             }
             if (aborted) {
-                throw err('aborted', 'Request aborted', { partial: content });
+                throw err('aborted', QSPanelWords.t('aiConnections.call.requestAborted'), { partial: content });
             }
             // Flush any trailing buffered frame.
             const tail = parser.flush();
@@ -205,9 +208,9 @@
         } catch (e) {
             if (signal) signal.removeEventListener('abort', onAbort);
             if (aborted || (e && e.name === 'AbortError')) {
-                throw err('aborted', 'Request aborted', { partial: content });
+                throw err('aborted', QSPanelWords.t('aiConnections.call.requestAborted'), { partial: content });
             }
-            throw err('network', e.message || 'Stream read failed', { cause: e, partial: content });
+            throw err('network', e.message || QSPanelWords.t('aiConnections.call.streamFailed'), { cause: e, partial: content });
         }
 
         if (signal) signal.removeEventListener('abort', onAbort);
@@ -230,8 +233,8 @@
 
     /**
      * Probe a connection: lists models if available, else does a tiny
-     * completion to validate auth + reachability. Returns
-     * `{ ok, models, message, category? }` — never throws.
+     * completion to validate auth + reachability. Returns `{ ok, models }`, or
+     * `{ ok: false, models: [], message, category?, status? }` (why it failed) — never throws.
      */
     async function test(connection, signal) {
         if (!connection) return { ok: false, models: [], message: 'No connection' };
@@ -263,10 +266,10 @@
                     };
                 }
                 const models = cat.parseModels(parsed, connection.providerType);
-                return { ok: true, models, message: models.length + ' models' };
+                return { ok: true, models };
             } catch (e) {
-                if (e && e.name === 'AbortError') return { ok: false, models: [], category: 'aborted', message: 'Aborted' };
-                return { ok: false, models: [], category: 'network', message: e.message || 'Network error' };
+                if (e && e.name === 'AbortError') return { ok: false, models: [], category: 'aborted', message: QSPanelWords.t('aiConnections.call.aborted') };
+                return { ok: false, models: [], category: 'network', message: e.message || QSPanelWords.t('aiConnections.call.networkError') };
             }
         }
 
@@ -282,14 +285,14 @@
                 signal
             });
             const fallback = (cat.get(connection.providerType) || {}).defaultModels || [];
-            return { ok: true, models: fallback.slice(), message: 'Reachable' };
+            return { ok: true, models: fallback.slice() };
         } catch (e) {
             return {
                 ok: false,
                 models: [],
                 category: e.category || 'network',
                 status: e.status || 0,
-                message: e.message || 'Failed'
+                message: e.message || QSPanelWords.t('aiConnections.call.failed')
             };
         }
     }
