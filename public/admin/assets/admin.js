@@ -1433,7 +1433,7 @@ const QuickSiteAdmin = {
             QSDom.el('h4', { text: this.t('shortcuts.actionsGroup') }),
             this._renderShortcutRow(['/'], this.t('shortcuts.focusSearch')),
             this._renderShortcutRow(['?'], this.t('shortcuts.showHelp')),
-            this._renderShortcutRow(['Esc'], this.t('shortcuts.closeModal'))
+            this._renderShortcutRow([this.t('shortcuts.keyEscape')], this.t('shortcuts.closeModal'))
         ]);
 
         return QSDom.el('div', {

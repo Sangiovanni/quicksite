@@ -4,7 +4,7 @@
     <div class="preview-toolbar__left">
         <!-- Unified Edit Target (Pages + Components) -->
         <div class="preview-toolbar__group">
-            <label class="preview-toolbar__label" for="preview-target"><?= adminEscape(__admin('preview.editTarget')) ?>:</label>
+            <label class="preview-toolbar__label" for="preview-target"><?= adminEscape(__admin('preview.editTarget')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <select id="preview-target" class="preview-toolbar__select">
                 <optgroup label="🏗️ <?= adminAttr(__admin('preview.layout')) ?>">
                     <option value="layout:menu"><?= adminEscape(__admin('preview.menu')) ?></option>
@@ -36,7 +36,7 @@
         
         <!-- Language Selector: shown for a project with more than one language. A run can change that while the page is open, so it is always there (preview.js rebuildLanguageList()) -->
         <div class="preview-toolbar__group"<?= $isMultilingual && count($languages) > 1 ? '' : ' style="display: none;"' ?>>
-            <label class="preview-toolbar__label" for="preview-lang"><?= adminEscape(__admin('preview.language')) ?>:</label>
+            <label class="preview-toolbar__label" for="preview-lang"><?= adminEscape(__admin('preview.language')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <select id="preview-lang" class="preview-toolbar__select preview-toolbar__select--sm">
                 <?php foreach ($languages as $lang): ?>
                     <option value="<?= adminEscape($lang) ?>" <?= $lang === $defaultLang ? 'selected' : '' ?>><?= strtoupper(adminEscape($lang)) ?></option>
@@ -46,7 +46,7 @@
 
         <!-- Page title: the page's title in the language shown (shown while a page is the edit target, to a role that can change it) -->
         <div class="preview-toolbar__group" id="preview-page-title-group" style="display: none;"<?= qs_editor_control_attrs('toolbar.title') ?>>
-            <label class="preview-toolbar__label" for="preview-page-title"><?= adminEscape(__admin('preview.pageTitle')) ?>:</label>
+            <label class="preview-toolbar__label" for="preview-page-title"><?= adminEscape(__admin('preview.pageTitle')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <input type="text" id="preview-page-title" class="preview-toolbar__input" maxlength="200" autocomplete="off"
                    title="<?= adminAttr(__admin('preview.pageTitleHint')) ?>">
         </div>
@@ -57,7 +57,7 @@
              (preview.js, from getSocialPreview's table). -->
         <?php require_once SECURE_FOLDER_PATH . '/src/functions/socialPreviewHelpers.php'; ?>
         <div class="preview-toolbar__group" id="preview-page-description-group" style="display: none;"<?= qs_editor_control_attrs('toolbar.description') ?>>
-            <label class="preview-toolbar__label" for="preview-page-description"><?= adminEscape(__admin('preview.pageDescription')) ?>:</label>
+            <label class="preview-toolbar__label" for="preview-page-description"><?= adminEscape(__admin('preview.pageDescription')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <input type="text" id="preview-page-description" class="preview-toolbar__input" maxlength="<?= (int) QS_SOCIAL_DESCRIPTION_MAX ?>" autocomplete="off"
                    title="<?= adminAttr(__admin('preview.pageDescriptionHint')) ?>" aria-describedby="preview-page-description-cut">
             <button type="button" id="preview-page-description-expand" class="admin-btn admin-btn--ghost admin-btn--icon-only preview-toolbar__expand"
@@ -74,7 +74,7 @@
 
         <!-- Theme Preview Toggle (always rendered; visibility managed by JS/config) -->
         <div class="preview-toolbar__group" id="preview-theme-toggle-group" style="display: <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
-            <label class="preview-toolbar__label"><?= adminEscape(__admin('preview.themePreview')) ?>:</label>
+            <label class="preview-toolbar__label"><?= adminEscape(__admin('preview.themePreview')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <div class="preview-toolbar__segmented" id="preview-theme-mode-switcher">
                 <button type="button" class="preview-toolbar__seg-btn preview-toolbar__seg-btn--active" data-theme-preview="light" title="<?= adminAttr(__admin('preview.themeLight')) ?>">
                     <span aria-hidden="true">☀</span> <?= adminEscape(__admin('preview.light')) ?>

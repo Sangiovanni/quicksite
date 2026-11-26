@@ -3,7 +3,7 @@
 The rules that govern every change to this codebase, whoever or whatever makes
 it. Read at the start of every session.
 
-> **This file is tracked, but it is not one of the six canonical `docs/` files
+> **This file is tracked, but it is not one of the seven canonical `docs/` files
 > and it does not freeze with them.** `docs/` is written for somebody *using*
 > QuickSite; this file is written for somebody *changing* it. Correct it whenever
 > the codebase moves under it.
@@ -68,7 +68,7 @@ the floor and invisible on the runtime.
 
 The `docs/` files are **user-facing**. Their reader is somebody trying to understand what QuickSite is, how it works, or how to use a feature. They are NOT internal status logs.
 
-**Belongs in `docs/`** (`ARCHITECTURE.md`, `ADMIN_PANEL.md`, `COMMAND_API.md`, `WORKFLOW_SYSTEM.md`, `PROJECT_STRUCTURE.md`):
+**Belongs in `docs/`** (`ARCHITECTURE.md`, `ADMIN_PANEL.md`, `COMMAND_API.md`, `WORKFLOW_SYSTEM.md`, `PROJECT_STRUCTURE.md`, `PANEL_TRANSLATION.md`):
 - What the system does and how it behaves
 - How a user reaches a feature, what arguments it takes, what the output looks like
 - Architectural facts (file boundaries, data flow, security model)

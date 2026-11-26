@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "meta": {
         "icon": "🚀",
-        "name": "Build QuickSite",
-        "description": "Rebuilds the full QuickSite website from scratch: languages, routes, page structures, translations, styles, and favicon. Uses fresh-start as pre-workflow and update-lang-switch as post-workflow.",
+        "titleKey": "workflows.specs.buildQuicksite.title",
+        "descriptionKey": "workflows.specs.buildQuicksite.description",
         "category": "start",
         "tags": [
             "quicksite",
@@ -49,6 +49,13 @@
             }
         ]
     },
+    "dataRequirements": [
+        {
+            "id": "langData",
+            "command": "getLangList",
+            "extract": "data"
+        }
+    ],
     "preWorkflows": [
         {
             "id": "fresh-start",
@@ -60,14 +67,16 @@
     ],
     "steps": [
         {
-            "comment": "=== 1. LANGUAGE SETUP — Add English",
+            "comment": "=== 1. LANGUAGE SETUP — Add English, where the project has no English yet (Fresh Start keeps the default language)",
+            "condition": "!data.langData.language_names.en",
             "command": "addLang",
             "params": {
                 "code": "en"
             }
         },
         {
-            "comment": "Add French (two or more languages: the site is multilingual)",
+            "comment": "Add French (two or more languages: the site is multilingual), where the project has no French yet",
+            "condition": "!data.langData.language_names.fr",
             "command": "addLang",
             "params": {
                 "code": "fr"

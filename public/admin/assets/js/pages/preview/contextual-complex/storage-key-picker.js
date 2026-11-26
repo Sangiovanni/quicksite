@@ -230,7 +230,7 @@
             note.hidden = line === '';
 
             if (categorySelect.options.length !== _categories.length) {
-                categorySelect.replaceChildren(..._categories.map(function (c) { return _renderOption(c, c); }));
+                categorySelect.replaceChildren(..._categories.map(function (c) { return _renderOption(c, QSPanelWords.has('storage.categories.' + c) ? QSPanelWords.t('storage.categories.' + c) : c); }));
                 if (_categories.indexOf(DEFAULT_CATEGORY) !== -1) categorySelect.value = DEFAULT_CATEGORY;
             }
 

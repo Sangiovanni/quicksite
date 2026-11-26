@@ -363,7 +363,7 @@
             <!-- Selected Selector Info (shows when a selector is selected) -->
             <div class="preview-selector-selected" id="selector-selected" style="display: none;">
                 <div class="preview-selector-selected__header">
-                    <span class="preview-selector-selected__label"><?= adminEscape(__admin('preview.selectedSelector')) ?>:</span>
+                    <span class="preview-selector-selected__label"><?= adminEscape(__admin('preview.selectedSelector')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                     <code class="preview-selector-selected__value" id="selector-selected-value"></code>
                     <span class="preview-rule-media" id="selector-selected-media" hidden></span>
                     <button type="button" class="preview-selector-selected__clear" id="selector-selected-clear" data-qs-icon="row" aria-label="<?= adminAttr(__admin('common.clear')) ?>" title="<?= adminAttr(__admin('common.clear')) ?>"></button>
@@ -522,7 +522,7 @@
         <div class="preview-source-panel" id="source-panel" data-tab="source" style="display: none;">
             <div class="preview-source-sidebar">
                 <div class="preview-source-sidebar__row">
-                    <span class="preview-source-sidebar__label"><?= adminEscape(__admin('preview.styleSourceFile')) ?>:</span>
+                    <span class="preview-source-sidebar__label"><?= adminEscape(__admin('preview.styleSourceFile')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                     <code class="preview-source-sidebar__file" id="source-sidebar-file">style.css</code>
                 </div>
                 <!-- Dirty indicator. Hidden when content === server. JS toggles
@@ -588,7 +588,7 @@
                     </svg>
                 </button>
                 <div class="preview-style-editor__title">
-                    <span class="preview-style-editor__label" id="style-editor-label" title="<?= adminAttr(__admin('preview.clickToGoBack')) ?>"><?= adminEscape(__admin('preview.editingSelector')) ?>:</span>
+                    <span class="preview-style-editor__label" id="style-editor-label" title="<?= adminAttr(__admin('preview.clickToGoBack')) ?>"><?= adminEscape(__admin('preview.editingSelector')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                     <code class="preview-style-editor__selector" id="style-editor-selector"></code>
                     <span class="preview-rule-media" id="style-editor-media" hidden></span>
                 </div>

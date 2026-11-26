@@ -17,7 +17,7 @@ $qsLocationTypes = static fn(string $location): string => implode(' ', array_key
 ?>
 
 <?php // The page's words (the import converter's notes among them), and the storage-key picker's own: this page uses one of the wizards' helpers. ?>
-<?= __adminWords(['apis', 'complexWizard.storageKeyPicker']) ?>
+<?= __adminWords(['apis', 'complexWizard.storageKeyPicker', 'storage.categories']) ?>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/wizard-text.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-text.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>

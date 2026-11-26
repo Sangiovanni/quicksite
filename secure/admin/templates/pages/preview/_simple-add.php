@@ -42,14 +42,14 @@ $simpleAddItems = [
 
     <!-- Text: a paragraph -->
     <div class="preview-contextual-form__field" data-preset-fields="text" style="display: none;">
-        <label for="simple-add-text"><?= adminEscape(__admin('preview.simpleAdd.text')) ?>:</label>
+        <label for="simple-add-text"><?= adminEscape(__admin('preview.simpleAdd.text')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
         <textarea id="simple-add-text" class="admin-input" rows="3" placeholder="<?= adminAttr(__admin('preview.simpleAdd.textPlaceholder')) ?>"></textarea>
     </div>
 
     <!-- Title: big, medium or small (h1, h2, h3) -->
     <div class="preview-contextual-form__section" data-preset-fields="title" style="display: none;">
         <div class="preview-contextual-form__field">
-            <span class="preview-contextual-form__section-label" id="simple-add-size-label"><?= adminEscape(__admin('preview.simpleAdd.size')) ?>:</span>
+            <span class="preview-contextual-form__section-label" id="simple-add-size-label"><?= adminEscape(__admin('preview.simpleAdd.size')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
             <!-- Three cards side by side, each word in its own size; the radios stay, for the keyboard -->
             <div class="preview-simple-add__sizes" role="radiogroup" aria-labelledby="simple-add-size-label">
                 <?php foreach (['big', 'medium', 'small'] as $size): ?>
@@ -59,14 +59,14 @@ $simpleAddItems = [
             <p class="preview-contextual-form__hint" id="simple-add-title-hint" style="display: none;"><?= adminEscape(__admin('preview.simpleAdd.titleHint')) ?></p>
         </div>
         <div class="preview-contextual-form__field">
-            <label for="simple-add-title-text"><?= adminEscape(__admin('preview.simpleAdd.text')) ?>:</label>
+            <label for="simple-add-title-text"><?= adminEscape(__admin('preview.simpleAdd.text')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <input type="text" id="simple-add-title-text" class="admin-input" autocomplete="off" placeholder="<?= adminAttr(__admin('preview.simpleAdd.textPlaceholder')) ?>">
         </div>
     </div>
 
     <!-- Button: a real <button>, sending its form when it lands in one -->
     <div class="preview-contextual-form__field" data-preset-fields="button" style="display: none;">
-        <label for="simple-add-button-text"><?= adminEscape(__admin('preview.simpleAdd.buttonText')) ?>:</label>
+        <label for="simple-add-button-text"><?= adminEscape(__admin('preview.simpleAdd.buttonText')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
         <input type="text" id="simple-add-button-text" class="admin-input" autocomplete="off" placeholder="<?= adminAttr(__admin('preview.simpleAdd.textPlaceholder')) ?>">
         <p class="preview-contextual-form__hint" id="simple-add-button-in-form" style="display: none;"><?= adminEscape(__admin('preview.simpleAdd.buttonInForm')) ?></p>
         <p class="preview-contextual-form__hint" id="simple-add-button-no-form" style="display: none;"><?= adminEscape(__admin('preview.simpleAdd.buttonNoForm')) ?></p>
@@ -75,11 +75,11 @@ $simpleAddItems = [
     <!-- Link: its text, a page of the site or an outside address, a new tab or not -->
     <div class="preview-contextual-form__section" data-preset-fields="link" style="display: none;">
         <div class="preview-contextual-form__field">
-            <label for="simple-add-link-text"><?= adminEscape(__admin('preview.simpleAdd.linkText')) ?>:</label>
+            <label for="simple-add-link-text"><?= adminEscape(__admin('preview.simpleAdd.linkText')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <input type="text" id="simple-add-link-text" class="admin-input" autocomplete="off" placeholder="<?= adminAttr(__admin('preview.simpleAdd.textPlaceholder')) ?>">
         </div>
         <div class="preview-contextual-form__field">
-            <label for="simple-add-link-page"><?= adminEscape(__admin('preview.simpleAdd.linkTo')) ?>:</label>
+            <label for="simple-add-link-page"><?= adminEscape(__admin('preview.simpleAdd.linkTo')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <select id="simple-add-link-page" class="admin-input">
                 <option value=""><?= adminEscape(__admin('preview.simpleAdd.linkPickPage')) ?></option>
                 <!-- The site's pages, filled by preview-simple-add.js; the outside address last -->
@@ -87,7 +87,7 @@ $simpleAddItems = [
             </select>
         </div>
         <div class="preview-contextual-form__field" id="simple-add-link-url-field" style="display: none;">
-            <label for="simple-add-link-url"><?= adminEscape(__admin('preview.simpleAdd.linkUrl')) ?>:</label>
+            <label for="simple-add-link-url"><?= adminEscape(__admin('preview.simpleAdd.linkUrl')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <input type="url" id="simple-add-link-url" class="admin-input" autocomplete="off" spellcheck="false" placeholder="https://">
         </div>
         <div class="preview-contextual-form__field">
@@ -98,14 +98,14 @@ $simpleAddItems = [
     <!-- Image, Video, Audio: a file from Media (or uploaded); the image's short description -->
     <div class="preview-contextual-form__section" data-preset-fields="image video audio" style="display: none;">
         <div class="preview-contextual-form__param-row">
-            <label class="preview-contextual-form__param-label" for="simple-add-file"><?= adminEscape(__admin('preview.simpleAdd.file')) ?>:</label>
+            <label class="preview-contextual-form__param-label" for="simple-add-file"><?= adminEscape(__admin('preview.simpleAdd.file')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <div class="preview-contextual-form__param-input-group">
                 <input type="text" id="simple-add-file" class="admin-input admin-input--sm preview-contextual-form__param-input" readonly placeholder="<?= adminAttr(__admin('preview.simpleAdd.filePlaceholder')) ?>">
                 <button type="button" class="admin-btn admin-btn--outline preview-asset-browse-btn" id="simple-add-file-choose"><?= adminEscape(__admin('preview.simpleAdd.choose')) ?></button>
             </div>
         </div>
         <div class="preview-contextual-form__field" id="simple-add-alt-field">
-            <label for="simple-add-alt"><?= adminEscape(__admin('preview.simpleAdd.description')) ?>:</label>
+            <label for="simple-add-alt"><?= adminEscape(__admin('preview.simpleAdd.description')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <input type="text" id="simple-add-alt" class="admin-input" autocomplete="off">
             <p class="preview-contextual-form__hint"><?= adminEscape(__admin('preview.simpleAdd.descriptionHint')) ?></p>
         </div>
@@ -114,7 +114,7 @@ $simpleAddItems = [
 
     <!-- List: a bulleted list, three lines to start; its lines are drawn by preview-simple-add.js, which adds and removes them -->
     <div class="preview-contextual-form__section" data-preset-fields="list" style="display: none;">
-        <label class="preview-contextual-form__section-label"><?= adminEscape(__admin('preview.simpleAdd.listItems')) ?>:</label>
+        <label class="preview-contextual-form__section-label"><?= adminEscape(__admin('preview.simpleAdd.listItems')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
         <div id="simple-add-list-items"></div>
         <button type="button" class="admin-btn admin-btn--outline" id="simple-add-list-more">+ <?= adminEscape(__admin('preview.simpleAdd.listMore')) ?></button>
     </div>

@@ -2748,7 +2748,7 @@
                 }
             });
             // A separator between whole messages, not a list inside a sentence
-            refs.status.textContent = msgs.join('; ');
+            refs.status.textContent = msgs.join(QSPanelWords.t('common.join.semicolon'));
             refs.status.style.color = 'var(--admin-error)';
             // Focus the first errant element so the user knows where to fix.
             if (allErrors[0] && allErrors[0].element) {

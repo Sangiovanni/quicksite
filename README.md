@@ -31,6 +31,7 @@ For a deeper view of how QuickSite is organized:
 - [docs/COMMAND_API.md](docs/COMMAND_API.md) — Management API surface and command catalogue.
 - [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) — on-disk layout.
 - [docs/WORKFLOW_SYSTEM.md](docs/WORKFLOW_SYSTEM.md) — workflow engine reference.
+- [docs/PANEL_TRANSLATION.md](docs/PANEL_TRANSLATION.md) — translating the admin panel: its word files, how a word is written, the French glossary.
 - [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md) — locked design decisions: what was chosen, why, and what was rejected.
 
 ### Key features

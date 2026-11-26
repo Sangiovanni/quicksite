@@ -3666,7 +3666,7 @@
                 ok: false,
                 severity: 'error',
                 hasContent: true,
-                message: QSPanelWords.t('preview.translateCsvErrors', { errors: hardErrs.join('; ') }),
+                message: QSPanelWords.t('preview.translateCsvErrors', { errors: hardErrs.join(QSPanelWords.t('common.join.semicolon')) }),
             };
         }
 
@@ -3709,7 +3709,7 @@
             ok: true,   // allow Apply — backend handles jagged grids safely
             severity: 'warning',
             hasContent: true,
-            message: QSPanelWords.t('preview.translateCsvWarnings', { warnings: warnParts.join('; ') }),
+            message: QSPanelWords.t('preview.translateCsvWarnings', { warnings: warnParts.join(QSPanelWords.t('common.join.semicolon')) }),
         };
     }
 

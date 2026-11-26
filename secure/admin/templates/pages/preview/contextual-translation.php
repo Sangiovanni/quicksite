@@ -5,14 +5,14 @@
     <div class="preview-contextual-translation__toolbar">
         <div class="preview-contextual-translation__toolbar-row">
             <label class="preview-contextual-translation__label" for="translation-lang">
-                <?= adminEscape(__admin('preview.translationLanguage')) ?>:
+                <?= adminEscape(__admin('preview.translationLanguage')) ?><?= adminEscape(__admin('common.join.colon')) ?>
             </label>
             <select class="preview-contextual-translation__select" id="translation-lang">
                 <!-- Options populated by JS on mode entry -->
             </select>
 
             <label class="preview-contextual-translation__label" for="translation-scope">
-                <?= adminEscape(__admin('preview.translationScope')) ?>:
+                <?= adminEscape(__admin('preview.translationScope')) ?><?= adminEscape(__admin('common.join.colon')) ?>
             </label>
             <select class="preview-contextual-translation__select" id="translation-scope">
                 <!-- Options populated by JS — "Whole site" + each page + each component -->

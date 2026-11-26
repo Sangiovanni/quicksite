@@ -18,7 +18,7 @@
             <div class="animation-preview__controls">
                 <!-- Duration -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-duration"><?= adminEscape(__admin('preview.animDuration')) ?>:</label>
+                    <label for="animation-preview-duration"><?= adminEscape(__admin('preview.animDuration')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                     <div class="animation-preview__input-group">
                         <input type="number" id="animation-preview-duration" class="admin-input" value="1000" min="100" max="10000" step="100">
                         <span class="animation-preview__unit">ms</span>
@@ -27,7 +27,7 @@
                 
                 <!-- Timing Function -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-timing"><?= adminEscape(__admin('preview.timingFunction')) ?>:</label>
+                    <label for="animation-preview-timing"><?= adminEscape(__admin('preview.timingFunction')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                     <select id="animation-preview-timing" class="admin-select">
                         <option value="ease" selected>ease</option>
                         <option value="linear">linear</option>
@@ -52,7 +52,7 @@
                 
                 <!-- Delay -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-delay"><?= adminEscape(__admin('preview.animDelay')) ?>:</label>
+                    <label for="animation-preview-delay"><?= adminEscape(__admin('preview.animDelay')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                     <div class="animation-preview__input-group">
                         <input type="number" id="animation-preview-delay" class="admin-input" value="0" min="0" max="5000" step="100">
                         <span class="animation-preview__unit">ms</span>
@@ -61,7 +61,7 @@
                 
                 <!-- Iteration Count -->
                 <div class="animation-preview__control">
-                    <label for="animation-preview-count"><?= adminEscape(__admin('preview.animIterations')) ?>:</label>
+                    <label for="animation-preview-count"><?= adminEscape(__admin('preview.animIterations')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                     <div class="animation-preview__input-group">
                         <input type="number" id="animation-preview-count" class="admin-input" value="1" min="1" max="100" step="1">
                         <label class="animation-preview__checkbox">
@@ -74,7 +74,7 @@
             
             <!-- Generated Animation CSS -->
             <div class="animation-preview__css-preview">
-                <label><?= adminEscape(__admin('preview.generatedCSS')) ?>:</label>
+                <label><?= adminEscape(__admin('preview.generatedCSS')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                 <code id="animation-preview-css">animation: 1000ms ease 0ms keyframeName; animation-iteration-count: 1;</code>
             </div>
         </div>

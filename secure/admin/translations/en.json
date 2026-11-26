@@ -75,6 +75,10 @@
             "title": "Color Picker"
         },
         "errorDetail": "Error: {message}",
+        "join": {
+            "colon": ":",
+            "semicolon": "; "
+        },
         "request": {
             "projectRequired": "No project selected for project-scoped command: {command}",
             "tooLarge": "The file is too large for this server to accept. It was refused by the web server before QuickSite saw it — on nginx this is client_max_body_size, which defaults to 1 MB. Raising it is a server change: see the shipped nginx-vhosts.conf.example in the deploy folder.",
@@ -1088,6 +1092,7 @@
             "examplesLabel": "Examples:"
         },
         "noDocumentation": "No additional documentation available.",
+        "docsInEnglish": "Commands are advanced elements: their documentation (descriptions, parameters, validation rules, examples) stays in English, to avoid any ambiguity.",
         "notPermitted": {
             "title": "Your role cannot run this command",
             "role": "Your role in this project, {role}, does not allow this command, so there are no fields and no button here. Its documentation is beside this.",
@@ -1347,7 +1352,8 @@
         "actionsGroup": "Actions",
         "focusSearch": "Focus search",
         "showHelp": "Show this help",
-        "closeModal": "Close modal / blur input"
+        "closeModal": "Close modal / blur input",
+        "keyEscape": "Esc"
     },
     "oauthProviders": {
         "title": "OAuth providers",
@@ -2472,6 +2478,14 @@
                         "help": "Where the template's main button leads (book, order, join): the page of the service you use, starting with https://. Left empty, a sample link."
                     }
                 }
+            },
+            "buildQuicksite": {
+                "title": "Build QuickSite",
+                "description": "Rebuilds the full QuickSite website from scratch: languages, routes, page structures, translations, styles, and favicon. Uses fresh-start as pre-workflow and update-lang-switch as post-workflow."
+            },
+            "keyframesPresets": {
+                "title": "Keyframe Animation Presets",
+                "description": "Install a starter library of @keyframes animations (fade, slide, pulse, shake, collapse). Existing keyframes with the same name are skipped — your edits are safe."
             },
             "freshStart": {
                 "title": "Fresh Start",

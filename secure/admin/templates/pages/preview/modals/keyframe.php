@@ -17,7 +17,7 @@
             <!-- Timeline -->
             <div class="preview-keyframe-modal__timeline-section">
                 <div class="preview-keyframe-modal__timeline-header">
-                    <label><?= adminEscape(__admin('preview.keyframeTimeline')) ?>:</label>
+                    <label><?= adminEscape(__admin('preview.keyframeTimeline')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                     <small><?= adminEscape(__admin('preview.clickToAddFrame')) ?></small>
                 </div>
                 <div class="preview-keyframe-modal__timeline" id="keyframe-timeline">

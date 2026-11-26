@@ -11,7 +11,7 @@
     <!-- Text-only node actions (shown when a text-only node is selected) -->
     <div class="preview-contextual-info" id="contextual-text-info" style="display: none;">
         <div id="ctx-text-summary">
-            <span class="preview-contextual-info__label"><?= adminEscape(__admin('preview.textKey')) ?>:</span>
+            <span class="preview-contextual-info__label"><?= adminEscape(__admin('preview.textKey')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
             <code id="ctx-text-key">-</code>
         </div>
         <div class="preview-contextual-info__actions" id="ctx-text-actions">

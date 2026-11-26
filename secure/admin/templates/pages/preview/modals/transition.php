@@ -119,7 +119,7 @@
                 <div class="transition-editor__settings-grid">
                     <!-- Properties to Transition -->
                     <div class="transition-editor__setting">
-                        <label><?= adminEscape(__admin('preview.transitionProperty')) ?>:</label>
+                        <label><?= adminEscape(__admin('preview.transitionProperty')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                         <select class="transition-editor__property-select" id="transition-property-select">
                             <option value="all"><?= adminEscape(__admin('preview.allProperties')) ?></option>
                             <option value="specific"><?= adminEscape(__admin('preview.specificProperties')) ?></option>
@@ -128,7 +128,7 @@
                     
                     <!-- Duration, Delay and Timing Function: All Properties' one set (each Specific row has its own) -->
                     <div class="transition-editor__setting transition-editor__all-setting">
-                        <label><?= adminEscape(__admin('preview.transitionDuration')) ?>:</label>
+                        <label><?= adminEscape(__admin('preview.transitionDuration')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                         <div class="transition-editor__input-group">
                             <input type="number" id="transition-duration" class="admin-input" value="0.3" min="0" max="60" step="0.1">
                             <select class="transition-editor__unit-select" id="transition-duration-unit">
@@ -140,7 +140,7 @@
                     
                     <!-- Delay -->
                     <div class="transition-editor__setting transition-editor__all-setting">
-                        <label><?= adminEscape(__admin('preview.transitionDelay')) ?>:</label>
+                        <label><?= adminEscape(__admin('preview.transitionDelay')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                         <div class="transition-editor__input-group">
                             <input type="number" id="transition-delay" class="admin-input" value="0" min="0" max="60" step="0.1">
                             <select class="transition-editor__unit-select" id="transition-delay-unit">
@@ -152,7 +152,7 @@
                     
                     <!-- Timing Function -->
                     <div class="transition-editor__setting transition-editor__setting--wide transition-editor__all-setting">
-                        <label><?= adminEscape(__admin('preview.timingFunction')) ?>:</label>
+                        <label><?= adminEscape(__admin('preview.timingFunction')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                         <div class="transition-editor__timing-row">
                             <select class="transition-editor__timing-select" id="transition-timing-select">
                                 <option value="ease">ease</option>
@@ -238,7 +238,7 @@
                 
                 <!-- Transition Preview String -->
                 <div class="transition-editor__preview-value">
-                    <label><?= adminEscape(__admin('preview.transitionValue')) ?>:</label>
+                    <label><?= adminEscape(__admin('preview.transitionValue')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                     <code id="transition-preview-code">all 0.3s ease</code>
                 </div>
             </div>
@@ -281,12 +281,12 @@
                             </div>
                             <div class="transition-editor__animation-settings">
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= adminEscape(__admin('preview.animDuration')) ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.animDuration')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                                     <input type="number" id="transition-base-anim-duration" class="admin-input admin-input--mini" value="1000" min="0" step="100">
                                     <span>ms</span>
                                 </div>
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= adminEscape(__admin('preview.iterations')) ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.iterations')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                                     <input type="number" id="transition-base-anim-iterations" class="admin-input admin-input--mini" value="1" min="1" max="100">
                                     <label class="transition-editor__anim-checkbox">
                                         <input type="checkbox" id="transition-base-anim-infinite">
@@ -334,12 +334,12 @@
                             </div>
                             <div class="transition-editor__animation-settings">
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= adminEscape(__admin('preview.animDuration')) ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.animDuration')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                                     <input type="number" id="transition-trigger-anim-duration" class="admin-input admin-input--mini" value="1000" min="0" step="100">
                                     <span>ms</span>
                                 </div>
                                 <div class="transition-editor__anim-setting">
-                                    <label><?= adminEscape(__admin('preview.iterations')) ?>:</label>
+                                    <label><?= adminEscape(__admin('preview.iterations')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                                     <input type="number" id="transition-trigger-anim-iterations" class="admin-input admin-input--mini" value="1" min="1" max="100">
                                     <label class="transition-editor__anim-checkbox">
                                         <input type="checkbox" id="transition-trigger-anim-infinite">

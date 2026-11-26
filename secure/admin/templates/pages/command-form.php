@@ -35,6 +35,9 @@
         <?= adminEscape(__admin('common.loading')) ?>
     </p>
 </div>
+<?php if (AdminTranslation::getInstance()->getCurrentLanguage() !== 'en'): ?>
+<div class="admin-alert admin-alert--info" id="command-docs-language"><?= adminEscape(__admin('commandForm.docsInEnglish')) ?></div>
+<?php endif; ?>
 
 <div class="admin-grid admin-grid--cols-2">
     <!-- Command Form -->

@@ -77,7 +77,7 @@
 
         <!-- Complex Element selection (for Complex type) -->
         <div class="preview-contextual-form__field" id="add-complex-field" style="display: none;">
-            <label for="add-complex-kind"><?= adminEscape(__admin('preview.complexKind')) ?>:</label>
+            <label for="add-complex-kind"><?= adminEscape(__admin('preview.complexKind')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <select id="add-complex-kind" class="admin-input">
                 <option value=""><?= adminEscape(__admin('preview.complexPickKind')) ?></option>
                 <!-- Populated by JS from window.QSComplexWizard.registry -->
@@ -97,7 +97,7 @@
              its translation in the current language. -->
         <div class="preview-contextual-form__section" id="add-text-field" style="display: none;">
             <label class="preview-contextual-form__section-label">
-                <?= adminEscape(__admin('preview.textTypeLabel')) ?>:
+                <?= adminEscape(__admin('preview.textTypeLabel')) ?><?= adminEscape(__admin('common.join.colon')) ?>
             </label>
             <div class="preview-contextual-form__field">
                 <label>
@@ -114,25 +114,25 @@
                  translation; typing a new query reveals an inline create form
                  (the picker writes the value via setTranslationKeys itself). -->
             <div class="preview-contextual-form__field" id="add-text-key-field">
-                <label><?= adminEscape(__admin('preview.textKey')) ?>:</label>
+                <label><?= adminEscape(__admin('preview.textKey')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                 <div id="add-text-key-picker"></div>
             </div>
             <!-- RAW literal value (shown when type=raw). -->
             <div class="preview-contextual-form__field" id="add-text-value-field" style="display: none;">
-                <label for="add-text-value"><?= adminEscape(__admin('preview.textValueLabel')) ?>:</label>
+                <label for="add-text-value"><?= adminEscape(__admin('preview.textValueLabel')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
                 <input type="text" id="add-text-value" class="admin-input" placeholder="<?= adminAttr(__admin('preview.textValuePlaceholder')) ?>" autocomplete="off">
             </div>
         </div>
 
         <!-- Tag Selection (for HTML Tag type) -->
         <div class="preview-contextual-form__field" id="add-tag-field" style="display: none;">
-            <label><?= adminEscape(__admin('preview.selectTag')) ?>:</label>
+            <label><?= adminEscape(__admin('preview.selectTag')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <?php $selectorId = 'add'; include '_tag-selector.php'; ?>
         </div>
         
         <!-- Component Selection (for Component type) -->
         <div class="preview-contextual-form__field" id="add-component-field" style="display: none;">
-            <label><?= adminEscape(__admin('preview.selectComponent')) ?>:</label>
+            <label><?= adminEscape(__admin('preview.selectComponent')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <?php $selectorId = 'add'; include '_component-selector.php'; ?>
         </div>
         
@@ -153,7 +153,7 @@
 
         <!-- Snippet Selection (for Snippet type) -->
         <div class="preview-contextual-form__field" id="add-snippet-field">
-            <label><?= adminEscape(__admin('preview.selectSnippet')) ?>:</label>
+            <label><?= adminEscape(__admin('preview.selectSnippet')) ?><?= adminEscape(__admin('common.join.colon')) ?></label>
             <?php $selectorId = 'add'; include '_snippet-selector.php'; ?>
         </div>
 
@@ -223,7 +223,7 @@
         <!-- Mandatory Parameters Section (dynamic based on tag) -->
         <div class="preview-contextual-form__section" id="add-mandatory-params" style="display: none;">
             <label class="preview-contextual-form__section-label">
-                <?= adminEscape(__admin('preview.requiredParams')) ?>:
+                <?= adminEscape(__admin('preview.requiredParams')) ?><?= adminEscape(__admin('common.join.colon')) ?>
             </label>
             <div class="preview-contextual-form__mandatory-fields" id="add-mandatory-params-container">
                 <!-- Dynamically populated -->

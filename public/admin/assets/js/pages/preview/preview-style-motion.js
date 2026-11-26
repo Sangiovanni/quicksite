@@ -524,7 +524,7 @@
             });
             return QSDom.el('div', { class: 'preview-animated-selector__orphan-hint' }, [
                 _icon(QuickSiteUtils.ICON_PATHS.info, 12),
-                QSDom.el('span', null, [QSPanelWords.t('preview.mayBeTriggeredVia') + ': ', ...related])
+                QSDom.el('span', null, [QSPanelWords.t('preview.mayBeTriggeredVia') + QSPanelWords.t('common.join.colon') + ' ', ...related])
             ]);
         }
         if (item.isOrphan) {

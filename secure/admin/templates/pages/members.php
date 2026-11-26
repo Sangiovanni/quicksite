@@ -80,7 +80,7 @@ window.QS_MEMBERS_CONFIG = {
     <span><?= adminEscape(__admin('members.banner.managing')) ?></span>
     <strong class="members-banner__project"><?= adminEscape(qs_project_label($__project)) ?></strong>
     <?php if ($__myRole !== null): ?>
-    <span class="members-banner__role-label"><?= adminEscape(__admin('members.banner.yourRole')) ?>:</span>
+    <span class="members-banner__role-label"><?= adminEscape(__admin('members.banner.yourRole')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
     <span class="members-role-chip members-role-chip--<?= adminEscape((string)$__myRole) ?>"><?= adminEscape(__adminRole((string)$__myRole)) ?></span>
     <?php endif; ?>
 </div>
@@ -216,7 +216,7 @@ window.QS_MEMBERS_CONFIG = {
             <p class="admin-hint"><?= adminEscape(__admin('members.policy.hint')) ?></p>
             <p class="admin-hint"><?= adminEscape(__admin('members.policy.notVisibility')) ?></p>
             <div class="members-policy-row" id="members-policy-row">
-                <span class="admin-label"><?= adminEscape(__admin('members.policy.label')) ?>:</span>
+                <span class="admin-label"><?= adminEscape(__admin('members.policy.label')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                 <span class="members-policy-value" id="members-policy-value">…</span>
                 <button type="button" id="btn-toggle-policy" class="admin-btn admin-btn--ghost" disabled><?= adminEscape(__admin('members.policy.toggle')) ?></button>
             </div>

@@ -139,6 +139,15 @@ qs_apply_alias_routing();
 require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
 $trimParameters = new TrimParameters();
 
+// The heading written where a project has no 404 page: QuickSite's own word in the
+// request's language (the address's, else the site's default), as a build's front
+// controller writes it; '404' alone where no starting-word file holds a word for it.
+$qsNotFoundHeading = static function () use ($trimParameters): string {
+    require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+    $word = qs_visitor_words(qs_resolve_project_language($trimParameters->lang()))['notFound'] ?? null;
+    return '<h1>' . htmlspecialchars(is_string($word) && $word !== '' ? $word : '404', ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</h1>';
+};
+
 // --- Route Resolution with Nested Routes Support ---
 $route = $trimParameters->route();         // e.g., ['guides', 'installation']
 $routePath = $trimParameters->routePath(); // e.g., 'guides/installation'
@@ -164,7 +173,7 @@ if (!$routeFound || $routePath === '404') {
     if ($templateFile !== null) {
         require_once $templateFile;
     } else {
-        echo '<h1>404 - Page Not Found</h1>';
+        echo $qsNotFoundHeading();
     }
     exit;
 }
@@ -222,7 +231,7 @@ if (!file_exists($templateFile)) {
         // would then get the absolute server path. The shared renderer, because
         // this is not an ApiResponse.
         require_once SECURE_FOLDER_PATH . '/src/functions/publicPaths.php';
-        echo '<h1>404 - Page Not Found</h1>';
+        echo $qsNotFoundHeading();
         echo '<p>Template file not found: ' . htmlspecialchars(qs_scrub_path_string($templateFile)) . '</p>';
     }
     exit;

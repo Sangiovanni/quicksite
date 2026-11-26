@@ -90,7 +90,7 @@
                 <div class="preview-contextual-js-form-params" id="js-page-event-params"></div>
                 <!-- Preview -->
                 <div class="preview-contextual-js-form-preview">
-                    <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?>:</span>
+                    <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                     <code class="preview-contextual-js-form-code" id="js-page-event-preview">-</code>
                 </div>
                 <div class="preview-contextual-js-form-actions">
@@ -191,7 +191,7 @@
                     </button>
                 </div>
                 <div class="preview-contextual-js-form-preview">
-                    <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?>:</span>
+                    <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                     <code class="preview-contextual-js-form-code" id="js-state-store-preview">-</code>
                 </div>
                 <div class="preview-contextual-js-form-actions">
@@ -216,7 +216,7 @@
     <!-- JS Info (shown when element selected) -->
     <div id="contextual-js-info" style="display: none;">
         <div class="preview-contextual-js-element">
-            <span class="preview-contextual-js-label"><?= adminEscape(__admin('preview.element')) ?>:</span>
+            <span class="preview-contextual-js-label"><?= adminEscape(__admin('preview.element')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
             <code class="preview-contextual-js-value" id="js-element-info">-</code>
         </div>
         <!-- Navigation Buttons (mirror of select-mode nav, scoped to JS panel) -->
@@ -449,7 +449,7 @@
             </div>
             
             <div class="preview-contextual-js-form-preview">
-                <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?>:</span>
+                <span class="preview-contextual-js-form-label"><?= adminEscape(__admin('preview.previewCode')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                 <code class="preview-contextual-js-form-code" id="js-preview-code">-</code>
             </div>
             

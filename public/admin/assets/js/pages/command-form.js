@@ -108,7 +108,7 @@ function _renderNotPermittedNotice() {
     if (role === 'unknown' || role === 'error') {
         reason = QSPanelWords.t('commandForm.notPermitted.unread');
     } else if (role) {
-        reason = QSPanelWords.t('commandForm.notPermitted.role', { role: role });
+        reason = QSPanelWords.t('commandForm.notPermitted.role', { role: QuickSiteUtils.roleName(role) });
     }
     return QSDom.el('div', { class: 'admin-alert admin-alert--warning', id: 'command-not-permitted' }, [
         QSDom.el('strong', { text: QSPanelWords.t('commandForm.notPermitted.title') }),

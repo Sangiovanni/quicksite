@@ -67,6 +67,13 @@
         "pageNotFound": "Page introuvable",
         "notFoundMessage": "La page que vous cherchez n'existe pas."
     },
+    "newProject": {
+        "tagline": "Bienvenue sur {{name}}",
+        "homeTitle": "{{name}} - Accueil",
+        "menuHome": "Accueil",
+        "copyright": "© {{year}} {{name}}",
+        "backHome": "Retour à l'accueil"
+    },
     "privacy": {
         "policy": {
             "title": "Politique de confidentialité",

@@ -356,7 +356,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
 
                 <!-- The panel's language, the current one marked; the script below answers these buttons' clicks alone. -->
                 <div class="admin-account__lang">
-                    <span class="admin-account__lang-label"><?= adminEscape(__admin('footer.language')) ?>:</span>
+                    <span class="admin-account__lang-label"><?= adminEscape(__admin('footer.language')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                     <?php foreach ($availableLangs as $langCode): ?>
                         <?php if ($langCode === $currentLang): ?>
                             <span class="admin-account__lang-btn admin-account__lang-btn--active"><?= adminEscape($langNames[$langCode] ?? strtoupper($langCode)) ?></span>
@@ -370,7 +370,7 @@ $panelSimple = !$isLoginPage && $panelMode !== 'advanced';
                      pages a beginner needs, advanced every page. It hides menu entries and grants or refuses
                      nothing. js/core/panel-mode.js answers a click, at once and saved. -->
                 <div class="admin-account__mode" id="admin-account-mode" role="group" aria-labelledby="admin-account-mode-label">
-                    <span class="admin-account__mode-label" id="admin-account-mode-label"><?= adminEscape(__admin('nav.mode')) ?>:</span>
+                    <span class="admin-account__mode-label" id="admin-account-mode-label"><?= adminEscape(__admin('nav.mode')) ?><?= adminEscape(__admin('common.join.colon')) ?></span>
                     <?php foreach (QS_PANEL_MODES as $modeOption): ?>
                     <button type="button" class="admin-account__mode-btn<?= $modeOption === $panelMode ? ' admin-account__mode-btn--active' : '' ?>"
                             data-panel-mode="<?= adminAttr($modeOption) ?>" aria-pressed="<?= $modeOption === $panelMode ? 'true' : 'false' ?>"><?= adminEscape(__admin('nav.mode' . ucfirst($modeOption))) ?></button>

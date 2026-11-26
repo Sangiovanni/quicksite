@@ -81,7 +81,7 @@ $baseUrl = rtrim(BASE_URL, '/');
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
     <h2 class="admin-empty__title"><?= adminEscape(__admin('commands.notFound.title')) ?></h2>
-    <p class="admin-empty__text"><code><?= adminEscape($selectedCommand) ?></code>: <?= adminEscape(__admin('commands.notFound.text')) ?></p>
+    <p class="admin-empty__text"><code><?= adminEscape($selectedCommand) ?></code><?= adminEscape(__admin('common.join.colon')) ?> <?= adminEscape(__admin('commands.notFound.text')) ?></p>
     <a href="<?= $router->url('command') ?>" class="admin-btn admin-btn--primary"><?= adminEscape(__admin('commands.notFound.back')) ?></a>
 </div>
 

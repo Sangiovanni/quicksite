@@ -158,7 +158,7 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     file_put_contents($projectPath . '/data/assets_metadata.json', '{}', LOCK_EX);
 
     // Create default translation file: the site's own texts, seeded from the name
-    $defaultTranslations = createDefaultTranslations($name);
+    $defaultTranslations = createDefaultTranslations($name, $defaultLang);
     qs_json_write($projectPath . '/translate/default.json', $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
     qs_json_write($projectPath . '/translate/' . $defaultLang . '.json', $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
     
@@ -250,30 +250,37 @@ function createProjectConfig(array $config): string {
 }
 
 /**
- * Generate default translations
+ * A new project's own texts, in its language: the starting words of
+ * <secure>/src/translations/ (qs_starting_word(): the language's file, else its base
+ * language's, else English's), the site's name written as the author typed it.
  */
-function createDefaultTranslations(string $siteName): array {
+function createDefaultTranslations(string $siteName, string $lang): array {
+    require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php';
+    $word = static function (string $key) use ($lang, $siteName): string {
+        return (string) qs_starting_word($lang, $key, ['name' => $siteName, 'year' => date('Y')]);
+    };
+    $notFound = $word('freshStart.pageNotFound');
     return [
         'site' => [
             'name' => $siteName,
-            'tagline' => 'Welcome to ' . $siteName
+            'tagline' => $word('newProject.tagline')
         ],
         'menu' => [
-            'home' => 'Home'
+            'home' => $word('newProject.menuHome')
         ],
         'page' => [
             'titles' => [
-                'home' => $siteName . ' - Home',
-                '404' => 'Page Not Found'
+                'home' => $word('newProject.homeTitle'),
+                '404' => $notFound
             ]
         ],
         'footer' => [
-            'copyright' => '© ' . date('Y') . ' ' . $siteName
+            'copyright' => $word('newProject.copyright')
         ],
         '404' => [
-            'title' => 'Page Not Found',
-            'message' => 'The page you are looking for does not exist.',
-            'backHome' => 'Back to Home'
+            'title' => $notFound,
+            'message' => $word('freshStart.notFoundMessage'),
+            'backHome' => $word('newProject.backHome')
         ]
     ];
 }

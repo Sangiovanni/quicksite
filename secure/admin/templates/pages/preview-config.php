@@ -138,7 +138,7 @@ $__previewProject  = $router->getCurrentProject();
 <!-- The editor's words (QSPanelWords), before its scripts: its own sections, the Social previews and Translations
      pages' sections, whose words its description field and Translation tool share, and the AI library's messages
      (aiConnections.call: the Workflows runner sends through it); common and nav come from the layout -->
-<?= __adminWords(['preview', 'complexWizard', 'socialPreviews', 'translations', 'aiConnections.call']) ?>
+<?= __adminWords(['preview', 'complexWizard', 'socialPreviews', 'translations', 'aiConnections.call', 'storage.categories']) ?>
 <!-- Preview Configuration (needed before preview.js) -->
 <script>
 window.PreviewConfig = {

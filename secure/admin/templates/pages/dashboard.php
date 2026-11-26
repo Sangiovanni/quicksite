@@ -350,7 +350,7 @@ if (isset($_GET['denied'])): ?>
 -->
 <template id="dashboard-restore-body">
     <div class="dashboard-restore">
-        <p><?= adminEscape(__admin('dashboard.projects.restoreFrom')) ?>: <strong id="restore-backup-name"></strong></p>
+        <p><?= adminEscape(__admin('dashboard.projects.restoreFrom')) ?><?= adminEscape(__admin('common.join.colon')) ?> <strong id="restore-backup-name"></strong></p>
         <div class="admin-alert admin-alert--warning">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -415,7 +415,7 @@ if (isset($_GET['denied'])): ?>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);">
-                <?= adminEscape(__admin('dashboard.projects.cloneFrom')) ?>: <strong id="clone-source-name"></strong>
+                <?= adminEscape(__admin('dashboard.projects.cloneFrom')) ?><?= adminEscape(__admin('common.join.colon')) ?> <strong id="clone-source-name"></strong>
             </p>
             <div class="admin-form-group">
                 <label class="admin-label" for="clone-project-name"><?= adminEscape(__admin('dashboard.projects.cloneNameLabel')) ?></label>
@@ -453,7 +453,7 @@ if (isset($_GET['denied'])): ?>
         </div>
         <div class="admin-modal__body">
             <div class="admin-form-group">
-                <?= adminEscape(__admin('dashboard.projects.exportFrom')) ?>: <strong id="export-source-name"></strong>
+                <?= adminEscape(__admin('dashboard.projects.exportFrom')) ?><?= adminEscape(__admin('common.join.colon')) ?> <strong id="export-source-name"></strong>
             </div>
             <div class="admin-alert admin-alert--warning">
                 <label class="admin-checkbox">
@@ -493,7 +493,7 @@ if (isset($_GET['denied'])): ?>
         </div>
         <div class="admin-modal__body">
             <p style="margin-bottom: var(--space-md);">
-                <?= adminEscape(__admin('dashboard.projects.importFrom')) ?>: <strong id="import-file-name"></strong>
+                <?= adminEscape(__admin('dashboard.projects.importFrom')) ?><?= adminEscape(__admin('common.join.colon')) ?> <strong id="import-file-name"></strong>
             </p>
             <div class="admin-form-group">
                 <label class="admin-label" for="import-project-name"><?= adminEscape(__admin('dashboard.projects.nameLabel')) ?></label>
