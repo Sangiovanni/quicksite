@@ -1,7 +1,7 @@
 <?php
-require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_config_mutate, qs_config_lock_refused
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_send_refusal
 /**
  * setThemeMode - Enable/disable dark mode support and configure theme defaults
  *
@@ -71,79 +71,45 @@ if ($hasUserToggle) {
     }
 }
 
-// ── Lock, read, patch, write config ───────────────────────────────────────
+// ── Lock, read, patch, write config (qs_config_mutate) ────────────────────
 
-$configPath = PROJECT_PATH . '/config.php';
-$lockFile   = $configPath . '.lock';
-$lockHandle = @fopen($lockFile, 'w');
-
-if ($lockHandle === false) {
-    ApiResponse::create(500, 'server.internal_error')
-        ->withMessage('Failed to create config lock file')
-        ->send();
-}
-
-if (!flock($lockHandle, LOCK_EX)) {
-    fclose($lockHandle);
-    ApiResponse::create(500, 'server.internal_error')
-        ->withMessage('Failed to acquire config lock')
-        ->send();
-}
-
-clearstatcache(true, $configPath);
-qs_opcache_invalidate($configPath);
-
-$freshConfig = @include $configPath;
-if (!is_array($freshConfig)) {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
-    ApiResponse::create(500, 'server.internal_error')
-        ->withMessage('Failed to read configuration file')
-        ->send();
-}
-
-$config = $freshConfig;
 $changes = [];
+$result = qs_config_mutate(PROJECT_PATH . '/config.php', function (array &$config) use (
+    $hasEnabled, $enabled, $hasDefault, $defaultTheme, $hasUserToggle, $userToggle, &$changes
+): bool {
+    if ($hasEnabled) {
+        $config['THEME_MODE_ENABLED'] = $enabled;
+        $changes['THEME_MODE_ENABLED'] = $enabled;
+    }
+    if ($hasDefault) {
+        $config['THEME_DEFAULT'] = $defaultTheme;
+        $changes['THEME_DEFAULT'] = $defaultTheme;
+    }
+    if ($hasUserToggle) {
+        $config['THEME_USER_TOGGLE_ENABLED'] = $userToggle;
+        $changes['THEME_USER_TOGGLE_ENABLED'] = $userToggle;
+    }
+    return true;
+});
 
-if ($hasEnabled) {
-    $config['THEME_MODE_ENABLED'] = $enabled;
-    $changes['THEME_MODE_ENABLED'] = $enabled;
-}
-if ($hasDefault) {
-    $config['THEME_DEFAULT'] = $defaultTheme;
-    $changes['THEME_DEFAULT'] = $defaultTheme;
-}
-if ($hasUserToggle) {
-    $config['THEME_USER_TOGGLE_ENABLED'] = $userToggle;
-    $changes['THEME_USER_TOGGLE_ENABLED'] = $userToggle;
-}
-
-$configContent = "<?php\n\nreturn " . var_export($config, true) . ";\n";
-
-// The size check (qs_small_write_refusal): the settings cap, and growth while
-// the owner is over quota.
-$refusal = qs_small_write_refusal([$configPath => strlen($configContent)]);
-if ($refusal !== null) {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
-    $refusal->send();
-}
-
-$result = @file_put_contents($configPath, $configContent, LOCK_EX);
-
-flock($lockHandle, LOCK_UN);
-fclose($lockHandle);
-@unlink($lockFile);
-
-if ($result === false) {
+if (!$result['ok']) {
+    // The size check (qs_small_write_guard): the settings cap, and growth while
+    // the owner is over quota.
+    qs_small_write_send_refusal();
+    if ($result['reason'] === 'lock_open_failed' || $result['reason'] === 'lock_failed') {
+        qs_config_lock_refused($result['reason'])->send();
+    }
+    if ($result['reason'] === 'read_failed') {
+        ApiResponse::create(500, 'server.internal_error')
+            ->withMessage('Failed to read configuration file')
+            ->send();
+    }
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage('Failed to update config.php')
         ->send();
 }
 
-qs_opcache_invalidate($configPath);
+$config = $result['config'];
 
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Theme mode updated successfully')

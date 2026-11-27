@@ -1,5 +1,5 @@
 <?php
-require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write, qs_config_lock
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
@@ -79,21 +79,11 @@ if (!file_exists($config_path)) {
         ->send();
 }
 
-// Use file locking to prevent race conditions when multiple addLang calls run in parallel
-$lockFile = $config_path . '.lock';
-$lockHandle = @fopen($lockFile, 'w');
-if ($lockHandle === false) {
-    ApiResponse::create(500, 'server.internal_error')
-        ->withMessage("Failed to create config lock file")
-        ->send();
-}
-
-// Acquire exclusive lock (blocking)
-if (!flock($lockHandle, LOCK_EX)) {
-    fclose($lockHandle);
-    ApiResponse::create(500, 'server.internal_error')
-        ->withMessage("Failed to acquire config lock")
-        ->send();
+// The config lock (qs_config_lock()), held until every file this command writes is written:
+// two addLang calls, or any other config writer, never interleave.
+$lockHandle = qs_config_lock($config_path, $lockFailure);
+if ($lockHandle === null) {
+    qs_config_lock_refused($lockFailure)->send();
 }
 
 // Clear PHP's file stat cache to ensure fresh read
@@ -109,9 +99,7 @@ $get_fresh_config = function($path) {
 $current_config = $get_fresh_config($config_path);
 
 if (!is_array($current_config)) {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
+    qs_config_unlock($lockHandle);
     ApiResponse::create(500, 'server.internal_error')
         ->withMessage("Failed to parse configuration file")
         ->send();
@@ -119,9 +107,7 @@ if (!is_array($current_config)) {
 
 // Check again under lock if language was added by concurrent request
 if (in_array($langCode, qs_project_language_codes($current_config), true)) {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
+    qs_config_unlock($lockHandle);
     ApiResponse::create(409, 'conflict.duplicate')
         ->withMessage("Language already exists")
         ->withData([
@@ -139,9 +125,7 @@ $current_config['LANGUAGES_SUPPORTED'] = array_merge(qs_project_language_codes($
 
 $refusal = qs_project_settings_guard($current_config, ['LANGUAGES_SUPPORTED']);
 if ($refusal !== null) {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
+    qs_config_unlock($lockHandle);
     $refusal->send();
 }
 
@@ -153,10 +137,8 @@ $source_file = PROJECT_PATH . '/translate/' . $default_lang . '.json';
 $target_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
 
 /** Release the config lock, put back everything this command wrote, and answer $response. */
-$fail = static function (ApiResponse $response) use ($lockHandle, $lockFile): void {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
+$fail = static function (ApiResponse $response) use ($lockHandle): void {
+    qs_config_unlock($lockHandle);
     qs_small_write_rollback(qs_small_write_journal());
     $response->send();
 };
@@ -209,9 +191,7 @@ if (!file_exists($source_file)) {
 }
 
 // Release config lock
-flock($lockHandle, LOCK_UN);
-fclose($lockHandle);
-@unlink($lockFile);
+qs_config_unlock($lockHandle);
 
 // Success. The paths are the project's own, relative to it: a response never
 // names where the installation keeps its files.

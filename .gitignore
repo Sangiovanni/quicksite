@@ -176,6 +176,11 @@ secure/projects/quicksite/data/oauth-secrets.json
 secure/projects/quicksite/config/members.json
 secure/projects/quicksite/config/members.json.lock
 
+# The template's config lock (qs_config_lock()): an empty file every writer of
+# config.php locks and none removes, so it stays once the template's settings
+# have been changed here.
+secure/projects/quicksite/config.php.lock
+
 # Resolver response cache. File-based TTL cache for
 # the server-side data resolver. Per-deployment runtime state — never
 # committed. cleanResolverCache command handles housekeeping; editApi

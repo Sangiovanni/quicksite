@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_config_lock
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
@@ -86,25 +87,14 @@ if ($refusal !== null) {
 // --- THE CONFIG, READ FRESH UNDER ITS LOCK (as addLang holds it), AND CHECKED BEFORE CHANGING ANYTHING ---
 $config_path = CONFIG_PATH;
 
-$lockFile = $config_path . '.lock';
-$lockHandle = @fopen($lockFile, 'w');
-if ($lockHandle === false) {
-    ApiResponse::create(500, 'server.internal_error')
-        ->withMessage("Failed to create config lock file")
-        ->send();
-}
-if (!flock($lockHandle, LOCK_EX)) {
-    fclose($lockHandle);
-    ApiResponse::create(500, 'server.internal_error')
-        ->withMessage("Failed to acquire config lock")
-        ->send();
+$lockHandle = qs_config_lock($config_path, $lockFailure);
+if ($lockHandle === null) {
+    qs_config_lock_refused($lockFailure)->send();
 }
 
 /** Release the config lock, put back everything this command wrote, and answer $response. */
-$fail = static function (ApiResponse $response) use ($lockHandle, $lockFile): void {
-    flock($lockHandle, LOCK_UN);
-    fclose($lockHandle);
-    @unlink($lockFile);
+$fail = static function (ApiResponse $response) use ($lockHandle): void {
+    qs_config_unlock($lockHandle);
     qs_small_write_rollback(qs_small_write_journal());
     $response->send();
 };
@@ -189,9 +179,7 @@ if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
 // Clear opcode cache if available
 qs_opcache_invalidate($config_path);
 
-flock($lockHandle, LOCK_UN);
-fclose($lockHandle);
-@unlink($lockFile);
+qs_config_unlock($lockHandle);
 
 // Success
 ApiResponse::create(200, 'operation.success')

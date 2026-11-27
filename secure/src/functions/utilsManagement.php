@@ -922,16 +922,66 @@ function qs_format_size(int $bytes): string {
 }
 
 /**
- * Read a project's config.php under an exclusive lock, let a callback patch it,
- * and write it back.
+ * Take a project's config lock: `config.php.lock` beside it, held exclusively.
+ * Every writer of a project's config.php takes it, through qs_config_mutate() or,
+ * when it holds the lock across other work, itself; it lets go with
+ * qs_config_unlock().
  *
- * Four commands need the same eight steps — lock, invalidate, re-read FRESH (the
+ * The lock file is kept: no writer removes it. A writer that removed it after
+ * letting go would leave one waiting on it holding a file no longer at its path,
+ * while a third opened a new file there and locked it at once: on Linux two
+ * writers would hold the config and one write would be lost; on Windows, where a
+ * file removed while held cannot be opened again until it is let go, the third
+ * would be refused. An empty file beside config.php is what it costs; an export,
+ * a backup and a build name the files they carry, and leave it.
+ *
+ * @param string      $configPath Absolute path to the project's config.php
+ * @param string|null $failure    OUT: 'lock_open_failed' when the lock file
+ *                                cannot be opened or made, 'lock_failed' when it
+ *                                cannot be locked (qs_config_lock_refused())
+ * @return resource|null the open, locked handle, or null
+ */
+function qs_config_lock(string $configPath, ?string &$failure = null)
+{
+    $failure = null;
+    $handle = @fopen($configPath . '.lock', 'c');
+    if ($handle === false) {
+        $failure = 'lock_open_failed';
+        return null;
+    }
+    if (!flock($handle, LOCK_EX)) {
+        fclose($handle);
+        $failure = 'lock_failed';
+        return null;
+    }
+    return $handle;
+}
+
+/** Let go of a config lock qs_config_lock() took. The lock file stays. */
+function qs_config_unlock($handle): void
+{
+    flock($handle, LOCK_UN);
+    fclose($handle);
+}
+
+/** The answer of a command whose config lock could not be taken: $failure is qs_config_lock()'s. */
+function qs_config_lock_refused(string $failure): ApiResponse
+{
+    return ApiResponse::create(500, 'server.internal_error')
+        ->withMessage($failure === 'lock_open_failed' ? 'Failed to create config lock file' : 'Failed to acquire config lock');
+}
+
+/**
+ * Read a project's config.php under its lock (qs_config_lock()), let a callback
+ * patch it, and write it back.
+ *
+ * The same eight steps every writer needs — lock, invalidate, re-read FRESH (the
  * `CONFIG` constant is the request's stale snapshot), patch, `var_export`, write,
- * unlock, invalidate again — and each hand-rolled them. `setThemeMode`,
- * `addLang`, `deleteLang` and `setDefaultLang` still do; they hold the lock
- * across other work (the words carried as the language count crosses two, a
- * word file's removal or rename) and cannot be folded in without restructuring
- * what runs inside the critical section. New writers use this.
+ * unlock, invalidate again. `addLang`, `deleteLang` and `setDefaultLang` take the
+ * lock themselves (qs_config_lock(), qs_config_unlock()): they hold it across
+ * other work (the words carried as the language count crosses two, a word file's
+ * removal or rename) and cannot be folded in without restructuring what runs
+ * inside the critical section. Every other writer uses this.
  *
  * `var_export` is what makes the write safe: a config value ends up as PHP
  * source in an array literal, so anything a caller stores must be re-parsable
@@ -944,28 +994,18 @@ function qs_format_size(int $bytes): string {
  * @param string   $configPath Absolute path to the project's config.php
  * @param callable $patch      fn(array &$config): bool
  * @return array{ok:bool, reason:string, config:array} `reason` is one of
- *         'lock_failed', 'read_failed', 'write_failed', 'abandoned', 'refused'
- *         (the size check: answer qs_small_write_refused()), or ''.
+ *         'lock_open_failed' or 'lock_failed' (qs_config_lock()), 'read_failed',
+ *         'write_failed', 'abandoned', 'refused' (the size check: answer
+ *         qs_small_write_refused()), or ''.
  */
 function qs_config_mutate(string $configPath, callable $patch): array
 {
     $fail = static fn(string $why): array => ['ok' => false, 'reason' => $why, 'config' => []];
 
-    $lockFile   = $configPath . '.lock';
-    $lockHandle = @fopen($lockFile, 'w');
-    if ($lockHandle === false) {
-        return $fail('lock_failed');
+    $lockHandle = qs_config_lock($configPath, $lockFailure);
+    if ($lockHandle === null) {
+        return $fail($lockFailure);
     }
-    if (!flock($lockHandle, LOCK_EX)) {
-        fclose($lockHandle);
-        return $fail('lock_failed');
-    }
-
-    $release = static function ($handle, string $file): void {
-        flock($handle, LOCK_UN);
-        fclose($handle);
-        @unlink($file);
-    };
 
     // Read FRESH. `include` rather than `require` so a missing file is a
     // reported failure, not a fatal; opcache is invalidated first because the
@@ -974,12 +1014,12 @@ function qs_config_mutate(string $configPath, callable $patch): array
     qs_opcache_invalidate($configPath);
     $config = @include $configPath;
     if (!is_array($config)) {
-        $release($lockHandle, $lockFile);
+        qs_config_unlock($lockHandle);
         return $fail('read_failed');
     }
 
     if ($patch($config) !== true) {
-        $release($lockHandle, $lockFile);
+        qs_config_unlock($lockHandle);
         return ['ok' => false, 'reason' => 'abandoned', 'config' => $config];
     }
 
@@ -988,12 +1028,12 @@ function qs_config_mutate(string $configPath, callable $patch): array
     $content = "<?php\n\nreturn " . var_export($config, true) . ";\n";
     require_once __DIR__ . '/quota.php';
     if (!qs_small_write_guard($configPath, strlen($content))) {
-        $release($lockHandle, $lockFile);
+        qs_config_unlock($lockHandle);
         return $fail('refused');
     }
 
     $written = @file_put_contents($configPath, $content, LOCK_EX);
-    $release($lockHandle, $lockFile);
+    qs_config_unlock($lockHandle);
 
     if ($written === false) {
         return $fail('write_failed');
