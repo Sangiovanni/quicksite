@@ -132,12 +132,15 @@
 
 /* Retention: select on top, custom input full-width below (stacked, robust) */
 .storage-retention { display: block; }
-.storage-retention .storage-retention-custom {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
+/* Custom…: the duration's number and unit, side by side, wrapping where they do not fit. */
+.storage-retention .storage-retention-duration {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: 8px;
 }
+.storage-retention-duration .storage-retention-number { flex: 0 1 8rem; min-width: 0; }
+.storage-retention-duration .storage-retention-unit { flex: 1 1 8rem; width: auto; min-width: 0; }
 
 .storage-cookie-fields {
     border-top: 0.5px solid var(--admin-border);

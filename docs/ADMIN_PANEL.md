@@ -3412,7 +3412,15 @@ group.
 
 **Registry CRUD.** Each entry has `id` (the key name), `scope`, a GDPR `category`
 (`essential` / `functional` / `analytics` / `marketing`), an optional `retention`
-(enum + custom), and a `description` in each language. Picking `cookie` scope reveals
+(enum + custom), and a `description` in each language. A preset retention (`session`,
+`1d`, `7d`, `30d`, `90d`, `1y`, `persistent`, `signout`: *until you sign out*) is stored as that
+value and shown as a word: in the panel's language in the dialog and on the key's card, in the
+page's language on the cookie-policy page. **Custom…** is a duration, a whole number from 1 to
+9999 and a unit (days, weeks, months, years), stored as the number and the unit's letters
+(`13mo`, `2w`) and shown the same way, counted in the reader's language (*13 months*, *13
+mois*). The dialog offers no free text: a key that already holds another text (written before,
+or sent through `addStorageItem` / `editStorageItem`, which accept any) shows it as written, and
+its dialog opens on that text, kept by a save. Picking `cookie` scope reveals
 `domain` / `path` / `secure` / `sameSite`. `consentRequired` is derived —
 `essential` never needs consent; everything else does. Commands:
 `listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.

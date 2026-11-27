@@ -2204,6 +2204,40 @@
             "analytics": "analytique",
             "marketing": "marketing"
         },
+        "retentionPresets": {
+            "session": "Session",
+            "1d": "1 jour",
+            "7d": "7 jours",
+            "30d": "30 jours",
+            "90d": "90 jours",
+            "1y": "1 an",
+            "persistent": "Jusqu'à effacement",
+            "signout": "Jusqu'à la déconnexion"
+        },
+        "retentionUnits": {
+            "d": {
+                "one": "{count} jour",
+                "other": "{count} jours"
+            },
+            "w": {
+                "one": "{count} semaine",
+                "other": "{count} semaines"
+            },
+            "mo": {
+                "one": "{count} mois",
+                "other": "{count} mois"
+            },
+            "y": {
+                "one": "{count} an",
+                "other": "{count} ans"
+            }
+        },
+        "retentionUnitNames": {
+            "d": "jours",
+            "w": "semaines",
+            "mo": "mois",
+            "y": "ans"
+        },
         "title": "Registre de stockage",
         "subtitle": "Toutes les clés de stockage navigateur que le site utilise (localStorage / sessionStorage / cookie). La couche de données du RGPD et du consentement aux cookies, et la source du sélecteur storageKey.",
         "loading": "Chargement du registre de stockage…",
@@ -2252,7 +2286,10 @@
             "categoryHint": "Détermine le consentement\u00a0: «\u00a0essentiel\u00a0» n'en demande aucun\u00a0; les autres, si.",
             "retention": "Durée de conservation",
             "retentionCustom": "Personnalisée…",
-            "retentionPlaceholder": "ex.\u00a0: 6 mois, 13 mois, jusqu'à la déconnexion",
+            "retentionNumber": "Nombre",
+            "retentionUnit": "Unité",
+            "retentionNumberInvalid": "Saisissez un nombre entier de 1 à 9999.",
+            "retentionKept": "«\u00a0{text}\u00a0» (telle que saisie)",
             "retentionHint": "Durée de vie de la clé — indiquée sur la page de politique de cookies ou de confidentialité.",
             "cookieDomain": "Domaine du cookie",
             "cookieDomainPlaceholder": "auto (ou .example.com)",

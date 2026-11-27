@@ -16,8 +16,9 @@
  * for the OAuth providers the project's sign-in routes use, named and linked
  * from the installation's provider list + a legal-review note) and writes it at
  * the route. If the route already exists, its structure is OVERWRITTEN (warned).
- * Seeds the page's words in every language the pages read (new keys only) and
- * records the route in data/consent.json so the banner links to it.
+ * Seeds the page's words in every language the pages read (new keys only), a
+ * key's retention among them when it is a preset or a duration, and records the
+ * route in data/consent.json so the banner links to it.
  *
  * @return ApiResponse 200 { route, overwritten, rows, languagesSeeded, languagesFailed? }
  */
@@ -106,11 +107,12 @@ saveConsentConfig(array_merge(loadConsentConfig(), ['policyRoute' => '/' . $rout
 qs_small_write_send_refusal();
 
 // Seed the page's words where a key has none, in every language the pages read (qs_starting_words_seed()),
-// its title (page.titles.<route>) from the policy's own title word. Per-item descriptions are NOT seeded
+// its title (page.titles.<route>) from the policy's own title word, and each duration a key's retention
+// holds from its unit's counted word (consentRetentionSeedEntries()). Per-item descriptions are NOT seeded
 // here: they live independently in translate/ under storageDescKey(), authored via the storage registry
 // and resolved live.
 $seeded = qs_starting_words_seed(['consent.policy', 'consent.category'],
-    [['key' => 'page.titles.' . $route, 'word' => 'consent.policy.title']]);
+    array_merge([['key' => 'page.titles.' . $route, 'word' => 'consent.policy.title']], consentRetentionSeedEntries($items)));
 
 $answer = [
     'route'           => '/' . $route,

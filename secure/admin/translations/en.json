@@ -2204,6 +2204,40 @@
             "analytics": "analytics",
             "marketing": "marketing"
         },
+        "retentionPresets": {
+            "session": "Session",
+            "1d": "1 day",
+            "7d": "7 days",
+            "30d": "30 days",
+            "90d": "90 days",
+            "1y": "1 year",
+            "persistent": "Persistent",
+            "signout": "Until sign-out"
+        },
+        "retentionUnits": {
+            "d": {
+                "one": "{count} day",
+                "other": "{count} days"
+            },
+            "w": {
+                "one": "{count} week",
+                "other": "{count} weeks"
+            },
+            "mo": {
+                "one": "{count} month",
+                "other": "{count} months"
+            },
+            "y": {
+                "one": "{count} year",
+                "other": "{count} years"
+            }
+        },
+        "retentionUnitNames": {
+            "d": "days",
+            "w": "weeks",
+            "mo": "months",
+            "y": "years"
+        },
         "title": "Storage registry",
         "subtitle": "Every browser-storage key the site uses (localStorage / sessionStorage / cookie). The GDPR / cookie-consent data layer and the storageKey picker source.",
         "loading": "Loading storage registry…",
@@ -2252,7 +2286,10 @@
             "categoryHint": "Drives consent: \"essential\" needs no consent; the others do.",
             "retention": "Retention",
             "retentionCustom": "Custom…",
-            "retentionPlaceholder": "e.g. 6 months, 13 months, until-logout",
+            "retentionNumber": "Number",
+            "retentionUnit": "Unit",
+            "retentionNumberInvalid": "Type a whole number from 1 to 9999.",
+            "retentionKept": "“{text}” (as typed)",
             "retentionHint": "How long the key lives — disclosed on the cookie/privacy page.",
             "cookieDomain": "Cookie domain",
             "cookieDomainPlaceholder": "auto (or .example.com)",
@@ -4514,8 +4551,8 @@
                 "one": "Replaces {count} existing: {list}."
             },
             "datumCount": {
-                "one": "{count} data-collected",
-                "other": "{count} data-collected"
+                "one": "{count} data collected",
+                "other": "{count} data collected"
             },
             "endpointsChecked": {
                 "one": "{checked} / {count} endpoint",
@@ -4629,7 +4666,7 @@
         "persistHint": "Off = cleared on tab close (sessionStorage). Local connections always persist (URLs aren't sensitive).",
         "runWithoutStoppingLabel": "Run without stopping",
         "autoExecuteCaution": "Use with caution.",
-        "runWithoutStoppingHint": "{caution} An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the Workflows panel (Preview → Workflows). What a part deletes or changes is still confirmed first.",
+        "runWithoutStoppingHint": "{caution} An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the Workflows panel (Visual Editor → Workflows). What a part deletes or changes is still confirmed first.",
         "modalTitle": "Add a connection",
         "empty": "No AI connection yet.",
         "emptyAdd": "+ Add your first connection",
@@ -4884,8 +4921,8 @@
             "description": "A <nav> bound to a state store. Reads `totalPages` to size itself; numbered buttons + optional Prev/Next chevrons. Click a number → setState(page) → fetchState. Hides when totalPages is missing or ≤ 1.",
             "store": "Bound state store",
             "storeLoading": "(loading…)",
-            "storeHint": "The store whose fields the navigator reads (totalPages) and writes (page). Configure on this page via JS mode → State stores.",
-            "noStores": "(no state stores on this page — add one in JS mode first)",
+            "storeHint": "The store whose fields the navigator reads (totalPages) and writes (page). Configure on this page via the Interactions tool → State stores.",
+            "noStores": "(no state stores on this page — add one in the Interactions tool first)",
             "pickStore": "-- pick a store --",
             "pageField": "Page field (REQUEST — buttons WRITE on click)",
             "pageFieldPlaceholder": "e.g. page",
@@ -5238,7 +5275,7 @@
         "dataAttrPicker": {
             "addCompanion": "Add {name} as a new custom param",
             "noMatch": "No matching data-* attributes. You can still type any value — the field is not constrained.",
-            "noStores": "No state stores on this page yet. Create one in the State stores panel (JS mode), then come back to bind.",
+            "noStores": "No state stores on this page yet. Create one in the State stores panel (Interactions tool), then come back to bind.",
             "pairedWith": "Often paired with:",
             "pickField": "(pick field)",
             "pickStore": "(pick store)",

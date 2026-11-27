@@ -25,15 +25,42 @@
     // Until the registry answers: the project's languages come from listStorageItems.
     var DEFAULT_LANG = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.defaultLang) || 'en';
 
-    var RETENTION_PRESETS = ['session', '1d', '7d', '30d', '90d', '1y', 'persistent'];
+    // The retention presets, as the registry stores them. The generated cookie policy names the same list
+    // (consentLayerHelpers.php CONSENT_RETENTION_PRESETS): the two change together.
+    var RETENTION_PRESETS = ['session', '1d', '7d', '30d', '90d', '1y', 'persistent', 'signout'];
+    // A retention may also be a duration: a whole number from 1 to 9999 and a unit (days, weeks, months, years), stored
+    // as 13mo, 2w. The policy reads it by the same rule (consentLayerHelpers.php CONSENT_RETENTION_UNITS and
+    // consentRetentionDuration()): the two change together. Any other retention is a text a key already holds (typed
+    // before, or sent through the API), kept and shown as written; the dialog offers no free text.
+    var RETENTION_UNITS = ['d', 'w', 'mo', 'y'];
+    var RETENTION_DURATION = new RegExp('^([1-9][0-9]{0,3})(' + RETENTION_UNITS.join('|') + ')$');
 
     // The page's words are the `storage` section of the panel's words, which storage.php hands: each is read
     // by its key's whole path through QSPanelWords (core/panel-words.js).
 
-    /** Items listed in the panel's language, as a plain enumeration ("a, b, c" in English). */
     /** A storage category's word (its id is one of the engine's four, STORAGE_CATEGORIES). */
     function _categoryWord(id) {
         return QSPanelWords.t('storage.categories.' + id);
+    }
+    /** A retention option's word: a preset's (its value is the preset), or the duration choice's. */
+    function _retentionOptionWord(value) {
+        if (value === '__custom__') return QSPanelWords.t('storage.keyDialog.retentionCustom');
+        return QSPanelWords.t('storage.retentionPresets.' + value);
+    }
+    /** A duration unit's name in the unit list (days, weeks, months, years). */
+    function _retentionUnitName(unit) {
+        return QSPanelWords.t('storage.retentionUnitNames.' + unit);
+    }
+    /** A retention read as a duration: {count: 13, unit: 'mo'} for "13mo", else null. */
+    function _retentionDuration(value) {
+        var m = RETENTION_DURATION.exec(String(value || ''));
+        return m ? { count: parseInt(m[1], 10), unit: m[2] } : null;
+    }
+    /** A key's retention as the panel shows it: a preset's word, a duration's counted word, or a held text as written. */
+    function _retentionWord(retention) {
+        if (RETENTION_PRESETS.indexOf(retention) !== -1) return _retentionOptionWord(retention);
+        var duration = _retentionDuration(retention);
+        return duration ? QSPanelWords.count('storage.retentionUnits.' + duration.unit, duration.count) : retention;
     }
     var SAMESITE_OPTIONS = ['Lax', 'Strict', 'None'];
 
@@ -221,7 +248,7 @@
             pills.appendChild(_renderPill(QSPanelWords.t('storage.card.noConsent'), 'essential'));
         }
         if (item.retention) {
-            pills.appendChild(_renderPill(QSPanelWords.t('storage.card.keeps', { retention: item.retention }), 'retention'));
+            pills.appendChild(_renderPill(QSPanelWords.t('storage.card.keeps', { retention: _retentionWord(item.retention) }), 'retention'));
         }
         main.appendChild(pills);
 
@@ -424,7 +451,7 @@
         shown.close();
     }
 
-    /** A select of values; each option shows its value, or the word wordOf(value) gives (a category's). */
+    /** A select of values; each option shows its value, or the word wordOf(value) gives (a category's, a retention's). */
     function _renderSelect(options, selected, wordOf) {
         var sel = QSDom.el('select', { class: 'admin-input' });
         options.forEach(function (opt) {
@@ -433,6 +460,50 @@
             sel.appendChild(o);
         });
         return sel;
+    }
+
+    /**
+     * The key dialog's Retention field, opened on what a key holds ('session' for a new key): the presets, then
+     * Custom… (a duration: a whole number and a unit, saved as 13mo). A key that holds another text (typed before, or
+     * sent through the API) has one more option, that text as typed, chosen: a save keeps it, another choice replaces
+     * it. read() answers the value to save, or null when the duration's number is not a whole number from 1 to 9999.
+     */
+    function _renderRetentionField(held) {
+        var duration = _retentionDuration(held);
+        // A preset first: 30d is a preset as well as a duration's form.
+        var preset = RETENTION_PRESETS.indexOf(held) !== -1;
+        var kept = !preset && !duration;
+        var choice = preset ? held : (duration ? '__custom__' : '__text__');
+        var values = RETENTION_PRESETS.concat(['__custom__'], kept ? ['__text__'] : []);
+        var select = _renderSelect(values, choice, function (value) {
+            return value === '__text__' ? QSPanelWords.t('storage.keyDialog.retentionKept', { text: held }) : _retentionOptionWord(value);
+        });
+        var number = QSDom.el('input', {
+            type: 'number', class: 'admin-input storage-retention-number', min: '1', max: '9999', step: '1', inputmode: 'numeric',
+            'aria-label': QSPanelWords.t('storage.keyDialog.retentionNumber'),
+            value: duration ? String(duration.count) : '',
+        });
+        var unit = _renderSelect(RETENTION_UNITS, duration ? duration.unit : 'd', _retentionUnitName);
+        unit.classList.add('storage-retention-unit');
+        unit.setAttribute('aria-label', QSPanelWords.t('storage.keyDialog.retentionUnit'));
+        var durationRow = QSDom.el('div', { class: 'storage-retention-duration' }, [number, unit]);
+        function sync() {
+            durationRow.style.display = select.value === '__custom__' ? '' : 'none';
+        }
+        select.addEventListener('change', sync);
+        sync();
+        var wrap = QSDom.el('div', { class: 'storage-retention' }, [select, durationRow]);
+        return {
+            group: _renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.retention')), wrap,
+                _renderHint(QSPanelWords.t('storage.keyDialog.retentionHint'))),
+            read: function () {
+                if (select.value === '__text__') return held;
+                if (select.value !== '__custom__') return select.value;
+                var typed = String(number.value).trim();
+                var count = /^[0-9]+$/.test(typed) ? parseInt(typed, 10) : 0;
+                return count >= 1 && count <= 9999 ? count + unit.value : null;
+            },
+        };
     }
 
     function _openModal(mode, item, prefill) {
@@ -480,25 +551,9 @@
         dialog.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.category'), true), categorySelect,
             _renderHint(QSPanelWords.t('storage.keyDialog.categoryHint'))));
 
-        // retention (preset + custom)
-        var retentionPresetVal = isEdit && item.retention && RETENTION_PRESETS.indexOf(item.retention) === -1 ? '__custom__' : (isEdit ? (item.retention || 'session') : 'session');
-        var retentionSelect = _renderSelect(RETENTION_PRESETS.concat(['__custom__']), retentionPresetVal);
-        // relabel the custom option
-        Array.prototype.forEach.call(retentionSelect.options, function (o) {
-            if (o.value === '__custom__') o.textContent = QSPanelWords.t('storage.keyDialog.retentionCustom');
-        });
-        var retentionCustom = QSDom.el('input', {
-            type: 'text', class: 'admin-input storage-retention-custom',
-            placeholder: QSPanelWords.t('storage.keyDialog.retentionPlaceholder'),
-            value: (retentionPresetVal === '__custom__') ? (item.retention || '') : '',
-        });
-        retentionCustom.style.display = (retentionPresetVal === '__custom__') ? '' : 'none';
-        retentionSelect.addEventListener('change', function () {
-            retentionCustom.style.display = (retentionSelect.value === '__custom__') ? '' : 'none';
-        });
-        var retentionWrap = QSDom.el('div', { class: 'storage-retention' }, [retentionSelect, retentionCustom]);
-        dialog.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.retention')), retentionWrap,
-            _renderHint(QSPanelWords.t('storage.keyDialog.retentionHint'))));
+        // retention (a preset, a duration, or the text a key already holds)
+        var retention = _renderRetentionField(isEdit ? (item.retention || 'session') : 'session');
+        dialog.appendChild(retention.group);
 
         // description — each language's own word (translate/, keyed; edits are live). One language shows at a
         // time, the page's; what was typed in another is kept until Save, which writes the languages edited.
@@ -551,8 +606,9 @@
                 scope: scopeSelect.value,
                 category: categorySelect.value,
             };
-            var retention = retentionSelect.value === '__custom__' ? retentionCustom.value.trim() : retentionSelect.value;
-            if (retention) body.retention = retention;
+            var retained = retention.read();
+            if (retained === null) { errBox.show(QSPanelWords.t('storage.keyDialog.retentionNumberInvalid')); return; }
+            if (retained) body.retention = retained;
 
             // The description of each language edited, and only those: on an edit an emptied language
             // removes that language's word; a language not edited keeps its word.

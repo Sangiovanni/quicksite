@@ -32,6 +32,24 @@
             "analytics": "Analytique",
             "marketing": "Marketing"
         },
+        "duration": {
+            "d": {
+                "one": "{{count}} jour",
+                "other": "{{count}} jours"
+            },
+            "w": {
+                "one": "{{count}} semaine",
+                "other": "{{count}} semaines"
+            },
+            "mo": {
+                "one": "{{count}} mois",
+                "other": "{{count}} mois"
+            },
+            "y": {
+                "one": "{{count}} an",
+                "other": "{{count}} ans"
+            }
+        },
         "policy": {
             "title": "Politique des cookies",
             "intro": "Cette page liste les données de stockage que ce site utilise, générée à partir du registre de stockage du site.",
@@ -44,6 +62,14 @@
             "col_description": "Finalité",
             "yes": "Oui",
             "no": "Non",
+            "retention_session": "Jusqu'à la fin de votre visite",
+            "retention_1d": "1 jour",
+            "retention_7d": "7 jours",
+            "retention_30d": "30 jours",
+            "retention_90d": "90 jours",
+            "retention_1y": "1 an",
+            "retention_persistent": "Jusqu'à ce que vous l'effaciez",
+            "retention_signout": "Jusqu'à votre déconnexion",
             "oauth_title": "Connexion tierce",
             "oauth_intro": "Ce site propose la connexion via les fournisseurs suivants. Consultez la politique de confidentialité de chaque fournisseur pour savoir ce qu'il collecte.",
             "provider_link": "Politique de confidentialité",

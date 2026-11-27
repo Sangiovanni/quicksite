@@ -40,6 +40,15 @@ const CONSENT_BANNER_FILE = '/templates/model/json/consent-banner.json';
 const CONSENT_POPUP_FILE  = '/templates/model/json/consent-popup.json';
 // Categories that can be consent-gated (essential is always-on, shown locked).
 const CONSENT_TOGGLE_CATEGORIES = ['functional', 'analytics', 'marketing'];
+// The retention presets a storage key can hold, as the registry stores them. The panel's Storage dialog offers the
+// same list (storage.js RETENTION_PRESETS): the two change together. Each has a word in the starting-word files,
+// consent.policy.retention_<preset>.
+const CONSENT_RETENTION_PRESETS = ['session', '1d', '7d', '30d', '90d', '1y', 'persistent', 'signout'];
+// A retention may also be a duration, a whole number from 1 to 9999 and one of these units (days, weeks, months, years),
+// stored as written here: 13mo, 2w. The dialog writes it from its number and unit fields (storage.js RETENTION_UNITS,
+// the same list). Its word is the unit's counted word, consent.duration.<unit>.one / .other. Any other retention is a
+// text the registry holds (typed before, or sent through the API), shown as written.
+const CONSENT_RETENTION_UNITS = ['d', 'w', 'mo', 'y'];
 
 function consentBannerPath(): string { return PROJECT_PATH . CONSENT_BANNER_FILE; }
 function consentPopupPath(): string  { return PROJECT_PATH . CONSENT_POPUP_FILE; }
@@ -107,6 +116,56 @@ function _cNode(string $tag, array $params = [], array $children = []): array {
 }
 function _cText(string $key): array { return ['textKey' => $key]; }
 function _cRaw(string $literal): array { return ['textKey' => '__RAW__' . $literal]; }
+
+/**
+ * A retention read as a duration (CONSENT_RETENTION_UNITS): ['count' => 13, 'unit' => 'mo'] for "13mo", null for
+ * anything else (a preset that is not a number, a text the key holds, none).
+ */
+function consentRetentionDuration(string $retention): ?array {
+    $units = implode('|', array_map(fn($u) => preg_quote($u, '/'), CONSENT_RETENTION_UNITS));
+    if (!preg_match('/^([1-9][0-9]{0,3})(' . $units . ')$/D', $retention, $m)) {
+        return null;
+    }
+    return ['count' => (int) $m[1], 'unit' => $m[2]];
+}
+
+/**
+ * A storage key's retention cell: a preset or a duration reads its word in the page's language, through the key
+ * consent.policy.retention_<value> (the stored value is unchanged); any other text the key holds shows as written, none a
+ * dash. A preset's word is in the starting-word files; a duration's is seeded with the page (consentRetentionSeedEntries()).
+ */
+function consentRetentionCell($retention): array {
+    $retention = is_scalar($retention) ? (string) $retention : '';
+    if (in_array($retention, CONSENT_RETENTION_PRESETS, true) || consentRetentionDuration($retention) !== null) {
+        return _cText('consent.policy.retention_' . $retention);
+    }
+    return _cRaw($retention !== '' ? $retention : '—');
+}
+
+/**
+ * The words a cookie policy's durations need, as qs_starting_words_seed() entries: for each duration the registry
+ * holds that is not a preset, its key consent.policy.retention_<value> and the unit's counted word, filled with the
+ * number, in each language the pages read ("13 months", "13 mois"; a language with no starting-word file in English).
+ * The form is chosen by the number: 1 takes `.one`, every other number `.other`, which is English's and French's rule
+ * for the numbers a duration can hold.
+ */
+function consentRetentionSeedEntries(array $items): array {
+    $entries = [];
+    foreach ($items as $item) {
+        $retention = is_array($item) && is_scalar($item['retention'] ?? null) ? (string) $item['retention'] : '';
+        if ($retention === '' || in_array($retention, CONSENT_RETENTION_PRESETS, true)) {
+            continue;
+        }
+        $duration = consentRetentionDuration($retention);
+        if ($duration === null || isset($entries[$retention])) {
+            continue;
+        }
+        $entries[$retention] = ['key' => 'consent.policy.retention_' . $retention,
+            'word' => 'consent.duration.' . $duration['unit'] . ($duration['count'] === 1 ? '.one' : '.other'),
+            'params' => ['count' => $duration['count']]];
+    }
+    return array_values($entries);
+}
 
 /** Banner structure (array of one root node). */
 function buildConsentBannerStructure(?string $policyRoute): array {
@@ -251,8 +310,9 @@ function consentEngineCookies(array $oauthLinks): array {
  * cookie preferences, a deterministic table built from the registry (and the
  * theme switch's key when the switch is on, and the cookies QuickSite itself
  * sets: consentEngineCookies()), an OAuth-provider privacy-link
- * section and a legal note. Structural copy + per-key descriptions use textKeys
- * (translatable); name/scope/retention are baked from the registry and the
+ * section and a legal note. Structural copy, per-key descriptions and a retention
+ * that is a preset or a duration use textKeys (translatable); name/scope and a
+ * retention held as any other text are baked from the registry and the
  * project's settings at generation time (re-generate to refresh).
  * $oauthLinks = [['name'=>..,'url'=>..|null], ...].
  */
@@ -284,7 +344,6 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
         if (!is_array($item)) continue;
         $cat = $item['category'] ?? 'functional';
         $consentKey = ($cat === 'essential') ? 'consent.policy.no' : 'consent.policy.yes';
-        $retention = $item['retention'] ?? '';
         $scope = (string) ($item['scope'] ?? '');
         $physical = qs_storage_physical_key((string) $id, $scope);
         if ($physical !== (string) $id) {
@@ -299,7 +358,7 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
             _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw($physical)]),
             _cNode('td', [], [_cRaw($scope)]),
             _cNode('td', [], [_cText('consent.category.' . $cat)]),
-            _cNode('td', [], [_cRaw($retention !== '' ? (string) $retention : '—')]),
+            _cNode('td', [], [consentRetentionCell($item['retention'] ?? '')]),
             _cNode('td', [], [_cText($consentKey)]),
             _cNode('td', [], $hasDesc ? [_cText(storageDescKey((string) $id))] : []),
         ]);
