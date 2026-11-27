@@ -204,6 +204,8 @@
                 const accessKey = ROLE_KEYS[role] || 'settings.permissions.customRole';
 
                 QSDom.clear(container);
+                // Loaded: no longer the spinner's centred box (it would lay the list and the commands side by side).
+                container.classList.remove('admin-loading');
                 container.appendChild(_renderDefinitionList([
                     [QSPanelWords.t('settings.permissions.yourRole'), _renderBadge(
                         isSuperAdmin ? QSPanelWords.t('settings.permissions.superadmin') : QuickSiteUtils.roleName(role), badgeClass)],

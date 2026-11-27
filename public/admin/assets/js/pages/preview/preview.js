@@ -1898,7 +1898,7 @@
             const result = await QuickSiteAdmin.apiRequest('findComponentUsages', 'GET', null, [editName]);
             
             if (result.ok && result.data?.data) {
-                const totalUsages = result.data.data.totalUsages || 0;
+                const totalUsages = result.data.data.total_usages || 0;
                 componentWarningText.textContent = QSPanelWords.count('preview.componentWarningUsages', totalUsages);
             }
         } catch (error) {

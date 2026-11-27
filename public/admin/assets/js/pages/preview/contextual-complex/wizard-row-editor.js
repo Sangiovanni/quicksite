@@ -106,7 +106,7 @@
             return QSDom.el('div', { class: ROW_TOOLS_CLASS }, [
                 tool(BTN_UP_CLASS, t('rowEditor.moveUp'), '↑'),
                 tool(BTN_DOWN_CLASS, t('rowEditor.moveDown'), '↓'),
-                window.QSControls.removeRow(t('rowEditor.remove'), null, { className: BTN_DELETE_CLASS })
+                window.QSControls.removeRow(QSPanelWords.t('common.remove'), null, { className: BTN_DELETE_CLASS })
             ]);
         }
 

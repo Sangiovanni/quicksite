@@ -734,7 +734,7 @@
             "download": "Télécharger",
             "downloadFailed": "Échec du téléchargement",
             "deleteFailed": "Échec de la suppression",
-            "clearFailed": "Échec de la suppression",
+            "clearFailed": "Échec de la suppression des exports",
             "loadError": "Erreur lors du chargement des données",
             "freeOfLimit": "{free} / {limit}",
             "backupCount": {
@@ -1733,6 +1733,28 @@
         "makeDefaultOneText": "Le site garde une seule langue\u00a0: {language} prend la place de {current}. Ses textes et ses adresses restent tels quels\u00a0; ses pages indiquent qu'elles sont en {language}.",
         "makeDefaultOneDone": "{language} est maintenant la langue du site.",
         "languageFailed": "Non effectué\u00a0: {reason}",
+        "switchOffer": {
+            "updateText": "Le sélecteur de langue du site ne correspond plus à ses langues.",
+            "updateButton": "Mettre à jour le sélecteur de langue",
+            "updateDone": "Sélecteur de langue mis à jour.",
+            "updateFailed": "Le sélecteur de langue n'a pas été mis à jour\u00a0: {reason}",
+            "removeText": "Le site n'a plus qu'une langue, et son sélecteur de langue est toujours placé.",
+            "removeButton": "Retirer le sélecteur de langue",
+            "removeTitle": "Retirer le sélecteur de langue\u00a0?",
+            "removePlaces": "Il est retiré de ces emplacements. Son fichier de composant reste\u00a0: il pourra être placé de nouveau plus tard.",
+            "removeDone": "Sélecteur de langue retiré.",
+            "removeFailed": "Le sélecteur de langue n'a pas été retiré de tous les emplacements\u00a0: {reason}",
+            "place": {
+                "menu": "Menu",
+                "footer": "Pied de page",
+                "page": "Page «\u00a0{name}\u00a0»",
+                "component": "Composant «\u00a0{name}\u00a0»"
+            },
+            "placeTimes": {
+                "one": "{place}",
+                "other": "{place} ({count}\u00a0fois)"
+            }
+        },
         "wordsTitle": "Textes",
         "search": "Chercher une clé ou un texte",
         "filterWhere": "Où",
@@ -2285,6 +2307,7 @@
             "category": "Catégorie",
             "categoryHint": "Détermine le consentement\u00a0: «\u00a0essentiel\u00a0» n'en demande aucun\u00a0; les autres, si.",
             "retention": "Durée de conservation",
+            "retentionNone": "— Aucune",
             "retentionCustom": "Personnalisée…",
             "retentionNumber": "Nombre",
             "retentionUnit": "Unité",
@@ -3437,8 +3460,10 @@
         "textModeHint": "Cliquez sur n'importe quel texte pour le modifier directement",
         "styleModeHint": "Cliquez sur un élément pour modifier son style, ou utilisez les sections ci-dessous",
         "jsModeHint": "Cliquez sur un élément pour gérer ses interactions JavaScript",
+        "deleteWithKey": "Supprimer (Suppr)",
         "simpleAdd": {
             "pick": "Que voulez-vous ajouter\u00a0?",
+            "unknownItem": "Aucun élément de l'ajout simple nommé «\u00a0{name}\u00a0»",
             "items": {
                 "text": "Texte",
                 "title": "Titre",
@@ -3872,6 +3897,7 @@
         "themeModeEnabled": "Prise en charge du mode sombre",
         "themeDefault": "Mode par défaut",
         "themeUserToggle": "Le visiteur peut changer",
+        "themeUserToggleHint": "Avec le mode par défaut «\u00a0Système\u00a0», le site suit l'appareil de chaque visiteur, même sans bouton pour changer.",
         "saveThemeConfig": "Enregistrer",
         "themeConfigSaved": "Paramètres du thème enregistrés",
         "deleteComponentNamed": "Supprimer le composant «\u00a0{name}\u00a0»",
@@ -4736,6 +4762,11 @@
         },
         "call": {
             "aborted": "Appel interrompu",
+            "missingConnection": "Connexion manquante",
+            "missingModel": "Modèle manquant",
+            "missingMessages": "Messages manquants",
+            "catalogNotLoaded": "Catalogue des fournisseurs non chargé",
+            "noConnection": "Aucune connexion",
             "failed": "Échec",
             "networkError": "Erreur réseau",
             "noEndpoint": "Aucun endpoint configuré pour {type}",
@@ -4875,8 +4906,7 @@
         "rowEditor": {
             "addRow": "+ Ajouter une ligne",
             "moveUp": "Monter",
-            "moveDown": "Descendre",
-            "remove": "Retirer"
+            "moveDown": "Descendre"
         },
         "textKeyPicker": {
             "searchPlaceholder": "Rechercher ou saisir une clé de traduction",
@@ -4920,7 +4950,6 @@
             "label": "Pagination (numérotée)",
             "description": "Un élément <nav> lié à un store d'état. Il lit `totalPages` pour se dimensionner\u00a0; boutons numérotés + chevrons Préc. / Suiv. optionnels. Clic sur un numéro → setState(page) → fetchState. Masqué quand totalPages est absent ou ≤ 1.",
             "store": "Store d'état lié",
-            "storeLoading": "(chargement…)",
             "storeHint": "Le store dont la pagination lit (totalPages) et écrit (page) les champs. À configurer sur cette page dans l'outil Interactions → Stores d'état.",
             "noStores": "(aucun store d'état sur cette page — ajoutez-en un d'abord dans l'outil Interactions)",
             "pickStore": "-- Choisir un store --",
@@ -4965,6 +4994,7 @@
             "addItem": "+ Ajouter un élément",
             "addOption": "+ Ajouter une option",
             "items": "Éléments",
+            "loading": "(chargement…)",
             "layout": "Disposition",
             "layoutInline": "En ligne (côte à côte)",
             "layoutStacked": "Empilée (une option par ligne)",
@@ -4995,9 +5025,7 @@
             "startAt": "Commencer à",
             "reversed": "Inversée (numérotation décroissante)",
             "olHint": "{start} et {reversed} ne s'appliquent qu'aux listes ordonnées.",
-            "items": "Éléments",
             "itemsHint": "Chaque élément est une clé de traduction, rendue dans un {li}.",
-            "addItem": "+ Ajouter un élément",
             "itemKeyPlaceholder": "ex.\u00a0: menu.home, footer.copyright",
             "errors": {
                 "type": "Choisissez un type de liste (ul ou ol)",
@@ -5009,13 +5037,10 @@
             "label": "Liste déroulante (select)",
             "description": "Un <select> avec ses options, présenté comme un champ de formulaire (label + select + span d'erreur).",
             "namePlaceholder": "ex.\u00a0: country",
-            "required": "Requis",
             "multiple": "Multiple (sélection multiple)",
             "placeholderOptional": "(optionnelle — première option vide)",
             "placeholderHint": "Si elle est définie, la première option est vide, désactivée et sélectionnée, et affiche ce texte traduit. Ignorée si «\u00a0Multiple\u00a0» est coché (limite du navigateur).",
-            "options": "Options",
             "optionsHint": "Chaque option a un attribut {value} littéral (envoyé à la soumission du formulaire) et une clé de traduction pour son libellé visible.",
-            "addOption": "+ Ajouter une option",
             "valuePlaceholder": "valeur (littérale, ex.\u00a0: us)",
             "labelKeyPlaceholder": "ex.\u00a0: form.contact.country",
             "placeholderKeyPlaceholder": "ex.\u00a0: form.contact.country.choose",
@@ -5251,7 +5276,6 @@
             "idPlaceholder": "ex.\u00a0: q1Sales",
             "idRequired": "Le mode Traduisible exige un id de tableau valide.",
             "label": "Tableau",
-            "langLoading": "(chargement…)",
             "modeRaw": "RAW (littéral — identique dans toutes les langues)",
             "modeRawHint": "Chaque cellule devient __RAW__<value> — affichée telle quelle. Aucune clé créée. Le plus rapide.",
             "modeTranslatable": "Traduisible (génère les clés + écrit les valeurs dans une langue)",

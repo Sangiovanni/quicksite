@@ -3476,16 +3476,15 @@ async function initSetKeyframesForm() {
                      + 'padding: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [
                 _renderLabel(QSPanelWords.t('commandForm.setKeyframes.addFrame'), 'admin-label'),
-                QSDom.el('div', {
-                    style: 'display: flex; gap: var(--space-sm); align-items: flex-start;'
-                }, [
-                    QSDom.el('div', { style: 'width: 120px;' }, [kfFrameKey, kfFrameKeyCustom]),
-                    QSDom.el('div', { style: 'flex: 1;' }, [kfFrameProperty, kfFrameValue]),
+                // the frame's key, its property and value, the button: admin.css, one under the other on a phone
+                QSDom.el('div', { class: 'admin-keyframe-add' }, [
+                    QSDom.el('div', { class: 'admin-keyframe-add__key' }, [kfFrameKey, kfFrameKeyCustom]),
+                    QSDom.el('div', { class: 'admin-keyframe-add__property' }, [kfFrameProperty, kfFrameValue]),
                     kfAddFrameBtn
                 ])
             ]),
             QSDom.el('div', {
-                style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
+                style: 'display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [kfApplyNameBtn, kfClearBtn, kfLoadExistingBtn]),
             _renderHint([QSPanelWords.t('commandForm.setKeyframes.hint')])
         ]);

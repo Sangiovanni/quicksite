@@ -44,14 +44,14 @@
                 labelMount
             ]),
             QSDom.el('div', { class: 'admin-form-group' }, [
-                QSDom.el('label', { class: 'admin-checkbox' }, [requiredEl, QSDom.el('span', { text: t('select.required') })]),
+                QSDom.el('label', { class: 'admin-checkbox' }, [requiredEl, QSDom.el('span', { text: QSPanelWords.t('common.required') })]),
                 ' ',
                 QSDom.el('label', { class: 'admin-checkbox', style: 'margin-left:12px' }, [multipleEl, QSDom.el('span', { text: t('select.multiple') })])
             ]),
             placeholderGroup,
             QSDom.el('hr', { style: 'margin:12px 0' }),
             QSDom.el('div', { class: 'admin-form-group' }, [
-                QSDom.el('label', { class: 'admin-label' }, [t('select.options'), ' ', W.requiredMark()]),
+                QSDom.el('label', { class: 'admin-label' }, [t('common.options'), ' ', W.requiredMark()]),
                 QSDom.el('p', { class: 'admin-hint' }, W.codeText(t('select.optionsHint'), { value: 'value' })),
                 optionsContainer
             ]),
@@ -94,7 +94,7 @@
         const optionPickers = new WeakMap();
         const optionsEditor = W.createRowEditor({
             container: optionsContainer,
-            addButtonLabel: t('select.addOption'),
+            addButtonLabel: t('common.addOption'),
             minRows: 1,
             initialRows: [
                 { value: '', labelKey: '' },

@@ -30,15 +30,16 @@ function findComponentInStructure($node, string $componentName, array &$found, s
         return;
     }
     
-    // Check if this node references the component
+    // Check if this node references the component: its node id, the dot notation deleteNode and getStructure take
+    // ("0" is an id: a test of the path as a boolean would read it as none)
     if (isset($node['component']) && $node['component'] === $componentName) {
-        $found[] = $path ?: 'root';
+        $found[] = $path === '' ? 'root' : $path;
     }
     
     // Recurse into children
     if (isset($node['children']) && is_array($node['children'])) {
         foreach ($node['children'] as $index => $child) {
-            $childPath = $path ? "{$path}.{$index}" : (string)$index;
+            $childPath = $path !== '' ? "{$path}.{$index}" : (string)$index;
             findComponentInStructure($child, $componentName, $found, $childPath);
         }
     }
@@ -87,7 +88,7 @@ function scanFileForComponent(string $filePath, string $componentName): array {
  * 
  * @param string $dir Directory to scan
  * @param string $prefix Path prefix for nested pages
- * @return array Array of ['name' => pageName, 'file' => filePath]
+ * @return array Array of ['name' => the page's route, as every page command takes it, 'file' => filePath]
  */
 function getAllPageFiles(string $dir, string $prefix = ''): array {
     $pages = [];
@@ -109,9 +110,15 @@ function getAllPageFiles(string $dir, string $prefix = ''): array {
             $subPrefix = $prefix ? $prefix . '/' . $item : $item;
             $pages = array_merge($pages, getAllPageFiles($path, $subPrefix));
         } else if (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
-            // JSON file - extract page name
+            // JSON file: the page's route. A page in a folder of its name (about/about.json) is the folder's route;
+            // a route parameter's folder (__slug) is written as the route writes it (:slug)
             $baseName = pathinfo($item, PATHINFO_FILENAME);
-            $pageName = $prefix ? $prefix . '/' . $baseName : $baseName;
+            $segments = $prefix === '' ? [] : explode('/', $prefix);
+            if (end($segments) !== $baseName) $segments[] = $baseName;
+            $pageName = implode('/', array_map(
+                fn(string $s): string => preg_match('/^__([a-zA-Z_][a-zA-Z0-9_]*)$/', $s, $m) ? ':' . $m[1] : $s,
+                $segments
+            ));
             $pages[] = [
                 'name' => $pageName,
                 'file' => $path

@@ -3054,17 +3054,17 @@ $GLOBALS['__help_commands'] = [
                 'can_delete' => true,
                 'delete_warning' => 'Warning: component is used in pages/menu/footer',
                 'total_usages' => 5,
-                'used_in' => ['page:home/home', 'page:about/about', 'menu'],
+                'used_in' => ['page:home', 'page:about', 'menu'],
                 'usages' => [
                     'pages' => [
                         [
-                            'name' => 'home/home',
+                            'name' => 'home',
                             'type' => 'page',
                             'locations' => ['0.2', '0.3'],
                             'count' => 2
                         ],
                         [
-                            'name' => 'about/about',
+                            'name' => 'about',
                             'type' => 'page',
                             'locations' => ['0.1'],
                             'count' => 1
@@ -3085,7 +3085,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Component name is not a bare component name (letter first, then letters, digits, hyphens and underscores, max 64 - never a path)',
             '404.file.not_found' => 'Component does not exist'
 ],
-        'notes' => 'can_delete is false only if other components use this component (would break them). Pages/menu/footer usage shows warning but allows delete. Use before deleting a component (editStructure with an empty structure) to understand impact. Locations array contains node IDs where component is referenced. A page is named by its structure file, without .json, relative to the pages folder: home/home is the page home.'
+        'notes' => 'can_delete is false only if other components use this component (would break them). Pages/menu/footer usage shows warning but allows delete. Use before deleting a component (editStructure with an empty structure) to understand impact. Locations array contains node IDs where component is referenced. Each location is a node id in the dot notation getStructure and deleteNode take (0.2.1). A page is named by its route, as every page command takes it (home, blog/:slug).'
     ],
     
     'renameComponent' => [
@@ -6183,7 +6183,7 @@ $GLOBALS['__help_commands'] = [
             'scope' => ['required' => true, 'type' => 'string', 'enum' => ['localStorage', 'sessionStorage', 'cookie'], 'description' => 'Where the browser keeps the key: localStorage, sessionStorage or cookie.'],
             'category' => ['required' => true, 'type' => 'string', 'enum' => ['essential', 'functional', 'analytics', 'marketing'], 'description' => 'What the key is for, which decides the consent it needs: essential (none), functional, analytics or marketing.'],
             'description' => ['required' => false, 'type' => 'object', 'description' => 'What the key is for, as {lang: text} (each language its own word), or as plain text, the default language\'s word. An empty text is no word.', 'validation' => 'Every language one of the project\'s (getLangList returns them)'],
-            'retention' => ['required' => false, 'type' => 'string', 'description' => 'How long the key is kept, as text: a preset (session, 1d, 7d, 30d, 90d, 1y, persistent, signout), a duration written as a whole number from 1 to 9999 followed by a unit, d (days), w (weeks), mo (months) or y (years), such as 13mo, or any other text. A preset or a duration is shown as a word in each reader\'s language (the panel\'s, the cookie policy page\'s); any other text is kept and shown as written (the panel offers the presets and durations alone, and keeps a key\'s other text when it saves). It is shown, never enforced.'],
+            'retention' => ['required' => false, 'type' => 'string', 'description' => 'How long the key is kept, as text: a preset (session, 1d, 7d, 30d, 90d, 1y, persistent, signout), a duration written as a whole number from 1 to 9999 followed by a unit, d (days), w (weeks), mo (months) or y (years), such as 13mo, or any other text. A preset or a duration is shown as a word in each reader\'s language (the panel\'s, the cookie policy page\'s); any other text is kept and shown as written (the panel offers none, the presets and the durations, and keeps a key\'s other text when it saves). It is shown, never enforced.'],
             'domain' => ['required' => false, 'type' => 'string', 'description' => 'Cookie scope only.'],
             'path' => ['required' => false, 'type' => 'string', 'description' => 'Cookie scope only.'],
             'secure' => ['required' => false, 'type' => 'boolean', 'description' => 'Cookie scope only.'],
@@ -6227,7 +6227,7 @@ $GLOBALS['__help_commands'] = [
             'scope' => ['required' => true, 'type' => 'string', 'enum' => ['localStorage', 'sessionStorage', 'cookie'], 'description' => 'Where the browser keeps the key: localStorage, sessionStorage or cookie.'],
             'category' => ['required' => true, 'type' => 'string', 'enum' => ['essential', 'functional', 'analytics', 'marketing'], 'description' => 'What the key is for, which decides the consent it needs: essential (none), functional, analytics or marketing.'],
             'description' => ['required' => false, 'type' => 'object', 'description' => 'What the key is for, as {lang: text}: each language named gets its word, and an empty text removes that language\'s word alone. Plain text is the default language\'s word (empty: that word removed). Left out, every language keeps its word, a rename included.', 'validation' => 'Every language one of the project\'s (getLangList returns them)'],
-            'retention' => ['required' => false, 'type' => 'string', 'description' => 'How long the key is kept, as text: a preset (session, 1d, 7d, 30d, 90d, 1y, persistent, signout), a duration written as a whole number from 1 to 9999 followed by a unit, d (days), w (weeks), mo (months) or y (years), such as 13mo, or any other text. A preset or a duration is shown as a word in each reader\'s language (the panel\'s, the cookie policy page\'s); any other text is kept and shown as written (the panel offers the presets and durations alone, and keeps a key\'s other text when it saves). It is shown, never enforced. Left out, it is cleared.']
+            'retention' => ['required' => false, 'type' => 'string', 'description' => 'How long the key is kept, as text: a preset (session, 1d, 7d, 30d, 90d, 1y, persistent, signout), a duration written as a whole number from 1 to 9999 followed by a unit, d (days), w (weeks), mo (months) or y (years), such as 13mo, or any other text. A preset or a duration is shown as a word in each reader\'s language (the panel\'s, the cookie policy page\'s); any other text is kept and shown as written (the panel offers none, the presets and the durations, and keeps a key\'s other text when it saves). It is shown, never enforced. Left out, it is cleared.']
         ],
         'example_post' => 'POST /management/p/<projectId>/editStorageItem with body: {"id":"cartSession","scope":"localStorage","category":"functional","retention":"90d"}',
         'success_response' => [

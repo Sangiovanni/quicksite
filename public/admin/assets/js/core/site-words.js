@@ -534,7 +534,24 @@ window.QSSiteWords = (function () {
             }
         }
         if (done.length) _announce({ command: 'deleteTranslationKeys', language: done.join(','), keys: removed.slice(), languagesChanged: false }, false);
-        return { ok: failures.length === 0, failures: failures, done: done };
+        return { ok: failures.length === 0, failures: _oneLanguageFailures(failures), done: done };
+    }
+
+    /**
+     * A one-language site's key lives in its language's file and in default.json: a refusal of both is one language's,
+     * reported once under its code, each message once.
+     */
+    function _oneLanguageFailures(failures) {
+        if (!_list || _list.multilingual) return failures;
+        const code = writeLanguage(_list, _list.defaultLanguage);
+        const merged = [];
+        failures.forEach(function (f) {
+            const language = f.language === 'default' ? code : f.language;
+            const same = merged.find(function (m) { return m.language === language; });
+            if (!same) merged.push({ language: language, message: f.message });
+            else if (same.message !== f.message) same.message += QSPanelWords.t('common.join.semicolon') + f.message;
+        });
+        return merged;
     }
 
     /** Whether a key has the shape the word files take: dotted names, none empty, no space and no placeholder. */

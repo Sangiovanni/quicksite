@@ -696,8 +696,8 @@ window.QuickSiteAPI = (function() {
      * Build the /admin/api path segment for a helper ACTION, carrying the edited
      * project as a URL marker the same way buildCommandPath() does for
      * /management. THE single place that knows the helper marker convention —
-     * fetchHelper uses it, and the pages that hand-build a helper URL against
-     * their own base (preview AI tools, translations) call it too.
+     * fetchHelper and postHelper use it, and the editor's one hand-built helper
+     * URL (the Workflows tool's ai-spec-raw read) calls it too.
      *
      * The helper endpoint authorizes each arm's underlying command
      * against THIS project and binds its context, so a project-scoped arm reads
@@ -742,7 +742,47 @@ window.QuickSiteAPI = (function() {
             return result.data;
         }
 
-        throw new Error((result && (result.error || result.message)) || 'Failed to fetch data');
+        throw new Error((result && (result.error || result.message)) || QSPanelWords.t('common.request.incomplete'));
+    }
+
+    /**
+     * POST a JSON body to an /admin/api helper action (the workflow arm, workflow-generate-steps), for every page
+     * that asks it: the editor's Workflows tool and the Translations page. The answer is never thrown on a refusal:
+     * {ok, status, data, body, message}, data the answer's data when it succeeded, body the parsed answer (null when
+     * there is none) so a caller reads a refusal's own fields (the arm's planChanged), message the server's words on
+     * a refusal. A missing token or a network failure throws, as fetchHelper() does.
+     *
+     * @param {string} action - helper action, e.g. 'workflow-generate-steps'
+     * @param {Object} body - what is sent, as JSON
+     * @returns {Promise<{ok: boolean, status: number, data: ?Object, body: ?Object, message: string}>}
+     */
+    async function postHelper(action, body) {
+        const token = getToken();
+        if (!token) {
+            throw new Error(QSPanelWords.t('common.request.noToken'));
+        }
+
+        const response = await fetch(`${config.adminBase}/api/${helperPath(action)}`, {
+            method: 'POST',
+            credentials: 'same-origin', // the session cookie is the credential
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'Accept-Language': QSPanelWords.lang
+            },
+            body: JSON.stringify(body || {})
+        });
+
+        const result = await readResponseBody(response);
+        const ok = response.ok && !!(result && result.success);
+        return {
+            ok: ok,
+            status: response.status,
+            data: ok ? (result.data || {}) : null,
+            body: result,
+            message: ok ? '' : ((result && (result.error || result.message)) || QSPanelWords.t('common.request.incomplete'))
+        };
     }
 
     /**
@@ -1053,6 +1093,7 @@ window.QuickSiteAPI = (function() {
         // plain link cannot carry the Authorization header this surface needs.
         downloadFile,
         fetchHelper,
+        postHelper,
         helperPath,
 
         // Panel state (/admin/state) — not commands. See setSelectedProject.

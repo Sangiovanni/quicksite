@@ -57,27 +57,28 @@
                     </button>
                     <div class="preview-theme-config-body" id="theme-config-body" style="display: none;">
                         <div class="preview-theme-config-row">
-                            <span class="preview-theme-config-label"><?= adminEscape(__admin('preview.themeModeEnabled')) ?></span>
+                            <span class="preview-theme-config-label" id="theme-config-enabled-label"><?= adminEscape(__admin('preview.themeModeEnabled')) ?></span>
                             <label>
-                                <input type="checkbox" id="theme-config-enabled" <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? 'checked' : '' ?>>
+                                <input type="checkbox" id="theme-config-enabled" aria-labelledby="theme-config-enabled-label" <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
                         </div>
                         <div class="preview-theme-config-row">
-                            <span class="preview-theme-config-label"><?= adminEscape(__admin('preview.themeDefault')) ?></span>
-                            <select id="theme-config-default" class="preview-toolbar__select preview-toolbar__select--sm">
+                            <span class="preview-theme-config-label" id="theme-config-default-label"><?= adminEscape(__admin('preview.themeDefault')) ?></span>
+                            <select id="theme-config-default" class="preview-toolbar__select preview-toolbar__select--sm" aria-labelledby="theme-config-default-label">
                                 <option value="light" <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'light' ? 'selected' : '' ?>>☀ <?= adminEscape(__admin('preview.light')) ?></option>
                                 <option value="dark"  <?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'dark'  ? 'selected' : '' ?>>🌙 <?= adminEscape(__admin('preview.dark')) ?></option>
                                 <option value="system"<?= ($editConfig['THEME_DEFAULT'] ?? 'light') === 'system'? 'selected' : '' ?>>⚙ <?= adminEscape(__admin('preview.system')) ?></option>
                             </select>
                         </div>
                         <div class="preview-theme-config-row">
-                            <span class="preview-theme-config-label"><?= adminEscape(__admin('preview.themeUserToggle')) ?></span>
+                            <span class="preview-theme-config-label" id="theme-config-usertoggle-label"><?= adminEscape(__admin('preview.themeUserToggle')) ?></span>
                             <label>
-                                <input type="checkbox" id="theme-config-usertoggle" <?= ($editConfig['THEME_USER_TOGGLE_ENABLED'] ?? false) ? 'checked' : '' ?>>
+                                <input type="checkbox" id="theme-config-usertoggle" aria-labelledby="theme-config-usertoggle-label" aria-describedby="theme-config-usertoggle-hint" <?= ($editConfig['THEME_USER_TOGGLE_ENABLED'] ?? false) ? 'checked' : '' ?>>
                                 <span class="preview-toggle__track"></span>
                             </label>
                         </div>
+                        <p class="preview-contextual-form__hint" id="theme-config-usertoggle-hint"><?= adminEscape(__admin('preview.themeUserToggleHint')) ?></p>
                         <button type="button" class="admin-btn admin-btn--primary" id="theme-config-save-btn" style="margin-top: 8px; width: 100%;">
                             <?= adminEscape(__admin('preview.saveThemeConfig')) ?>
                         </button>

@@ -73,7 +73,7 @@
             </button>
             <!-- Delete: red, and the shared bin; it asks first. Del deletes too (preview.js). -->
             <button type="button" class="admin-btn admin-btn--danger" id="ctx-node-delete"<?= qs_editor_control_attrs('select.delete') ?> data-qs-icon="trash"
-                    title="<?= adminAttr(__admin('common.delete')) ?> (Del)" aria-label="<?= adminAttr(__admin('common.delete')) ?>" aria-keyshortcuts="Delete">
+                    title="<?= adminAttr(__admin('preview.deleteWithKey')) ?>" aria-label="<?= adminAttr(__admin('common.delete')) ?>" aria-keyshortcuts="Delete">
                 <span><?= adminEscape(__admin('common.delete')) ?></span>
             </button>
             <!-- Variables button (component-only, shown/hidden by JS) -->

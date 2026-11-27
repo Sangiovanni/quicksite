@@ -244,7 +244,7 @@
         (function () {
             var opt = document.createElement('option');
             opt.value = '';
-            opt.textContent = t('table.langLoading');
+            opt.textContent = t('common.loading');
             langSelect.appendChild(opt);
         })();
         langRow.appendChild(langLabel);

@@ -122,7 +122,7 @@ window.PreviewSimpleAdd = (function () {
      */
     function plan(name, values, keys, env) {
         const preset = PRESETS[name];
-        if (!preset) throw new Error('No simple Add item named ' + name);
+        if (!preset) throw new Error(QSPanelWords.t('preview.simpleAdd.unknownItem', { name: name }));
         return preset.build(values, keys, env || {});
     }
 

@@ -350,16 +350,31 @@
         align-items: stretch;
         padding-bottom: 0;
     }
+    /* A group's whole entry opens and closes it: its arrow is laid over the word's row and takes the press, its
+       chevron where it was (the word's link stays for the keyboard); the group's entries follow on a row of their own */
     .admin-nav__group {
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
     }
     .admin-nav__group-toggle {
-        flex: 1 1 0;
+        grid-column: 1;
+        grid-row: 1;
         min-width: 0;
     }
+    .admin-nav__group > .admin-nav__group-arrow-btn {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        padding-inline-end: var(--space-sm);
+        background: transparent;
+    }
     .admin-nav__group-dropdown {
+        grid-column: 1 / -1;
+        grid-row: 2;
         position: static;
-        flex: 0 0 100%;
         box-sizing: border-box;
         width: auto;
         min-width: 0;
@@ -368,6 +383,16 @@
         background: transparent;
         border: none;
         box-shadow: none;
+    }
+
+    /* The Set Keyframes form's Add a frame row: the frame's key, its property and value, then its button, one under
+       the other */
+    .admin-keyframe-add {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .admin-keyframe-add__key {
+        width: auto;
     }
 
     /* The editor: the rows, then the page right after them. Row 1 wraps as one flow with what its

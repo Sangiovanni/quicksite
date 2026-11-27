@@ -1112,8 +1112,27 @@ input.admin-checkbox {
 
 .admin-filter-group--actions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-sm);
     flex: 0 0 auto;
+    /* never wider than its row: on a phone its buttons wrap instead of running past the screen */
+    max-width: 100%;
+}
+
+/* The Set Keyframes form's Add a frame row (command-form.js): the frame's key, its property and value, the button
+   (one under the other on a phone, responsive.css) */
+.admin-keyframe-add {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: flex-start;
+}
+
+.admin-keyframe-add__key {
+    width: 120px;
+}
+
+.admin-keyframe-add__property {
+    flex: 1;
 }
 
 /* What holds a table or another wide block: it scrolls sideways by itself, and an edge

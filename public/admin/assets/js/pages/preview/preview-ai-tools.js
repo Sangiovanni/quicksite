@@ -4405,25 +4405,17 @@ window.PreviewAiTools = (function () {
 
     // ──────────────────────────── The plan ──────────────────────────────
 
-    /** The workflow endpoint (workflow-generate-steps): a POST of the request, its data on success. */
+    /**
+     * The workflow endpoint (workflow-generate-steps), through the panel's one POST to the admin helpers
+     * (QuickSiteAPI.postHelper): the request's data on success; a refusal thrown in the server's words, or as the
+     * run's plan changed (the server's 409 with planChanged).
+     */
     function _workflowRequest(body) {
-        var cfg = window.PreviewConfig || {};
-        var url = (cfg.adminUrl || '') + 'api/' + _helperPath('workflow-generate-steps');
-        var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Accept-Language': QSPanelWords.lang };
-        if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
         var id = _activeWorkflowSummary && _activeWorkflowSummary.id;
-        return fetch(url, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(Object.assign({ workflowId: id }, body))
-        }).then(function (res) {
-            return res.json().catch(function () { return null; }).then(function (json) {
-                if (json && json.planChanged === true) throw _planChangedError();
-                if (!res.ok || !json || !json.success) {
-                    throw new Error((json && json.error) || ('HTTP ' + res.status));
-                }
-                return json.data || {};
-            });
+        return window.QuickSiteAPI.postHelper('workflow-generate-steps', Object.assign({ workflowId: id }, body)).then(function (answer) {
+            if (answer.body && answer.body.planChanged === true) throw _planChangedError();
+            if (!answer.ok) throw new Error(answer.message);
+            return answer.data;
         });
     }
 

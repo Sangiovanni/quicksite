@@ -7,7 +7,9 @@
  * workflow, the console) and when the tab comes back into view; a write in progress is never redrawn over.
  *
  * Every control that writes is drawn only for a role that can run its command (translation.write), after the
- * panel's permissions load: a viewer sees the words and the languages, and nothing to press.
+ * panel's permissions load: a viewer sees the words and the languages, and nothing to press. The language switch's
+ * offer, after an add or a removal, sends content commands (editStructure, deleteNode) and is drawn only for a role
+ * that can run them and the reads they need.
  *
  * Template: secure/admin/templates/pages/translations.php (the static structure, and the `translations` section it
  * hands). Every dynamic part is built here with QSDom.el and named _render* helpers, each returning one Element.
@@ -29,7 +31,9 @@
         filter: { used: true, unset: true, unused: true, same: false, search: '', scope: 'site' },
         editing: null,               // {key, language, text, error, busy} while a word is edited
         pendingReload: false,        // a change announced while a word was edited: read once it is done
-        can: { write: false, remove: false, addLang: false, deleteLang: false, setDefault: false },
+        can: { write: false, remove: false, addLang: false, deleteLang: false, setDefault: false, switchUpdate: false, switchRemove: false },
+        offerSeq: 0,                 // the language-switch offer's reads: an older one's answer is dropped
+        focusOffer: false,           // a language was removed: its bin is gone, the offer's button takes the focus
     };
 
     const $ = function (id) { return document.getElementById(id); };
@@ -144,7 +148,18 @@
         drawScope();
         drawAddForm();
         drawTable();
-        if (focusBack) focusBack.restore();
+        if (focusBack && !focusBack.restore()) {
+            // What held the focus is gone (a language's bin, the language removed): the offer's button, else the Add row.
+            const next = fallbackFocus();
+            if (next) next.focus();
+        }
+    }
+
+    /** Where the focus goes when its control is gone from the languages: the switch offer's button, else the Add row's picker. */
+    function fallbackFocus() {
+        const offer = !dom.switchOffer.hidden && dom.switchOffer.querySelector('button');
+        if (offer) return offer;
+        return dom.languageAdd.hidden ? null : dom.languageAdd.querySelector('button:not([hidden]), select');
     }
 
     function permissionsKnown() {
@@ -524,6 +539,7 @@
             body: opts.body,
             type: opts.danger ? 'danger' : 'info',
             confirmText: opts.action,
+            returnFocus: opts.returnFocus,
             action: async function () {
                 const done = await opts.run();
                 if (!done || !done.ok) return { ok: false, message: (done && done.message) || '' };
@@ -576,11 +592,13 @@
                 }
                 const done = await SW.remove(targets, [row.key]);
                 if (!done.ok) {
+                    // A one-language site's key leaves its language's file and default.json: one language, named once.
+                    const unique = function (items) { return items.filter(function (v, i) { return items.indexOf(v) === i; }); };
                     return {
                         ok: false,
                         message: t('deleteFailed', {
-                            languages: QSPanelWords.list(done.failures.map(function (f) { return languageName(f.language); }), 'unit'),
-                            reason: done.failures.map(function (f) { return f.message; }).join(' | '),
+                            languages: QSPanelWords.list(unique(done.failures.map(function (f) { return languageName(f.language); })), 'unit'),
+                            reason: unique(done.failures.map(function (f) { return f.message; })).join(QSPanelWords.t('common.join.semicolon')),
                         }),
                     };
                 }
@@ -595,7 +613,7 @@
         return el('label', { class: 'translations-dialog__option' }, [input, el('span', { text: label })]);
     }
 
-    function askAddLanguage() {
+    async function askAddLanguage() {
         const code = dom.languagePick.value;
         if (!code) return;
         const list = state.list;
@@ -613,7 +631,7 @@
         body.push(_renderParagraph(words > 0
             ? QSPanelWords.count('translations.addLanguageCopy', words, { default: languageName(dflt) })
             : t('addLanguageEmpty')));
-        ask({
+        const added = await ask({
             title: t('addLanguageTitle', { language: name }),
             body: body,
             action: t('addLanguageButton'),
@@ -623,6 +641,7 @@
                 return { ok: false, message: t('languageFailed', { reason: done.message }) };
             },
         });
+        if (added) offerSwitch();
     }
 
     /**
@@ -647,17 +666,22 @@
             }
             body.push(_renderLanguageLinks(links));
         }
-        ask({
+        const removed = await ask({
             title: t('removeLanguageTitle', { language: lang.name }),
             body: body,
             action: t('removeLanguage'),
             danger: true,
+            returnFocus: fallbackFocus,
             run: async function () {
                 const done = await SW.removeLanguage(lang.code);
                 if (done.ok) return { ok: true, toast: t('removeLanguageDone', { language: lang.name }) };
                 return { ok: false, message: t('languageFailed', { reason: done.message }) };
             },
         });
+        if (removed) {
+            state.focusOffer = true;
+            offerSwitch();
+        }
     }
 
     /**
@@ -738,6 +762,177 @@
         });
     }
 
+    // ------------------------------------------------------------------------------------------------ the language switch
+
+    /*
+     * After an add or a removal changes the language count, the site's language switch (the lang-switch component)
+     * may no longer list its languages. The page offers one button, never acting on its own, and only where the switch
+     * is placed somewhere and the update-lang-switch workflow's own test says it no longer matches: at two languages
+     * or more, Update (the workflow's step, the component rewritten from the language list); at one, Remove (every
+     * placement, each named in the question; the component file kept). The page holds no test of its own: it asks the
+     * workflow route for the workflow's first phase, no step meaning the switch matches.
+     */
+    const SWITCH = 'lang-switch';
+    const SWITCH_WORKFLOW = 'update-lang-switch';
+
+    /** Where the switch is placed (findComponentUsages): {ok, places: [{type, name, nodeIds}]}; no component file, none. */
+    async function readSwitchPlaces() {
+        const res = await window.QuickSiteAdmin.apiRequest('findComponentUsages', 'GET', null, [SWITCH]);
+        if (res && res.status === 404) return { ok: true, places: [] };
+        const data = res && res.ok && res.data && res.data.data;
+        if (!data || !data.usages) return { ok: false, message: SW.serverWords(res) };
+        const u = data.usages;
+        const places = [];
+        const add = function (type, name, entry) {
+            const ids = entry && Array.isArray(entry.locations) ? entry.locations.map(String) : [];
+            if (ids.length) places.push({ type: type, name: name, nodeIds: ids });
+        };
+        add('menu', null, u.menu);
+        add('footer', null, u.footer);
+        (Array.isArray(u.pages) ? u.pages : []).forEach(function (p) { add('page', p.name, p); });
+        (Array.isArray(u.components) ? u.components : []).forEach(function (c) { add('component', c.name, c); });
+        return { ok: true, places: places };
+    }
+
+    /** The workflow's first phase, resolved now by the server: {ok, steps}, no step when the switch matches the languages. */
+    async function readSwitchSteps() {
+        const answer = await window.QuickSiteAPI.postHelper('workflow-generate-steps', { workflowId: SWITCH_WORKFLOW, params: {}, phase: 0 });
+        const phase = answer.ok && answer.data && answer.data.phase;
+        if (!phase || !Array.isArray(phase.steps)) return { ok: false, message: answer.message };
+        return { ok: true, steps: phase.steps };
+    }
+
+    function hideSwitchOffer() {
+        dom.switchOffer.hidden = true;
+        dom.switchOffer.replaceChildren();
+    }
+
+    /** Read what the offer needs and draw it, or nothing (no role for it, no switch placed, a switch that matches, a failed read). */
+    async function offerSwitch() {
+        const seq = ++state.offerSeq;
+        const focusAfter = state.focusOffer;
+        state.focusOffer = false;
+        hideSwitchOffer();
+        if (!state.can.switchUpdate && !state.can.switchRemove) return;
+        try {
+            const list = await SW.read();
+            if (seq !== state.offerSeq || !list) return;
+            const one = !list.multilingual;
+            if (one ? !state.can.switchRemove : !state.can.switchUpdate) return;
+            const placed = await readSwitchPlaces();
+            if (seq !== state.offerSeq || !placed.ok || placed.places.length === 0) return;
+            const plan = await readSwitchSteps();
+            if (seq !== state.offerSeq || !plan.ok || plan.steps.length === 0) return;
+            dom.switchOffer.replaceChildren(_renderSwitchOffer(one, placed.places));
+            dom.switchOffer.hidden = false;
+            if (focusAfter) {
+                const at = document.activeElement;
+                if (!at || at === document.body || dom.languages.contains(at) || dom.languageAdd.contains(at)) {
+                    dom.switchOffer.querySelector('button').focus();
+                }
+            }
+        } catch (e) {
+            // A read that fails offers nothing: the switch is the author's to update from the editor.
+        }
+    }
+
+    /** The offer: what it is about and its one button. */
+    function _renderSwitchOffer(one, places) {
+        const button = el('button', {
+            type: 'button', class: 'admin-btn admin-btn--primary',
+            text: t(one ? 'switchOffer.removeButton' : 'switchOffer.updateButton'),
+        });
+        button.addEventListener('click', function () {
+            if (one) askRemoveSwitch(places, button); else updateSwitch(button);
+        });
+        return el('div', { class: 'translations-languages__offer-body' }, [
+            el('p', { class: 'translations-languages__offer-text', text: t(one ? 'switchOffer.removeText' : 'switchOffer.updateText') }),
+            button,
+        ]);
+    }
+
+    /** Update: the workflow's step, read again now and sent as its command; the switch then lists the site's languages. */
+    async function updateSwitch(button) {
+        button.disabled = true;
+        let failed = null;
+        try {
+            const plan = await readSwitchSteps();
+            if (!plan.ok) {
+                failed = plan.message;
+            } else {
+                for (const step of plan.steps) {
+                    const method = String(step.method || 'POST').toUpperCase();
+                    const res = await window.QuickSiteAdmin.apiRequest(step.command, method, method !== 'GET' ? (step.params || null) : null);
+                    if (!res || !res.ok) { failed = SW.serverWords(res); break; }
+                }
+            }
+        } catch (e) {
+            failed = String((e && e.message) || e);
+        }
+        if (failed !== null) {
+            button.disabled = false;
+            window.QuickSiteAdmin.showToast(t('switchOffer.updateFailed', { reason: failed }), 'error');
+            return;
+        }
+        window.QuickSiteAdmin.showToast(t('switchOffer.updateDone'), 'success');
+        hideSwitchOffer();
+        const next = fallbackFocus();
+        if (next) next.focus();
+    }
+
+    /** A place's name in Remove's question: the menu, the footer, a page, a component. */
+    function _switchPlaceName(place) {
+        return t('switchOffer.place.' + place.type, { name: place.name || '' });
+    }
+
+    function _renderSwitchPlaces(places) {
+        return el('ul', { class: 'translations-dialog__places' }, places.map(function (place) {
+            return el('li', { text: QSPanelWords.count('translations.switchOffer.placeTimes', place.nodeIds.length, { place: _switchPlaceName(place) }) });
+        }));
+    }
+
+    /** Node ids, the last first: removing a node shifts the ids of the siblings after it, never those before. */
+    function _lastFirst(a, b) {
+        const x = a.split('.'), y = b.split('.');
+        for (let i = 0; i < Math.max(x.length, y.length); i++) {
+            if (x[i] === undefined) return 1;
+            if (y[i] === undefined) return -1;
+            const d = (parseInt(y[i], 10) || 0) - (parseInt(x[i], 10) || 0);
+            if (d !== 0) return d;
+        }
+        return 0;
+    }
+
+    /** Remove: every placement (deleteNode, the last first in a file), asked first, each place named; the component file stays. */
+    async function askRemoveSwitch(places, button) {
+        const removed = await ask({
+            title: t('switchOffer.removeTitle'),
+            body: [_renderParagraph(t('switchOffer.removePlaces')), _renderSwitchPlaces(places)],
+            action: t('switchOffer.removeButton'),
+            danger: true,
+            returnFocus: fallbackFocus,
+            run: async function () {
+                // Read again: a press after a refusal removes what is still placed, by the ids it has now.
+                const now = await readSwitchPlaces();
+                if (!now.ok) return { ok: false, message: t('switchOffer.removeFailed', { reason: now.message }) };
+                for (const place of now.places) {
+                    for (const nodeId of place.nodeIds.slice().sort(_lastFirst)) {
+                        const body = { type: place.type, nodeId: nodeId };
+                        if (place.name) body.name = place.name;
+                        const res = await window.QuickSiteAdmin.apiRequest('deleteNode', 'DELETE', body);
+                        if (!res || !res.ok) return { ok: false, message: t('switchOffer.removeFailed', { reason: SW.serverWords(res) }) };
+                    }
+                }
+                return { ok: true, toast: t('switchOffer.removeDone') };
+            },
+        });
+        if (removed) {
+            hideSwitchOffer();
+        } else if (button.isConnected) {
+            button.focus();
+        }
+    }
+
     // ------------------------------------------------------------------------------------------------ wiring
 
     function bind() {
@@ -750,6 +945,7 @@
             languagePick: $('translations-language-pick'),
             languageAddBtn: $('translations-language-add-btn'),
             languageDefaultBtn: $('translations-language-default-btn'),
+            switchOffer: $('translations-switch-offer'),
             search: $('translations-search'),
             scope: $('translations-scope'),
             sameChip: $('translations-same-chip'),
@@ -810,6 +1006,10 @@
             addLang: can('addLang'),
             deleteLang: can('deleteLang'),
             setDefault: can('setDefaultLang'),
+            // The language switch's offer sends content commands, not language ones, behind the reads it needs:
+            // where the switch is placed, and the workflow route (gated as getStructure).
+            switchUpdate: can('editStructure') && can('getStructure') && can('findComponentUsages'),
+            switchRemove: can('deleteNode') && can('getStructure') && can('findComponentUsages'),
         };
     }
 

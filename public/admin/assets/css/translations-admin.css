@@ -62,6 +62,29 @@
     color: var(--admin-warning);
 }
 
+/* The language switch's offer, once an add or a removal leaves it behind the languages: a note and its one button. */
+.translations-languages__offer {
+    margin-top: var(--space-md);
+}
+
+.translations-languages__offer-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm) var(--space-md);
+    padding: var(--space-md);
+    border: 1px solid var(--admin-info-border);
+    border-radius: var(--radius-md);
+    background: var(--admin-info-bg);
+}
+
+.translations-languages__offer-text {
+    flex: 1 1 16rem;
+    min-width: 0;
+    margin: 0;
+    color: var(--admin-text);
+}
+
 .translations-languages__add {
     margin-top: var(--space-lg);
 }
@@ -342,6 +365,13 @@
 .translations-dialog__words dd {
     margin: 0;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.translations-dialog__places {
+    margin: 0;
+    padding-left: var(--space-lg);
+    font-size: var(--font-size-sm);
     overflow-wrap: anywhere;
 }
 

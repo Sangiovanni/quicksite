@@ -119,7 +119,7 @@
         (function () {
             var loadingOpt = document.createElement('option');
             loadingOpt.value = '';
-            loadingOpt.textContent = t('storeLoading');
+            loadingOpt.textContent = window.QSComplexWizard.t('common.loading');
             storeSelect.appendChild(loadingOpt);
         })();
         storeGroup.appendChild(storeSelect);

@@ -29,11 +29,11 @@ function findComponentUsagesInternal(string $componentName): array {
     $findInStructure = function($node, string $target, array &$found, string $path = '') use (&$findInStructure): void {
         if (!is_array($node)) return;
         if (isset($node['component']) && $node['component'] === $target) {
-            $found[] = $path ?: 'root';
+            $found[] = $path === '' ? 'root' : $path;
         }
         if (isset($node['children']) && is_array($node['children'])) {
             foreach ($node['children'] as $i => $child) {
-                $findInStructure($child, $target, $found, $path ? "{$path}.{$i}" : (string)$i);
+                $findInStructure($child, $target, $found, $path !== '' ? "{$path}.{$i}" : (string)$i);
             }
         }
     };

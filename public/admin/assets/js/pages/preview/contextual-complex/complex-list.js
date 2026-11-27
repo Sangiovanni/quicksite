@@ -55,7 +55,7 @@
             olGroup,
             QSDom.el('hr', { style: 'margin:12px 0' }),
             QSDom.el('div', { class: 'admin-form-group' }, [
-                QSDom.el('label', { class: 'admin-label' }, [t('list.items'), ' ', W.requiredMark()]),
+                QSDom.el('label', { class: 'admin-label' }, [t('common.items'), ' ', W.requiredMark()]),
                 QSDom.el('p', { class: 'admin-hint' }, W.codeText(t('list.itemsHint'), { li: '<li>' })),
                 itemsHost
             ])
@@ -78,7 +78,7 @@
         const itemPickers = new WeakMap();
         const itemsEditor = W.createRowEditor({
             container: itemsHost,
-            addButtonLabel: t('list.addItem'),
+            addButtonLabel: t('common.addItem'),
             minRows: 1,
             initialRows: [
                 { labelKey: '' },

@@ -86,7 +86,7 @@ function getTagExamples(): array {
         
         'samp' => '<p>' . $t('preview.example.output') . ' <samp class="tag-ex-samp">' . $t('preview.example.sampleOutput') . '</samp></p>',
         
-        'var' => '<p>' . $t('preview.example.formula') . ': <var class="tag-ex-var">x</var> + <var class="tag-ex-var">y</var> = <var class="tag-ex-var">z</var></p>',
+        'var' => '<p>' . $t('preview.example.formula') . $t('common.join.colon') . ' <var class="tag-ex-var">x</var> + <var class="tag-ex-var">y</var> = <var class="tag-ex-var">z</var></p>',
         
         'blockquote' => '<blockquote class="tag-ex-blockquote">"' . $t('preview.example.quote') . '"<footer class="tag-ex-blockquote-footer">— ' . $t('preview.example.quoteAuthor') . '</footer></blockquote>',
         
@@ -206,9 +206,9 @@ function getTagExamples(): array {
         'col' => '<table class="tag-ex-table"><colgroup><col class="tag-ex-colgroup-1" style="width:30%;"><col class="tag-ex-colgroup-3"></colgroup><tr><td class="tag-ex-td">30%</td><td class="tag-ex-td">' . $t('preview.example.auto') . '</td></tr></table>',
         
         // ===== OTHER TAGS =====
-        'data' => '<p>' . $t('preview.example.product') . ': <data value="978-3-16-148410-0" class="tag-ex-data">ISBN 978-3-16-148410-0</data></p>',
+        'data' => '<p>' . $t('preview.example.product') . $t('common.join.colon') . ' <data value="978-3-16-148410-0" class="tag-ex-data">ISBN 978-3-16-148410-0</data></p>',
         
-        'bdi' => '<p>' . $t('preview.example.user') . ': <bdi class="tag-ex-bdi">مستخدم</bdi> (' . $t('preview.example.rtlText') . ')</p>',
+        'bdi' => '<p>' . $t('preview.example.user') . $t('common.join.colon') . ' <bdi class="tag-ex-bdi">مستخدم</bdi> (' . $t('preview.example.rtlText') . ')</p>',
         
         'bdo' => '<p><bdo dir="rtl" class="tag-ex-bdo">' . $t('preview.example.helloWorld') . '</bdo><br><span class="tag-ex-small">(' . $t('preview.example.reversed') . ')</span></p>',
         

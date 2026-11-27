@@ -677,7 +677,9 @@
         const enabled = yes(saved.enabled);
         const dark = enabled && saved.default === 'dark';
         themeConfigEnabled.checked = enabled;
-        if (themeConfigDefault) themeConfigDefault.value = dark ? 'dark' : 'light';
+        // The mode saved, System included (the editor's scope follows Light for it, as after Save Settings).
+        const mode = enabled && ['light', 'dark', 'system'].indexOf(saved.default) !== -1 ? saved.default : 'light';
+        if (themeConfigDefault) themeConfigDefault.value = mode;
         if (themeConfigToggleEl) themeConfigToggleEl.checked = enabled && yes(saved.userToggle);
         syncThemeConfigDependents();
         showSavedThemeMode();

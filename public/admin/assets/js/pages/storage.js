@@ -463,19 +463,22 @@
     }
 
     /**
-     * The key dialog's Retention field, opened on what a key holds ('session' for a new key): the presets, then
-     * Custom… (a duration: a whole number and a unit, saved as 13mo). A key that holds another text (typed before, or
-     * sent through the API) has one more option, that text as typed, chosen: a save keeps it, another choice replaces
-     * it. read() answers the value to save, or null when the duration's number is not a whole number from 1 to 9999.
+     * The key dialog's Retention field, opened on what a key holds ('session' for a new key, none for a key that has
+     * none): none (—, the empty value: a save leaves the retention out), the presets, then Custom… (a duration: a whole
+     * number and a unit, saved as 13mo). A key that holds another text (typed before, or sent through the API) has one
+     * more option, that text as typed, chosen: a save keeps it, another choice replaces it. read() answers the value to
+     * save ('' for none), or null when the duration's number is not a whole number from 1 to 9999.
      */
     function _renderRetentionField(held) {
+        held = held || '';
         var duration = _retentionDuration(held);
         // A preset first: 30d is a preset as well as a duration's form.
         var preset = RETENTION_PRESETS.indexOf(held) !== -1;
-        var kept = !preset && !duration;
-        var choice = preset ? held : (duration ? '__custom__' : '__text__');
-        var values = RETENTION_PRESETS.concat(['__custom__'], kept ? ['__text__'] : []);
+        var kept = held !== '' && !preset && !duration;
+        var choice = held === '' || preset ? held : (duration ? '__custom__' : '__text__');
+        var values = [''].concat(RETENTION_PRESETS, ['__custom__'], kept ? ['__text__'] : []);
         var select = _renderSelect(values, choice, function (value) {
+            if (value === '') return QSPanelWords.t('storage.keyDialog.retentionNone');
             return value === '__text__' ? QSPanelWords.t('storage.keyDialog.retentionKept', { text: held }) : _retentionOptionWord(value);
         });
         var number = QSDom.el('input', {
@@ -551,8 +554,9 @@
         dialog.appendChild(_renderGroup(_renderLabel(QSPanelWords.t('storage.keyDialog.category'), true), categorySelect,
             _renderHint(QSPanelWords.t('storage.keyDialog.categoryHint'))));
 
-        // retention (a preset, a duration, or the text a key already holds)
-        var retention = _renderRetentionField(isEdit ? (item.retention || 'session') : 'session');
+        // retention (none, a preset, a duration, or the text a key already holds): a new key starts on Session, an
+        // edited key on what it holds, none included (a save of none writes none)
+        var retention = _renderRetentionField(isEdit ? (item.retention || '') : 'session');
         dialog.appendChild(retention.group);
 
         // description — each language's own word (translate/, keyed; edits are live). One language shows at a

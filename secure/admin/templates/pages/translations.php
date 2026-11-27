@@ -44,6 +44,7 @@
     <div class="admin-card__body">
     <p class="admin-hint" id="translations-languages-hint" hidden><?= adminEscape(__admin('translations.languagesHint')) ?></p>
     <div class="translations-languages__list" id="translations-languages"></div>
+    <div class="translations-languages__offer" id="translations-switch-offer" role="status" hidden></div>
     <div class="translations-languages__add" id="translations-language-add" data-requires-command="addLang" hidden>
         <label class="admin-label" for="translations-language-pick"><?= adminEscape(__admin('translations.addLanguage')) ?></label>
         <div class="translations-languages__add-row">

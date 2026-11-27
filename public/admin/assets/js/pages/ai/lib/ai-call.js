@@ -34,13 +34,13 @@
 
     async function call(args) {
         const { connection, model, messages, options, signal, onChunk } = args || {};
-        if (!connection) throw err('invalid_request', 'Missing connection');
-        if (!model) throw err('invalid_request', 'Missing model');
+        if (!connection) throw err('invalid_request', QSPanelWords.t('aiConnections.call.missingConnection'));
+        if (!model) throw err('invalid_request', QSPanelWords.t('aiConnections.call.missingModel'));
         if (!Array.isArray(messages) || messages.length === 0) {
-            throw err('invalid_request', 'Missing messages');
+            throw err('invalid_request', QSPanelWords.t('aiConnections.call.missingMessages'));
         }
         if (!window.QSProviderCatalog) {
-            throw err('invalid_request', 'Provider catalog not loaded');
+            throw err('invalid_request', QSPanelWords.t('aiConnections.call.catalogNotLoaded'));
         }
 
         const cat = window.QSProviderCatalog;
@@ -237,7 +237,7 @@
      * `{ ok: false, models: [], message, category?, status? }` (why it failed) — never throws.
      */
     async function test(connection, signal) {
-        if (!connection) return { ok: false, models: [], message: 'No connection' };
+        if (!connection) return { ok: false, models: [], message: QSPanelWords.t('aiConnections.call.noConnection') };
         const cat = window.QSProviderCatalog;
         const modelsUrl = cat.buildModelsUrl(connection);
 

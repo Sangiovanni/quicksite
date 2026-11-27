@@ -1733,6 +1733,28 @@
         "makeDefaultOneText": "The site keeps one language: {language} takes the place of {current}. Its words and its addresses stay as they are; its pages say they are in {language}.",
         "makeDefaultOneDone": "{language} is the site's language now.",
         "languageFailed": "Not done: {reason}",
+        "switchOffer": {
+            "updateText": "The site's language switch no longer lists its languages.",
+            "updateButton": "Update the language switch",
+            "updateDone": "Language switch updated.",
+            "updateFailed": "The language switch was not updated: {reason}",
+            "removeText": "The site has one language now, and its language switch is still placed.",
+            "removeButton": "Remove the language switch",
+            "removeTitle": "Remove the language switch?",
+            "removePlaces": "It is taken out of these places. Its component file stays, so it can be placed again later.",
+            "removeDone": "Language switch removed.",
+            "removeFailed": "The language switch was not removed from every place: {reason}",
+            "place": {
+                "menu": "Menu",
+                "footer": "Footer",
+                "page": "Page “{name}”",
+                "component": "Component “{name}”"
+            },
+            "placeTimes": {
+                "one": "{place}",
+                "other": "{place} ({count} times)"
+            }
+        },
         "wordsTitle": "Words",
         "search": "Search a key or a word",
         "filterWhere": "Where",
@@ -2285,6 +2307,7 @@
             "category": "Category",
             "categoryHint": "Drives consent: \"essential\" needs no consent; the others do.",
             "retention": "Retention",
+            "retentionNone": "— None",
             "retentionCustom": "Custom…",
             "retentionNumber": "Number",
             "retentionUnit": "Unit",
@@ -3437,8 +3460,10 @@
         "textModeHint": "Click any text in the preview to edit it inline",
         "styleModeHint": "Click an element to edit its style, or use the sections below",
         "jsModeHint": "Click an element to manage its JavaScript interactions",
+        "deleteWithKey": "Delete (Del)",
         "simpleAdd": {
             "pick": "What do you want to add?",
+            "unknownItem": "No simple Add item named {name}",
             "items": {
                 "text": "Text",
                 "title": "Title",
@@ -3872,6 +3897,7 @@
         "themeModeEnabled": "Dark mode support",
         "themeDefault": "Default mode",
         "themeUserToggle": "Visitor can switch",
+        "themeUserToggleHint": "With Default mode System, the site follows each visitor's device, even without a switch.",
         "saveThemeConfig": "Save Settings",
         "themeConfigSaved": "Theme settings saved successfully",
         "deleteComponentNamed": "Delete the component “{name}”",
@@ -4736,6 +4762,11 @@
         },
         "call": {
             "aborted": "Aborted",
+            "missingConnection": "Missing connection",
+            "missingModel": "Missing model",
+            "missingMessages": "Missing messages",
+            "catalogNotLoaded": "Provider catalog not loaded",
+            "noConnection": "No connection",
             "failed": "Failed",
             "networkError": "Network error",
             "noEndpoint": "No endpoint configured for {type}",
@@ -4875,8 +4906,7 @@
         "rowEditor": {
             "addRow": "+ Add row",
             "moveUp": "Move up",
-            "moveDown": "Move down",
-            "remove": "Remove"
+            "moveDown": "Move down"
         },
         "textKeyPicker": {
             "searchPlaceholder": "Search or type a translation key",
@@ -4920,7 +4950,6 @@
             "label": "Paged navigator (numbered)",
             "description": "A <nav> bound to a state store. Reads `totalPages` to size itself; numbered buttons + optional Prev/Next chevrons. Click a number → setState(page) → fetchState. Hides when totalPages is missing or ≤ 1.",
             "store": "Bound state store",
-            "storeLoading": "(loading…)",
             "storeHint": "The store whose fields the navigator reads (totalPages) and writes (page). Configure on this page via the Interactions tool → State stores.",
             "noStores": "(no state stores on this page — add one in the Interactions tool first)",
             "pickStore": "-- pick a store --",
@@ -4965,6 +4994,7 @@
             "addItem": "+ Add item",
             "addOption": "+ Add option",
             "items": "Items",
+            "loading": "(loading…)",
             "layout": "Layout",
             "layoutInline": "Inline (side-by-side)",
             "layoutStacked": "Stacked (one per line)",
@@ -4995,9 +5025,7 @@
             "startAt": "Start at",
             "reversed": "Reversed (counts down)",
             "olHint": "{start} and {reversed} only apply to ordered lists.",
-            "items": "Items",
             "itemsHint": "Each item is one translation key, rendered as a {li}.",
-            "addItem": "+ Add item",
             "itemKeyPlaceholder": "e.g. menu.home, footer.copyright",
             "errors": {
                 "type": "Pick a list type (ul or ol)",
@@ -5009,13 +5037,10 @@
             "label": "Select (dropdown)",
             "description": "<select> with options, wrapped as a form field (label + select + error span).",
             "namePlaceholder": "e.g. country",
-            "required": "Required",
             "multiple": "Multiple (multi-select)",
             "placeholderOptional": "(optional — empty first option)",
             "placeholderHint": "When set, the first option is empty/disabled/selected and shows this translated text. Ignored if \"Multiple\" is checked (browser limitation).",
-            "options": "Options",
             "optionsHint": "Each option has a literal {value} (submitted on form post) and a translation key for the visible label.",
-            "addOption": "+ Add option",
             "valuePlaceholder": "value (literal, e.g. us)",
             "labelKeyPlaceholder": "e.g. form.contact.country",
             "placeholderKeyPlaceholder": "e.g. form.contact.country.choose",
@@ -5251,7 +5276,6 @@
             "idPlaceholder": "e.g. q1Sales",
             "idRequired": "Translatable mode needs a valid table id.",
             "label": "Table",
-            "langLoading": "(loading…)",
             "modeRaw": "RAW (literal — same in all languages)",
             "modeRawHint": "Each cell becomes __RAW__<value> — rendered verbatim. No keys created. Fastest.",
             "modeTranslatable": "Translatable (auto-generate keys + write values to one language)",
