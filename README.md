@@ -656,6 +656,8 @@ Contributions are welcome under the AGPL-3.0 License — and not just code.
 
 All contributions go through review for security, quality, and consistency.
 
+**Licensing:** an outside contribution is merged only after its author and the maintainer have agreed on its licensing. There is no contributor licence agreement to sign up front: the agreement is made for each contribution, before it is merged.
+
 ## Acknowledgments
 
 Built using a **hybrid human-AI development approach** — architecture and design decisions are human-driven, implementation assisted by GitHub Copilot (Claude). More about this workflow in [PHILOSOPHY.md](PHILOSOPHY.md).
