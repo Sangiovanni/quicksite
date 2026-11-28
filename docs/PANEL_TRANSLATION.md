@@ -31,7 +31,8 @@ words of the website an author builds) are a different system, described in `ARC
 **What stays English in every language:** a prompt the panel sends to an AI model (the Workflows runner's request to
 continue a cut answer), a command's own message from the server, a command's documentation (its description, parameters,
 validation rules and examples: the API's reference, the same on every installation), the verb and data-attribute catalogs'
-descriptions, the AI connection presets' instructions, and the browser's own controls. In any panel language but English,
+descriptions, the AI connection presets' instructions, the site templates' pictures in the Workflows tool's template picker
+(each shows its site in English), and the browser's own controls. In any panel language but English,
 the command console says so above each command (`commandForm.docsInEnglish`).
 
 **A new word:** add it to `en.json` first, then to each other language's file at the same path. A word one language

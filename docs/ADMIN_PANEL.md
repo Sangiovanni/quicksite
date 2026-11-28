@@ -1,8 +1,10 @@
 # QuickSite Admin Panel
 
 > Canonical reference for the admin panel's JS architecture, boot flow, and module map. See [ARCHITECTURE.md](ARCHITECTURE.md) for the system-level overview, [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the workflow engine, and [COMMAND_API.md](COMMAND_API.md) for the API commands the panel calls.
+>
+> Every claim in this file was checked, one by one, against the code of release 1.0.0-beta.12.
 
-The admin panel is a server-rendered PHP shell plus a set of vanilla JS modules loaded per route. There is **no module bundler**. Load order is controlled by `secure/admin/templates/layout.php` and is the single most important contract in the front end — reorder a `<script>` tag and the panel breaks silently.
+The admin panel is a server-rendered PHP shell plus a set of vanilla JS modules loaded per route. There is **no module bundler**. Load order is controlled by `secure/admin/templates/layout.php` (a page's own scripts by its template, which the layout includes: §2) and is the single most important contract in the front end — reorder a `<script>` tag and the panel breaks silently.
 
 State lives on a small set of `window.*` globals owned by core files. Cross-module signalling uses a handful of custom events (§4).
 
@@ -16,7 +18,7 @@ secure/admin/templates/layout.php            → shell + script loader
                                                injects window.QUICKSITE_CONFIG
 secure/admin/templates/pages/<page>.php      → page shell + page-specific
                                                config injection
-public/admin/assets/js/core/                 → api.js, utils.js, storage-keys.js
+public/admin/assets/js/core/                 → the core modules (§5.1)
 public/admin/assets/admin.js                 → window.QuickSiteAdmin singleton
 public/admin/assets/js/components/           → colorpicker.js
 public/admin/assets/js/pages/                → page controllers
@@ -26,11 +28,11 @@ public/admin/assets/js/lib/css-refiner/      → CSS analysis library
                                                (consumed by optimize.js)
 ```
 
-Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form: a public name and the password, typed twice — the server assigns the username, and the form says so before it is submitted; the page exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page, which shows the assigned username — pre-filled, in one box with a warning that it is private, must be saved now, and is shown for 24 hours at most — on every visit in that browser until a sign-in succeeds there. That sign-in drops it, and so does the login page once the note is 24 hours old, however often the page was visited in between. The note lives in a session id minted for it at registration, so no id the browser held before — or was handed by somebody else — can read it. Registering never logs you in by itself. Creating the first account on `/admin/setup` shows a one-shot "account created" banner instead. All three are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`. Under **Keep me signed in**, the login page states how long a session lasts unused — `auth.php`'s `idle_ttl` (setup's item 10 sets it); when `remember_ttl` is the shorter, it names both: ticked, the shorter, unticked, `idle_ttl` — each rounded to the nearest unit and said as *about*, since a session's last use is stamped at most once every tenth of the limit. Attempts are limited per username and per address, whatever username an address tries (ARCHITECTURE.md §3, *Sign-in attempts are counted twice*). A refused attempt says how long to wait in the largest unit that fits, rounded up (*try again in 2 minutes*): every attempt during a wait, and the wrong password that starts one, under its *invalid username or password*; the panel's languages carry the words for each unit. A sign-in (or a refused one), a sign-out, a registration and the first account's creation through them are written to the security trail exactly as the `login`, `logoutSession` and `register` commands write them ([COMMAND_API.md](COMMAND_API.md), *The security trail*).
+Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form: a public name and the password, typed twice — the server assigns the username, and the form says so before it is submitted; the page exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page, which shows the assigned username — pre-filled, in one box with a warning that it is private, must be saved now, and is shown for 24 hours at most — on every visit in that browser until a sign-in succeeds there. That sign-in drops it, and so does the login page once the note is 24 hours old, however often the page was visited in between. The note lives in a session id minted for it at registration, so no id the browser held before — or was handed by somebody else — can read it. Registering never logs you in by itself. Creating the first account on `/admin/setup` shows a one-shot "account created" banner instead. All three are plain server-rendered forms whose own script is a password-visibility toggle; the layout's head scripts, `QUICKSITE_CONFIG`, `api.js`, `utils.js` and `admin.js` load there too (not the header, `members-badge.js`, `panel-mode.js` or the `apiUrl` line, §2). They are served with `Cache-Control: no-store`. Under **Keep me signed in**, the login page states how long a session lasts unused — `auth.php`'s `idle_ttl` (setup's item 10 sets it); when `remember_ttl` is the shorter, it names both: ticked, the shorter, unticked, `idle_ttl` — each rounded to the nearest unit and said as *about*, since a session's last use is stamped at most once every tenth of the limit. Attempts are limited per username and per address, whatever username an address tries (ARCHITECTURE.md §3, *Sign-in attempts are counted twice*). A refused attempt says how long to wait in the largest unit that fits, rounded up (*try again in 2 minutes*): the wrong password that starts a wait says it under its *invalid username or password*, and every attempt during the wait says it alone; the panel's languages carry the words for each unit. A sign-in (or a refused one), a sign-out, a registration and the first account's creation through them are written to the security trail exactly as the `login`, `logoutSession` and `register` commands write them ([COMMAND_API.md](COMMAND_API.md), *The security trail*).
 
 **First run.** QuickSite ships no account, so while the user registry is empty every admin URL renders `/admin/setup` instead. The page asks for a **setup token** along with a display name, a username and the password, twice — the two are compared before anything else is checked, so a slip costs no attempt. The token is 64 hex characters that the engine writes to `secure/management/config/setup-token.txt` on the page's first render — reading that file is the authorisation, which is why creating the first account needs neither a command line nor a shipped default password. It is written once and never regenerated, compared with a constant-time check, and destroyed the moment it is used. Attempts are rate-limited per caller with the same backoff as the login form, and count toward the caller's address's sign-in limit, and any bad token — wrong, absent, or already used — is refused identically. As on the login page, the wrong token that starts a wait says so under its refusal (*try again in 30 seconds*), and every attempt during the wait says how long is left.
 
-The requirement lives at the shared account-creation path rather than in the page, so every route inherits it: while the registry is empty, a direct call to the `register` command is refused — with `auth.registration_disabled` while `allow_self_registration` is off, and `auth.setup_required` while it is on. Both conditions are checked server-side — the registry must be empty **and** the token valid — so a token file that somehow survives grants nothing once an account exists, and deleting `users.php` later cannot re-arm it. If the token file cannot be written, the page says so and names the path instead of showing a form that cannot work.
+The requirement lives at the shared account-creation path rather than in the page, so every route inherits it: while the registry is empty, a direct call to the `register` command is refused — with `auth.registration_disabled` while `allow_self_registration` is off, and `auth.setup_required` while it is on. Both conditions are checked server-side — the registry must be empty **and** the token valid — so a token file that somehow survives grants nothing once an account exists, and deleting `users.php` later cannot re-arm it. If the token file cannot be written, the page says so and names the path, above the form.
 
 ---
 
@@ -39,18 +41,21 @@ The requirement lives at the shared account-creation path rather than in the pag
 `layout.php` emits `<script>` tags in this exact order:
 
 1. Inline `<script>` — the language bootstrap. Reads the admin language from browser storage and may redirect before anything else runs.
-2. `core/storage-keys.js` → defines `window.QuickSiteStorageKeys` (single source of truth for localStorage / sessionStorage key strings).
-3. `core/dom.js` → defines `window.QSDom`, in `<head>` so page scripts can use it at parse time; then `core/controls.js` → defines `window.QSControls` (the panel's edit, delete and close controls, §5.1).
-4. `core/searchable-select.js` → the type-ahead select widget.
-5. `core/bubble.js` → the panel's hover bubble (§5.1, *Tooltips*). Defines no global: it listens on the document and builds its element on first use.
-6. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST come before the scripts below, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
-7. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
-8. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, the panel's dialogs `confirm()` and `prompt()`, escaping, prefs, pending messages).
-9. `core/members-badge.js` → the membership counts behind the Members nav badge.
-10. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, the header's menus and height, page utility delegation).
-11. `core/update-notice.js` → emitted **only** for an account named in `operator.php`, so nobody else downloads it. After `api.js`, which is where its helper call comes from.
-12. Inline `<script>` sets `QUICKSITE_CONFIG.apiUrl` (skipped on the login page).
-13. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
+2. `core/panel-words.js` → defines `window.QSPanelWords`, the one way a script reads a panel word; the layout then hands it the word sections every page's scripts read (`__adminWords()`: `common`, `nav`, `writeRate`, `shortcuts`, `panelMode`, `commands`, `roles`, and `updateNotice` on an operator's page).
+3. `core/storage-keys.js` → defines `window.QuickSiteStorageKeys` (the registry of localStorage / sessionStorage key strings, §6).
+4. `core/dom.js` → defines `window.QSDom`, in `<head>` so page scripts can use it at parse time; then `core/controls.js` → defines `window.QSControls` (the panel's edit, delete and close controls, §5.1).
+5. `core/site-words.js` → defines `window.QSSiteWords` (the one list of a site's words, §5.1).
+6. `core/searchable-select.js` → the type-ahead select widget.
+7. `core/bubble.js` → the panel's hover bubble (§5.1, *Tooltips*). Defines no global: it listens on the document and builds its element on first use.
+8. The page template, inside `<main>`: its own word sections (`__adminWords()`) and its page-specific module(s). Their scripts run here, before the config and `api.js`: at parse time a page module can use what steps 2 to 7 define, and it reaches the rest from `DOMContentLoaded` on. For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
+9. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, projectContentBase, publicSpace, token, currentProject, globalCommands, starredProjects, writeRate, isOperator, panelMode, defaultLang, multilingual, adminLang), replacing any object of that name a page template set before it. The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST come before the scripts below, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
+10. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
+11. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, the panel's dialogs `confirm()` and `prompt()`, escaping, prefs, pending messages).
+12. `core/members-badge.js` → the membership counts behind the Members nav badge (signed-in pages only).
+13. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, the header's menus and height, page utility delegation).
+14. `core/panel-mode.js` → the account menu's Mode row and the chooser (signed-in pages only; for an account with no mode, the chooser's markup, `partials/mode-chooser.php`, comes just before it).
+15. `core/update-notice.js` → emitted **only** for an account named in `operator.php`, so nobody else downloads it. After `api.js`, which is where its helper call comes from.
+16. Inline `<script>` sets `QUICKSITE_CONFIG.apiUrl` (skipped on the sign-in, register and first-run pages).
 
 Any reorder breaks the chain. Treat the load order as a published contract.
 
@@ -60,34 +65,35 @@ Any reorder breaks the chain. Treat the load order as a published contract.
 
 | Global | Owner | Consumers |
 |---|---|---|
-| `window.QUICKSITE_CONFIG` | `layout.php` (extended by some page templates) | every JS file |
-| `window.QuickSiteStorageKeys` | `js/core/storage-keys.js` | `api.js`, `utils.js`, all pages that touch storage |
+| `window.QUICKSITE_CONFIG` | `layout.php` (a field a page template sets on it before the layout's block lasts only in a reference its script took as it loaded, §7) | most panel scripts: `api.js`, `admin.js`, the page modules |
+| `window.QuickSiteStorageKeys` | `js/core/storage-keys.js` | `site-words.js`, `update-notice.js`, all pages that touch storage |
 | `window.QuickSiteAPI` | `js/core/api.js` | `admin.js`, every page module |
-| `window.QuickSiteUtils` | `js/core/utils.js` | `admin.js`, `history.js`, `sitemap.js`, preview modules |
+| `window.QuickSiteUtils` | `js/core/utils.js` | `admin.js`, the core modules that draw (`dom.js`, `controls.js`, `searchable-select.js`, `panel-mode.js`, `update-notice.js`), nearly every page and editor module |
 | `window.QSControls` | `js/core/controls.js` | every page and editor module that draws an item's edit or delete, a dialog's × or a form row's × (§5.1) |
 | `window.QuickSiteAdmin` | `admin.js` | every page module (most broadly coupled global) |
-| `window.PreviewConfig` | `templates/pages/preview-config.php` | `preview.js`, all `pages/preview/*` modules |
-| `window.PreviewState` | `pages/preview/preview-state.js` | all `pages/preview/*` modules |
-| `window.QSColorPicker` | `js/components/colorpicker.js` | `preview-style-editor.js`, `preview-style-theme.js` |
+| `window.PreviewConfig` | `templates/pages/preview-config.php` | `preview.js`, `preview-ai-tools.js`, `preview-style-source.js`, `contextual-complex/complex-table.js`; `core/api.js` keeps its `authToken` current |
+| `window.PreviewState` | `pages/preview/preview-state.js` | most `pages/preview/*` modules |
+| `window.QSColorPicker` | `js/components/colorpicker.js` | `preview-style-editor.js`, `preview-style-theme.js`, `preview-transition-editor.js`, `pages/social-previews.js` |
 | `window.CSSRefiner` | `js/lib/css-refiner/*.js` (loaded by `optimize.php`) | `pages/optimize.js` |
-
-There is **no** `pages/ai.js`, `pages/batch.js`, or `pages/docs.js` in the current codebase.
 
 ---
 
 ## 4. Event bus
 
-Five custom events, each with one emitter:
+Eight custom events, each with one emitter but `quicksite:memberships-changed`, which the two membership pages emit:
 
 | Event | Emitted by | Listened for by |
 |---|---|---|
+| `quicksite:command-answered` | `js/core/api.js`, on `window`, for each answered command: its name, whether it succeeded, the project and its sender's mark, nothing it carried or answered | `js/core/site-words.js` — marks the site's words stale after a write of them |
+| `quicksite:translations-changed` | `js/core/site-words.js`, on `window`, after a write of the site's words answered for the edited project, on the page or in another of its tabs | `js/pages/preview/preview.js` and `preview-translation.js` — the editor's words; `js/pages/translations.js` — the Translations page |
+| `quicksite:panel-mode` | `js/core/panel-mode.js`, on `document`, whenever the mode's class changes (detail `{mode}`) | `js/pages/preview/preview.js` — draws the editor's view for the mode |
 | `quicksite:write-rate` | `js/core/api.js`, when a counted command's answer carries the write allowance | `admin.js` — the header's figure; `js/pages/preview/preview-ai-tools.js` — the kept steps' Run button |
 | `quicksite:routes-changed` | `js/pages/preview/preview.js` `refreshEditList()`, after a wizard's setup and after a phase of a run that changed something | the page's other copies of the routes: `preview-js-interactions.js` (the route pickers), `contextual-complex/route-input.js` (the links' suggestions), `contextual-complex/complex-oauth-button.js` |
 | `quicksite:memberships-changed` | the membership pages, after a roster or inbox action | `js/core/members-badge.js` — recomputes the counts |
-| `quicksite:membership-counts-updated` | `js/core/members-badge.js`, once counts are recomputed | `js/pages/dashboard-memberships.js` — fills the dashboard card |
+| `quicksite:membership-counts-updated` | `js/core/members-badge.js`, once counts are recomputed | `js/pages/dashboard-memberships.js` — fills the dashboard card; `js/pages/members.js` — names the other projects where a request waits |
 | `quicksite:stars-changed` | `admin.js` `setProjectStar()`, on `document`, once the server answers with the account's starred projects (`detail.starred`) | `admin.js` `bindStarToggle()` — each star button; `layout.php` — the header's project list; `js/pages/memberships.js` — its project list |
 
-Payload shapes are implicit — there is no schema or version field on any of them.
+Payload shapes are implicit — there is no schema or version field on any of them. Two more events stay inside one page: `qs:editor:structure-changed` (`preview.js`, heard by `preview-style-selectors.js`) and `command-success` on a command's form (`admin.js`, heard by `command-form.js`).
 
 ---
 
@@ -99,20 +105,22 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
+| `js/core/panel-words.js` | `window.QSPanelWords`: the one way a script reads a panel word, by its key's whole path (`t(path, params)`); a page hands it the word sections its scripts read (`__adminWords()`), the layout those every page reads. The first script file of every page. |
 | `js/core/api.js` | `QuickSiteAPI.request` + `upload`; announces each answered command on the page (`quicksite:command-answered`: its name, whether it succeeded, the project and its sender's mark, nothing it carried or answered); in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
-| `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
+| `js/core/storage-keys.js` | Constants for the panel's localStorage / sessionStorage keys (`window.QuickSiteStorageKeys`); the admin language's key, `quicksite_admin_lang`, is written in `layout.php` (§6). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `icon(name)` (the panel's named icons: one map of names to drawings, each built with `createElementNS` in the text's colour; a new icon is one entry) + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM — and `followPointer()`, the one drag routine of the panel's handles (the editor's options panel, the device frame's edges), on pointer events, and `rememberFocus()` / `byFocusKey()`, which give the focus back to a control a redraw put in place of the one that held it. Loaded in `<head>` so page scripts can use it at parse time. |
-| `js/core/controls.js` | `window.QSControls`: the panel's edit, delete and close controls, one look each (*Edit, delete and close: one look each*, above): `edit()` and `bin()` (an item's pencil and bin), `close()` (a dialog's ×), `removeRow()` (the small × of a form row), and `drawIcons()`, which gives a template's `data-qs-icon` buttons their icon once the page has loaded. Every icon is `QuickSiteUtils.ICON_PATHS`'. Loaded in `<head>`. |
+| `js/core/controls.js` | `window.QSControls`: the panel's edit, delete and close controls, one look each (*Edit, delete and close: one look each*, below): `edit()` and `bin()` (an item's pencil and bin), `close()` (a dialog's ×), `removeRow()` (the small × of a form row), and `drawIcons()`, which gives a template's `data-qs-icon` buttons their icon once the page has loaded. Every icon is `QuickSiteUtils.ICON_PATHS`'. Loaded in `<head>`. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge, and each share on its entry (My memberships, Project members); the queue's count also per project (`adjudicationByProject`), which the Project members page names; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
-| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). An option of empty value is the list's placeholder, never a row, unless the list makes it a choice of its own (`emptyChoice`: Social previews' *The whole site* or *No territory*, chosen again after another, §9.19). |
-| `js/core/panel-mode.js` | The mode (*The mode: simple or advanced* above): the account menu's **Mode** row, the chooser for an account with no mode, and what follows the first pick (the account menu open, the row's glow, the bubble). Loaded on every page of a signed-in account, after `admin.js`. |
+| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by the header's project list, the visual editor's pickers, the console's pickers of project data, and the lists of the Dashboard's New Project dialog and of the Project members, Social previews and Translations pages. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). An option of empty value is the list's placeholder, never a row, unless the list makes it a choice of its own (`emptyChoice`: Social previews' *The whole site* or *No territory*, chosen again after another, §9.19). |
+| `js/core/panel-mode.js` | The mode (*The mode: simple or advanced* below): the account menu's **Mode** row, the chooser for an account with no mode, and what follows the first pick (the account menu open, the row's glow, the bubble). Loaded on every page of a signed-in account, after `admin.js`. |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
 | `js/core/media-pictures.js` | `window.QSMediaPictures.list()`: the pictures a shared link's card can show — Media's images, each named as Media names it (`images/<file>`), SVG left out. The one list the console's picture field and the Social previews page offer (§9.19); loaded by those two pages. |
 | `js/core/media-alt.js` | `window.QSMediaAlt`: a picture's alt text per language, the one rule the Media page reads and saves it by (§9.15) — whether an alt is a translation key (the renderer's test; a text after the raw marker `__RAW__` never is), a new key's name (`freeKey()`), a picture's text in each of the project's languages and the languages it has none in, and the writes a save makes with what takes each back (`plan()`, `run()`). It sends nothing itself. Loaded by the Media page. |
 | `js/core/site-words.js` | `window.QSSiteWords`: the one list of a site's words (§9.20) — the languages, every language's words read under that language, and on request where the site names each key and each key's state per language (by the rule of the `translation-keys-grouped` helper). A surface reads it when it opens: one cache per page and project, a failed read keeping the last list and saying so, a read older than a write never replacing what the write put in. Every write of the site's words answered on the page, made through it or by any other script (`quicksite:command-answered`), marks it stale and announces `quicksite:translations-changed`, to the page and to the project's other tabs in this browser. Holds the panel's one **Create** (the word typed, in the language being edited alone; never over a text any language holds; a word required), the language calls (`addLang`, `deleteLang`, `setDefaultLang`: one language to two and back, the engine carries the words), and the editing language remembered per project (`editorLanguage`, §6). Loaded in `<head>`. |
 | `js/core/srcset.js` | `window.QSSrcset`: a `srcset` read and written as the engine reads it: each file's address split by the HTML standard's rules, the same as `UrlPolicy::srcsetAddresses()` and the site runtime's copy in `qs.js`, with its descriptors; whether rows of one kind can hold a value, and the first reason they cannot; rows written back into a line, sorted by their descriptor; each row's problem; a picture's format by its extension. Draws nothing. Loaded by the visual editor: its srcset field (§8.1, *A srcset's field*) and the Workflows tool's outside pictures (§8.12). |
+| `js/core/text-markers.js` | `window.QSTextMarkers`: formatting inside one translated sentence, the editor's side of the grammar whose engine side is `textMarkers.php`, read from the one list of markers the editor's payload carries (`TagRegistry::editorPayload()`): a word's parts, the word as nodes, the word where formatting cannot show, a sentence written back as one word. Holds no list of its own. Loaded by the visual editor and the Social previews page. |
 | `js/core/social-figures.js` | `window.QSSocialFigures`: a shared link's texts judged by `getSocialPreview`'s platform table — a text's length in characters or bytes, its cut at a platform's length, the platforms that draw a page's card (X by its card type), the platforms a text is longer than. Holds no figure of its own. Loaded by the Social previews page and the visual editor (the Description field's mark, §8.2). |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, the menu's groups after both filters (`applyMenuGroups()`), `canRun(command)` (the one answer to whether a page shows a control: the role holds the command, and a project-scoped command has a project), delegation. |
 
@@ -179,9 +187,9 @@ show their share: **My memberships** what waits for you (invitations and notices
 members** the join requests waiting for your validation, across the projects you run.
 
 **The mode: simple or advanced.** Each account chooses the menu it sees. **Simple** shows Dashboard,
-Build (Visual Editor, Builds), Media, Sitemap, Members (My memberships, Project members) and Settings
-(Settings, AI connections). **Advanced** shows every page: Commands, History and API Endpoints in
-Build, Social previews in a **Site** group beside Sitemap (its word opens Sitemap; in simple the group holds Sitemap alone and is drawn as its link), Authentication, Compliance (Storage, Privacy), Optimize and Embed Security besides. The mode
+Build (Visual Editor, Builds), Media, Site (Sitemap, Translations; its word opens Sitemap), Members (My memberships, Project members) and Settings
+(Project Settings, AI). **Advanced** shows every page: Commands, History and API Endpoints in
+Build, Social previews in the **Site** group beside Sitemap and Translations, Authentication, Compliance (Storage, Privacy), Optimize, and Embed Security in Settings besides. The mode
 decides the menu and nothing else: every page opens at its address for anyone whose role allows it,
 in either mode, and no permission, control or command reads the mode. A page the advanced menu reaches
 and the simple one does not (Commands, History, API Endpoints, Social previews, Authentication, Storage, Privacy, Optimize,
@@ -225,9 +233,10 @@ its detail `{mode}`, whenever the class changes (a switch, a failed save putting
 chooser's pick). With no guard registered the switch happens at once, as on every other page.
 
 `--admin-header-height` follows the header's real height at every width, in any language and at
-any text size: `admin.js` writes it on `:root` from a `ResizeObserver`, and `admin.css` and
-`css/responsive.css` hold a value per view for the first paint. The sticky notices, the toasts, the
-editor's height and the Optimize page's sidebar read it. The header itself never does.
+any text size: `admin.js` writes it on `:root` from a `ResizeObserver`, and for the first paint `admin.css` holds
+the two-band header's value (a computer and a tablet) and `css/responsive.css` the phone's. The sticky
+notices, the toasts, the editor's height and the Optimize page's sidebar read it. The header's rows
+never do; the phone's menu panel, out of the flow, takes its greatest height from it.
 
 **What is wider than the screen.** A table of the panel sits in `.admin-table-wrapper`
 (`QSDom.tableWrapper()`), which scrolls by itself and takes the keyboard's focus. A shadow at its
@@ -257,7 +266,7 @@ panel's one question: no page builds a confirm of its own, and every delete asks
 | Keys | While it is open no key reaches the page: not the editor's shortcuts (Delete, Escape), not the panel's (`g d`, `?`), not a modal underneath. The × at its top right, Escape and a click on the backdrop answer no, as **Cancel** does. |
 | Words | The question's own: its `title` names the thing (*Delete the key “cartItems”?*), or, with none, its message is the question; its button says the verb (`confirmText`: *Delete*, *Remove*, *Unset*), never *Confirm* on a red one. The message keeps its line breaks and is shown as text; **Cancel** is `common`'s, or the `cancelText` given. A prompt has no title unless given, its question is the field's label, and `defaultValue` / `placeholder` fill the field. |
 | Body and action | A question may carry a `body` under its message: what it is about (a word in each language, the links a removal breaks) or what it asks to choose (a language, a role, a reason, a date). With an `action`, its button runs it with the question still open and busy: the question closes when it succeeds, and stays open with the server's words when it is refused, so a choice made in its body is not lost. A question that needs something first (a date picked and what it would delete read) keeps its button disabled until its body allows it (`onOpen`). |
-| The one modal | Both are drawn in `QuickSiteUtils.openModal(box, options)`, which does the layer, the focus, Tab and the keys for any content; the keyboard-shortcuts help (`?`), the Storage page's item and consent dialogs and the Privacy page's dialogs are drawn in it too, and the mode chooser uses it with no dismissal, so Escape and the backdrop do nothing there and only its own buttons close it. |
+| The one modal | Both are drawn in `QuickSiteUtils.openModal(box, options)`, which does the layer, the focus, Tab and the keys for any content; the keyboard-shortcuts help (`?`), the Storage page's item and consent dialogs, the Privacy page's dialogs, Media's picture shown large and two dialogs of the visual editor (`preview.js`, `preview-ai-tools.js`) are drawn in it too, and the mode chooser uses it with no dismissal, so Escape and the backdrop do nothing there and only its own buttons close it. |
 | The one exception | Leaving the page with unsaved CSS Source edits (closing the tab, reloading) is the browser's own `beforeunload` question: a page cannot replace it (§8.10). |
 
 **Edit, delete and close: one look each.** The panel draws them in one place, `core/controls.js`
@@ -281,7 +290,7 @@ acts once the answer is yes, and a refusal is its error toast.
 
 | File | Purpose |
 |---|---|
-| `js/components/colorpicker.js` | `QSColorPicker` widget (used by preview style/theme tools). |
+| `js/components/colorpicker.js` | `QSColorPicker` widget (used by the editor's style, theme and transition tools, and by the Social previews page). |
 
 ### 5.3 Top-level page controllers
 
@@ -289,7 +298,7 @@ acts once the answer is yes, and a refusal is its error toast.
 |---|---|
 | `pages/dashboard.js` | Stats cards, the site map card, the edited project and what acts on it, the owner's space. |
 | `pages/dashboard-memberships.js` | Fills the dashboard memberships card from the `quicksite:membership-counts-updated` event (computed by `core/members-badge.js`). |
-| `pages/memberships.js` | My Memberships page: my projects / invitation inbox / my join requests / my proposals / notices / request-to-join. Global self-service commands only. |
+| `pages/memberships.js` | My Memberships page: my projects / invitation inbox / my join requests / my proposals / notices / request-to-join. One command (`listProjects`); the inbox, the proposals and every self-service action go to the account endpoint `/admin/self`, which is not a command. |
 | `pages/members.js` | Project Members page: roster, pending queue, invite + propose (user-lookup flows), join-policy toggle, ownership transfer for the edited project. |
 | `pages/account.js` | My Account page: change password, sign out everywhere, delete account (§9.13). |
 | `pages/command.js` | Command index list, permission-aware filter. |
@@ -306,16 +315,18 @@ acts once the answer is yes, and a refusal is its error toast.
 | `pages/oauth-providers.js` | The OAuth providers the installation offers, a how-to per provider, and the project's preview and build keys (§9.5 Tier 4). |
 | `pages/storage.js` | Browser-storage registry + cookie-consent management (§9.10). |
 | `pages/privacy.js` | Privacy helper — data-sharing registry + policy generation (§9.11). |
+| `pages/translations.js` | Translations page: a site's words in every language side by side, and its languages, through `QSSiteWords` (§9.20). |
 | `pages/api-import/openapi-converter.js` | OpenAPI → native-shape converter for the API registry's import modal (§9.1). |
+| `pages/api-import/response-draft.js` | One test response turned into a draft response schema for the author to review, never saved by itself: types and names, never a value (`QSApiImport.draftResponseSchema`, its walks bounded by `DRAFT_LIMITS`) (§9.1). |
 
 ### 5.4 AI sub-pages (`pages/ai/`)
 
-There is no workflow browser or spec-runner page: both are subsumed by the visual editor's Workflows mode (§8.12), so this folder holds only the BYOK connection UI and the shared AI-call library.
+This folder holds the BYOK connection UI and the shared AI-call library; workflows are browsed and run in the visual editor's Workflows mode (§8.12).
 
 | File | Purpose |
 |---|---|
 | `pages/ai/ai-connections.js` | BYOK connection wizard + connection list (cloud + local). Persists to the v3 store; no PHP roundtrip. A connection's form sets its streaming and its **output limit**: the most the AI may write in one answer, a whole number from 256 to 1000000 tokens (16384 until one is set). |
-| `pages/ai/lib/provider-catalog.js` | Pure data + per-provider HTTP helpers (URL / headers / body / parser). It holds the output limit every request asks for (`maxOutputTokens()`: the connection's own limit, else `DEFAULT_MAX_OUTPUT_TOKENS`, 16384; an explicit `max_tokens` wins) and reads why an answer ended (`parseFinishReason()`, `finishKind()`). Used by `ai-connections.js` and `ai-call.js`. |
+| `pages/ai/lib/provider-catalog.js` | Pure data + per-provider HTTP helpers (URL / headers / body / parser). It holds the output limit every request asks for (`maxOutputTokens()`: the connection's own limit, else `DEFAULT_MAX_OUTPUT_TOKENS`, 16384; an explicit `max_tokens` wins) and reads why an answer ended (`parseFinishReason()`, `finishKind()`). Used by `ai-connections.js`, `ai-call.js` and `preview-ai-tools.js`. |
 | `pages/ai/lib/connections-store.js` | v3 storage CRUD (`aiConnectionsV3`), `getActive()`, `recordStatus()`. A connection keeps its `maxOutputTokens` (null: the default). |
 | `pages/ai/lib/ai-call.js` | Browser-direct AI dispatcher (`QSAiCall.call`) with SSE streaming + abort + typed errors. Its result says why the answer ended: `finish` is `stop`, `length` (cut at the output limit), `other` (the provider stopped it) or null, and `finishReason` is the provider's own word. A stream that breaks off throws with what had arrived (`partial`). Its `usage` is the answer's token counts as the provider reports them (`input_tokens`, `output_tokens`), null when it sends none; a stream's counts are its events' put together, each count the largest it reached (Anthropic sends the input count when the answer starts and the output count when it ends). |
 | `pages/ai/lib/stream-parsers.js` | Per-provider SSE chunk parsers consumed by `ai-call.js`. Each keeps the provider's reason the answer ended (`finish`) and reads an error sent mid-stream. |
@@ -335,7 +346,7 @@ There is no workflow browser or spec-runner page: both are subsumed by the visua
 | `preview-style-motion.js` | Animation / keyframe editor (§8.11). |
 | `preview-style-source.js` | Source view — raw stylesheet editing in CSS mode (§8.10). |
 | `preview-style-theme.js` | Theme variable editor (light / dark scope). |
-| `preview-transition-editor.js` | Transition-property editor. |
+| `preview-transition-editor.js` | The State & Animation Editor (CSS → Selectors → a selector → **Animate**): a selector's transitions and its base / trigger state styles with animations. |
 | `preview-js-interactions.js` | Element-level interaction (event) editor + verb picker (§9.9). |
 | `preview-translation.js` | Translation Manager mode (§8.9). |
 | `preview-simple-add.js` | The simple Add (§8.1, *The simple Add*): what each item of the list sends, its keys' names, and taking back a refused add. |
@@ -395,23 +406,23 @@ key — see §9.10.
 
 Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`).
 
-Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. These forms answer from inside their page, after the layout has written the page's head: the router renders every panel page into an output buffer of its own (`AdminRouter::render()`), so the session cookie and the redirect they send never depend on php.ini's `output_buffering`. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
+The panel sets two cookies, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. These forms answer from inside their page, after the layout has written the page's head: the router renders every panel page into an output buffer of its own (`AdminRouter::render()`), so the session cookie and the redirect they send never depend on php.ini's `output_buffering`. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
 
-`QSSESSID` is only ever set by something that deliberately stores state — signing in, or picking a language while signed out (the panel remembers that choice for a visitor who has no account). Loading a page never mints one, and a `QSSESSID` naming a session that no longer exists is treated as no cookie at all: the visitor is anonymous and is not handed a replacement.
+`QSSESSID` is only ever set by something that deliberately stores state — signing in, picking a language while signed out (the panel remembers that choice for a visitor who has no account), or submitting the register or first-run form (its note for the sign-in page rides the session). Loading a page never mints one, and a `QSSESSID` naming a session that no longer exists is treated as no cookie at all: the visitor is anonymous and is not handed a replacement.
 
 | Constant | Storage | Used by |
 |---|---|---|
 | `adminPrefs` | localStorage | `utils.js`, `admin.js`, `settings.js` |
 | `pendingMessage` | sessionStorage | `utils.js`, `admin.js` |
 | `apiAuthTokens` | localStorage, per project (the key gets `:<project>` appended): a panel key, which no page of any project reaches. The panel reads nothing under `qsp_`, so what a page keeps under the bare name `qs_api_auth_tokens` is the page's own | `apis.js` |
-| `aiConnectionsV3` | localStorage | `connections-store.js` (canonical), `ai-connections.js` |
-| `aiKeysV2` | localStorage / sessionStorage | `connections-store.js`, `settings.js` — read-only, for the v2 → v3 migration |
-| `aiDefaultProvider` | localStorage / sessionStorage | `connections-store.js`, `settings.js` |
+| `aiConnectionsV3` | localStorage / sessionStorage: written to localStorage when `aiPersist` is `'true'`, to sessionStorage otherwise (the other copy removed); read from localStorage first | `connections-store.js` (canonical), `ai-connections.js` |
+| `aiKeysV2` | localStorage / sessionStorage | `connections-store.js` — read-only, for the v2 → v3 migration; `settings.js` — read-only, for the Settings page's AI status |
+| `aiDefaultProvider` | localStorage / sessionStorage | `connections-store.js`, `settings.js` — read-only: the v2 default provider, read by the migration and by the Settings page's AI status |
 | `aiPersist` | localStorage | `connections-store.js`, `ai-connections.js`, `settings.js` |
 | `aiAutoPreview` | localStorage | declared; no current reader |
 | `aiAutoExecute` | localStorage | `preview-ai-tools.js`, `ai-connections.js`, `settings.js` — **Run without stopping**: on only once `'true'` is stored (all three read it so) |
 | `aiKeptSteps` | localStorage | `preview-ai-tools.js` — what a stopped run did not reach, per account and project (the key gets `:<account>:<project>` appended): the workflow and the run's parameters, the steps of the phase it stopped in that did not run, and its later phases (by name, resolved when the kept run reaches them), and the stored path of each picture the run brought in by its link (`swaps`); offered again from the panel's banner, never run on their own (§8.12) |
-| `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
+| `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, kept with its project and offered back only in that project on the next entry, cleared on save, on **Cancel** (the file read again) and on discard) |
 | `sidebarWidth` | localStorage | `preview-sidebar-resize.js` — the visual editor's options panel's width in pixels, as its handle left it; stored as `quicksite_sidebar_width` |
 | `previewFrame` | localStorage | `preview.js` — the visual editor's device and each device frame's last size, as JSON (`{"device": "mobile", "sizes": {"mobile": [375, 667], "tablet": [768, 1024]}}`); one per browser, for every project. A missing, malformed or out-of-range part gives that part's default (§8.3) |
 | `toolsShowNames` | localStorage | `preview.js` — whether the editor's tool row, and the actions of its Select and Text panels, show each button's name beside its icon (**Show names**): `'false'` hides them, anything else shows them; stored as `quicksite-tools-show-names` |
@@ -422,7 +433,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `editorLanguage` | localStorage | `site-words.js` — the language a site's words are edited in, per project (`:<project>` appended): the visual editor's toolbar **Language**, its Translations tool, the Translations page and the Storage and Privacy pages start on it, and a change in any of them is kept; a language the project no longer has reads as its default (§8.9, §9.10, §9.11, §9.20) |
 | `socialPreviewDevice` | localStorage | `social-previews.js` — the device the Social previews page draws its cards for: `'phone'`, or anything else (or nothing) for a computer; one per browser, for every project (§9.19) |
 | `workflowsList` | localStorage | `preview-ai-tools.js` — the Workflows panel's workflows last opened, newest first (three kept), and the groups left open once the list folds, as JSON (`{"recent": ["restyle"], "open": ["look"]}`); one per browser, for every project. A missing or malformed part reads as empty, and a failure to read or write is silent (§8.12) |
-| `workflowsBackupNoteHidden` | localStorage | `preview-ai-tools.js` — the Workflows panel's backup message put away for good (`'1'`); stored as `quicksite-ai-tools-backup-note-hidden`, its name from before the registry (§8.12) |
+| `workflowsBackupNoteHidden` | localStorage | `preview-ai-tools.js` — the Workflows panel's backup message put away for good (`'1'`); stored as `quicksite-ai-tools-backup-note-hidden` (§8.12) |
 | `workflowsOptions` | localStorage | `preview-ai-tools.js` — the Workflows panel's Options as JSON (`{"noAi": false, "nothingDeleted": false, "compact": true, "unrunnable": false}`): the two switches, the compact view and the box that shows the workflows the role cannot run; one per browser, for every project. A missing or malformed part reads as unticked, and a failure to read or write is silent (§8.12) |
 | `updateCheckAt` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
 | `updateNoticeHidden` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
@@ -435,34 +446,34 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | PHP file | Injects into | Notable fields |
 |---|---|---|
 | `templates/layout.php` | `window.QUICKSITE_CONFIG` + `QSPanelWords` | `apiBase`, `adminBase`, `baseUrl`, `projectContentBase`, `publicSpace`, `currentProject`, `globalCommands`, `starredProjects` (the account's starred project ids, §8.0), `panelMode` (the account's mode, `null` until its first pick: a display preference, never an authorization input), `writeRate`, `defaultLang`, `multilingual`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14), `adminLang`; the words every page's scripts read: `common`, `nav`, `writeRate`, `shortcuts`, `panelMode`, `commands`, `roles` (the built-in roles' names), and `updateNotice` on an operator's page |
-| `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` + `QSPanelWords` | `aiSettingsUrl`, `quicksiteVersion` (`null` when the `VERSION` file cannot be read); the parts of `settings` its script reads |
+| `templates/pages/settings.php` | `QUICKSITE_CONFIG` before the layout's block replaces it (`settings.js` keeps the object it finds as it loads) + `QSPanelWords` | `aiSettingsUrl`, `quicksiteVersion` (`null` when the `VERSION` file cannot be read); the parts of `settings` its script reads |
 | `templates/pages/dashboard.php` | `QSPanelWords` | `dashboard.projects`, `dashboard.storage`, `dashboard.sitemap` |
-| `templates/pages/history.php` | extends `QUICKSITE_CONFIG` + `QSPanelWords` | `commandUrl`, `consoleEnabled`; the parts of `history` its script reads |
+| `templates/pages/history.php` | `QUICKSITE_CONFIG` before the layout's block replaces it, so `history.js` reads neither field + `QSPanelWords` | `commandUrl`, `consoleEnabled`; the parts of `history` its script reads |
 | `templates/pages/builds.php` | `window.QS_BUILDS_CONFIG` + `QSPanelWords` | the edited project and its label; `builds` |
-| `templates/pages/apis.php` | `QSPanelWords` | `apis`, and the storage-key picker's `complexWizard.storageKeyPicker` |
-| `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `QSPanelWords` | `baseUrl`; `embedSecurity.errors`, `.blockEverything`, `.noRules` |
+| `templates/pages/apis.php` | `QSPanelWords` | `apis`, the storage-key picker's `complexWizard.storageKeyPicker`, and `storage.categories` |
+| `templates/pages/embed-security.php` | `QSPanelWords` (and a `QUICKSITE_CONFIG.baseUrl` the layout's block replaces and no script reads) | `embedSecurity.errors`, `.blockEverything`, `.noRules` |
 | `templates/pages/media.php` | `QSPanelWords` | `media` |
 | `templates/pages/privacy.php` / `storage.php` | `QSPanelWords` | `privacy` / `storage`: every word the page shows, its dialogs' and toasts' included |
 | `templates/pages/sitemap.php` | `QSPanelWords` | `sitemapPage`, and the counted `dashboard.sitemap.urlCount` / `routeCount` the Dashboard's card shares |
-| `templates/pages/preview-config.php` | `window.PreviewConfig` + `QSPanelWords` | the editor's data — routes, components, settings, token, plus `tagInfo` (`TagRegistry::editorPayload()` — the tag classification, mandatory params, per-tag defaults and translation-key params the editor works from), the Workflows list's rows and groups (their words resolved by PHP in the panel's language, from the workflow files' keys), and `componentStarter` (a new component's starter text in each of the project's languages, QuickSite's own word `component.starter`); its words: the `preview` and `complexWizard` sections, the `socialPreviews` and `translations` sections its description field and Translation tool share with those pages, and `aiConnections.call` (the AI library's messages) |
+| `templates/pages/preview-config.php` | `window.PreviewConfig` + `QSPanelWords` | the editor's data — its addresses (`baseUrl`, `previewBase`, `adminUrl`, `structureUrl`, `projectStyleUrl`), the edited project, the special pages, the routes' resolvers and their sample defaults, the theme-mode settings, the languages (`multilingual`, `defaultLang`) and the token (`authToken`), plus `tagInfo` (`TagRegistry::editorPayload()` — the tag classification, mandatory params, per-tag defaults and translation-key params the editor works from), the Workflows list's rows and groups (their words resolved by PHP in the panel's language, from the workflow files' keys), and `componentStarter` (a new component's starter text in each of the project's languages, QuickSite's own word `component.starter`); its words: the `preview` and `complexWizard` sections, the `socialPreviews` and `translations` sections its description field and Translation tool share with those pages, `aiConnections.call` (the AI library's messages) and `storage.categories` |
 | `templates/pages/ai-connections.php` | `window.QSAC_ASSET_BASE` + `QSPanelWords` | the asset base the provider logos load from, so they resolve when the panel is not served from the domain root; `aiConnections` |
 | `templates/pages/optimize.php` | `data-lib-ready` on `.optimize-page` + `window.CSSRefiner.t` / `.count` + `QSPanelWords` | `data-lib-ready` is `"true"` only when the CSS Refiner library is installed, and `optimize.js` does nothing otherwise; `CSSRefiner.t(name, params)` and `CSSRefiner.count(name, n, params)` are one-line callers of `QSPanelWords` with the prefix `optimize.cssRefiner.`, the words the Refiner's analyzers write; `optimize.cssRefiner` |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `QSPanelWords` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; the parts of `memberships` its script reads |
 | `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `QSPanelWords` | `project`, `myUserId`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` (admin/owner only, read server-side from `members.json`); the parts of `members` its script reads |
 | `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `QSPanelWords` | `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; `account.password`, `account.sessions`, `account.delete`, `login.throttled`. Never the username — the deletion's typed confirmation is checked by the server (§9.13) |
-| `templates/pages/command-form.php` | `window.QS_COMMAND_GROUPS`, `QS_CONSOLE_FLAGS`, `QS_SNIPPET_CATEGORIES`, `QS_TAG_GROUPS` + `QSPanelWords` | the console's command groups (each category's name a word in the panel's language, resolved by the server), its flags, the snippet categories and the tag groups, as data through `qs_inline_script_json()`; the parts of `commandForm` its script reads and each snippet category's word |
+| `templates/pages/command-form.php` | `window.QS_COMMAND_GROUPS`, `QS_CONSOLE_FLAGS`, `QS_SNIPPET_CATEGORIES`, `QS_TAG_GROUPS` + `QSPanelWords` | the console's command groups (each category's name a word in the panel's language, resolved by the server), its flags, the snippet categories and the tag groups, as data through `qs_inline_script_json()` (the flags through `json_encode()` with its four `JSON_HEX_*` flags); the parts of `commandForm` its script reads and each snippet category's word |
 | `templates/pages/oauth-providers.php`, `social-previews.php`, `translations.php` | `QSPanelWords` (Social previews also `window.QS_SOCIAL_CONFIG`) | `oauthProviders`, `socialPreviews`, `translations` |
 | `templates/pages/login.php`, `register.php`, `setup.php` | `QSPanelWords` | `login.showPassword`, `login.hidePassword` (the password field's eye) |
 
-**The one way a word reaches a script** is `QSPanelWords` (`js/core/panel-words.js`, the first script of every page's `<head>`). A page's template hands its scripts the sections they read, before them, with `<?= __adminWords([paths]) ?>` (`AdminTranslation.php`): each path's whole sub-tree in the panel's language, at its own path, written through `qs_inline_script_json()` so that no word can end the script; a path may be a part of a section another page owns (`complexWizard.storageKeyPicker`). No page writes an object of words of its own, and nothing copies words by hand. A script reads a word by its key's whole path: `QSPanelWords.t(path, params)` fills its `{name}` parts (the one placeholder of a script's word), and a path that holds no word answers the path itself, never English and never empty; `count(path, n)` reads a counted word's `<path>.one` or `<path>.other`, chosen by the browser's `Intl.PluralRules` in the panel's language (French counts 0 as one, English as other), the number written in that language; `parts(path, params)` cuts a word at its `{name}` parts and gives each its value as it is, a string or an element (a version drawn in a `<code>`), so a sentence holding an element stays one word; `list(items, type)` joins items the panel language's way; `number()` and `date()` write a figure and a date in the panel's language, and `QuickSiteUtils.formatSize()` a size, its units words of their own (`common.size.*`). A page's own lookup is a one-line caller with a fixed prefix (`QSComplexWizard.t()`, `complexWizard.`; the Sitemap's `t()`, `sitemapPage.`; `QuickSiteAdmin.t()` and `QuickSiteUtils.tCommon()` take the whole path and `common.` the same way), never a fallback of its own.
+**The one way a word reaches a script** is `QSPanelWords` (`js/core/panel-words.js`, the first script file of every page's `<head>`, after the inline language bootstrap). A page's template hands its scripts the sections they read, before them, with `<?= __adminWords([paths]) ?>` (`AdminTranslation.php`): each path's whole sub-tree in the panel's language, at its own path, written through `qs_inline_script_json()` so that no word can end the script; a path may be a part of a section another page owns (`complexWizard.storageKeyPicker`). No page writes an object of words of its own, and nothing copies words by hand. A script reads a word by its key's whole path: `QSPanelWords.t(path, params)` fills its `{name}` parts (the one placeholder of a script's word), and a path that holds no word answers the path itself, never English and never empty; `count(path, n)` reads a counted word's `<path>.one` or `<path>.other`, chosen by the browser's `Intl.PluralRules` in the panel's language (French counts 0 as one, English as other), the number written in that language; `parts(path, params)` cuts a word at its `{name}` parts and gives each its value as it is, a string or an element (a version drawn in a `<code>`), so a sentence holding an element stays one word; `list(items, type)` joins items the panel language's way; `number()` and `date()` write a figure and a date in the panel's language, and `QuickSiteUtils.formatSize()` a size, its units words of their own (`common.size.*`). A page's own lookup is a one-line caller with a fixed prefix (`QSComplexWizard.t()`, `complexWizard.`; the Sitemap's `t()`, `sitemapPage.`; `QuickSiteAdmin.t()` and `QuickSiteUtils.tCommon()` take the whole path and `common.` the same way), never a fallback of its own.
 
 **How a word is written** — its placeholders, its counted forms, the join words the code reads for a label's punctuation (`common.join.colon`, `common.join.semicolon`), what stays English — and the French glossary are in `PANEL_TRANSLATION.md`.
 
 **A template escapes every word it writes**: `adminEscape(__admin(key))` in HTML text, `adminAttr(__admin(key))` in an attribute, and `adminEscapeCode(__admin(key))` for a word that holds `<code>` on purpose (it escapes the word whole, then gives back `<code>` and `</code>` alone). `__admin(key, params)` takes its parameters and nothing else: there is no English second argument, and a key no language holds answers its path. Its PHP twins of the browser's rules are `__adminCount(path, n, params)` (a counted word, its category from the `intl` extension when it is there, else *one* for 1) and `__adminSize(bytes)` (the same tiers and words as `formatSize()`). A role's name is a word too: a built-in role's `roles.<id>` (`QuickSiteUtils.roleName(id)` in a script, `__adminRole(id)` in a template), a role an operator adds to `roles.php` its id, as no word names it. A language's words are laid over the English ones **key by key** (`AdminTranslation`), so a word its file leaves out reaches every handed section and every `__admin()` call in English, even inside a section the file holds; only a word no file holds, English included, shows its path.
 
-**The panel's own server answers are in the panel's language.** `/admin/api`, `/admin/self` and `/admin/state` answer through `AdminTranslation`, which takes the language there from the request's `Accept-Language` header alone and never opens the session (`AdminTranslation::takeLanguageFromHeader()`, called by `qs_admin_json_boot()` before anything reads a word): `js/core/api.js` sends the panel's language (`QSPanelWords.lang`) on every call to them, and the Workflows runner on its two calls of its own. Their words are the `answers` section (a refusal, a confirmation, *Unauthorized* on a 401), and the console's option labels the API serves are `commandForm.apiOptions.*`. A command's own message, passed through by an arm, stays as the command wrote it, in English.
+**The panel's own server answers are in the panel's language.** `/admin/api`, `/admin/self` and `/admin/state` answer through `AdminTranslation`, which takes the language there from the request's `Accept-Language` header alone and never opens the session (`AdminTranslation::takeLanguageFromHeader()`, called by `qs_admin_json_boot()` before anything reads a word): `js/core/api.js` sends the panel's language (`QSPanelWords.lang`) on every call to them, and the Workflows runner on its one call of its own (a workflow's file, `ai-spec-raw`). Their words are the `answers` section (a refusal, a confirmation, *Unauthorized* on a 401), and the console's option labels the API serves are `commandForm.apiOptions.*`. A command's own message, passed through by an arm, stays as the command wrote it, in English.
 
-`currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
+`currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects. The layout's block replaces `window.QUICKSITE_CONFIG` whole, after the page's template: a field a page sets on it lasts only in a reference its script took as it loaded, and never overwrites a global one. Treat the injected globals as read-only by convention.
 
 `writeRate` is the account's write rate as the page loads (COMMAND_API.md *Per-user resource limits*): every window with what is left of it and when it frees, the batch runner's wait limit, the commands that never count, and a short tag naming the account in browser storage (never its id). It is `null` on the sign-in pages. From then on `js/core/api.js` keeps it current from the `RateLimit` / `RateLimit-Policy` headers of every counted answer (`QuickSiteAPI.getWriteRate()`, `countsAsWrite()`), and says a write-rate refusal in the panel's language. Whenever a window is set, the **header shows what is left** of the window closest to its limit — every window, one per line, in the panel's bubble on hover and on keyboard focus — and redraws when an answer moves it or a window refills; with no window it shows nothing. Every Management call in the panel goes through the API client, so no write escapes the figure.
 
@@ -480,7 +491,7 @@ This pointer is **not** a command. Which project a person has open is a fact abo
 
 **The header's project list.** It is the panel's searchable dropdown (§9.9.2): its first line is the edited project's name, whole, which the header may cut; under the search are the other projects. Type a part of a project's name or its id, and only the matching projects stay. The account's **starred** projects come first, each with ★ before its name, then the others by name. The header sets no star — the ☆ on the dashboard's first line does, for the edited project, and so does the one on each row of My Memberships → *My projects*; a star set there re-orders this list at once. With one project the header shows a plain badge. A switch the server refuses, or one that fails, puts the list back on the edited project, under the error toast; choosing the edited project again sends nothing.
 
-**Where the list reads from.** It shows the account's own copy of its memberships, kept in its `users.php` entry (`projects`): drawing a page header reads no project folder. Each project's `members.json` stays the authority — it decides every access, and the dashboard's lists read it (`listProjects`). The two can drift (a membership whose copy was not written, a roster edited by hand), so the copy is **repaired from the authority**: by the **dashboard**'s load, which reads every project's `members.json` before the header is drawn and rewrites the account's entries when they differ, and by a **switch**, which writes the project it opens as a membership in the same write as the selection. The dashboard's repair is kept five minutes per account and dropped by any membership change anywhere, so a burst of reloads costs one scan and your own join or leave shows on the next load. It follows `reconcileMemberships`' rule: a project whose roster lists you (as a member, an invitee or with your own pending request) gets its entry, its date kept; an entry the roster contradicts goes, and so does a member or pending entry of a project that no longer exists; a refused, removed or deleted notice stays; a project whose roster cannot be read is left as it is.
+**Where the list reads from.** It shows the account's own copy of its memberships, kept in its `users.php` entry (`projects`): drawing a page header scans no project folder, reading only the `members.json` and the name of each project the copy lists (and of the selected one). Each project's `members.json` stays the authority — it decides every access, and the dashboard's lists read it (`listProjects`). The two can drift (a membership whose copy was not written, a roster edited by hand), so the copy is **repaired from the authority**: by the **dashboard**'s load, which reads every project's `members.json` before the header is drawn and rewrites the account's entries when they differ, and by a **switch**, which writes the project it opens as a membership in the same write as the selection. The dashboard's repair is kept five minutes per account and dropped by any membership change anywhere, so a burst of reloads costs one scan and your own join or leave shows on the next load. It follows `reconcileMemberships`' rule: a project whose roster lists you (as a member, an invitee or with your own pending request) gets its entry, its date kept; an entry the roster contradicts goes, and so does a member or pending entry of a project that no longer exists; a refused, removed or deleted notice stays; a project whose roster cannot be read is left as it is.
 
 **Starring** is panel state too: `POST /admin/state/project-star` with `{"project": "<id>", "starred": true}` (or `false`; any other value is `400 validation.invalid_type`) writes the account's `starred_projects` in `users.php`. Starring a project you are not a member of is refused as selecting one is (`403 authz.not_a_member`); unstarring always goes through; every write drops the stars of the projects you no longer belong to. A star decides nothing but the order of your own lists. The page receives the stars as `QUICKSITE_CONFIG.starredProjects`; `QuickSiteAdmin.orderProjectSelect()` orders a project dropdown from them and `starredFirst()` a list of rows, each again whenever a star changes (`quicksite:stars-changed`).
 
@@ -490,19 +501,19 @@ The preview iframe loads the edited project in editor mode through its per-proje
 
 ### 8.1 Modes
 
-The row under the toolbar exposes seven modes, each backed by a `data-mode="..."` button. Source: `secure/admin/templates/pages/preview/tools.php`.
+The row under the toolbar exposes seven tools, each backed by a `data-mode="..."` button (Select, Move, Text, CSS, Interactions, Translations, Workflows). Source: `secure/admin/templates/pages/preview/tools.php`. Add is an eighth mode with no button of its own (`add`: the form Select's **Add** and **Edit Params** open, `contextual-add.php`). Select also carries the four arrows to the parent, the siblings and the first child, and, on a component, **Variables**, **Enums** and **Emulation** (Emulation also on a page whose route has a parameter or a resolver), and **Translate from CSV** on a table (§8.7); the Text tool is not offered while a component is the edit target.
 
 | Button | Mode | What it does |
 |---|---|---|
 | **Select** | `select` | Click an element → inspect node, add a sibling/child (a child only where the element can hold one: not a text, a component or a void element such as an image), **edit its params + class + mandatory attrs in place** (via **Edit Params**), duplicate, save as snippet / component, or delete (after a question): each action is its icon and its name, one per line, **Add** green, **Edit Params** orange with the shared pencil, **Delete** red with the shared bin. With **Show names** (at the start of the tools' row) off, each action is its icon alone, in one row that wraps, its tooltip and its screen-reader label naming it; the Text tool's **Delete this text node**, red as well, follows the same choice. |
-| **Drag** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. A press selects an element, and **Lock** keeps it selected through any number of drops. A finger scrolls the page: a tap selects, and only a locked element is dragged, by a press on it. |
-| **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. A paste is plain text on one line — the clipboard's text, each run of line breaks a space — inserted as typing is, so Ctrl+Z undoes it; when an edit ends, the element holds exactly the text saved. |
-| **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). Its **Theme Mode Settings** (dark mode support, the default mode — Light, Dark or System — and whether a visitor can switch, saved by `setThemeMode`) say under *Visitor can switch* that with System the site follows each visitor's device even without a switch; when the **Theme mode** workflow saves the mode, the three controls show what it saved, System included. The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. In advanced mode, designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
+| **Move** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. A press selects an element, and **Lock** keeps it selected through any number of drops. A finger scrolls the page: a tap selects, and only a locked element is dragged, by a press on it. |
+| **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. A translated text takes bold, italic and underline (Ctrl+B, Ctrl+I, Ctrl+U) and a line break (Shift+Enter), written as the word's formatting markers (§8.8); a text that takes no formatting stays plain. Edits the value, never the key. A paste is plain text on one line — the clipboard's text, each run of line breaks a space — inserted as typing is, so Ctrl+Z undoes it; when an edit ends, the element holds exactly the text saved. |
+| **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). Its **Theme Mode Settings** (dark mode support, the default mode — Light, Dark or System — and whether a visitor can switch, saved by `setThemeMode`) say under *Visitor can switch* that with System the site follows each visitor's device even without a switch; when the **Theme mode** workflow saves the mode, the three controls show what it saved, System included. The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. In advanced mode, a designer and the roles above it also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. An element's event list offers the events the interaction commands accept, in two groups: **Common for** the element's tag, and **Less common**. |
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **Workflows** | `ai-tools` | In-editor workflow runner. A searchable list of the workflows, grouped by what you want to do, each row saying in words what a run does; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
-**Which tools a role sees.** Each tool, and each of Select's buttons, is offered only to a role that holds the commands it sends, in either mode: one definition, `secure/admin/functions/editorTools.php` (`qs_editor_controls()`), draws them as `data-requires-command`, which the role filter reads once permissions load (§5.1). Select reads, so every role has it. A viewer has Select alone, with none of its buttons; an editor has every tool but CSS; a designer and the roles above it have them all. Workflows needs what adding an element needs: every shipped workflow but one writes the site, and the one left runs what is pasted into it. A tool not offered cannot be entered (`switchMode()` goes to Select instead), and the Delete key acts only where Select's bin is offered. The server still checks each command's role. The toolbar's **Title** and **Description** fields are in the same definition (`toolbar.title`, `toolbar.description`): each is shown only to a role that holds the command it saves with, `editTitle` and `setSocialPreview`, so a viewer sees neither.
+**Which tools a role sees.** Each tool, and each of Select's buttons, is offered only to a role that holds the commands it sends, in either mode: one definition, `secure/admin/functions/editorTools.php` (`qs_editor_controls()`), draws them as `data-requires-command`, which the role filter reads once permissions load (§5.1). Select reads, so every role has it. A viewer has Select alone, with none of its buttons that write (Emulation, which writes nothing, stays); an editor has every tool but CSS; a designer and the roles above it have them all. Workflows needs what adding an element needs: every shipped workflow but one writes the site, and the one left runs what is pasted into it. A tool not offered cannot be entered (`switchMode()` goes to Select instead), and the Delete key acts only where Select's bin is offered. The server still checks each command's role. The toolbar's **Title** and **Description** fields are in the same definition (`toolbar.title`, `toolbar.description`): each is shown only to a role that holds the command it saves with, `editTitle` and `setSocialPreview`, so a viewer sees neither.
 
 **The simple view.** In simple mode (§5.1) the editor leaves out what a beginner does not need: the **Interactions** tool, CSS's **Source** and **Motion** (the tab, and a selected selector's **Animate**), and Select's **Save as Snippet** and **Save as Component**. Select's **Add** opens the simple Add in place of the five tabs. The same definition marks each of these `data-editor-advanced`, which the page's simple class hides, so a switch shows or hides them at once. A switch that would close the tool in use (Interactions, Source, Motion) or start an open Add form again first asks, **Switch** or **Stay**, saying what not saved there would be lost; **Stay** changes nothing. After **Switch** the editor leaves a tool the mode no longer shows for Select (Motion for Theme, Source for the page), and an open Add form starts again in the new mode on the same element and position. With nothing open, the switch happens at once. The mode decides what is drawn and nothing else.
 
@@ -519,15 +530,15 @@ The row under the toolbar exposes seven modes, each backed by a `data-mode="..."
 | **List** | a bulleted list, `<ul>`, an `<li>` per line | its lines: three to start, **+ Add an item** adds one and each line's **×** removes it (one always stays); a line left empty takes its placeholder's words (*Item 3*) |
 | **Block** | a plain box, `<div>`, empty | nothing: it is selected once added, an empty box you can see, to add elements inside |
 
-There is no class, no ID and no key-or-literal choice: each text gets a translation key of its own, written in every language of the project, the text in the language being edited and empty in the others (the Translations tool lists those as unset), and named as the engine names the keys it generates: `<page>.item<N>` (a nested page's slashes as dots), `menu.item<N>`, `footer.item<N>`, `component.<name>.item<N>`, after the highest such number already used. Image, Video and Audio take their file with **Choose…**, which opens the Media picker; there it carries **Upload a file…** above the list, for a role that may upload, and the file uploaded is picked at once. Nothing opens by itself: **Add Element** with no file says so and puts the focus on **Choose…**. The form opens on **Inside** when the element selected is empty and can hold others (a new Block, an empty form), on **After** otherwise. Every item goes through the same commands as the advanced form: `addNode`, and for the List `addComplexElement` (its `list` kind), which adds the whole list or nothing. The keys are written first (`setTranslationKeys`, one call per language); when the element is then refused, the keys that add wrote are deleted again (`deleteTranslationKeys`), the form stays open and says why. The list is fixed in code: each item needs a form of its own.
+There is no class, no ID and no key-or-literal choice: each text gets a translation key of its own, its word written in the language being edited only (the other languages hold no word for it, and the Translations tool lists the key there as unset), and named as the engine names the keys it generates: `<page>.item<N>` (a nested page's slashes as dots), `menu.item<N>`, `footer.item<N>`, `component.<name>.item<N>`, after the highest such number already used. Image, Video and Audio take their file with **Choose…**, which opens the Media picker; there it carries **Upload a file…** above the list, for a role that may upload, and the file uploaded is picked at once. Nothing opens by itself: **Add Element** with no file says so and puts the focus on **Choose…**. The form opens on **Inside** when the element selected is empty and can hold others (a new Block, an empty form), on **After** otherwise. Every item goes through the same commands as the advanced form: `addNode`, and for the List `addComplexElement` (its `list` kind), which adds the whole list or nothing. The keys are written first (`setTranslationKeys`, one call, in the language being edited); when the element is then refused, the keys that add wrote are deleted again (`deleteTranslationKeys`), the form stays open and says why. The list is fixed in code: each item needs a form of its own.
 
-**The embed warning.** A banner above the page warns while the structure being edited (a page, the menu, the footer or a component) holds an embed (`<iframe>`) that the installation's embed policy does not cover: its address names no host the policy lists (the host itself or a subdomain of it, matched as `IframeSandbox` matches it), it has no host of its own (a relative address, which is this site), it names this site's own host, or it carries a `srcdoc`. Such an embed runs with the policy's default sandbox, the strictest the deployer set, and may stay empty. The policy is read with `getIframeSandbox`, once per page load; the check runs on the first structure shown, on every move through the Edit list and after every change of structure. The banner's **View policy** link to Embed Security is there only where the installation shows that page (setup item 11, §9.17); its × hides the banner until the page is loaded again. In the editor an embed lets the pointer through, so a click on it selects it, wherever it sits on the page (one at a page's top level included).
+**The embed warning.** A banner above the page warns while the structure being edited (a page, the menu, the footer or a component) holds an embed (`<iframe>`) that the installation's embed policy does not cover: its address names no host the policy lists (the host itself or a subdomain of it, matched as `IframeSandbox` matches it), it has no host of its own (a relative address, which is this site), it names this site's own host, or it carries a `srcdoc`. Such an embed runs with the policy's default sandbox, the strictest the deployer set, and may stay empty. The policy is read with `getIframeSandbox`, once per page load; the check runs on the first structure shown, on every move through the Edit list and after every change of structure. The banner's **View policy** link to Embed Security is there only where the installation shows that page (setup item 11; §9's Embed security row); its × hides the banner until the page is loaded again. In the editor an embed lets the pointer through, so a click on it selects it, wherever it sits on the page (one at a page's top level included).
 
 **Picking a target.** Picking the Menu or the Footer in the Edit list selects nothing, as picking a page does, and scrolls it into view in the frame. The frame shows a page with its menu and footer around it, so in Select a click on an element outside the target, whichever of the three it is, asks whether to switch: a yes moves the Edit list there with nothing selected, and a no leaves the outline and the panel on what was selected before. Workflows asks nothing, as a selection there acts on nothing, and Select does not take over a selection another tool made outside the target.
 
 **Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. An element added *inside* one that holds text takes that text (`addNode` moves the target's text into the new element when the new element can hold children), and the canvas shows it there at once, the text once, without a reload. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas, an element just added included; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
 
-**Saving a selection as a snippet.** Select mode's *save as snippet* flow asks for a name and offers one checkbox: **"Save to my personal snippets (reusable in all my projects)"**. Leave it unchecked and the snippet belongs to the project you are editing, where every member of that project can use it. Tick it and the snippet goes to your own library instead — it follows you into every project you work on, and nobody else can see it, insert it, or delete it. The Add panel's **Snippet** tab lists all three tiers in one picker — the snippets shipped with the engine, your personal ones, and the current project's — with each entry labelled by the tier it came from. See [COMMAND_API.md](COMMAND_API.md) for how a name that exists in more than one tier resolves.
+**Saving a selection as a snippet.** Select mode's *save as snippet* flow asks for a name, an id, a category and an optional description, and offers one checkbox: **"Save to my personal snippets (reusable in all my projects)"**. Leave it unchecked and the snippet belongs to the project you are editing, where every member of that project can use it. Tick it and the snippet goes to your own library instead — it follows you into every project you work on, and nobody else can see it, insert it, or delete it. The Add panel's **Snippet** tab lists all three tiers in one picker — the snippets shipped with the engine, your personal ones, and the current project's — with each entry labelled by the tier it came from. See [COMMAND_API.md](COMMAND_API.md) for how a name that exists in more than one tier resolves.
 
 **The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), with its formatting as a page draws it (a word's `<b>`, `<i>`, `<u>`, `<strong>`, `<em>` and `<br>` markers as elements; removed inside an `option`, a `textarea` or the other elements that show no formatting: [ARCHITECTURE.md](ARCHITECTURE.md) §2), a raw text (`__RAW__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way, their markers removed. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
 
@@ -537,7 +548,7 @@ There is no class, no ID and no key-or-literal choice: each text gets a translat
 
 **The tag preview.** Picking a tag in the **HTML Tag** tab shows a small example of it under the picker, and its **`</>`** button switches to the example's HTML as the page holds it once parsed: a boolean attribute reads `open=""`, a table row sits in the `<tbody>` the browser adds, an `<option>` is closed. A tag that renders nothing visible (`script`, `meta`, `template`…) reads "No visual preview". The examples come with the page, one `<template>` per tag written by `_tag-selector.php` from `_tag-examples.php`, so picking a tag copies its example and parses nothing.
 
-**The Selectors tab and `@media`.** The **Selectors** tab of the CSS mode lists every rule of the stylesheet: tags, classes, ids and attributes outside any `@media` block, and under **Media Queries** each block with the rules it holds. A chip is one rule: a chip under `@media (max-width: 768px)` is the rule inside that block, not the rule of the same selector outside it. Selecting it marks that chip, the box under the list shows `@media (max-width: 768px)` beside the selector, and **Edit Styles** (its pencil), **Copy From…** and **Animate** read and write the rule inside its block — the style editor's and the State & Animation Editor's headers show the query too, and the style editor's live preview applies only where the rule does. **Copy From…** offers every other rule, a rule inside a block with its query; from a rule inside a block, the rule of the same selector outside it is one of them. A selector holding `+` (`h1 + p`) is read as written. The editor's own script in the preview is never listed as an id.
+**The Selectors tab and `@media`.** The **Selectors** tab of the CSS mode lists every rule of the stylesheet: tags, classes, ids and attributes outside any `@media` block, and under **Media Queries** each block with the rules it holds; after them, the tags, classes and ids the page shown uses that have no rule yet, and never `:root` (the Theme tab's). A chip with a rule is that rule: a chip under `@media (max-width: 768px)` is the rule inside that block, not the rule of the same selector outside it. Selecting it marks that chip, the box under the list shows `@media (max-width: 768px)` beside the selector, and **Edit Styles** (its pencil), **Copy From…** and **Animate** read and write the rule inside its block — the style editor's and the State & Animation Editor's headers show the query too, and the style editor's live preview applies only where the rule does. **Copy From…** offers every other rule, a rule inside a block with its query; from a rule inside a block, the rule of the same selector outside it is one of them. A selector holding `+` (`h1 + p`) is read as written. The editor's own script in the preview is never listed as an id.
 
 **A slider's number.** A property the editor sets with a slider (`opacity`, from 0 to 1) has a number field beside it, and the two move together: a number typed within the slider's bounds moves it at once; on leaving the field, a number outside them becomes the nearest bound, and anything that is not a number goes back to the last value. In a narrow sidebar the slider gives way and the number field keeps its width. The slider shows in the style editor's new property row (Selectors → **Edit Styles** → **Add Property**) and in the State & Animation Editor's add rows; a property the style editor already holds is a text field.
 
@@ -580,9 +591,9 @@ Menu and footer are global — editing them in any page's preview applies site-w
 
 1. Iframe loads with `?_editor=1` → renderer adds `data-qs-node` / `data-qs-struct`.
 2. Click → iframe sends node path via `postMessage`.
-3. Sidebar shows properties of the selected node.
+3. The element info row shows the selected node, and the panel the tool's actions for it.
 4. Edit → API call to `editStructure` / `editNode` / `setStyleRule` / `setTranslationKeys` / etc.
-5. Preview reloads, or updates inline for text-only changes.
+5. The preview updates in place where it can (a text, an add, a delete, a duplicate, a changed element, a stylesheet reloaded alone) and reloads otherwise.
 
 An add, a delete or a duplicate updates the page in place: the engine renders the new node, and the
 editor renumbers the nodes after it **within the same structure only** — the page, the menu and the
@@ -612,8 +623,8 @@ An emptied structure stays empty: nothing is put back. The one exception is a ne
 project's **404 page**, which a visitor can reach before anything else is built:
 it starts with a heading, a sentence and a link back to the home page, three
 ordinary nodes whose texts (`404.title`, `404.message`, `404.backHome`) are written
-in English into every language file the project starts with, for the author to
-rewrite.
+in the project's language (the engine's starting words for it, English where it
+has none) into the word files the project starts with, for the author to rewrite.
 
 **Which tags the editor offers, and which params it asks for, come from the
 server.** `TagRegistry` is the single source of truth, and
@@ -621,8 +632,10 @@ server.** `TagRegistry` is the single source of truth, and
 `PreviewConfig.tagInfo`; the editor keeps no list of its own but one: the
 `<img>`, which it offers an optional `srcset` field (§8.1, *A srcset's field*;
 the other element HTML gives a `srcset`, a `<source>`, asks for one among its
-one-of params). Adding a tag, a mandatory param, or a per-tag default is
-therefore one edit, in `secure/src/classes/TagRegistry.php`.
+one-of params). Adding a mandatory param or a per-tag default is
+therefore one edit, in `secure/src/classes/TagRegistry.php`; a new tag also takes its
+entry in the picker's groups (`getUICategories()`, same file), its description among
+the panel's words and, to show a preview, its example in `_tag-examples.php`.
 
 **Translated attributes are picked, not typed.** Where an attribute on a tag
 holds a translation key — `alt` on `img` and `area`, `title` on `iframe` — the
@@ -641,13 +654,15 @@ whose text it writes per language (§9.15), so the key is what arrives.
 | Routes / structure | `getRoutes`, `getStructure`, `editStructure`, `addNode`, `editNode`, `deleteNode`, `duplicateNode`, `moveNode`, `addComplexElement`, `addRoute`, `setRouteLayout`, `setRouteResolver` |
 | Components | `listComponents`, `addComponentToNode`, `findComponentUsages` |
 | Snippets | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `insertSnippet`, `injectSnippetCss` |
-| Translations | `getTranslation`, `getTranslations`, `getLangList`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `importStructureTranslations`, `editTitle`, `getSocialPreview`, `setSocialPreview` (the Description field) |
+| Translations | `getTranslation`, `getTranslations`, `getLangList`, `getTranslationKeys`, `validateTranslations`, `getUnusedTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `importStructureTranslations`, `editTitle`, `getSocialPreview`, `setSocialPreview` (the Description field) |
 | Styles | `getStyles`, `editStyles`, `listStyleRules`, `getStyleRule`, `setStyleRule` |
 | Theme | `getRootVariables`, `setRootVariables`, `setThemeMode` |
 | Animations | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` |
-| Interactions / events | `listJsFunctions`, `listDataBindings`, `listInteractions`, `addInteraction`, `editInteraction`, `deleteInteraction`, `addPageEvent`, `editPageEvent`, `deletePageEvent` |
-| State + integrations | `getStateStores`, `setStateStores`, `listApiEndpoints`, `editApi`, `listOAuthProviders`, `setOAuthCredentials`, `listStorageItems`, `addStorageItem` |
-| Assets / misc | `listAssets`, `uploadAsset` (the Media picker's upload, in the simple Add), `getIframeSandbox` (the embed warning), `help`, `backupProject` |
+| Interactions / events | `listJsFunctions`, `listDataBindings`, `listInteractions`, `addInteraction`, `editInteraction`, `deleteInteraction`, `getPageEvents`, `addPageEvent`, `editPageEvent`, `deletePageEvent` |
+| State + integrations | `getStateStores`, `setStateStores`, `listApiEndpoints`, `editApi`, `listOAuthProviders`, `listStorageItems`, `addStorageItem` |
+| Assets / misc | `listAssets`, `uploadAsset` (the Media picker's upload, in the simple Add), `getIframeSandbox` (the embed warning), `backupProject` |
+
+A workflow's run (§8.12) also sends whatever commands its steps name.
 
 For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
 
@@ -670,12 +685,8 @@ selects with all their options, lists, field rows with the
    the page, where neither could reach.
 2. The **kind-specific form** rendered by that wizard's
    `renderWizard(container)`.
-3. The standard footer **Save** button calls the controller's
-   `validate()` then `getConfig()`, then `POST /management/p/<projectId>/addComplexElement`.
-
-The top-of-page "Add Element" quick-add button is hidden while the
-Complex tab is active — the wizard needs config first, so the
-quick-add doesn't fit.
+3. The form's **Add Element** button (and **Save & add another** beside it) calls the controller's
+   `validate()`, then its optional `preSubmit()` (a wizard's own setup calls: the OAuth button makes its routes there), then `getConfig()`, then `POST /management/p/<projectId>/addComplexElement`.
 
 **Architecture — builder + wizard pairs**
 
@@ -752,25 +763,26 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 | `QSComplexWizard.createRowEditor` | Variable-cardinality row list with reorder/add/delete + keyboard nav. Used by every wizard that has a "list of N things" section (Select options, FormScaffold fields, List items). |
 | `QSComplexWizard.createTextKeyPicker` | Translation-key picker — searchable list of existing keys + inline "Create" form for new ones. Matches the component-variables panel UX. |
 | `QSComplexWizard.createStorageKeyPicker` | Storage-key picker — the declared keys, a form that declares a new one, the `qsp_<projectId>_` chip. Takes `getScope` and `setScope` from the field beside it; `setValue()` shows a key without reporting a change. The parameter editor's storage attributes, the Interactions tool's `storageKey` argument, a state store's start value and the API page's token sources all use it (§9.10). |
-| `QSComplexWizard.t` / `codeText` / `requiredMark` | The wizards' words (`wizard-text.js`, loaded first). `t(key, params)` is `QSPanelWords.t('complexWizard.' + key, params)` (§7), over the `complexWizard` section the editor hands; a key no file holds shows as its path (`complexWizard.<key>`). `codeText(text, codes)` turns a sentence's `{name}` markers into `<code>` elements, so a hint can name an attribute without markup in its translation. `requiredMark()` is the red asterisk of a required field's label. |
+| `QSComplexWizard.t` / `codeText` / `requiredMark` | The wizards' words (`wizard-text.js`, loaded first). `t(key, params)` is `QSPanelWords.t('complexWizard.' + key, params)` (§7), over the `complexWizard` section the editor hands; a key no file holds shows as its path (`complexWizard.<key>`). `codeText(text, codes)` turns a sentence's `{name}` markers into `<code>` elements, so a hint can name an attribute without markup in its translation. `requiredMark()` is the asterisk of a required field's label. |
 
 **Built-in kinds**
 
 | Kind | Emits | Notes |
 |---|---|---|
 | `field-row` | `<div class="field"><label/><input/><span data-error-for/></div>` | Single form field, ready for `QS.validate` per-field error wiring. Building block for Form Scaffold. |
-| `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch + optional post-submit actions) | Headline API-objective integration. Reuses `FieldRow` internally for each field. Each field's label key gets the field's name as its starting text where it has none (*Starting texts* above); the submit button's key is yours to pick and gets none. **Auto-seed from request schema**: when the picked API endpoint declares a `requestSchema.properties`, a `⤓ Pre-fill from request schema` button appears in the API group — click to populate every field row with `{name, type, required, labelKey}` inferred from the schema. Type inference: standard JSON Schema (`boolean` → checkbox; `number` / `integer` → number); QuickSite-permissive aliasing — any HTML5 input name typed directly into `type` (`password` / `email` / `tel` / `url` / `date` / `color` / …) maps to that input type; `format` on a `string` (email / tel / url / date / time / date-time / color / **password**) → matching HTML5 type; `writeOnly: true` → password; property name matches `/password/i` → password (last-resort); else `text`. **Reset behaviour**: with fields already populated, the button label flips to `⤴ Reset to schema fields (clears N)` and asks in the panel's own confirmation dialog (**Replace** / **Cancel**) before replacing them — useful after picking the wrong endpoint or to recover from typos. |
+| `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch) | Sends the form to an endpoint of the API registry, or to a URL. Reuses `FieldRow` internally for each field. Each field's label key gets the field's name as its starting text where it has none (*Starting texts* above); the submit button's key is yours to pick and gets none. **Auto-seed from request schema**: when the picked API endpoint declares a `requestSchema.properties`, a `⤓ Pre-fill from request schema` button appears in the API group — click to populate every field row with `{name, type, required, labelKey}` inferred from the schema. Type inference: standard JSON Schema (`boolean` → checkbox; `number` / `integer` → number); QuickSite-permissive aliasing — any HTML5 input name typed directly into `type` (`password` / `email` / `tel` / `url` / `date` / `color` / …) maps to that input type; `format` on a `string` (email / tel / url / date / time / date-time / color / **password**) → matching HTML5 type; `writeOnly: true` → password; a property name containing *password*, in any letter case → password (last-resort); else `text`. **Reset behaviour**: with fields already populated, the button label flips to `⤴ Reset to schema fields (clears N)` and asks in the panel's own confirmation dialog (**Replace** / **Cancel**) before replacing them — useful after picking the wrong endpoint or to recover from typos. |
 | `select` | `<div class="field"><label/><select/><span data-error-for/></div>` with N `<option>` children | Same outer shape as field-row so a select sits alongside text inputs in a form-scaffold and picks up the same QS.validate hook. Optional placeholder option + required + multiple. |
 | `list` | `<ul>` or `<ol>` with N `<li><textKey/></li>` children | Simple flat list. `<ol>` supports `start` and `reversed`. |
 | `radio-group` | `<fieldset class="field">` + `<legend>` + N (`<label><input type="radio">`) + `<span data-error-for>` | All radios share one `name`. Layout `inline` / `stacked` (adds `field--inline` class). Optional default-selected value (a `<select>` rebuilt from the live option values). |
 | `checkbox-group` | Same as radio-group with `type="checkbox"` | Optional `arraySubmit` toggle emits `name="<name>[]"` for PHP-style array submission (error span still uses the bare name). Multi-select default values. |
 | `table` | `<table>` + optional `<caption>` + optional `<thead>` + `<tbody>` of M rows × N columns of `<td>` | Spreadsheet paste (TSV/CSV) with hybrid mode radio — **RAW** (`__RAW__`-prefixed literals, same in every language) or **Translatable** (auto-generated keys `table.<id>.head.<col>` + `table.<id>.body.<r>.<c>` written via `setTranslationKeys` for a user-picked language). Empty pasted cells skipped (no orphan keys). When `id` is set the `<table>` is stamped with `data-qs-complex="table"` + `data-qs-complex-id="<id>"` so the **Translate from CSV** workflow (see below) can find it. |
-| `definition-list` | `<dl>` with N (`<dt>`, `<dd>`) pairs | One translation key per term and per description. MVP is 1:1 (single `<dt>` per `<dd>`). |
+| `definition-list` | `<dl>` with N (`<dt>`, `<dd>`) pairs | One translation key per term and per description. Each term has one description (a single `<dt>` per `<dd>`). |
 | `accordion` | `<div class="accordion">` with N native `<details>` / `<summary>` disclosure items | No JS or ARIA wiring — browser handles toggling. Per-item `openByDefault` adds the `open` attribute. |
 | `nav-menu` | `<nav>` / `<ul>` with N `<li><a href="…">` items | Per-item **external** toggle adds `target="_blank" rel="noopener"`. Each `href` input attaches the shared routes datalist for autocomplete (external URLs still work). |
 | `breadcrumb` | `<nav aria-label="…">` / `<ol class="breadcrumb">` with N `<li>` | Last item auto-renders as plain text with `aria-current="page"` (no link); its href input is auto-greyed-out in the wizard. Same routes datalist as nav-menu for intermediate hrefs. The `<nav>`'s name, which a screen reader reads, is the key `breadcrumb.label`, given its starting text in each language (*Breadcrumb*, *Fil d'Ariane*; *Starting texts* above). |
-| `tab-set` | `<div class="tabset" id="<setId>">` + `<div role="tablist">` + N `<button role="tab">` + N `<div role="tabpanel">` | ARIA-correct tab semantics. Click-to-switch wired via existing QS verbs (`removeClass` / `addClass` / `hide` / `show` chain in each tab's `onclick`) — no new runtime needed. User-provided `setId` scopes the per-tab click chain so multiple tab sets coexist on one page. Each panel content is a single `<p>` with a `textKey` — edit further via the regular editor after save. |
+| `tab-set` | `<div class="tabset" id="<setId>">` + `<div role="tablist">` + N `<button role="tab">` + N `<div role="tabpanel">` | ARIA roles and relations (`role`, `aria-controls`, `aria-labelledby`, `aria-selected` on the first tab). A click moves the `tab--active` class and shows the panel; `aria-selected` and `tabindex` stay as built, and the arrow keys do not move between tabs. Click-to-switch wired via existing QS verbs (`removeClass` / `addClass` / `hide` / `show` chain in each tab's `onclick`), with no runtime of its own. User-provided `setId` scopes the per-tab click chain so multiple tab sets coexist on one page. Each panel content is a single `<p>` with a `textKey` — edit further via the regular editor after save. |
 | `paged-navigator` | `<nav class="paged-nav" data-state-pagenav="<storeId>" …>` (empty at build time; runtime populates buttons) | Numbered-page navigator bound to a state store. Reads the store's `totalPages` field to size itself, marks the current `page` with `aria-current="page"`. Smart-ellipsis windowing (`1 … 4 5 [6] 7 8 … 100`). Optional ‹ Prev / Next › chevrons. Hides itself when `totalPages` is missing or ≤ 1. Click delegation: one listener attached to the `<nav>` (via WeakSet guard) survives re-renders — calls `setState(storeId, pageField, N)` then `fetchState(storeId)`. Pair with an offset-pagination store (see §9.6). |
+| `oauth-button` | `<a class="qs-oauth-button qs-oauth-button--<provider>" href="/auth/oauth/<provider>/start">` with an optional icon `<span>` and the label's text | The wizard makes the start and callback routes and their resolvers first (its `preSubmit()`), then adds the button; the label gets its starting text (*Starting texts* above). |
 
 **Adding a new kind — 2-file recipe**
 
@@ -790,43 +802,49 @@ the `addComplexElement` command level.
 
 When a wizard emits a translatable string (label, placeholder,
 button text, list-item label), the wizard's textKey picker either
-points at an existing translation key OR creates one with an empty
-value on save. The picker uses the standard `setTranslationKeys`
-command, which now also enforces the leaf-vs-branch collision rule
+points at an existing translation key OR creates one with its word, at
+once, from its own **Create** button: a word is required, and it is
+written in the language being edited only. The picker uses the standard
+`setTranslationKeys` command, which enforces the leaf-vs-branch collision rule
 (can't have both `form.email.label` AND `form.email.label.placeholder`
 in the file — pick a different sibling).
 
 **Atomicity**
 
-The whole subtree is spliced under one file lock by reusing
+The whole subtree reaches the structure file in one locked write, by reusing
 `addNode`'s insertion helper. If the builder throws or returns a
 malformed node, nothing is written. Half-built subtrees never reach
 the structure file.
 
-**Translate from CSV** (currently: Table only)
+**Translate from CSV** (a table only)
 
-Complex-element builders that opt in by stamping the
-`data-qs-complex="<kind>"` + `data-qs-complex-id="<id>"` attribute pair
-on their root node become **translatable in bulk**: select the rendered
-element in Select mode, click **Translate from CSV** in the action
-toolbar (button auto-shows when the marker is present), paste a CSV
-in another language, pick the target language, click Apply. The
+A table given an id carries the `data-qs-complex="table"` +
+`data-qs-complex-id="<id>"` attribute pair on its root and is
+**translatable in bulk**: select the rendered
+table in Select mode, click **Translate from CSV** in the action
+toolbar (the button shows when the selected element is a table carrying
+both attributes), paste a CSV
+in another language, pick the target language, click Apply. The table
+must be in a page's structure. The
 `POST /management/p/<projectId>/importStructureTranslations` command validates that
-the existing structure's dimensions match the pasted grid exactly
-(returns a 422 with a diff on mismatch — no partial writes) and writes
-the values into the picked language's translation file for every key
-the element references. The page JSON is **not modified** — this is a
+the pasted grid has the table's header cells and its number of body rows
+(a body row that is too short is filled with empty cells, one too long is
+cut; a mismatch returns a 422 with a diff — no partial writes) and writes
+the values into the picked language's translation file under the keys
+`table.<id>.head.<col>` and `table.<id>.body.<r>.<c>`, the ones a
+Translatable paste gives the cells (a cell holding a RAW text or a key of
+its own does not show them). The page JSON is **not modified** — this is a
 translation-only workflow. The words go through the shared translation
 writer, as every other word does: on a one-language site they reach
 `default.json` too, the file its pages read, so the import shows on the
 site; a word in the way refuses the import with the server's words, and
 nothing is written.
 
-Today only the Table builder stamps the markers. Future complex
-elements opt in by emitting the same two attributes on their root and
-either reusing the `kind: 'table'` handler in `importStructureTranslations`
-or adding a `case 'their-kind':` branch with the equivalent dimension
-scanner.
+The Table builder and the Paged navigator stamp the markers; only a table
+is read by this workflow. Another kind needs three things: the two
+attributes on its root, its kind accepted by `importStructureTranslations`
+with its own dimension scan, and the editor's button, which shows for
+`table` and measures a `<table>` (`_updateTranslateCsvButton` in `preview.js`).
 
 ### 8.8 Text authoring (Add → Text tab, inline edit, RAW + key)
 
@@ -835,16 +853,16 @@ a **translation key** (looked up against the language file at render time, e.g.
 `home.greeting`) and a **RAW literal** (`__RAW__`-prefixed, rendered verbatim —
 for separators / one-off labels like `" / "`, `"—"`). Both are first-class.
 
-**Tag elements add empty.** A new tag has no text child. To add text to a tag, use **Add → Text** (below) or **Text mode** inline.
+**Tag elements add empty.** A new tag has no text child. To add text to a tag, use **Add → Text** (below); **Text mode** then edits it inline.
 
 **Add → "Text" tab.** A 5th tab in the Add panel (after HTML Tag / Component /
 Snippet / Complex), remembered as the others are (`addLastTab`, §6). Pick the type:
 - **Translation key** — opens a searchable picker (the same
   `QSComplexWizard.createTextKeyPicker` the variables panel uses): type to
   filter existing keys; if your query doesn't match an existing key, an inline
-  "Create '<query>'" form appears with a value input. Saving creates the key
-  (via `setTranslationKeys`) with the value in the current language (empty in
-  others) and the picker carries the new key.
+  "Create '<query>'" form appears with a value input. **Create** writes the key
+  (via `setTranslationKeys`) with its value, which is required, in the language
+  being edited (nothing is written in the others) and the picker carries the new key.
 - **RAW (literal)** — a plain value input. Stored as the node's `textKey` =
   `"__RAW__"+value`, rendered verbatim in every language.
 
@@ -873,9 +891,11 @@ paste arrives as plain text. A sentence saved unchanged writes nothing, and one
 whose formatting nobody touched is written back exactly as it was stored. Every
 other place on the page showing the same key shows the new sentence, with its
 formatting, at once. A `__RAW__` literal takes no formatting: the shortcuts do
-nothing there, and **Shift+Enter** saves as **Enter** does.
+nothing there, and **Shift+Enter** saves as **Enter** does. A translated text
+inside an element that shows no formatting (an option, a textarea) is edited
+the same way, as plain words.
 
-In the renderer (`JsonToHtmlRenderer::renderText`), editor mode wraps both
+In the renderer (`JsonToHtmlRenderer::renderTextNode`), editor mode wraps both
 key-based AND `__RAW__` text in the `data-qs-textkey` selection span
 (with a `data-qs-raw="true"` marker on literals), so RAW text gets a selection
 handle just like translation-key text.
@@ -886,7 +906,7 @@ handle just like translation-key text.
 | Add Text dispatch + picker mount | `public/admin/assets/js/pages/preview/preview.js` (`addTextNode`, `ensureAddTextKeyPicker`) |
 | TextKey picker primitive | `public/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js` |
 | Inline RAW-vs-key save branch | `preview.js` `handleTextEdited` + `saveRawTextEdit` |
-| Renderer editor wrapping | `secure/src/classes/JsonToHtmlRenderer.php` `renderText()` |
+| Renderer editor wrapping | `secure/src/classes/JsonToHtmlRenderer.php` `renderTextNode()` |
 | Backend insert | `secure/management/command/addNode.php` (`nodeKind:'text'` mode) |
 
 ### 8.9 Translation Manager (Translations mode)
@@ -929,31 +949,31 @@ For unset rows the Edit icon becomes a `+` (Set value) icon and the panel pre-fi
 
 After save success the panel reads the list again so the row's status flips naturally (unset → used, etc. — the "stale-sibling sweep"), then calls `PreviewState.reloadPreview()` so the iframe shows the new value live.
 
-**Per-row delete** — the row's bin asks first, in the panel's confirm (§5.1): its title `Delete {key} from {LANG}.json?`, the word it holds as its message (cut at 200 characters), for a key a page may never have shown, and, when ≥2 languages exist, the multi-language checkbox in its body (default OFF — you're usually editing one language); its red **Delete** runs `deleteTranslationKeys` for the target language(s) via `Promise.all`; 404 from a non-current language is treated as success (key already absent in that file).
+**Per-row delete** — the row's bin asks first, in the panel's confirm (§5.1): its title `Delete {key} from {LANG}.json?`, the word it holds as its message (cut at 200 characters), for a key a page may never have shown, and, when ≥2 languages exist, the multi-language checkbox in its body (default OFF — you're usually editing one language); its red **Delete** runs `deleteTranslationKeys` for each target language, one after another (`QSSiteWords.remove()`); a 404 from any language is treated as success (the key is already absent from that file).
 
-**Bulk remove-unused** — the same question applied at scale, list first: its title `Delete the {n} unused keys?`, its message `These {n} unused keys will be deleted from {LANG}.json:`, and in its body the list of every unused key with its word (cut at 120 characters), which scrolls inside the question, and the multi-language checkbox (default ON — orphaned keys are orphaned everywhere); its red button says `Delete {n} keys`. Single `deleteTranslationKeys` call per target language, parallel. It offers only keys nothing on the site names, so it never removes a word a page, the consent layer, Media or a registry still uses.
+**Bulk remove-unused** — the same question applied at scale, list first: its title `Delete the {n} unused keys?`, its message `These {n} unused keys will be deleted from {LANG}.json:`, and in its body the list of every unused key with its word (cut at 120 characters), which scrolls inside the question, and the multi-language checkbox (default ON — orphaned keys are orphaned everywhere); its red button says `Delete {n} keys`. One `deleteTranslationKeys` call per target language, one after another. It offers only keys nothing on the site names, so it never removes a word a page, the consent layer, Media or a registry still uses.
 
 **Deleting an element keeps a word something else still uses** — the editor's element delete and its text-only delete (`deleteNode`) remove a word the deleted element named only when nothing else on the site uses it: a text shown by another element, a picture's description another page or Media holds, keep their words in every language. The text-only delete's *Keep translation keys* box keeps every word.
 
-Both deletes run with the question open, and the list is read again before it closes. Partial failure (some languages succeed, others fail) is said in the question, which stays open: `Failed for 1/2 languages: FR: <details>`. The user can retry without losing the choice made in it.
+Both deletes run with the question open, and the list is read again before it closes. Partial failure (some languages succeed, others fail) is said in the question, which stays open: `Failed for 2/3 languages: FR: <details> | DE: <details>` (one failed language alone reads `Failed to delete: [FR] <details>`). The user can retry without losing the choice made in it.
 
 **Scope-aware counts** — chip counts + coverage % reflect the active scope + substring filter (status excluded). Site-wide totals drive ONLY: the "no translation keys yet" empty state, and the bulk-button enabled gate. So `Used 8` next to the chip when scoped to `home` page is correct ("8 keys on the home page are used"); the bulk button stays enabled iff *any* unused keys exist site-wide, not just on the scoped page.
 
 Unused keys naturally drop out for non-`site` scopes — they belong to no source by definition.
 
-**A one-language site** (one language listed: a site is multilingual with two or more) — the runtime ignores per-language files and loads `default.json` exclusively (see [Translator.php:25-27](../secure/src/classes/Translator.php#L25)). The panel detects this from `getLangList`'s `multilingual_enabled` field and:
+**A one-language site** (one language listed: a site is multilingual with two or more) — the runtime ignores per-language files and loads `default.json` exclusively (see [Translator.php:77-80](../secure/src/classes/Translator.php#L77)). The panel detects this from `getLangList`'s `multilingual_enabled` field and:
 - Sets `_availableLangs = ['default']` (NOT the configured `LANGUAGES_SUPPORTED`)
 - Hides the language picker + its label
 - A write is sent in the site's language code, which the shared writer copies into `default.json`; a delete removes the key from both files
 - The multi-language checkbox auto-hides (one language, no choice to surface)
 
-This matters because a one-language site still lists its one language (`'en'` or similar) and keeps that language's file beside `default.json` — managing `en.json` alone would be invisible to the rendered site, which loads `default.json`. All translation commands accept `'default'` as a valid language code for one-language writes.
+This matters because a one-language site still lists its one language (`'en'` or similar) and keeps that language's file beside `default.json` — managing `en.json` alone would be invisible to the rendered site, which loads `default.json`. `getTranslation`, `getTranslationKeys`, `getUnusedTranslationKeys`, `validateTranslations`, `setTranslationKeys` and `deleteTranslationKeys` accept `'default'` as a language code for one-language writes; `analyzeTranslations`, `editTitle` and `importStructureTranslations` take a language of the project only.
 
 **Default.json visibility (multilingual)** — hidden from the language picker. It's a plumbing file (the words of a one-language site), not a user-facing translation target.
 
 **Live reload after writes** — every write path (save, per-row delete, bulk delete) ends with `_reloadPreviewIframe()` → `PreviewState.reloadPreview()`, the same hook every other write flow (style, JS interactions, animations) uses. Authoring feels real-time.
 
-**Iframe nav-guard** — translation mode is registered in `isEditorMode()` in `preview-iframe-inject.js` so link clicks + form submits in the preview are swallowed (same as select/text/style/js/add). Without this, accidentally clicking a link in the preview would navigate the iframe to a different page than the editor's "page" picker — silent edit-target drift.
+**Iframe nav-guard** — translation mode is registered in `isEditorMode()` in `preview-iframe-inject.js` so link clicks + form submits in the preview are swallowed (same as select/drag/text/style/js/add). Without this, accidentally clicking a link in the preview would navigate the iframe to a different page than the editor's "page" picker — silent edit-target drift.
 
 **Files**
 
@@ -964,7 +984,7 @@ This matters because a one-language site still lists its one language (`'en'` or
 | JS module | `public/admin/assets/js/pages/preview/preview-translation.js` |
 | Mode wiring | `public/admin/assets/js/pages/preview/preview.js` (`setMode('translation')`) |
 | Its words | the `preview` section (`preview.translation*`) and the Translations page's `translations` section, handed by `preview-config.php` through `__adminWords()` (§7) |
-| CSS | `public/admin/assets/admin.css` (`.preview-contextual-translation__*`) |
+| CSS | `public/admin/assets/admin.css` (`.preview-contextual-translation__*`); its tablet and phone rules in `public/admin/assets/css/responsive.css` |
 | Shared list | `public/admin/assets/js/core/site-words.js` (`QSSiteWords`: the reading, the states, the writes, the event) |
 | Server: the states' rule | `public/admin/api/index.php` case `'translation-keys-grouped'` (the console reads it; the list makes the same partition from the commands it reads) |
 | Server: scan commands | `getTranslationKeys.php`, `getUnusedTranslationKeys.php`, `validateTranslations.php`, on `qs_site_translation_keys()` (`translationHelpers.php`) |
@@ -974,7 +994,7 @@ This matters because a one-language site still lists its one language (`'en'` or
 
 ### 8.10 Source view (CSS mode)
 
-An advanced sub-view of CSS mode that exposes the entire `style.css` as a code-editor surface for designers / developers who need to read or edit the whole file in context, without leaving the visual editor. Hidden for roles without the `editStyles` permission.
+An advanced sub-view of CSS mode that exposes the entire `style.css` as a code-editor surface for designers / developers who need to read or edit the whole file in context, without leaving the visual editor. Hidden for roles without the `editStyles` permission, and left out of the simple view.
 
 **Where you land it from:** the **CSS** tool → top-row **Source** button above the Theme / Selectors / Motion tabs. Activating it hides the three tabs and swaps the iframe canvas for the editor; deactivating restores both.
 
@@ -1030,8 +1050,8 @@ Match highlighting paints into a separate `<pre>` overlay layer (between the hig
 **Content restrictions.** A whole-file save (and every structured style write) is validated before it lands:
 
 - **Remote `@import` is rejected.** An `@import` that points at another origin — anything carrying a URL scheme (`https:`, `http:`, `data:`, …) or a protocol-relative `//host` — is refused. This keeps the generated site dependency-free (no third-party fetch on a visitor's behalf) and closes an exfiltration channel. Relative and same-origin imports (`theme.css`, `/style/extra.css`) are allowed; to use a web font or external sheet, download it into the project instead.
-- **A few legacy vectors are blocked** regardless of how they are spelled (comments or CSS escapes inserted mid-keyword do not evade the check): the `javascript:` / `vbscript:` schemes, IE `expression(...)` and `behavior:`, Firefox `-moz-binding:`, and `data:` URIs carrying HTML. `scroll-behavior` and ordinary quoted values (`font-family: "Segoe UI"`, `content: "→"`) are unaffected.
-- **Size limit.** A stylesheet is capped at 512 KB — the largest the CSS engine parses within the server's memory budget. This applies to the whole-file save and to every incremental write (variables, rules, keyframes, snippet CSS injection).
+- **A few legacy vectors are blocked** regardless of how they are spelled (comments or CSS escapes inserted mid-keyword do not evade the check): the `javascript:` / `vbscript:` schemes, IE `expression(...)` and `behavior:`, Firefox `-moz-binding:`, `data:` URIs carrying HTML, an HTML `<script` or `<style` tag, and a PHP opening tag. `scroll-behavior` and ordinary quoted values (`font-family: "Segoe UI"`, `content: "→"`) are unaffected.
+- **Size limit.** A stylesheet is capped at 512 KB at most — the largest the CSS engine parses within the server's memory budget; an installation's file cap can lower it, never raise it. This applies to the whole-file save and to every incremental write (variables, rules, keyframes, snippet CSS injection).
 
 Selectors, media queries, variable names, and declaration blocks additionally may not contain a raw `{` or `}` (which would break out of the rule) — the `>` child combinator, pseudo-classes, and attribute selectors are all fine.
 
@@ -1059,7 +1079,7 @@ Selectors, media queries, variable names, and declaration blocks additionally ma
 
 ### 8.11 Motion tab (CSS mode)
 
-The third tab of CSS mode — manages CSS transitions, animations, and the `@keyframes` library for the current project. Renamed from "Animations" (the old label collided with the inner "animations" sub-group and led to the "Animations > Animations" head-scratcher).
+The third tab of CSS mode — manages CSS transitions, animations, and the `@keyframes` library for the current project.
 
 **Where you land it from:** the **CSS** tool → click the **Motion** tab.
 
@@ -1076,7 +1096,7 @@ The third tab of CSS mode — manages CSS transitions, animations, and the `@key
 |---|---|
 | **Transitions** | Selectors with a `transition:` declaration. Tops the list with a "+ Add transition" button that opens the Transition wizard (below). |
 | **Animations** | Selectors with an `animation:` declaration. |
-| **Hover-state-only** | Diagnostic group (collapsed by default). Selectors that change appearance in `:hover` / `:focus` / etc. without declaring a `transition` — common authoring oversight. The header carries an ⓘ icon + tooltip explaining what the group means. |
+| **Hover-state-only** | Diagnostic group (collapsed by default) for selectors that change appearance in `:hover` / `:focus` / etc. without declaring a `transition`; the panel reads them from `getAnimatedSelectors` but lists none: the group stays empty, its count at 0. The header carries an ⓘ icon + tooltip explaining what the group means. |
 
 Clicking any row opens the existing State & Animation Editor (`modals/transition.php`) scoped to that selector.
 
@@ -1093,7 +1113,7 @@ Its **Properties** setting is **All Properties** — one duration, delay and tim
 | The pencil (*Edit “fadeIn”*) | Opens the keyframe editor (`modals/keyframe.php`) on this keyframe. |
 | The bin (*Delete “fadeIn”*) | Asks first (*Delete the keyframe “fadeIn”?*, a red **Delete**), then removes the `@keyframes` rule via `deleteKeyframes`. |
 
-The editor shows one frame per position on the timeline. A key naming several positions (`0%, 100%`, `from, to`) opens as one frame per position, each with the same declarations — the same animation — and is saved that way, `from` and `to` as `0%` and `100%`. A position named by two keys becomes one frame, the later key winning for a property both set. A decimal position (`12.5%`) is kept, and a frame's position can be typed as a decimal. An animation with a key the editor cannot place — neither `from`, `to` nor a percentage up to 100% — does not open. A frame's × and a property's × take it out of the form, written only on **Save**; saving under a name another keyframe already holds asks first (*Replace the keyframe “fadeIn”?*, a red **Replace**).
+The editor shows one frame per position on the timeline. A key naming several positions (`0%, 100%`, `from, to`) opens as one frame per position, each with the same declarations — the same animation — and is saved that way, `from` and `to` as `0%` and `100%`. A position named by two keys becomes one frame, the later key winning for a property both set. A decimal position (`12.5%`) is kept, and a frame's position can be typed as a decimal. An animation with a key the editor cannot place — neither `from`, `to` nor a percentage up to 100% — does not open. A frame's × and a property's × take it out of the form, written only on **Save**; the last frame and a frame's last property stay (a toast says so); saving under a name another keyframe already holds asks first (*Replace the keyframe “fadeIn”?*, a red **Replace**).
 
 If the keyframe is used by ≥ 1 selector, a **used by N** chip appears next to the frame count. Clicking it expands an inline list below the row, each line showing a selector and its bin, which asks first (*Remove animation from .btn?*, a red **Remove**) and strips the `animation:` declaration from that rule (via `setStyleRule` with `removeProperties: ['animation']`). The data is pivoted from the same `animatedSelectorsData.animations` cache that drives the Animations sub-group, so the badge count updates immediately on any apply / remove inside the session.
 
@@ -1107,7 +1127,7 @@ If the keyframe is used by ≥ 1 selector, a **used by N** chip appears next to 
 | Easing | Button showing the current value; opens `QSEasingPicker` (see §5.8) pre-loaded with that value. |
 | Delay | Number input (ms; default 0; omitted from the output when 0). |
 
-If the picked selector already has a transition, the form pre-fills from `animatedSelectorsData.transitions[i].parsed[0]` (CSS times normalised to integer ms) + an amber "will overwrite" hint appears. Submit writes `transition: <prop> <dur>ms <easing> <delay>ms;` via `setStyleRule`. The structured-tabs caches invalidate so the new entry surfaces in the Transitions sub-group on the next view; `PreviewState.hotReloadCss()` flushes the iframe's stylesheet.
+If the picked selector already has a transition, the form pre-fills its property, duration and delay from `animatedSelectorsData.transitions[i].parsed[0]` (CSS times normalised to integer ms; the easing keeps `ease`) + an amber "will overwrite" hint appears. Submit writes `transition: <prop> <dur>ms <easing> <delay>ms;` via `setStyleRule`. The Selectors cache is reset and the Motion tab reads its data again at once, so the new entry shows in the Transitions sub-group; `PreviewState.hotReloadCss()` flushes the iframe's stylesheet.
 
 **Easing picker** (`QSEasingPicker`, §5.8) is shared between the wizard's easing field and the Animation Preview modal's Timing Function "custom curve" button.
 
@@ -1117,21 +1137,23 @@ If the picked selector already has a transition, the form pre-fills from `animat
 |---|---|
 | Panel template (sections + groups + tooltip) | `secure/admin/templates/pages/preview/contextual-style.php` |
 | JS module | `public/admin/assets/js/pages/preview/preview-style-motion.js` (window global `PreviewStyleMotion`) |
+| State & Animation Editor | `public/admin/assets/js/pages/preview/preview-transition-editor.js` (`PreviewTransitionEditor`), its modal `secure/admin/templates/pages/preview/modals/transition.php` |
+| Modals | `modals/keyframe.php` (the keyframe editor), `modals/animation-preview.php` (the Animation Preview), `modals/apply-keyframe.php`, `modals/add-transition.php` |
 | Apply-keyframe modal | `secure/admin/templates/pages/preview/modals/apply-keyframe.php` |
 | Add-transition wizard modal | `secure/admin/templates/pages/preview/modals/add-transition.php` |
 | Easing picker | `public/admin/assets/js/lib/easing-picker/` (see §5.8) |
 | Its words | the `preview` section (the keyframes', transitions' and easing picker's words), handed by `preview-config.php` through `__adminWords()` (§7) |
 | CSS | `public/admin/assets/admin.css` (`.preview-keyframe-item*`, `.preview-animations-*`, `.apply-keyframe-modal*`, `.add-transition-modal*`, `.qs-easing-picker*`) |
-| Server: read | `listKeyframes`, `getAnimatedSelectors` |
+| Server: read | `listKeyframes`, `getAnimatedSelectors`; `getKeyframes` (one keyframe's frames, for its preview and its editor) |
 | Server: write | `setStyleRule` (apply-keyframe, remove-from-selector, add-transition all go through it; the remove path uses `removeProperties: ['animation']`); `setKeyframes`, `deleteKeyframes` |
 
 ### 8.12 Workflows (mode `ai-tools`)
 
-The Workflows mode lets the operator pick a workflow, fill its parameters, and run it without leaving the visual editor. The workflows are listed by what you want to do, each row saying in words what a run does; picking one swaps the panel into a runner organised in three zones — INPUTS, AI EXCHANGE, EXECUTION.
+The Workflows mode lets the operator pick a workflow, fill its parameters, and run it without leaving the visual editor. The workflows are listed by what you want to do, each row saying in words what a run does; picking one swaps the panel into a runner organised in three zones — INPUTS, AI EXCHANGE, RUN.
 
 #### Backup-first banner
 
-An amber-bordered banner sits at the top of the panel: `⚠ Workflows modify your site directly. Changes cannot be easily reverted. We recommend creating a backup before running any workflow you're not sure about.` *Don't show this message again* puts the message away for this browser (`workflowsBackupNoteHidden`, §6) and leaves the button. The button calls the existing `backupProject` command (timestamped folder copy into `secure/projects/<active>/backups/<timestamp>/`) and confirms via toast on success or failure.
+An amber-bordered banner sits at the top of the panel: `⚠ Workflows modify your site directly. Changes cannot be easily reverted. We recommend creating a backup before running any workflow you're not sure about.` *Don't show this message again* puts the message away for this browser (`workflowsBackupNoteHidden`, §6) and leaves the button. The button calls the `backupProject` command (timestamped folder copy into `secure/projects/<active>/backups/<timestamp>/`) and confirms via toast on success or failure.
 
 #### Workflow list
 
@@ -1144,7 +1166,7 @@ An amber-bordered banner sits at the top of the panel: `⚠ Workflows modify you
   All four start unticked, and this browser keeps them as they were last left (`workflowsOptions`, §6).
 
   The line names the switches that are on and how many rows they take from what the search keeps: *Options: No AI · 7 hidden*. When they take every row, the list says so with **Show all**, which turns them off. A search that finds nothing says *No workflow matches your search and switches.*
-- **Groups, by what you want to do,** in the order of the schema's `meta.category`: *Start a new site* (Replaces what is there), *Add to my site* (Keeps what is there), *Change the look* (Colours, styles, animations), *Texts and languages* (Words, translations, the switch), *Cookies and privacy* (Your consent banner and pages), *Tools* (For when you know what you want); alphabetical within. A group's title stays at the top of the panel while its rows scroll under it, until the next group's title takes its place. A group with no workflow shows nothing, and a group name the schema does not hold is listed last, under its own name
+- **Groups, by what you want to do,** in the order of the schema's `meta.category`: *Start a new site* (Replaces what is there), *Add to my site* (Keeps what is there), *Change the look* (Colours, styles, animations), *Texts and languages* (Words, translations, the switch), *Cookies and privacy* (Your consent banner and pages), *Tools* (For when you know what you want); alphabetical within. A group's title stays at the top of the panel while its rows scroll under it, until the next group's title takes its place. A group with no workflow shows nothing, and a group name the schema does not hold is listed last, under its word key's path (`workflows.categories.<name>.title`)
 - **A row** carries the workflow's icon and title, then what a run does, one line per fact, each but *Changes* after its icon (`QSDom.icon()`: a spark for AI, the spark struck through for no AI, a bin for what can be deleted, a plug for a need), then its description cut at two lines:
   - AI or not, and how many requests a run sends (*one request*, or *several* when two AI workflows are in its reach or a `forEach` repeats one), with how long the answer runs when the file says (`meta.answerLength`); *No AI: you paste the commands* for a `pasteOnly` workflow
   - **Can delete:** the groups any step of its reach can delete, in the run review's own words (*Pages*, *Media files*…), in the warning colour
@@ -1152,14 +1174,14 @@ An amber-bordered banner sits at the top of the panel: `⚠ Workflows modify you
   - *Can run any command, one that deletes included* when its answer may send any command (`answerRules.anyCommand`)
   - what the project needs first (`meta.needsKey`): *Needs a cookie banner*
 
-  These facts are read from the workflow's file and every workflow it may reach, through `WorkflowManager::rowFacts()`, when the editor loads: nothing is fetched, so each says what a run *can* do. A file without `answerLength` or `needsKey` says less. Opening the row shows the run's own review, which names what a phase deletes or changes on this project
-- **From 30 workflows** each group folds to its name and count, *Change the look (6)*: the first is open until the reader opens or closes one, a search opens every group holding a match, and the browser keeps which are open (`workflowsList`, §6). **Recently used** then comes first, with the last three workflows opened in this browser. Both numbers are conventions, named at the top of `preview-ai-tools.js`
-- **The compact view** shows small cards side by side, every one the same size, wrapping as the panel narrows: the workflow's icon, bigger, its name under it on three lines at most, then "…" (the whole name is the card's hover text and accessible name), and the facts' icons alone, each with its words as its hover text and its accessible name. *What can be deleted* is always there, in the warning colour. A tap or a click anywhere on the card opens the workflow, whose review says what it does. The full rows teach the icons
+  These facts are read from the workflow's file and every workflow it may reach, through `WorkflowManager::rowFacts()`, when the editor loads: nothing is fetched, so each says what a run *can* do. A file without `answerLength` or `needsKey` says less. Opening the row shows the run's plan in the Batch (closed until opened), which marks each phase and step that deletes or changes on this project; the review before a phase names what
+- **From 30 workflows** each group folds to its name and count, *Change the look (6)*: the first is open until the reader opens or closes one, a search opens every group holding a match, and the browser keeps which are open (`workflowsList`, §6). **Recently used** then comes first, with the last three workflows opened in this browser; it is not shown during a search or while a switch is on. Both numbers are conventions, named at the top of `preview-ai-tools.js`
+- **The compact view** shows small cards side by side, every one the same size, wrapping as the panel narrows: the workflow's icon, bigger, its name under it on three lines at most, then "…" (the whole name is the card's hover text and accessible name), and the facts' icons alone, each with its words as its hover text and its accessible name. A workflow that can delete always shows its bin, in the warning colour. A tap or a click anywhere on the card opens the workflow, whose review says what it does. The full rows teach the icons
 - **What is listed** — a workflow is offered when the account's role may send every command a run of it may send: its related commands and its steps', and those of every sub-workflow it may reach, whatever their conditions (`WorkflowManager::runCommands()`). The others reach the page in a list of their own (`aiToolsUnrunnable`), which nothing that opens a workflow reads: **Show workflows my role can't run** draws them in their groups, greyed, each opening with *Your role can't run this workflow*, with nothing to press. They follow the search and the switches, and the Options line does not count them
 
 #### Setup Languages, the two Create Websites and Translate Site
 
-*Create Website: one AI request* asks its AI for the whole site in one answer: the pages, their texts in every language, the stylesheet. *Create Website: several AI requests* builds the same site in several requests, one phase each, and takes the same parameters. After `fresh-start`, `setup-languages` and, when multilingual, the language switch, its own phase writes the pages, their texts in the default language and a base stylesheet of their layout. Then one **Translate Site** phase per other language, named by it (`Translate Site — Français`), and **Restyle** last, which designs the look from that stylesheet. Its AI phases share one *Your prompt*. Both take three options that reach the AI only when ticked: **Include dark mode** (the light/dark button placed by the AI, its dark colours, then **Theme mode** switching dark mode on), **Let the AI bring its own pictures** (each brought in by its link), and **Include my starred assets** (their descriptions, and the pictures listed to attach) ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Create Website's options*).
+*Create Website: one AI request* asks its AI for the whole site in one answer: the pages, their texts in every language, the stylesheet. *Create Website: several AI requests* builds the same site in several requests, one phase each, and takes the same parameters. After `fresh-start`, `setup-languages` and, when multilingual, the language switch, its own phase writes the pages, their texts in the default language and a base stylesheet of their layout. Then one **Translate Site** phase per other language, named by it (`Translate Site — Français`), and **Restyle** last, which designs the look from that stylesheet. Its AI phases share one *Your prompt*. Both take three options that reach the AI only when ticked: **Include dark mode** (the light/dark button placed by the AI, its dark colours, then **Theme mode** switching dark mode on), **Let the AI bring its own pictures** (each brought in by its link), and **Include my starred assets in the prompt** (their descriptions, and the pictures listed to attach) ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Create Website's options*).
 
 *Setup Languages* sets the project's languages and its default. **Several languages** is the form's choice between one language and several, with nothing stored behind it: ticked, the site takes the languages chosen (two or more); unticked, one. A site with two or more languages is multilingual, and the words cross with the second language added and the last one removed (`addLang`, `deleteLang`). A run on a project already set as asked has no step. Its box **Update the language switch** (ticked by default) runs *Update Language Switch* after it, which rebuilds the site's language switch only when the switch no longer lists the project's languages, in their order: when a run adds or removes one, going back to one language included, or when the switch was already out of date. A switch changed by hand that still lists them is left as it is; unticked, the switch is never touched. Both Create Websites update the switch themselves and do not pass the box.
 
@@ -1169,16 +1191,16 @@ An amber-bordered banner sits at the top of the panel: `⚠ Workflows modify you
 
 Each gives a part of the site that QuickSite generated the site's look: *Fit my cookie banner* the banner and its popup, *Fit my consent pages* the cookie policy page and the privacy page. Generate them first, on the Compliance pages. Each is one short AI answer of style rules: the prompt states the elements' structure, gives the site's stylesheet and QuickSite's default styles for those elements, and asks for rules that follow the first and override the second. Its box **Colours only** sends the site's CSS variables instead of its stylesheet: a much shorter prompt, with no corners, shadows or buttons to match.
 
-An answer may only send `setStyleRule`. A rule must begin with the part's own selector, `#qs-consent-banner` or `#qs-consent-popup`, or `.qs-cookie-policy-page` or `.qs-privacy-policy-page`, since the default styles reach the page after the site's stylesheet and a plainer rule would lose to them. It may style what is inside the part, not what follows it: a `+` or `~` straight after its selector is left out. A rule that sets `display`, `visibility`, `position`, `z-index` or `all` is left out: QuickSite shows, hides and places these elements, and `all` would reset that. The rules go into the site's stylesheet, so generating the banner or a page again keeps them; a Fresh Start or a Restyle that replaces the stylesheet can lose them, and running the workflow again brings them back.
+An answer may only send `setStyleRule`. A rule must begin with the part's own selector, `#qs-consent-banner` or `#qs-consent-popup`, or `.qs-cookie-policy-page` or `.qs-privacy-policy-page`, since the default styles reach the page after the site's stylesheet and a plainer rule would lose to them. It may style what is inside the part, not what follows it: a `+` or `~` straight after its selector is left out. A rule that sets `display`, `visibility`, `position`, `z-index` or `all` is left out, as is one whose property name is not written plainly (an escape, a comment): QuickSite shows, hides and places these elements, and `all` would reset that. The rules go into the site's stylesheet, so generating the banner or a page again keeps them; a Fresh Start or a Restyle that replaces the stylesheet can lose them, and running the workflow again brings them back.
 
 #### Start from a template
 
-One row of *Start a new site* builds a ready-made site: it runs *Fresh Start*, then the picked template's own steps. No model is asked. A template is a file ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Site templates*), so the picker grows with the folder and the list keeps one row.
+One row of *Start a new site* builds a ready-made site: it runs *Fresh Start* and *Setup Languages* (and the light / dark button's workflow with dark mode), then the picked template's own steps. No model is asked. A template is a file ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Site templates*), so the picker grows with the folder and the list keeps one row.
 
 - **Template** — a group of radio cards, one per template: its picture (its icon when it has none), its name and one line. The arrow keys move between them, as for any group of radios, and each is named by its template. **Run** stays off until one is picked.
 - **The kinds** — the cards come kind by kind, each kind under its name (*Services*, *Food and stays*, *Shops and makers*, *Events and groups*, *General*). Above them, a row of buttons named **Show**: **All**, then one per kind, each with the number of its templates. A press shows that kind's cards alone, and the button says it is pressed; the buttons wrap where the panel is narrow. The card picked is never hidden: it stays under its own kind's name when another kind is shown. The kind shown lasts while the editor's page is open, and nothing of it is stored. The kinds are the row's own list, and each template states its kind in its file.
 - **Preview** — under a card whose template has a built preview. It opens the panel's dialog on the pages the engine built for that template, with every option on: all its languages, and its light/dark button. **Light** and **Dark** open the preview in either theme, for a template that has both. The pages sit in a frame that is given no access to the panel: it has no same-origin, and it runs scripts only when the preview keeps one (the theme switch's, and the one that speaks for its outside links). **A link that leads out of the preview** (the sample's booking page, a call, a letter) goes nowhere there: a press on it shows a line under the dialog's note, *This link is switched off in the preview. On your site, it works.*, read aloud by a screen reader, which goes when the frame shows another page. The dialog acts on that one message alone, from its own frame's window alone, and shows only its own words: a message from anywhere else, or of another shape, changes nothing. The dialog closes by the **×** at its top right, by Escape while the focus is outside the frame, or by a click beside it. The × is the panel's own, named *Close* for a screen reader, and it stays at the top right at every width: **Light** and **Dark** sit beside the title where there is room and under it where there is not.
-- **Several languages** — shown once a template written in more than one language is picked. Ticked, it shows **Languages**, the template's own, all ticked at first; at least two stay ticked.
+- **Several languages** — shown once a template written in more than one language is picked. Ticked, it shows **Languages**, the template's own, all ticked at first; **Run** stays off while fewer than two are ticked (*Pick at least 2*).
 - **Main language** — the language a visitor gets first: one of the template's, or one of those ticked.
 - **Include dark mode** — shown for a template that has dark colours. Ticked, the site gets them and a light/dark button in its menu; a visitor sees the light theme first.
 - **Name**, **Phone number**, **E-mail address**, **Address**, **Booking or ordering link** — shown only for a template that asks for them (the templates by type of business), all optional. What is typed lands in every place the site shows it, in each language, and in the links that call, write or book. A field left empty keeps the template's sample, which says of itself that it is one. **Run** stays off while a phone number, an e-mail address or a link is not written as one.
@@ -1193,13 +1215,13 @@ A preview is shown only while it matches its template's file; a template changed
 - **`filterFrom`** — a `select` filtered from another parameter (the **Default language** of the first three, from **Languages** while **Several languages** is ticked) is drawn again on each change of another parameter, and keeps its value only while its list offers it; otherwise the value moves to the first option, the one the field shows
 - **`excludeFrom`** — the other way round: a `select` that leaves out another parameter's value (Translate Site's **Language to write**, never its **Translate from**), drawn again on the same changes and with the same move to the first option
 - **Model: [dropdown]** (BYOK only) — inline above the action buttons; writes to the active connection's `defaultModel` via `QSConnectionsStore`
-- **Primary action button** — it starts a run. Its label: `Run` for a run with no AI phase, or one whose AI phase comes after others (they run first, and without a key its prompt is then shown to copy); for a run that starts with its AI phase, `Generate prompt` with no key; with a key, `Run with AI` (Run without stopping on) or `Send to AI` (off). During the run it reads `Running…`, or `Sending to {model}…` while a prompt is sent
+- **Primary action button** — it starts a run. Its label: `Run` for a run with no AI phase. With no key: `Run` when its AI phase comes after others (they run first, and its prompt is then shown to copy), `Generate prompt` when the run starts with its AI phase. With a key, for any run with an AI phase: `Run with AI` (Run without stopping on) or `Send to AI` (off). During the run it reads `Running…`, or `Sending to {model}…` while a prompt is sent
 - **Secondary `Generate for copy` button** (an AI phase + BYOK) — a run whose AI phases show and copy their prompt instead of sending it: the phases before them run first, as with the primary button; the prompt is then shown, the General prompt section expanded, scrolled to and focused, and the prompt copied to the clipboard with a toast
 
 #### Runner — AI EXCHANGE zone (dashed border, a run with an AI phase only)
 
-- **General prompt** — read-only textarea showing the assembled final prompt (rendered template + user prompt). Copy button. Filled when the run reaches an AI phase: its prompt is built then, from the project as the earlier phases left it. With several AI phases the zone serves each in turn, its header naming it (`AI exchange — {name}`). With a box marked `attachStarred` ticked (Create Website's *Include my starred assets*), the workflow's own prompt has the project's starred pictures under it, each with its thumbnail, its name and **Download**, to attach to the AI chat with the prompt; a prompt sent through a connection attaches none, and the line under it says so
-- **AI response** — textarea that doubles as paste target (no BYOK) or live stream sink (BYOK). It takes an answer only when a phase can: before the run when its first phase is the AI one, else once the run reaches that phase (until then: `Run first: the parts before it prepare the project, then its prompt is built.`). Status line below the textarea cycles through `Sending to {model}… (X.Xs)` → `Receiving from {model}… (N chars, X.Xs)` → `N commands ready ✓` (green) or `Invalid JSON: …` / `No commands found in response.` (red). Once the server has read an answer, N is what will run: a command the workflow does not name, a style rule outside what it may style, or a rule setting what it may not change is left out, each named under the status line, and `Nothing in this answer can run.` (red) takes the place of N when none is left. An answer that cannot run says why, in red, and none of it runs:
+- **General prompt** — read-only textarea showing the assembled final prompt (rendered template + user prompt). Copy button. Filled when the run reaches an AI phase: its prompt is built then, from the project as the earlier phases left it. With several AI phases the zone serves each in turn, its header naming it (`AI exchange — {name}`). With a box marked `attachStarred` ticked (Create Website's *Include my starred assets in the prompt*), the workflow's own prompt has the project's starred pictures under it, each with its thumbnail, its name and **Download**, to attach to the AI chat with the prompt; a prompt sent through a connection attaches none, and the line under it says so
+- **AI response** — textarea that doubles as paste target (no BYOK) or live stream sink (BYOK). It takes an answer only when a phase can: before the run when its first phase is the AI one, else once the run reaches that phase (until then: `Run first: the parts before it prepare the project, then its prompt is built.`). Status line below the textarea cycles through `Sending to {model}… (X.Xs)` → `Receiving from {model}… (N chars, X.Xs)` → `N commands ready` (green) or `Invalid JSON: …` / `No commands found in response.` (red). Once the server has read an answer, N is what will run: a command the workflow does not name, a style rule outside what it may style, or a rule setting what it may not change is left out, each named under the status line, and `Nothing in this answer can run.` (red) takes the place of N when none is left. An answer that cannot run says why, in red, and none of it runs:
   - `The answer was cut at the connection's output limit (N tokens), so none of it runs. Raise the limit in AI connections, or ask for less.` when the provider cut it at the limit;
   - `The AI stopped its answer early (reason), so none of it runs.` when the provider stopped it for another reason (a safety filter, say);
   - `The answer broke off after N characters: …` when the connection broke while it arrived;
@@ -1211,24 +1233,24 @@ A preview is shown only while it matches its template's file; a template changed
   - pasted, `Characters — copied: N · pasted: N · prompts: N`: characters only, never turned into tokens. A prompt counts when it is shown to copy (copying it again adds nothing), an answer when it is taken — Execute, Continue (the cut part), or a continuation's reply joined (the reply, not the joined answer); an answer pasted before the run counts with no prompt;
   - then where the calls came from (`anthropic · {model}`), and `its last answer was cut at the output limit` or `its last answer was stopped by the AI` when it did not end as asked. A Continue or a Send again is one more call of the phase.
 
-#### Runner — EXECUTION zone (dashed border)
+#### Runner — RUN zone (dashed border)
 
 - **Run without stopping** (every workflow; off until switched on — Settings and AI connections show the same switch) — when on, an answer that parses runs after a 1.5 s grace (`Auto-executing in 1.5s — edit response to cancel`; any edit of the answer cancels it, and the edited answer, once classified, starts it again), and the run goes from one phase to the next without a review. What a phase deletes or changes is still confirmed (*A run, phase by phase*)
 - **The run line** — for a run of more than one phase: its phases in order, each with its state (✅ done, ▶ the current one, ⏹ where it stopped), an AI phase marked `(AI)`
 - **The review** — the pause before a phase, outside the collapsible Batch so it is always seen (*A run, phase by phase*)
 - **This run's AI cost** — just above the Batch and its `Done` line, from the run's first AI call: the run's totals — those of the phases sent with the key and those pasted on lines of their own, never added together — then, when the run has several AI phases, each one on its own lines, named as the run line names it. It stays after the run (a parameter change, ← Back and the workflow opened again) until that workflow runs again, and a reload clears it: it is held in the page, and **nothing is written** — no file, no request, no browser storage
 - **Batch (collapsible)** — the run's phases, each a group whose header names it, where it runs (`before` / `after` the workflow), its number of steps and whether they delete or change content, its rows below; a run of one phase is its rows alone. It shows the plan before Run (drawn again a moment after each parameter change), and an AI phase's commands once its answer parses (`Its commands appear when the AI answers.` until then). A row shows the command name, a `Deletes` (red) or `Changes` (amber) mark when the step does either, and a truncated `key: "value" • …` params summary; clicking the row toggles the full params JSON inline. State header cycles `Idle` → `N commands ready` → `Running 2/N · {phase}` → `Done (N succeeded)` or `Done (X/N succeeded, Y failed)`. A run that ends with no step to run also says so in a green toast: `No changes were needed here.`
-- **Execute button** — the AI answer's, while an answer that parses is ready for a phase that can take it and Run without stopping is off. Its label says what the answer does: `Delete and run` (red) when a command deletes, `Change and run` when one changes content, `Execute commands` otherwise; it waits for the server's reading of the answer
+- **Execute button** — the AI answer's, while an answer that parses is ready for a phase that can take it and Run without stopping is off, or the answer was put together from several (it then waits for Execute whatever the switch). Its label says what the answer does: `Delete and run` (red) when a command deletes, `Change and run` when one changes content, `Confirm and run` when its only stopping command deletes nothing (a backup put back, say), `Execute commands` otherwise; it waits for the server's reading of the answer
 
-After each phase that succeeded in at least one command, the iframe reloads via `window.PreviewManager.reload()`, so a review shows what the last phase did. The Edit list and the toolbar's Language list are read again first (`refreshEditList()`), so a phase that turns the project's languages on or off, or adds or deletes one, leaves the frame on an address the project has, with the page, the tool and the run as they were.
+After each phase that succeeded in at least one command, the iframe reloads via `window.PreviewManager.reload()`, so a review shows what the last phase did, unless the reading below already moved the editor to another address, which loads the frame itself. The Edit list and the toolbar's Language list are read again first (`refreshEditList()`), so a phase that turns the project's languages on or off, or adds or deletes one, leaves the frame on an address the project has, with the page, the tool and the run as they were.
 
 #### A run, phase by phase
 
 A run goes through the workflow's **phases**: each pre-workflow, the workflow itself, then each post-workflow ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*). The server answers them (`workflow-generate-steps`): the plan when the run starts, every phase resolved against the project as it is then, and each phase again when the run reaches it — so a phase reads what the earlier ones changed (`setup-languages` sets the languages a `fresh-start` before it removed; a language switch lists the languages added before it).
 
 - **The review** (Run without stopping off) — before each phase but the first (a phase of steps that has none passes without one: there is nothing in it to stop before), and before a first phase that deletes or changes content: `Next — 2 of 4: {name}`, its number of steps (an AI phase: `Its prompt is built from the project as it now is.`, with its Your prompt field), the last phase's result (`{name}: 21 of 23 succeeded, 2 failed`), what it deletes and changes, and **Continue** / **Stop**. When the phase deletes, Continue reads **Delete and continue** and is red; when it only changes, **Change and continue**. The Batch opens on its steps.
-- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content is warned only when it deletes: not a build, while `restoreBackup`, whose help marks it destructive, stops the run as a deletion does. A flagged command that deletes nothing says what it does, in the warning, on its step and on its phase (`Puts a backup back, over the project's current state`), and the buttons and the dialog then say **Confirm**; one real deletion beside it brings **Delete** back. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
-- **The danger dialog** (Run without stopping on) — once, before anything runs, the panel's danger dialog (`Delete content?` or `Change content?`, the focus on Cancel) lists what every phase the plan knows deletes and changes, each phase named; an AI phase is announced (`{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.`). It is not shown when nothing known deletes or changes anything. After it, only what it did not list asks again: a phase that, resolved when reached, deletes or changes more, and an AI answer that deletes.
+- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content is warned only when it deletes: not a build, while `restoreBackup`, whose help marks it destructive, stops the run as a deletion does. A flagged command that deletes nothing says what it does: in the warning its line (`Puts a backup back, over the project's current state`), on its step and on its phase its word (*Restores*), and the buttons and the dialog then say **Confirm**; one real deletion beside it brings **Delete** back. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
+- **The danger dialog** (Run without stopping on) — once, before anything runs, the panel's danger dialog (`Delete content?`, `Change content?`, or `Run these commands?` when its only stopping command deletes nothing; the focus on Cancel) lists what every phase the plan knows deletes and changes, each phase named; an AI phase is announced (`{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.`). It is not shown when nothing known deletes or changes anything. After it, only what it did not list asks again: a phase that, resolved when reached, deletes or changes more, and an AI answer that deletes.
 - **An AI phase** — its prompt is built when the run reaches it, from the project as it now is, the phase's request appended; it is sent with the connection's key, or shown and copied. The run then **waits for its answer whatever Run without stopping says** — without a key that is where it stops until the answer is pasted (`3 of 3: {name} waits for its AI answer, in AI response below.`, with **Stop**). With the switch off the answer runs from its Execute button.
 - **A cut answer** — while the run waits for an answer that cannot run, the bar offers a way on, by why it could not. Neither button is offered while a send is under way.
   - **Continue the answer** is offered when the answer still holds commands that arrived whole: it was cut at the output limit, broke off, or is not whole JSON. Those commands are kept, and the AI is asked only for the rest, from the command that was cut.
@@ -1242,7 +1264,7 @@ A run goes through the workflow's **phases**: each pre-workflow, the workflow it
 - **A step's options** — a failing step is counted and the run carries on, unless it sets `abortOnFail: true`: the run then stops at that step (`Stopped: {command} failed, and its step stops the run when it fails.`), its later phases not run. `retryOn` sends a step again on the statuses it lists, up to `maxRetries` times (default 3) `retryDelayMs` apart (default 1000), the row saying so (`Retrying (1 of 3) in 2 s — {error}`, then `Failed: {error} (after 3 retries)`).
 - **Stop, and what is kept** — Stop at a review or while an answer is awaited, a step's `abortOnFail` and the write rate (below) end the run and keep the rest for later: the steps of the phase it stopped in that did not run (from the failed or refused step), and its later phases, kept by name and resolved when the kept run reaches them. The banner at the top of the panel says which run stopped and before what (`{label}: stopped before {name}`, or `{n} steps kept from a stopped run`), lists the later phases (`Then: …`), warns that the page may have changed, and offers **Run them** — which reopens that workflow with the run's parameters and requests and resumes there — and **Discard**. A new run waits until the kept rest is run or discarded.
 - **Pictures by link, and from outside** — once a step downloads a picture by its link (`uploadAsset` with `url`), the steps still to run show and send the path it was stored at in that link's place, kept steps included ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *A picture brought in by its link*). When the run ends, finished or stopped, a box under the run's line lists **Pictures from outside the site**: every picture address its steps placed outside the site (a failed download, a use before the upload, an address with no upload), with `Not one of your assets: replace it, or it may disappear.` A run with none shows no box.
-- **The run's plan changed** — the runner asks for each phase by its place and by its key, the entries that lead to it ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*). A sub-workflow's condition or `forEach` that reads the project's data can plan another phase in that place once an earlier phase has changed the project; the server then refuses the phase, and the run stops there with `The run's plan changed: start the run again.` (the batch header and a warning). What ran stays done and nothing is kept. A kept rest resumes only where its phase still is, else it is refused with the same words and nothing runs.
+- **The run's plan changed** — the runner asks for each phase by its place and by its key, the entries that lead to it ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*). A sub-workflow's condition or `forEach` that reads the project's data can plan another phase in that place once an earlier phase has changed the project; the server then refuses the phase, and the run stops there with `The run's plan changed: start the run again.` (the batch header and a warning). What ran stays done and nothing is kept. A kept rest resumes only where its phase still is, else it is refused with the same words and nothing runs; the kept rest is then gone.
 - **During a run** — its parameters and ← Back are locked; leaving Workflows and coming back returns to the run, its review or its wait still on screen.
 
 #### The write rate
@@ -1255,11 +1277,11 @@ A run sends its commands back to back, and every command but a read counts again
 
 #### Footer
 
-Single line: `Touches: cmd1, cmd2, cmd3` — the workflow's `relatedCommands` listed inline in mono font, a command under a condition included. Model is in the INPUTS zone, not the footer.
+Single line: the word *Touches*, then the workflow's `relatedCommands` as small chips in mono font, a command under a condition included; a workflow that names none has no footer line.
 
 #### Element selection
 
-Workflows mode forwards as `select` to the iframe overlay, so hover-highlight + click-to-select work just like in Select mode. The footer/menu structure-mismatch confirm prompts are suppressed — selection in Workflows is informational, not edit-context-switching. The current selection is available through `window.PreviewManager.getSelectedNode()` as `{ struct, node, component, tag, classes }`. Workflows declaring a `selector` parameter receive this object as the param value and refresh live as the user picks different elements; see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the parameter-type contract.
+Workflows mode forwards as `select` to the iframe overlay, so hover-highlight + click-to-select work just like in Select mode. The footer/menu structure-mismatch confirm prompts are suppressed — selection in Workflows is informational, not edit-context-switching. The current selection is available through `window.PreviewManager.getSelectedNode()` as `{ struct, node, component, tag, classes }`. Workflows declaring a `selector` parameter receive `{ tag, classes, struct, node }` from it as the param value (nothing while no element is selected) and refresh live as the user picks different elements; see [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) for the parameter-type contract.
 
 #### BYOK calls
 
@@ -1285,17 +1307,23 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id" with a button copying the id, *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename** (a pencil, whose tooltip says *Change the name of this project*), **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any and you own it (their count and size are *My total space*'s own figures for that project): the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. The build and each backup there have their bin, and the exports a red **Clear All**: each asks first, naming what goes (*Delete the backup “…”?*). An account that owns no project but can read the build or the backups sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures the card. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **Restore** lists the project's backups, the × at the list's top right closing it; each backup has its own **Restore** and its bin, each asking first, naming the backup. The restore's question holds the warning and two boxes (back up the current project first; delete this backup once it is restored), and the restore runs with it open: a refusal, such as the storage quota, stays in it in the server's words. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks first, naming it. When an action reloads the page, its success message is shown after the reload. |
+| **Dashboard** (`dashboard.js`) | Stats cards (routes, pages, components, languages), the site map, and a memberships card. Calls `getRoutes`, `listPages`, `listComponents`, `getLangList`, `getSiteMap`, `validateTranslations`, `listProjects` (and the project and Manage Space commands named below). The page opens on the **edited project's line**: its ☆ (§8.0), "Name #id" with a button copying the id, *Editing* and your role on it in its colour, the whole name where a phone's header shows its first letters. Under it are the project's buttons: **New Project** and **Import** make another project, and **Clone**, **Rename** (a pencil, whose tooltip says *Change the name of this project (its owner only)*), **Backup**, **Restore** and **Export** act on the edited project, each shown only to a role that may run its command on it (**Rename** is the owner's). The backups label and the storage rows name every project the same way, reading names from `listProjects` and `/admin/self/space-usage`. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. **Another project's name in a row switches to it**, after one question, the same write as the header's project list, which stays the way to a project you work on and do not own. **Each row's bin deletes that project**, and it is the only place the panel does: that list is exactly the projects you own, and `deleteProject` is the owner's. One question names the project, says what goes with it and that it cannot be undone, and says so when it is the one you edit; then the page reloads, as a project gone leaves the header's list and the Members counts too. **Manage Space**, at the foot of *My total space*, lists the edited project's build and backups, and its saved exports when it holds any, you own it and your role may run `clearExports` (their count and size are *My total space*'s own figures for that project): the panel's **Export** streams its archive and keeps nothing on the server, so only `exportProject` with `save` leaves one to clear. The build and each backup there have their bin, and the exports a red **Clear All**: each asks first, naming what goes (*Delete the backup “…”?*); the build also has its download, and neither it nor its bin is offered when a finished build may carry the OAuth secrets and your role cannot set the project's keys. An account that owns no project but can read the build or the backups sees the card with Manage Space alone. A backup made or deleted, a build deleted or the exports cleared from this page re-measures the card. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the edited project is owner, read from `listProjects`. **Restore** lists the project's backups, the × at the list's top right closing it; each backup has its own **Restore** and its bin, each asking first, naming the backup. The restore's question holds the warning and two boxes (back up the current project first; delete this backup once it is restored), and the restore runs with it open: a refusal, such as the storage quota, stays in it in the server's words. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks first, naming it. When an action reloads the page, its success message is shown after the reload. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
-| **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
+| **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating or importing a project) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Signing out is recorded in the security log. Admin and owner only. |
 | **Settings** (`settings.js`) | System information (QuickSite's version, from the `VERSION` file as the footer's is, and how many commands `help` documents), the caller's permissions, admin preferences (keyboard shortcuts, toast duration), AI configuration status. |
+| **AI connections** (`pages/ai/ai-connections.js`) | The browser's AI connections, cloud (a key of your own) and local, that the Workflows tool calls — see §9.21. No command: the connections live in this browser (§6). |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
-| **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
+| **My memberships** (`memberships.js`) | Your own memberships: the projects, the invitations, your join requests and proposals, the notices — see §9.12. |
+| **Project members** (`members.js`) | The edited project's roster, queue, invitations and join policy — see §9.12. |
+| **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `testApiEndpoint`; `listStorageItems` for the storage-key picker. |
+| **OAuth providers** (`oauth-providers.js`) | The sign-in providers the installation offers and this project's keys for them — see §9.22. Commands: `listOAuthProviders`, `setOAuthCredentials`. |
 | **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`; for a picture's alt text, the one list of the site's words (§9.20), `setTranslationKeys`, `deleteTranslationKeys`. |
-| **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
+| **Sitemap** (`sitemap.js`) | Route tree (add and delete a route, its layout, its resolvers), reachability, and the sitemap file — see §9.8. |
 | **Social previews** (`social-previews.js`) | The card a shared link of the site gets on each platform, drawn for a computer or a phone, and the site's and each page's values it is drawn from — see §9.19. Commands: `getSocialPreview`, `setSocialPreview`. In the Advanced menu's **Site** group. |
-| **Translations** (`translations.js`) | A site's words in every language side by side, and its languages — see §9.20. Reads through the one list of the site's words (`QSSiteWords`); commands `setTranslationKeys`, `deleteTranslationKeys`, `addLang`, `deleteLang`, `setDefaultLang`; `checkStructureMulti` read for the question before a removal down to one language. In the **Site** group, simple and advanced. |
+| **Translations** (`translations.js`) | A site's words in every language side by side, and its languages — see §9.20. Reads through the one list of the site's words (`QSSiteWords`); commands `setTranslationKeys`, `deleteTranslationKeys`, `addLang`, `deleteLang`, `setDefaultLang`, `getLanguageList` for the languages to add; for the language switch's offer, `findComponentUsages`, the update-lang-switch workflow through the admin helper, and `deleteNode`; `checkStructureMulti` read for the question before a removal down to one language. In the **Site** group, simple and advanced. |
+| **Storage** (`storage.js`) | The site's browser-storage registry and its cookie consent — see §9.10. |
+| **Privacy** (`privacy.js`) | What the site sends to APIs and sign-in providers, and its privacy policy — see §9.11. |
 | **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
 | **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. An installation can hide the page (setup item 11, `embed-security.php`, `qs_embed_security_shown()`; absent, it is shown): it leaves the menu and says it was turned off, while the policy stays in force and `getIframeSandbox` keeps answering every role that holds it. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
@@ -1312,8 +1340,8 @@ managed by `secure/src/classes/ApiEndpointManager.php`.
 **Runtime config** (auto-regenerated on every CRUD): the manager
 writes the project's own `public/scripts/qs-api-config.js` which exposes
 `window.QS_API_ENDPOINTS = { "<apiId>": { baseUrl, auth, endpoints } }`.
-Pages get this script included automatically when at least one API
-is registered (see `PageManagement::render()`).
+Pages include this script whenever the project has the file (see
+`qs_runtime_handoff()`, which `PageManagement::render()` calls).
 
 **The token source** of an API with a bearer, API-key or basic auth type says where the token comes from, as `<location>:<name>`.
 The location list offers each auth type what reads it, and the server refuses any other pair:
@@ -1356,13 +1384,13 @@ project sends no token and stores none.
 
 | Field | Purpose |
 |---|---|
-| `id` | Stable identifier: starts with a letter or digit, then letters, digits, hyphens or underscores. Case-insensitive. |
+| `id` | Identifier: starts with a letter or digit, then letters, digits, hyphens or underscores, in either case. Ids are compared exactly, so `Get-Post` and `get-post` are two endpoints. The form can change an id, and every reference follows. |
 | `name` | Human label shown in the picker. |
 | `method` | `GET / POST / PUT / PATCH / DELETE`. |
 | `path` | Relative to API `baseUrl`. May contain `:placeholders` (see below). |
-| `parameters` | Optional array of `{ name, type, required, description }`. Type ∈ `string / number / integer / boolean`. |
+| `parameters` | Optional array of `{ name, type, required }` in the form; the server also accepts a `description`, which the form does not show. Type ∈ `string / number / integer / boolean`. |
 | `auth` | What a call to this endpoint carries (below): `none / inherit / required`, or an auth object. Inherits from API-level auth by default. |
-| `callableFrom` | `client` / `server` / `both`, or absent for auto-derive. Server-only endpoints are **filtered out of `qs-api-config.js`** at build emit time (clients literally can't call them). Auto-derive rule: `apiKey → server`; everything else → `both`. Set explicitly in the form via the "Callable from" select; "Auto" shows a live preview of the derived value. |
+| `callableFrom` | `client` / `server` / `both`, or absent for auto-derive. Server-only endpoints are **filtered out of `qs-api-config.js`** each time it is written (clients literally can't call them). Auto-derive rule: `apiKey → server`; everything else → `both`. Set explicitly in the form via the "Callable from" select; "Auto" shows a live preview of the derived value. |
 | `requestSchema` | Optional JSON Schema for POST/PUT/PATCH bodies. Drives the test modal's dynamic form. |
 | `responseSchema` | Optional JSON Schema. Drives the response-bindings picker (componentList / count / etc.). A test can draft one (below). It is public: it travels in the client's config. |
 
@@ -1375,7 +1403,7 @@ project sends no token and stores none.
 | `none` | Nothing | Nothing |
 | an auth object (`{type, tokenSource}`) | Itself | Its type |
 
-Anything else is refused when saved, and a call under it does not go out. The form offers the three words and shows an auth object as
+Anything else is refused when saved; the server's call and a test under it do not go out, and the browser's goes out with no credential. The form offers the three words and shows an auth object as
 an option of its own, which Save keeps; an object is set through `editApi`. An endpoint's own `auth` reaches the browser in
 `qs-api-config.js` when it differs from its API's. `none` under an API-key API stays server-only unless `callableFrom` says otherwise.
 
@@ -1426,7 +1454,7 @@ nothing to offer such an endpoint, and says so.
 
 **What an omitted parameter leaves behind**
 
-A missing **required** parameter rejects at runtime, with a toast naming it.
+A missing **required** parameter rejects at runtime, and the console names it; the visitor sees no toast.
 The test panel is the exception on purpose: it leaves `:name` in the URL it
 reports, because seeing it there is how the omission surfaces in a panel whose
 job is to show you the request.
@@ -1459,7 +1487,7 @@ Direct-URL mode is deliberately excluded: `QS.fetch('GET', 'https://…')` has n
 so a colon in it is far more likely to be theirs.
 
 Non-placeholder `opts` keys (anything not in
-`{body, onSuccess, onError, silent, _auth, _endpoint, _baseUrl}`) get appended
+`{body, onSuccess, onError, silent, _auth, _endpoint, _baseUrl, toastSuccessKey, toastErrorKey, noBindings}`) get appended
 as query-string parameters. Example:
 `QS.fetch('@my-api/users', 'page=2', 'sort=name')` →
 `GET <baseUrl>/users?page=2&sort=name`.
@@ -1476,8 +1504,8 @@ top-level keys and picks the appropriate converter:
 |---|---|---|
 | Top-level `apis: {...}` | Native | Pasted as-is. The shape exported by the page's Export button. |
 | Top-level `openapi: "3.x"` | OpenAPI 3.x | Converted by the OpenAPI converter (below). |
-| Top-level `swagger: "2.0"` | Swagger 2.0 | Detected and explicitly unsupported — the preview points the user at `converter.swagger.io` to convert to 3.x first. |
-| Top-level `endpoints.{public, secured, ...}` | File-manager | Legacy converter — each group becomes its own API, its id always `test-api-<group>` and its display name `<api_name> (<group>)` from the document's own `api_name` (defaulting to `Test API`); bearer/basic/apiKey auth derived from the group's `authentication.type`; `:placeholders` rebuilt from each endpoint's declared parameters + `route_format` (a `"path segments"` hint turns a `name` parameter into `/name/:name`), and an endpoint that already carries a `:placeholder` keeps it. |
+| Top-level `swagger: "2.0"` | Swagger 2.0 | Detected and explicitly unsupported — the paste screen says so and points the user at `converter.swagger.io` to convert to 3.x first. |
+| Top-level `endpoints.{public, secured, ...}` | File-manager | Each group becomes its own API, its id always `test-api-<group>` and its display name `<api_name> (<group>)` from the document's own `api_name` (defaulting to `Test API`); bearer/basic/apiKey auth derived from the group's `authentication.type`; `:placeholders` rebuilt from each endpoint's declared parameters + `route_format` (a `"path segments"` hint turns a `name` parameter into `/name/:name`), and an endpoint that already carries a `:placeholder` keeps it. |
 
 **OpenAPI 3.x converter** (`openapi-converter.js`). Maps an OpenAPI
 document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
@@ -1494,7 +1522,7 @@ document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
 | `paths.<p>.<method>.requestBody.content.<media>.schema` | Endpoint `requestSchema` | First declared content-type wins (`application/json` preferred). `$ref` is inlined; `allOf` is merged into a flat object schema; `oneOf` / `anyOf` are skipped with a note. |
 | `paths.<p>.<method>.responses.2xx.content.<media>.schema` | Endpoint `responseSchema` | Status preference: `200` → `201` → `202` → `204` → `default` → any other 2xx. |
 | `paths.<p>.<method>.security` (vs spec-level `security`) | Endpoint `auth` | `inherit` when the operation references the picked API scheme. `none` when effective security is empty (op explicitly `[]` or no security anywhere). `required` when the operation references a different scheme — the preview notes which alternates were seen. |
-| `example:` on a schema property | Copied | Stripped on credential-named keys (`token`, `accessToken`, `password`, `apiKey`, `secret`, `bearer`, `authorization`, etc.) and on anything under `securitySchemes`. Kept-vs-stripped counts appear in the preview. |
+| `example:` on a schema property | Copied | Stripped on credential-named keys (`token`, `accessToken`, `password`, `apiKey`, `secret`, `bearer`, `authorization`, etc.). Kept-vs-stripped counts appear in the preview. |
 | `$ref: "#/components/..."` | Inlined | Local refs only; external URL refs are skipped with a note. Cycles are broken by emitting an empty-object placeholder so a circular schema doesn't infinite-loop. |
 | `xml` metadata on schemas | Dropped | OpenAPI-specific; meaningless to QuickSite. |
 
@@ -1509,7 +1537,7 @@ document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
 that need authoring on top:
 
 - **Response bindings** (which fields feed which DOM selectors / state stores) are project-specific and authored in the visual editor — the imported schemas drive the binding picker, but no bindings are emitted.
-- **OAuth handler config** — when a security scheme is `oauth2` or `openIdConnect`, the converter sets the API auth to `bearer` (oauth2 yields a bearer token at runtime). Configure the OAuth handler details via the API edit form.
+- **OAuth handler config** — when a security scheme is `oauth2` or `openIdConnect`, the converter sets the API auth to `bearer` (oauth2 yields a bearer token at runtime). Set the token source, and the refresh endpoint if the API has one, in the API edit form.
 - **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The token the Test panel sends is entered per-API in the registry card's Auth Token field, and kept in the browser under the panel's own key, one per project (§6), where no page of any project reaches it. A storage key an import names is not declared by it: declaring one needs a category only the author can choose, so the preview's notes name each API whose source is an undeclared key, in every format, and say what to do, and the storage-key picker says so when the API is opened.
 - **Alternate security schemes** — endpoints flagged `auth: 'required'` (different scheme from the API default) carry the API's credential until refined, and nothing while the API has no auth. The preview's notes name which schemes were seen.
 - **What the server refuses** — a refused endpoint stays out of its API, and a toast names the API, the endpoint and why. An API that already exists is replaced in one `editApi` call, which the server takes whole or not at all: a refused import leaves the API as it was, and only what referred to an endpoint it leaves out goes with it.
@@ -1523,14 +1551,14 @@ feeds which template variable, with optional enum resolution.
 
 **Where it lives in the UI**
 
-The picker is part of the **JS Interactions** modal (per-element
-event handler authoring). Component-list mode appears when:
+The picker is part of the editor's **Interactions** tool, in its Add
+Interaction form (per-element event handler authoring). Component-list mode appears when:
 - The interaction is in **Action Type: API Call** (not Function).
 - The selected endpoint has a `responseSchema`.
 - The selected field is an `array`.
 
 Then a **render-mode radio** appears below the field picker:
-`( ) data-bind template   ( ) Component per item`.
+`( ) data-bind template   ( ) Component per item   ( ) Count`.
 Picking "Component per item" reveals: component selector + fieldMap
 table + data-bind coverage warning + empty-text input.
 
@@ -1538,7 +1566,7 @@ table + data-bind coverage warning + empty-text input.
 
 | UI | Behaviour |
 |---|---|
-| Field dropdown | Dot-paths now supported. Recurses into `type: object` properties (`data.commandsList` etc.). Arrays terminate recursion — their item shape drives the fieldMap. |
+| Field dropdown | Dot-paths are supported. Recurses into `type: object` properties (`data.commandsList` etc.). Arrays terminate recursion — their item shape drives the fieldMap. |
 | Component dropdown | Populated from `listComponents`. |
 | FieldMap table | One row per target var. Target vars = union of `{{placeholder}}` keys + `__enums__` short keys in the component template. "From" column auto-defaults to name-match against the array's `items.properties`; user can override. "Enum" column shows a checkbox for vars declared in `__enums__`, pre-checked with the fully-qualified `<componentName>.<shortKey>` name. |
 | Warning banner | Yellow banner when one or more fieldMap target vars are missing a `data-bind="<var>"` attribute on the component template. The `{{<var>}}` placeholders are server-resolved once at hidden-template render time; the runtime needs `data-bind` to know which DOM nodes to update on each cloned item. |
@@ -1548,7 +1576,7 @@ table + data-bind coverage warning + empty-text input.
 
 Three conditions would otherwise produce nothing at all — no rows, no radios, no
 message — which reads as a broken panel rather than a missing prerequisite. In
-each, the picker explains instead:
+the first two the picker explains instead; in the third the page's console does:
 
 | Condition | What you see |
 |---|---|
@@ -1556,21 +1584,22 @@ each, the picker explains instead:
 | The selected field is not declared `array` | A note under the row naming the type it *is* declared as. List / Component per item / Count need an `array`. |
 | The fetch runs in direct-URL mode | `QS.fetch('GET', 'https://…')` carries no endpoint, so bindings never run. When the URL matches a registered endpoint that has bindings, the console says which one and how to call it (`QS.fetch('@api/endpoint')`). An unrelated direct URL stays quiet. |
 
-The schema is hand-authored — there is no inference from a test call, so the
-field list is exactly what you declared.
+The field list is exactly what the saved schema declares: a test of the
+endpoint on `/admin/apis` offers a draft schema to review (§9.1), and nothing
+is offered here until a schema is saved.
 
 **Persisted shape**
 
-The picker writes to the endpoint's `responseBindings` array via
-`editApi`, so the Response Mapping section is offered only to a role that may
+The picker writes its complete rows (a field and a selector) to the endpoint's
+`responseBindings` array via `editApi`, when at least one row is complete, so the Response Mapping section is offered only to a role that may
 run `editApi`: for another role it does not show, and Save writes the
 interaction alone. A binding that sets an attribute (its **Attribute** field) names
 one an author could write on the page: an event handler (`onclick` and the
 like), `srcdoc`, any `data-consent-*` name (what a click on the consent
 banner records) or a malformed name is refused, and the save stops with
 *Error saving bindings* naming the binding. The browser holds every binding
-to the same rule, and writes no `meta`'s `content` or `http-equiv` either
-(a binding names no tag here), as described for `data-bind-attr` in §9.6. Component-list
+to the same rule, and writes no `meta`'s `content` or `http-equiv` and no
+`iframe`'s `src` or `sandbox` either (a binding names no tag here), as described for `data-bind-attr` in §9.6. Component-list
 bindings have this shape:
 
 ```json
@@ -1604,7 +1633,7 @@ The page needs three things:
      "params": { "data-list-template": "true", "style": "display:none" }
    }
    ```
-   The renderer (`JsonToHtmlRenderer`) merges these call-site params
+   The live renderer (`JsonToHtmlRenderer`) merges these call-site params
    into the rendered template root — class concatenates, style
    concatenates, everything else overrides. This is what makes the
    first child of `#commands-list` discoverable by `qs.js`'s
@@ -1616,14 +1645,13 @@ The page needs three things:
 
 **Authoring `data-bind` on a component**
 
-The picker scope intentionally stops at writing the binding. Adding
-`data-bind` attributes to a component template is currently a manual
-edit of the component JSON (or via the regular visual editor's
-attribute UI, with the component opened for editing). When both
+The picker stops at writing the binding. A `data-bind` attribute is added
+to a component template in the component's JSON, or with the visual
+editor's attribute controls while the component is open for editing. When both
 text content AND an attribute need to be bound on the same conceptual
 element, use a nested element pair (outer = attribute via
-`data-bind` + `data-bind-attr`, inner = text via `data-bind`).
-See `component-command-card.json` for a worked example.
+`data-bind` + `data-bind-attr`, inner = text via `data-bind`):
+`{"tag": "a", "params": {"data-bind": "url", "data-bind-attr": "href"}, "children": [{"tag": "span", "params": {"data-bind": "name"}}]}`.
 
 **Runtime flow**
 
@@ -1692,13 +1720,14 @@ array, the render-mode radio shows three options: `data-bind template`,
   forgotten in `fr` is the miss worth catching.
 
   ⚠ Expect it on a freshly created key. The create form writes the value you
-  type into the language you are editing and an **empty string** into every
-  other, and an empty translation is treated as untranslated everywhere in the
+  type into the language you are editing and **nothing** into the others, and a
+  key a language does not hold (or holds empty) is untranslated everywhere in the
   engine — so a new key is genuinely unresolved in every other language, and
   `/fr/` really would render `{translation missing: …}`. The warning names what
   is left to type rather than reporting a fault.
-- **Fallback** — number used when the field resolves to null, missing,
-  or a falsy non-array (0 / "" / false). Defaults to 0.
+- **Fallback** — number used when the field is `null`, `""` or `false`, or a
+  number that is `NaN` or infinite. Defaults to 0. A real `0` is a count and is
+  written as 0; a field the response does not carry leaves the target as it is.
 
 **Count semantics**
 
@@ -1706,7 +1735,8 @@ array, the render-mode radio shows three options: `data-bind template`,
 |---|---|
 | Array | `value.length` |
 | Finite number | the number itself, **`0` included** |
-| null / undefined | fallback |
+| null | fallback |
+| undefined (the response does not carry the field) | not bound: the target keeps what it shows |
 | `""` / `false` | fallback |
 | `NaN` / `Infinity` | fallback |
 | any other truthy (object, non-empty string, `true`) | 1 |
@@ -1808,9 +1838,9 @@ elements.forEach(el => el.textContent = output)
 
 Sentence-mode is forgiving: if the matching string is missing, the runtime
 falls back to the raw number and emits a `console.warn` naming the key. A
-binding still carrying `zeroStr` / `oneStr` / `manyStr` — a build produced
-before the sentences moved out of `qs-api-config.js` — is read as a last
-resort, so an old build renders sentences rather than bare numbers.
+binding that carries `zeroStr` / `oneStr` / `manyStr` is read as a last
+resort, when the page's table does not hold the key, and renders that sentence
+rather than a bare number.
 
 ### 9.4 Fetch picker (Action Type: API Call)
 
@@ -1829,7 +1859,7 @@ Action Type [ API Call                                    ▼ ]
 Mode        ( ) From registry   ( ) Direct URL
 [ registry mode shown ]                | [ direct mode shown ]
   API       [ test-api-public      ▼ ] |   Method  [ POST  ▼ ]
-  Endpoint  [ GET /listFile        ▼ ] |   URL     [ ...      ]
+  Endpoint  [ list-files (GET)     ▼ ] |   URL     [ ...      ]
   Target    @test-api-public/list-files
 [ Path params (only if path has :placeholders) ]
   :nameContains  [ value or #selector.value          ]
@@ -1843,7 +1873,7 @@ Body source       [ #form (hidden on GET / DELETE)   ]
       [ verb ▼ ] [ args... ] [×]
       [ verb ▼ ] [ args... ] [×]
 
-Preview      {{call:fetch:@test-api/help,toastSuccessKey=Saved!}};{{call:hide:#form}}
+Preview      {{call:fetch:@test-api-public/list-files,toastSuccessKey=form.contact.success}};{{call:hide:#form}}
 ```
 
 **Mode toggle**
@@ -1860,9 +1890,9 @@ via its `target.startsWith('@')` branch.
 
 When the selected endpoint's path (or the typed URL) contains
 `:placeholders`, the picker auto-renders one row per placeholder. Each
-row is a free-text value input that the user fills (literal value
-like `42` or a runtime selector like `#search-input.value` — the
-runtime decides). Values are emitted as keyword args.
+row is a free-text input holding the value to put in the address (like
+`42`): `qs.js` writes it there as typed, URL-encoded. Values are emitted
+as keyword args, `name=value`.
 
 The placeholder substitution happens client-side in `qs.js` (see
 `docs/ADMIN_PANEL.md §9.1` "Path templating"). The picker just
@@ -1878,12 +1908,15 @@ Otherwise free-text — typically `#form-id`.
 **Toast messages** (Advanced fold)
 
 Two textKey pickers (success / error) + per-side silent checkbox.
-Translation happens at compile time via the
-`TRANSLATABLE_KEYWORD_ARGS` table in `CallTransformer` (see
-`docs/ARCHITECTURE.md` for the metadata pattern). The compiled chain
-ships translated **strings**, not keys. Multi-language works for
-free — each page render runs `CallTransformer::transform` in the request's
-language.
+A key becomes its words on the server, in the page's language: when the page is
+rendered, or, in a one-language build, once when it is built. The
+`TRANSLATABLE_KEYWORD_ARGS` table in `CallTransformer` names the keyword args that
+hold a key (see `docs/ARCHITECTURE.md` for the metadata pattern). The handler a
+visitor's page carries holds the translated **string**, not the key; the saved
+interaction keeps the key, and so does a multilingual build's compiled page.
+Multi-language works for free — the live render runs `CallTransformer::transform`
+in the request's language, and a multilingual build's page looks each key up
+(`qs_translated_call_argument()`) each time it is served.
 
 `silent` opts out of BOTH success and error toasts (matches the
 existing `silent=true` semantics in qs.js). The default toasts' words are
@@ -1925,16 +1958,16 @@ marker. The picker detects the mode on edit:
 - First param starts with `@` → registry mode.
 - First param matches a known HTTP method → direct mode.
 
-Kwargs (`body=...`, `toastSuccessKey=...`, `:placeholder=...`, etc.)
-are parsed back from the param tail and populated into the right
-form fields.
+Kwargs are parsed back from the param tail: `body=...`, `silent=...` and
+each path placeholder's `name=...` go to their form fields;
+`toastSuccessKey=...` and `toastErrorKey=...` are read and not shown.
 
-**Toast keys on edit**: the saved chain has the *resolved* string
-(PHP translated it at compile time), not the key. The picker's
-textKey picker shows KEYS — so on edit, the toast pickers start
-empty. Re-picking re-emits the key.
+**Toast keys on edit**: the saved interaction holds the key, and the form
+does not show it: the toast pickers are not filled from it. Saving writes
+what the pickers hold, so a saved `toastSuccessKey` / `toastErrorKey` is
+dropped unless it is picked again before Save.
 
-**Compile-time translation pattern (reusable)**
+**Translatable-argument pattern (reusable)**
 
 The metadata table for `fetch` is the first consumer:
 
@@ -1944,17 +1977,18 @@ private const TRANSLATABLE_KEYWORD_ARGS = [
 ];
 ```
 
-Future verbs that introduce translatable **kwargs** (e.g. `confirm`,
-`prompt`) add one line. `CallTransformer::buildCallJs` walks
-each call's args and translates the value whenever the key is in
-the list.
+A verb whose keyword args hold a translation key adds one line to the
+table. `CallTransformer::buildCallSegments` walks each call's args and,
+whenever the keyword is in the list, leaves the value as a key to look up
+in the page's language (`resolveSegments()`, or a multilingual build's
+`qs_translated_call_argument()`; a one-language build resolves it when it is built).
 
 Parallel path for translatable **positional** args (catalog-driven):
 args declaring `inputType: 'translationKey'` in `qsVerbCatalog.php` are
 resolved automatically at render time — no per-verb code change
 required. See §9.9.7 + ARCHITECTURE §9.0.2 for the resolution mechanics.
 
-### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401), Tier 3 (magic-link)
+### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401), Tier 3 (magic-link), Tier 4 (OAuth)
 
 Token-flow primitives across four tiers (persistence + refresh + magic-link + OAuth) plus the cookie auth type. Auth routes are author-owned, with `addRoute`'s conflict-detection acting as the safety rail.
 
@@ -2007,12 +2041,12 @@ can then edit the storage / key / path or remove the row.
 
 The hint only shows in **Registry mode** (Direct URL has no
 schema). Nested paths are supported — e.g. a response with
-`data.access_token` surfaces the button as `[+ saveToken("access_token")]`
-and the action's `path` arg is `data.access_token`.
+`data.accessToken` surfaces the button as `[+ saveToken("accessToken")]`
+and the action's `path` arg is `data.accessToken`.
 
 #### Cookie auth type (Pattern X)
 
-New value for `auth.type` in the API admin form: **`cookie`** —
+The API form's auth type offers **`cookie`** —
 **Cookie (browser-managed)**. Use when the API and the web app
 share an origin and the API sets a session cookie on login
 (legacy PHP/Rails/Django apps, internal admin tools).
@@ -2055,7 +2089,8 @@ that domain. `QS.fetch` in that preview still sends it: the browser decides that
 
 What cannot be read as one `name=value` pair does not go out: no `=`, an empty
 name, a name holding white space, a control character or a comma, and a line
-break or a NUL anywhere. A pair that goes out goes as it came, a repeated name
+break or a NUL anywhere; nor does a pair whose value holds a comma followed by
+one of the engine's names. A pair that goes out goes as it came, a repeated name
 included. With nothing left the call has no `Cookie` header.
 
 **CSRF — the double-submit token**
@@ -2095,11 +2130,11 @@ bearer token, and shares no plumbing with this.
 
 #### Tier 2 — Refresh on 401
 
-When a bearer-authed endpoint returns **401**, `QS.fetch`
+When an endpoint whose auth declares `refreshEndpoint` returns **401**, `QS.fetch`
 transparently obtains a fresh access token and retries the original
 request once — no toast, no chain change. Configured per-API in the
 **Refresh (optional)** section of the API admin auth form (shown only
-when auth type is `bearer`). The `auth` config grows five optional
+when auth type is `bearer`). The `auth` config takes five optional
 fields — the first four move together (all-or-nothing), the last is
 truly optional:
 
@@ -2116,9 +2151,10 @@ Runtime flow (`qs.js`) on a 401 from an endpoint whose auth declares
 
 1. Read the refresh token from `refreshTokenSource`. If absent, skip
    refresh — the 401 flows to the normal error path.
-2. POST to `refreshEndpoint` (resolved from the registry, running with
-   **its own** configured auth) with a body of the refresh token under
-   `refreshTokenBodyField`. The refresh call uses plain `fetch`, so it
+2. Call `refreshEndpoint` by its registered method, POST when it declares none
+   (resolved from the registry, running with **its own** configured auth),
+   with a body of the refresh token under `refreshTokenBodyField`; a GET or
+   HEAD endpoint is sent no body, so no refresh token. The refresh call uses plain `fetch`, so it
    can never recurse into another refresh.
 3. On success: write the new access token (`responseTokenPath`) to
    `tokenSource`; if `responseRefreshTokenPath` is set and present in
@@ -2148,7 +2184,9 @@ With tokens persisting (Tier 1) and refreshing (Tier 2), the runtime
 offers declarative, *authorable* ways to react to login / storage state —
 enough to build login / logout / status UIs without hand-written JS. All
 bindings re-apply on page load and on `qs:auth:saved` / `qs:auth:cleared`
-(`saveToken` / `clearToken` / `refresh` emit those).
+(`saveToken` / `clearToken` / `refresh` emit those), on `qs:storage:changed`
+(a `QS.store` write), on `qs:consent:changed`, and on the two magic-link
+exchange events.
 
 **Verbs**
 
@@ -2158,11 +2196,14 @@ bindings re-apply on page load and on `qs:auth:saved` / `qs:auth:cleared`
 | `QS.refresh("@apiId")` | manually run the Tier 2 refresh for an API (button-friendly). Resolves the API's auth config and reuses the auto-refresh flow. A raw fetch can't replace it — only this injects the stored refresh token. |
 | `QS.applyAuthState()` | re-scan the bindings below after injecting DOM dynamically |
 
+`QS.isAuthed()` is a function of the runtime for hand-written script; it is not a `{{call:…}}` verb. Of these three, `refresh` (the verb catalogue) and `applyAuthState` (allowed in a chain) can be written in an interaction.
+
 `refresh` is in the interaction picker (`listJsFunctions`); `applyAuthState`
 is allowlisted for hand-authoring but not surfaced (niche).
 
 **Declarative bindings** — plain `data-*` (NOT `data-qs-*`, which the editor
-reserves for its own markers and strips from user params):
+reserves for its own markers: its forms leave them out and `editNode` refuses
+one in a node's params):
 
 | Attribute | Effect |
 |---|---|
@@ -2182,9 +2223,10 @@ hidden parent hides its children regardless of their own state.
 #### Tier 3 — Magic-link
 
 Magic-link sign-in: the user types their email, the auth API mails a
-single-use code, the user clicks the link, lands on `/auth/magic/<code>`,
-the page automatically exchanges the code for a real session token. No
-password.
+single-use code, the user clicks the link, lands on the author's route that
+carries it (`/auth/magic/<code>`, any route with a `:param`), and the page's
+`onload` chain, which the author adds, exchanges the code for a real session
+token. No password.
 
 **Why a code, not the token directly.** Putting the actual session token
 in the URL leaks via email forwarding, browser history, corporate HTTPS
@@ -2201,10 +2243,10 @@ Phase 1 — User requests the link:
    │ email          │                    │              │
    ├───────────────>│ POST /issue-magic  │              │
    │                │ {email}            │              │
-   │                ├───────────────────>│ (proxy)      │
-   │                │                    ├─────────────>│ generates "abc123",
+   │                ├──────────────────────────────────>│
+   │                │                    │              │ generates "abc123",
    │                │                    │              │ stores, emails user
-   │                │<───────────────────│ 200 OK       │
+   │                │<──────────────────────────────────│ 200 OK
    │ "Check your email"                  │              │
 
 Phase 2 — User clicks the email link (out of band):
@@ -2235,13 +2277,13 @@ Phase 3 — Page loads, exchange runs:
 |---|---|---|
 | `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (the route the server resolved for the page — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. On success it goes to `returnTo`, else to a `?return=` path on this site, composed as every site address is: the base the page is served under and, on a multilingual site, the page's language. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
 | `QS.requestMagicLink(endpoint, email, returnTo?)` | Forward path. POSTs `{email}` to the issue endpoint. `email` accepts a literal address OR a `#selector` / `.selector` to read from an `<input>` (same convention as `setState`'s value arg). | `validate` → `requestMagicLink` → optional `redirect` to "check your email" page |
-| `QS.logoutServer(endpoint)` | Server-side logout — POST so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
+| `QS.logoutServer(endpoint)` | Server-side logout — calls the endpoint by its registered method (register it as POST) so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
 
 All three are in `CHAIN_AWAITABLE`, so chains that include them are wrapped in `(async()=>{await ...})()` — subsequent saveToken / clearToken / redirect see resolved state.
 
 ##### The `magic-link-handler` component
 
-QuickSite-provided 3-paragraph template. Copy into your project at
+A 3-paragraph template, given here (no file of it ships). Create it in your project at
 `secure/projects/<your-project>/templates/model/json/components/magic-link-handler.json`:
 
 ```json
@@ -2290,10 +2332,10 @@ Any additional languages your project ships need the same shape.
 ##### What you need to wire up — checklist
 
 1. **Auth API endpoints** — your auth backend serves an `issue-magic` endpoint (POSTs `{email}`, mails the link, always returns 200), an `exchange-magic` endpoint (POSTs `{key}`, returns `{token, refreshToken}` on success or 401), and optionally a `logout` endpoint (POST with bearer, returns 200).
-2. **Register the endpoints in `/admin/apis`** — typically as `@auth-api/issue-magic`, `@auth-api/exchange-magic`, `@auth-api/logout`. Set `auth: 'none'` on the issue + exchange endpoints (no token to send pre-login). Set the API-level `tokenSource` to the same key your `saveToken` chain will write to.
+2. **Register the endpoints in `/admin/apis`** — typically as `@auth-api/issue-magic`, `@auth-api/exchange-magic`, `@auth-api/logout`. Set `auth: 'none'` on the issue + exchange endpoints (no token to send pre-login; the two magic-link verbs send no credential whatever the registry says, so `none` records the intent and matters for any other caller of those endpoints). Set the API-level `tokenSource` to the same key your `saveToken` chain will write to.
 3. **Author the route** in `/admin/sitemap` — e.g. `/auth/magic/:key` (the `:key` is the path-param segment that captures the code).
 4. **Drop the component JSON** into your project's `components/` dir (canonical above), then add it to the route's page via the visual editor.
-5. **Add the onload page-event chain** — via the JS-mode page-events panel on that route. Example for the test project:
+5. **Add the onload page-event chain** — via the JS-mode page-events panel on that route. Example:
    ```
    {{call:exchangeMagicLink:@auth-api/exchange-magic,key}};
    {{call:saveToken:localStorage,authToken,token}};
@@ -2303,10 +2345,10 @@ Any additional languages your project ships need the same shape.
 6. **Add the 3 translation keys** to every active language's `translate/<lang>.json`.
 7. **(Optional)** For the forward path, build a small email-entry form on a public page using `QS.requestMagicLink`:
    ```html
-   <form>
+   <form id="email-form">
      <input id="email-input" type="email" required>
      <button type="submit"
-             onclick="{{call:validate:event,event}};{{call:requestMagicLink:@auth-api/issue-magic,#email-input,/check-email}}">
+             onclick="{{call:validate:event,#email-form}};{{call:requestMagicLink:@auth-api/issue-magic,#email-input,/check-email}}">
        Email me a sign-in link
      </button>
    </form>
@@ -2335,7 +2377,7 @@ others). Server-side token custody — provider tokens never reach the browser.
 
 - **OAuth** when you want "Sign in with Google / GitHub / Meta / Amazon"
   branded buttons backed by the provider's identity. Lets users sign in
-  with accounts they already have. Server-side session, ~14-day default.
+  with accounts they already have. Server-side session of 14 days at most (a fixed length, no setting): the record lives in a PHP session whose own cookie ends with the browser session, and PHP may collect an idle session file sooner (`session.gc_maxlifetime`).
 - **Magic-link (Tier 3)** when you own the identity store (your own
   user database, your own email sender). Browser-side token, you
   control everything end-to-end.
@@ -2345,7 +2387,8 @@ The two coexist — same site can offer both.
 **Token custody — BFF (Backend-For-Frontend)**: the OAuth flow's
 provider tokens (`access_token`, `refresh_token`) are kept server-side
 after the code exchange. The browser receives a first-party
-`HttpOnly; Secure; SameSite=Lax` session cookie (`qs_oauth_user`)
+`HttpOnly; SameSite=Lax` session cookie, `Secure` when the page is served over https
+(`qsp_<projectId>_qs_oauth_user`)
 mapping to a server-side session record. Provider tokens never reach
 JavaScript — closes the XSS exfil surface that
 browser-localStorage-stored OAuth tokens create. By design (see
@@ -2418,7 +2461,7 @@ registered for them.
 1. **The provider is offered** — the shipped four are; any other is added to
    the list by the installation's operator.
 2. **The keys** — on the **OAuth providers** page (Authentication in the
-   sidebar), open the provider's *How to get the keys*: it links the
+   Advanced menu, or `/admin/oauth-providers` in either mode), open the provider's *How to get the keys*: it links the
    provider's console, gives the callback address to register for each set,
    and notes the provider's own rules. Enter the client id and secret in
    **Preview keys** (and, before building, in **Build keys**). Only the
@@ -2440,7 +2483,7 @@ registered for them.
 
 **The flow** (no author interaction past step 3):
 
-1. User clicks the button → 302 to
+1. User clicks the button, a link to
    `http://your-site/auth/oauth/<provider>/start`
 2. `OAuthHandler::handleStart` generates state + PKCE verifier,
    stores them server-side, redirects to the provider's authorize URL
@@ -2500,7 +2543,8 @@ against the cookie's session.
 `invalid_state` / `missing_code` / `token_exchange_failed` /
 `userinfo_failed` / `userinfo_missing_sub`, plus the provider's own
 `error` query param when the user denied consent (`access_denied`,
-etc.). The author owns the UX layer on the landing page — read the
+etc.); `invalid_state` always lands on the site's home, since the page to return to
+is read from the state record it could not find. The author owns the UX layer on the landing page — read the
 `oauth_error` query param and surface a sensible message.
 
 **Third-party cookies** (Safari ITP / Firefox ETP): the cookies set
@@ -2527,7 +2571,7 @@ guard.
 | Server-side handler | `secure/src/classes/OAuthHandler.php` |
 | State + session storage | `secure/src/functions/oauthStateStore.php` (PHP-session-backed; swappable abstraction) |
 | Resolver kind registration + validation | `secure/src/functions/resolverHelpers.php` (`oauth-start` / `oauth-callback` / `oauth-logout` in `RESOLVER_ALLOWED_KINDS`) |
-| Dispatcher | `public/p/index.php` OAuth branch (substitutes `{:routeParam}` placeholders, dispatches to handleStart / handleCallback / handleLogout) |
+| Dispatcher | `qs_run_oauth_route()` in `secure/src/functions/oauthRuntime.php` (substitutes `{:routeParam}` placeholders, dispatches to handleStart / handleCallback / handleLogout); `public/p/index.php` and a built site both call it |
 | The provider list | `<secure>/management/config/oauth-providers.json` (the operator's), else the shipped `oauth-providers.json.example`; read and checked by `secure/src/functions/oauthProviderHelpers.php` |
 | The project's keys | `data/oauth-secrets.json` (a preview set and a build set per provider), written by `secure/management/command/setOAuthCredentials.php` |
 | Provider listing | `secure/management/command/listOAuthProviders.php` (the offered providers, the project's key status, the callback addresses, per-provider setup status) |
@@ -2535,7 +2579,7 @@ guard.
 | The `?return=` rule | `qs_site_path()` in `secure/src/functions/requestRuntime.php`; `OAuthHandler::returnTarget()` |
 | Visual element | `secure/src/classes/complexElements/OAuthButton.php` (builder) + `public/admin/.../contextual-complex/complex-oauth-button.js` (wizard) |
 | Template helpers | `secure/src/functions/oauthStateStore.php` (`isOAuthLoggedIn`, `getOAuthUser`) — loaded globally by `public/init.php` |
-| Locked design decisions | [docs/DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) — OAuth section |
+| Design decisions | [docs/DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) — OAuth section |
 
 ---
 
@@ -2592,12 +2636,12 @@ page. Click → inline picker lists every other-route store as `<route> ▸
 <storeId>`. Pick → if the storeId already exists on this page, an inline
 rename input appears (seeded with `<id>_copy`); otherwise Import is enabled
 immediately. The import is an **independent duplicate** (deep-clone of the
-def via JSON round-trip); future edits to the source don't propagate. The
-live-shared cross-page store variant — one store referenced from multiple
-pages — is intentionally out of scope.
+def via JSON round-trip); later edits to the source don't propagate. There is
+no store shared live between pages: each page holds its own copy.
 
 **Triggering.** `setState` and `fetchState` appear in the interaction picker's
-**Function** dropdown (both the element form and the page-event form). Their `store`
+**Function** dropdown under the events they declare: in the page-event form (onload / onscroll / onresize)
+`fetchState` shows under `onload`, and `setState` only with **Show all functions** ticked. Their `storeId`
 argument is a dropdown of the page's stores; `setState` adds `field` and `value` (a
 literal, or a `#id` / `.class` selector read live). They compile to
 `{{call:setState:store,field,value}}` / `{{call:fetchState:store}}` — chain them for
@@ -2608,7 +2652,8 @@ init / `setState` / `fetchState`:
 
 - `data-state-value="store.field"` — scalar; sets `textContent` to the field
   value.
-- `data-state-list="store.field"` — array container. The container's first child
+- `data-state-list="store.field"` — array container. The container's first child,
+  or the element inside it carrying `data-list-template` when one does,
   is the **item template** that gets cloned per array item. Several containers may
   name the same field: each is filled, from its own first child.
   - Template descendants with `data-bind="fieldName"` get `textContent` set to
@@ -2704,8 +2749,8 @@ Trigger via a page event in JS mode → Page Events → **Add Page Event** →
 `onload` → `onScrollFetchState:list,200,100`. That registers (once) a debounced
 window-scroll listener that fires `fetchState(list)` only when the viewport is
 within 200px of the page bottom (debounced 100ms), and **stops** firing once
-the store is exhausted (HTTP error, response items empty, or a `both` cursor
-that didn't advance). A subsequent `setState` (e.g. new search query) clears
+the store is exhausted (HTTP error, a response saying `hasMore: false`,
+response items empty, or a `both` cursor that didn't advance). A subsequent `setState` (e.g. new search query) clears
 the exhausted flag and re-arms the trigger.
 
 > Don't wire a raw `onscroll` → `fetchState` page event for infinite scroll:
@@ -2713,12 +2758,14 @@ the exhausted flag and re-arms the trigger.
 > store has no built-in stopping condition there — it will thrash the API and
 > loop past end-of-list. `onScrollFetchState` is the safe equivalent.
 
-Both patterns are demonstrated in the test pages `test/paged` (offset) and `test/state` (cursor).
+Both patterns are built from the attributes above alone.
 
 ### 9.7 Server-side data resolvers
 
-A **resolver** is a per-route declaration that fires a server-side fetch
-**before** the page renders, and exposes the response as template
+A **data resolver** (a resolver's `kind`, `data` when omitted; the other kinds,
+`oauth-start`, `oauth-callback` and `oauth-logout`, replace the render with a
+redirect and take none of the fields below, §9.5) is a per-route declaration
+that fires a server-side fetch **before** the page renders, and exposes the response as template
 variables. The initial HTML carries the API content already populated —
 search engines and AI crawlers see real text on the first byte, not an
 empty shell waiting for JS. State stores (§9.6) still handle the
@@ -2740,10 +2787,10 @@ splits).
 | Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
 | Cache layer | `secure/src/functions/resolverCache.php` + `cleanResolverCache` command |
 | Read / write commands | `setRouteResolver` (set / clear / patch / append / remove single slot) |
-| Page emit — flat namespace | `secure/src/classes/JsonToHtmlRenderer.php` performs the `{{resolved:NAME}}` / `{{resolved:NAME.dot.path}}` substitution; the values reach it through `secure/src/functions/resolverRegistry.php` (`qs_set_resolved_vars` / `qs_get_resolved_vars`) |
+| Page emit — flat namespace | `secure/src/functions/runtimePlaceholders.php` (`qs_resolved_value()`) performs the `{{resolved:NAME}}` / `{{resolved:NAME.dot.path}}` substitution for both the renderer (`JsonToHtmlRenderer.php`) and a compiled page (`JsonToPhpCompiler.php`); the values reach it through `secure/src/functions/resolverRegistry.php` (`qs_set_resolved_vars` / `qs_get_resolved_vars`) |
 | Page emit — `r0`/`r1` namespaced | Same substitution, with `secure/src/functions/runtimeHandoff.php` building the JS-side mirror |
 | Hydration handoff to client | `secure/src/functions/runtimeHandoff.php` → `window.QS_RESOLVED` + `window.QS_RESOLVED_BY_INDEX`. One writer, so a built site emits the same blocks the live view does. |
-| Admin UI — list view + per-config modal | `/admin/sitemap` → context menu ⋯ → "Configure resolver" — partials `sitemap-resolver-list.php` + `sitemap-resolver.php`; logic in `public/admin/assets/js/pages/sitemap.js` |
+| Admin UI — list view + per-config modal | `/admin/sitemap` → a row's actions menu ⋮ → "Configure resolver" — partials `sitemap-resolver-list.php` + `sitemap-resolver.php`; logic in `public/admin/assets/js/pages/sitemap.js` |
 
 #### Sidecar shape
 
@@ -2788,7 +2835,7 @@ when two or more.
 | `inputs` | no | `{name: spec}` | Map of endpoint parameter name → source spec (see below). Omit when the endpoint takes no inputs. |
 | `expose` | no | `{varName: dotPath}` | Map of template variable name → response dot-path. Omit when the resolver's only purpose is a side-effect (rare). |
 | `cacheTTL` | no | integer (seconds) | 0 or omitted = no cache. Positive = cache window. **Cache is force-disabled by the server for `bearer` / `cookie` / `basic` auth regardless of TTL** — see auth-cacheable rule below. |
-| `onMiss` | no | string | `render-empty` to fall back to null-valued exposes on failure (page still renders). Omitted = fail-loud (page short-circuits to 404 / 500). Future values reserved. |
+| `onMiss` | no | string | `render-empty`, the one value, to fall back to null-valued exposes on failure (page still renders). Omitted = fail-loud (page short-circuits to 404 / 500). |
 
 #### Inputs — source specs
 
@@ -2806,9 +2853,9 @@ The resolver form offers `param:`, `query:` and a literal. A row saved with `ses
 
 Missing sources resolve to `null` and get dropped from the request
 entirely (the upstream's default applies), instead of being sent as an
-empty placeholder. Path placeholders that don't resolve are left as
-the literal `:name` in the URL so the upstream 404 surfaces the
-misconfig visibly.
+empty placeholder. A required path placeholder that doesn't resolve is
+left as the literal `:name` in the URL so the upstream 404 surfaces the
+misconfig visibly; an optional one the endpoint declares is removed from the path.
 
 #### Expose — response dot-paths
 
@@ -2827,7 +2874,9 @@ response":
 Templates substitute via `{{resolved:NAME}}` for flat names and
 `{{resolved:NAME.path.through.value}}` for further dot-path traversal
 into the exposed shape. PHP code can also read the values directly
-through `getResolvedVars()` from `secure/src/functions/resolverHelpers.php`.
+through `qs_get_resolved_vars()` from `secure/src/functions/resolverRegistry.php`
+(`getResolvedVars()` in `resolverHelpers.php` is the same read, in the installation only:
+a build carries the first file, not the second).
 
 When the **endpoint declares a `responseSchema`**, the expose editor's
 dot-path field is a `<select>` of the enumerated paths (with an orphan
@@ -2864,11 +2913,11 @@ constraint visible.
 Cache writes happen only on **2xx** responses. 4xx / 5xx / transport
 failures aren't cached, so a transient blip doesn't lock in a "not
 found" for the full TTL window. The `cleanResolverCache` command
-clears entries (by endpoint id, API id, expired-only, or all) — useful
+clears entries (by endpoint id, API id, everything stored before a timestamp, expired-only, or all) — useful
 for development and for the auto-clear hook `editApi` runs when an
 endpoint config changes.
 
-**Cache observability** — every document response carries an
+**Cache observability** — every response of a page whose resolvers fired carries an
 `X-QS-Resolver-Cache` header with one of `hit` / `miss` / `skip` /
 `disabled` per resolver, comma-separated for multi-resolver routes
 (`hit,miss,disabled`). DevTools Network tab shows the resolver's
@@ -2876,14 +2925,12 @@ cache state without needing to tail logs.
 
 #### `onMiss` — failure-mode fallback
 
-Per-resolver, locked values:
+Per-resolver; the values:
 
 | Value | Behaviour |
 |---|---|
 | (absent, "fail-loud") | A failure short-circuits the page — see failure-mode table. |
-| `render-empty` | Failure exposes the resolver's expose keys as **null**; page renders with null vars; template uses `data-state-show-empty` (§10) for graceful "no data" UI. |
-
-Future values (e.g. `redirect:<url>`) are reserved.
+| `render-empty` | Failure exposes the resolver's expose keys as **null**; page renders with null vars; a state store on the route bound to the same endpoint is seeded with them, and `data-state-show-empty="store.field"` (§10) then shows the "no data" UI. |
 
 #### Multi-resolver — parallel execution + namespaced access
 
@@ -2907,9 +2954,9 @@ flat namespace.
 ```
 
 Authors disambiguate by **renaming** (`{ "bookTitle": "data.title" }`
-on one, `{ "chapterTitle": "data.title" }` on the other) OR by using
-the **namespaced-by-index** form, which is always available regardless
-of flat collisions:
+on one, `{ "chapterTitle": "data.title" }` on the other). The
+**namespaced-by-index** form addresses each resolver's own exposed keys
+(`r0.bookTitle`, `r1.chapterTitle`); it does not lift the rule:
 
 | Layer | Flat access | Namespaced access |
 |---|---|---|
@@ -2953,7 +3000,7 @@ window.QS_RESOLVED_BY_INDEX = {
   duplicate round-trip. Subsequent `fetchState` calls (search,
   paginate, refresh) work normally.
 - `QS_RESOLVED_BY_INDEX` is **resolver-index-keyed**, mirroring the
-  PHP-side `$r0` / `$r1` namespace for client-side code that wants
+  PHP-side `r0` / `r1` namespace (`{{resolved:r0.title}}`) for client-side code that wants
   explicit per-resolver addressing.
 
 Both blocks — like every inline `window.QS_*` block the runtime handoff
@@ -2974,35 +3021,37 @@ without `render-empty` short-circuits the whole page.
 | Single-resolver outcome | Multi-resolver outcome | Page result |
 |---|---|---|
 | Resolver succeeds | All resolvers succeed | **200** — template renders with vars populated |
-| Resolver fails + `onMiss: render-empty` + upstream 4xx/5xx | At least one resolver fails this way; all other failures are also `render-empty` | **200** — template renders with null vars for the failed resolver(s); template's `data-state-show-empty` (§10) drives the "no data" UI |
-| Resolver fails + no `onMiss` + upstream **4xx** | Any resolver fails this way | **404** — render the project's `templates/pages/404.php` (the slug doesn't exist; matches the `/products/red-vase` not-found pattern) |
-| Resolver fails + no `onMiss` + upstream **5xx or curl error** | Any resolver fails this way | **500** — render the project's `templates/pages/500.php` (the upstream is down; the page can't render meaningfully) |
-| Resolver fails + **config bug** (endpoint missing from registry, `apiKey` not set, a refused `auth`, `headers` or token source, `callableFrom: client` server-side call, etc.) | Any resolver fails this way | **500** — verbose inline page surfacing the misconfig (route, error message, fix hint). |
+| Resolver fails (any failure: upstream 4xx/5xx, a curl error, a config bug) + `onMiss: render-empty` | At least one resolver fails this way; all other failures are also `render-empty` | **200** — template renders with null vars for the failed resolver(s); a state store's `data-state-show-empty` (§10) drives the "no data" UI |
+| Resolver fails + no `onMiss` + upstream **4xx** | Any resolver fails this way | **404** — render the project's `templates/pages/404/404.php` (or a flat `templates/pages/404.php`; a plain page when it has neither) (the slug doesn't exist; matches the `/products/red-vase` not-found pattern) |
+| Resolver fails + no `onMiss` + upstream **5xx or curl error** | Any resolver fails this way | **500** — render the project's `templates/pages/500/500.php` (or a flat `templates/pages/500.php`; a plain page when it has neither) (the upstream is down; the page can't render meaningfully) |
+| Resolver fails + **config bug** + no `onMiss` (endpoint missing from registry, `apiKey` not set, a refused `auth`, `headers` or token source, `callableFrom: client` server-side call, etc.) | Any resolver fails this way | **500** — verbose inline page surfacing the misconfig (route, error message, fix hint). |
 
 `$GLOBALS['__qs_resolver_failure']` is populated for `404` / `500`
 template branches with `{ route, status, error }` so the template can
 log or surface the cause. The multi-resolver case carries the
-**first unrecovered failure's** details (`resolverIndex` included) —
-the short-circuit policy means subsequent failures aren't reached.
+**first unrecovered failure's** route, status and error (its index is not
+kept). Every resolver has fired by then; only the first unrecovered failure
+is recorded.
 
 #### Editor emulation panel
 
 `?_editor=1` activates emulation: the production resolver is **not
 fired**, and routeParams + resolved vars come from a base64-encoded
 `_emulate` JSON payload in the URL. The visual editor's emulation
-panel (extended from the param-route emulation) provides:
+panel provides:
 
-- **Inputs panel** — every route `:name` segment + every resolver
-  expose key, editable as text inputs. Schema-driven defaults pre-fill
-  the expose inputs from the endpoint's `responseSchema` when one is
-  declared.
+- **Inputs panel** — every route `:name` segment + every expose key of a
+  single-resolver route, editable as text inputs. Schema-driven defaults
+  pre-fill the expose inputs (text, number and boolean values) from the
+  endpoint's `responseSchema` when one is declared, the first time, before
+  anything is saved for the page.
 - **Live-data toggle** (`?_live=1`) — runs the REAL resolver instead
   of the emulation. Useful for validating the page against real API
   responses while still using the editor's emulated routeParams.
 
 #### Admin authoring — list view + per-config modal
 
-Sitemap → context menu ⋯ → "Configure resolver" opens the **list
+Sitemap → a row's actions menu ⋮ → "Configure resolver" opens the **list
 view** modal (`sitemap-resolver-list.php`). Single-resolver routes
 show with one entry; multi-resolver routes show all entries; routes
 without a resolver show an empty state with "+ Add resolver". The × at its top
@@ -3022,7 +3071,7 @@ orphans; inputs name picker uses the endpoint's declared `parameters`
 when present (free-text fallback otherwise); expose path picker uses
 the `responseSchema` when present (free-text fallback otherwise);
 cacheTTL input disables when auth isn't cacheable. Save validation
-runs both client-side (per-row + cross-row collision) and server-side
+runs client-side (per row) and server-side
 (per-config + cross-resolver collision detection in `validateResolverConfigs`).
 
 The sitemap badge on resolver-bound routes shows `resolver` (single)
@@ -3049,7 +3098,7 @@ covers the editor UX.
   global **menu** / **footer** (calls `setRouteLayout`). Optimistic UI;
   the reachability section re-renders after each toggle since visibility
   affects which routes count as reachable.
-- **Actions** (always in view) — `+` to add a child, `⋯` to open the
+- **Actions** (always in view) — `+` to add a child (a route at the deepest level, the fifth, has none), `⋮` to open the
   context menu (Add child / View in editor / Open page / Edit title /
   Configure resolver / Delete route, with Delete disabled for the home route).
   Delete route asks first, naming the route (*Delete route /blog?*), and a route
@@ -3085,14 +3134,15 @@ ARCHITECTURE §6.3), so the toast is a "did you mean this?" surface rather
 than a block.
 
 **Edit title**. The context menu's `Edit title` opens a modal with one
-input per active language pre-filled from `page.titles.<route>` (via
-`getTranslation`). Save dispatches `setTranslationKeys` once per changed
+input per active language pre-filled from `page.titles.<route>` (read
+through the panel's one list of the site's words, `getLangList` +
+`getTranslations`, again at each open). Save dispatches `setTranslationKeys` once per changed
 language and re-fetches on the next open.
 
 **Reachability**. Below the tree, the reachability section runs
 `analyzeReachability`: total / reachable / orphan counts, an orphans list
 with a hint, the global menu + footer links, and a per-route link graph
-table. The banner turns red when any orphan is detected.
+table. The banner takes the warning colour when any orphan is detected, and the success colour when every route is reachable.
 
 **Sitemap File**. At the bottom, under a base-URL input: **Select your
 links**, one row per route showing its first URL (and ×N langs when
@@ -3117,11 +3167,11 @@ sitemap contains is a write and needs a write role.
 |---|---|
 | Tree + reachability + add form + Sitemap File logic | `public/admin/assets/js/pages/sitemap.js` |
 | Page shell | `secure/admin/templates/pages/sitemap.php` + `sitemap-edit-title.php` partial |
-| Server commands | `addRoute`, `deleteRoute`, `getSiteMap`, `setSiteMapConfig`, `setRouteLayout`, `analyzeReachability` |
-| Route schema | A project's `secure/management/routes.php` (writable via the commands; `varExportNested()` preserves nested string keys) |
+| Server commands | `addRoute`, `deleteRoute`, `getSiteMap`, `setSiteMapConfig`, `setRouteLayout`, `analyzeReachability`, plus `validateTranslations` (the summary), `setRouteResolver` (§9.7) and, for Edit title, `getLangList` / `getTranslations` / `setTranslationKeys` |
+| Route schema | A project's `secure/projects/<project>/routes.php` (writable via the commands; `varExportNested()` preserves nested string keys) |
 | Param syntax helpers | `secure/src/functions/routeHelpers.php` — single source for the `:name` ↔ `__name` filesystem sanitisation (NTFS reserves `:`) |
 
-### 9.9 Verb picker (interactions, page events, complex wizards)
+### 9.9 Verb picker (interactions, page events)
 
 The structured authoring UI for every `{{call:verb:args}}` interaction in
 the admin. Lives in `preview-js-interactions.js`. This section documents
@@ -3133,19 +3183,22 @@ design rationale + alternatives weighed.
 
 - **Interactions panel** (element-level) — Add Interaction form, both the
   verb dropdown and per-arg inputs.
-- **Page events panel** (page-level) — same shape, parallel form
-  (`peForm*` references in the JS).
-- **Complex element wizards** — wizards that author chained verbs
-  internally (e.g. magic-link landing page presets) reuse the same
-  `_createArgRow` helper.
+- **Page events panel** (page-level) — a parallel form (`peForm*`
+  references in the JS). Its `selector`, `class` and `matchTarget`
+  arguments are plain text fields and its `eventArg` argument a visible
+  text field: those four pickers are drawn in the element form only.
+- **Post-fetch actions** — each action row of an API-call interaction (a
+  verb dropdown and that verb's arguments) is built by the same
+  `_createArgRow` helper. The complex element wizards do not use it.
 
 #### 9.9.1 Verb categorisation
 
 Each entry in `secure/src/functions/qsVerbCatalog.php` declares an
 optional `category` field. The picker groups verbs by category in a
-locked render order (most-authored first):
+fixed render order (most-authored first); a category the list does not
+know comes after `general`, in alphabetical order, and before Uncategorized:
 
-| Category | Display label | Verbs (today's catalog) |
+| Category | Display label | Verbs |
 |---|---|---|
 | `dom-toggle` | DOM toggles | show, hide, toggle, toggleHide, addClass, removeClass, setValue |
 | `form` | Forms | validate |
@@ -3164,8 +3217,10 @@ LAST so authors notice that the verb forgot to declare a category.
 
 #### 9.9.2 Search-as-you-type (QSSearchableSelect)
 
-Every dropdown in the picker (verb selection, apiEndpoint, route,
-routeParam, translationKey) is wrapped with `QSSearchableSelect` — a
+The picker's long lists (the verb, `api`, `apiEndpoint`, `route`, `routeParam`
+and the storage key's list) are wrapped with `QSSearchableSelect` (`enum` and
+`store` stay native selects, and `translationKey` is the translation-key
+picker's own search field) — a
 reusable combobox primitive at
 `public/admin/assets/js/core/searchable-select.js`. So are the event of an
 element's interaction (each event's explanation as its description),
@@ -3195,7 +3250,9 @@ Behaviours:
   click on the label opens the list and a second click closes it;
   `destroy()` points it back. A label that wraps the select already has
   the trigger as its control. A select that nothing names gives a
-  nameless trigger, so every select the panel wraps has one.
+  nameless trigger: the picker's own argument lists (`api`, `apiEndpoint`,
+  `route`, `routeParam`) and a post-fetch action's verb list are in that
+  case, their row's label not pointing at them.
 - **Its words are the panel's**: `common.selectPlaceholder`,
   `common.search`, `common.noResults`, `common.noMatchesFor` and
   `common.createFromSearch`, which `layout.php` ships on every page
@@ -3221,7 +3278,7 @@ Behaviours:
   the viewport. Re-anchors after every filter so a 1-item visible list
   hugs the trigger.
 
-`min-width: 200px` applied globally so short labels don't collapse the trigger.
+The widget is as wide as its container (`width: 100%`); no minimum width is set.
 
 #### 9.9.3 Event filtering
 
@@ -3231,14 +3288,14 @@ picker filters the verb dropdown by the currently-edited event:
 
 - `onScrollFetchState` declares `events: ['onload']` → only appears when
   authoring `onload`.
-- `exchangeMagicLink` declares `events: ['onload']` → page-event only.
+- `exchangeMagicLink` declares `events: ['onload']` → a page event, or the `onload` of an element that has one (`img`, `iframe`, `body`).
 - `redirect` declares `events: ['onclick', 'ondblclick', 'oncontextmenu',
   'onkeydown', 'onkeyup']` → element-interaction events.
 - `prevent` declares `events: ['onclick']` → a link. A form's submit
   needs none: the page keeps a form whose chain sends something, or that
   has no action of its own ([ARCHITECTURE.md §9.0.1](ARCHITECTURE.md)).
 
-A **Show all** checkbox above the verb picker overrides the filter for
+A **Show all** checkbox under the verb picker overrides the filter for
 the unusual cases (e.g. authoring a custom event chain). The filter
 runs in `_filterFunctionsByEvent` (`preview-js-interactions.js`).
 
@@ -3257,32 +3314,33 @@ these hints too — today checks required-arg presence and the
 `routeParam` constraint that values must match the page's `:name`
 segments.
 
-| inputType | Picker UI | Metadata fields | Used by (today's verbs) |
+| inputType | Picker UI | Metadata fields | Used by |
 |---|---|---|---|
 | *(default)* | Plain `<input type="text">` | — | Any arg without an inputType hint |
 | `selector` | Searchable autocomplete from page's `#id` / `.class` / tag tokens | — | show.target, hide.target, focus.target, scrollTo.target, … |
 | `class` | Searchable autocomplete from page's classes (no leading `.`) | — | show.hideClass, addClass.className, … |
-| `eventArg` | Auto-injected hidden input (the `event` keyword arg) | — | validate.event |
+| `eventArg` | Auto-injected hidden input (the `event` keyword arg) | — | prevent.event, filter.event |
 | `matchTarget` | GitHub-style tokenfield — selectors OR attribute names | — | filter.matchAttr |
-| `enum` | Native `<select>` from arg `options` | `options: [string,…]` (required), `default` (optional) | scrollTo.behavior, toast.type, saveToken.storage, clearToken.storage |
+| `enum` | Native `<select>` from arg `options` | `options: [string,…]` (required), `default` (optional) | scrollTo.behavior, toast.type, saveToken.storage, clearToken.storage, store.storage |
 | `store` | Native `<select>` of current page's state-store IDs | — | setState.storeId, fetchState.storeId, onScrollFetchState.storeId |
 | `api` | QSSearchableSelect of `@apiId` (no endpoint segment) | — | refresh.apiRef |
 | `apiEndpoint` | QSSearchableSelect of `@apiId/endpointId` | — | exchangeMagicLink.endpoint, requestMagicLink.endpoint, logoutServer.endpoint |
 | `route` | QSSearchableSelect of project routes; with `allowExternal: true`, a `Custom URL…` sentinel swaps the row to free-text input | `allowExternal: bool` (default `false`) | redirect.url *(allowExternal)*, exchangeMagicLink.returnTo, requestMagicLink.returnTo |
 | `routeParam` | QSSearchableSelect of `:name` segments extracted from the current page's route slug | — | exchangeMagicLink.paramName |
-| `translationKey` | `QSComplexWizard.createTextKeyPicker` (searchable tree + inline "Create new key" form); with `allowFreeText: true`, a `Custom text…` sentinel swaps the row to free-text input. Catalog-flagged positional args also get **compile-time resolution** at render (§9.9.7) | `allowFreeText: bool` (default `false`) | toast.message *(allowFreeText)* |
+| `translationKey` | `QSComplexWizard.createTextKeyPicker` (a search field over the list of the site's keys, and a Create form when the key typed is not one of them, for a role that may run `setTranslationKeys`); with `allowFreeText: true`, a `Custom text…` sentinel swaps the row to free-text input. A positional arg the catalog marks `translationKey` is looked up in the page's language on the server (§9.9.7) | `allowFreeText: bool` (default `false`) | toast.message *(allowFreeText)* |
 
 #### 9.9.5 Hybrid-picker pattern (`allowExternal` / `allowFreeText`)
 
 Two inputType handlers carry a per-arg flag that opts in to a "Custom
-…" sentinel — a button at the top of the dropdown that swaps the row
-from picker mode to a free-text input + a `←` back button.
+…" sentinel — the first row of the route list, or a button under the
+translation-key picker — that swaps the row from picker mode to a
+free-text input + a `←` back button.
 
-- `route` + `allowExternal: true` (today: `redirect.url`) — picker shows
+- `route` + `allowExternal: true` (`redirect.url`) — picker shows
   registered routes; the `Custom URL…` sentinel lets the author type
   any URL (external, anchor, scheme-prefixed). Picker mode is the
   default; back button returns to it.
-- `translationKey` + `allowFreeText: true` (today: `toast.message`) —
+- `translationKey` + `allowFreeText: true` (`toast.message`) —
   picker shows the project's translation keys; the `Custom text…`
   sentinel lets the author type a raw string for one-off / debug
   toasts. Back button returns to the picker.
@@ -3301,8 +3359,8 @@ mode + pre-filled (vs. dumping it as a "(legacy)" picker option).
 
 #### 9.9.6 Required-arg validation
 
-Save is blocked when any `required: true` catalog arg has an empty
-value at its positional index. Two-layer check:
+Save is blocked when a required catalog arg (every arg not marked
+`required: false`) has an empty value at its positional index. Two-layer check:
 
 **Client side** — `_validateRequiredArgs` reads `availableFunctions`
 (the same catalog the picker uses) before building the POST payload.
@@ -3311,11 +3369,13 @@ On failure:
   (`.preview-contextual-js-form-input--error`).
 - Inline chip below each offending row
   (`⚠ <argName> is required`).
-- Summary toast: `Missing required parameter(s): <names>`.
+- Summary toast: `Missing required parameter: <name>`, or `Missing required parameters: <names>` for several.
 - Form stays open; save did not fire.
 
 Marks lift on first edit of the offending field (one-shot `input` /
-`change` listener attached when the marks are painted).
+`change` listener attached when the marks are painted); on a translation
+key, a storage key or a response path, whose value sits in a hidden input,
+they lift at the next save.
 
 **Server side** — `validateInteractionArgs` in
 `secure/src/functions/interactionHelpers.php` reads `qsVerbCatalog()`
@@ -3325,15 +3385,18 @@ field-level `withErrors([{field, index, reason, hint}, ...])` when a
 required arg is empty, `422` when the verb itself is unknown to the
 catalog. Defense in depth for direct API callers and batch imports.
 
-#### 9.9.7 Compile-time translation (catalog-driven)
+#### 9.9.7 Translated arguments (catalog-driven)
 
 When a verb arg declares `inputType: 'translationKey'`, the saved
 value is stored as a translation key (e.g.
-`{{call:toast:hello.world,info,4000}}`). At render time,
-`CallTransformer::buildCallJs` reads the catalog, sees that the
-`message` arg of `toast` carries the translationKey hint, and
-substitutes the per-language string before the chain is compiled into
-the JS attribute:
+`{{call:toast:hello.world,info,4000}}`). When the page is rendered,
+`CallTransformer` (`buildCallSegments()`, which asks
+`getTranslatablePositionalIndices()`) reads the catalog, sees that the
+`message` arg of `toast` carries the translationKey hint, and writes the
+string of the page's language in its place: the live render looks the key
+up as it renders, a multilingual build's page calls
+`qs_translated_call_argument()` each time it is served, and a one-language
+build writes its one translation when it is built:
 
 ```
 en.json:  hello.world = "Hello world"
@@ -3351,14 +3414,17 @@ Rendered output (French request):
 ```
 
 The source JSON is identical for both languages — multilingual works
-natively. Custom Text mode (when `allowFreeText: true`) passes
-through unchanged: a raw string like `"Hello world!"` triggers
-`Translator::translate`'s missing-marker, which the resolver falls
-back from to the raw value.
+natively. Custom text passes through unchanged: a raw string like
+`"Hello world!"` has no translation, so `qs_translated_call_argument()`
+(`runtimeHandoff.php`) writes the raw value. This is the server's rule
+for every positional `translationKey` arg, whatever `allowFreeText` says.
 
-Uses the shared `CallTransformer::transform` on the build
-path. Future verbs gain compile-time translation by declaring the
-inputType in the catalog — zero renderer code changes.
+The live render calls `CallTransformer::transform()`; a build takes the
+same chain as segments (`transformSegments()`) and writes each translatable
+argument as a `qs_translated_call_argument()` call (or, in a one-language
+build, its one translation), so both write the same JavaScript. A verb's
+positional arg is translated by declaring the inputType in the catalog,
+with no change to a renderer.
 
 #### 9.9.8 Files
 
@@ -3369,11 +3435,10 @@ inputType in the catalog — zero renderer code changes.
 | Combobox primitive | `public/admin/assets/js/core/searchable-select.js` |
 | TranslationKey picker primitive | `public/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js` |
 | Route datalist primitive (complex wizards) | `public/admin/assets/js/pages/preview/contextual-complex/route-input.js` |
-| CSS (picker + hybrid layouts + validation styles) | `public/admin/assets/admin.css` (search for `.qs-searchable-select`, `.qs-route-picker`, `.qs-translation-key-picker`, `.preview-contextual-js-form-input--error`) |
+| CSS (picker + hybrid layouts + validation styles) | `public/admin/assets/css/searchable-select.css` (the combobox, `.qs-searchable-select`); `public/admin/assets/admin.css` (the hybrid rows and the validation marks: `.qs-route-picker`, `.qs-translation-key-picker`, `.preview-contextual-js-form-input--error`) |
 | Server validator | `secure/src/functions/interactionHelpers.php` (`validateInteractionArgs`, `routeParamsForPageSlug`) |
 | Save commands wired | `secure/management/command/addInteraction.php`, `editInteraction.php`, `addPageEvent.php`, `editPageEvent.php` |
-| Compile-time translation | `secure/src/classes/JsonToHtmlRenderer.php` (`getTranslatablePositionalIndices`, `resolveTranslationKeyOrFallback`) + `JsonToPhpCompiler.php` |
-| Inputs catalogue | [COMMAND_API.md "Catalog inputType reference"](COMMAND_API.md) |
+| Translated arguments | `secure/src/classes/CallTransformer.php` (`getTranslatablePositionalIndices`, `argumentSegment`, `resolveSegments`), `secure/src/functions/runtimeHandoff.php` (`qs_translated_call_argument()`, the lookup and the fall-back to the raw value) and `secure/src/classes/JsonToPhpCompiler.php` (a build's) |
 
 #### 9.9.9 Authoring a new inputType
 
@@ -3450,8 +3515,9 @@ refresh token source (§9.1).
   verb (with no scope chosen there, both), the start value's kind, the token source's
   location. A `cookie` entry is never offered: these
   read and write browser storage, not cookies. The list has a search field. The
-  registry is read each time a picker opens, and a key created in one picker is
-  offered by the next without a reload.
+  registry is read each time a picker is drawn, into one list for all of them;
+  opening a list shows that list again, and reads the registry again only after a
+  read that failed. A key created in one picker is offered by the next without a reload.
 - **Create new key…**, or a search that finds nothing, opens a form: the key's name,
   after the same chip, its scope (the one chosen beside it to start with), its category and an optional
   description, in the language a site's words are edited in (`editorLanguage`, §6). Creating declares the key with
@@ -3479,7 +3545,7 @@ projects can both declare `cart` without touching each other's data. The prefix
 applies on the live site and in a built site alike, so the two never disagree
 about where a value lives. Everything you author names the **declared id**: the
 registry, the `data-storage-show` / `data-storage-value` / `data-auth-source`
-attributes, the verb arguments, the consent categories and the policy page. The
+attributes, the verb arguments and the consent categories. The
 translation happens once, inside `qs.js`, at the point of the read or write.
 
 **Where you see the physical name.** Three places, so it is never a surprise:
@@ -3490,9 +3556,10 @@ translation happens once, inside `qs.js`, at the point of the read or write.
   the same chip. On the form, the chip disappears when
   you switch the scope to `cookie`: QuickSite does not write a cookie you
   declare here — your own code does — so it is stored under exactly the name you
-  type. (The two cookies QuickSite writes for itself, the consent record and the
-  visitor OAuth session, are namespaced per project like storage keys are. They
-  are not registry entries and never appear in this form.)
+  type. (QuickSite writes three cookies for itself: the consent record and the
+  signed-in visitor's session, both namespaced per project like storage keys are,
+  and the sign-in's state store `qs_oauth_session`, one name on a host. None is a
+  registry entry and none appears in this form.)
 - **On each card.** `localStorage` / `sessionStorage` entries carry a `stored as`
   line, so you know what to search for in the browser's developer tools;
   `cookie`-scope entries have none.
@@ -3508,7 +3575,8 @@ categories are matched on, so an id baked into the stored key would stop matchin
 the moment the project was imported under a different name.
 
 **Descriptions and languages.** A description is each language's own word, stored
-as the translation key `storage.desc.<id>`, not inline: each language keeps its own,
+as the translation key `storage.desc.<id>` (in the key, each character of the id that
+is not a letter, a digit or `_` becomes `_`), not inline: each language keeps its own,
 and each language's cookie-policy page shows its own, live, with no need to generate
 the page again. On a project of two or more languages the page shows one language
 at a time: **Descriptions shown in**, above the list, picks it, and the cards show
@@ -3534,16 +3602,17 @@ changes nothing: the item and its descriptions stay as they were. The dialog's e
 shows in its body, above the buttons, where it covers no field.
 
 **Scan / reconcile.** The toolbar's **Scan / reconcile** button runs
-`scanStorageUsage`, which walks the build (structure `data-storage-*` attrs +
-`saveToken` / `store` / `clearToken` chains, page-events handler chains,
-api-endpoints auth sources, state-store init) and reconciles against the
+`scanStorageUsage`, which walks the project's structures (pages, menu, footer and
+components: the `data-storage-value` / `data-storage-show` / `data-auth-source`
+attributes and the `saveToken` / `store` / `clearToken` chains), the page events'
+chains, the API endpoints' token sources and the state stores' start values, and reconciles against the
 registry into four buckets:
 
 | Bucket | Meaning | Action |
 |---|---|---|
-| **OK** | declared + written in the build | none (collapsible) |
-| **Undeclared** | written/referenced but not in the registry — the GDPR gap | one-click **Declare** (uses inferred scope + `functional` default) |
-| **Dangling read** | read by a binding but never written | review (likely a leftover) — not a GDPR item |
+| **OK** | declared, and written or cleared somewhere | none (collapsible) |
+| **Undeclared** | written or cleared but not in the registry — the GDPR gap | one-click **Declare** (the inferred scope + `functional`); when no scope can be inferred, the add dialog opens on the key |
+| **Dangling read** | read (a binding, a token source, a start value) but never written, declared or not | review (likely a leftover) — not a GDPR item; the section shows only when it has a row |
 | **Orphan** | declared but unreferenced | ignore (collapsible) — never nagged to delete |
 
 **Generate the consent layer.** The **Generate consent layer** button (a dialog in
@@ -3553,9 +3622,12 @@ the registry (one popup
 toggle row per category a visitor can choose, shown on a page exactly while that
 category has a declared key, so a category declared later brings its row with no
 generation again; Essential is always-on, locked)
-and turns the consent rule on (below). They render on every page via `renderConsentLayer()`
-(the menu/footer pattern), are styleable in the stylesheet editor and editable in
-the visual editor, and `qs.js` wires the **Accept all / Refuse all / Customize**
+and turns the consent rule on (below). They are on every page: the live render writes them
+through `renderConsentLayer()`, and a build compiles both into the built site, whose pages
+include them; unlike the menu and the footer, no route can leave them out. They are styleable
+in the stylesheet editor and their texts are translation keys, edited like any other; the
+structure commands take `menu`, `footer`, `page` and `component` only, so their nodes are not
+edited in the visual editor. `qs.js` wires the **Accept all / Refuse all / Customize**
 actions, through one listener on the page. Inside the banner and the popup every
 `data-consent-action` works; anywhere else on a page, an element marked
 `data-consent-action="customize"` — a footer's *Cookie settings* link, the policy
@@ -3731,7 +3803,8 @@ language's words as they are. Commands: `setCollectedDatum` / `deleteCollectedDa
 datum's card has its pencil, which opens the dialog, and its bin, which asks first, naming
 the datum, and says that every field mapped to it becomes unset; a refusal stays in the
 question. A save that would clash with the shape of a translation file is refused with
-the server's words and changes nothing, as on the storage registry (§9.10). Every control of the page
+the server's words and changes nothing in that language (a language the same save wrote before it
+stays written), as on the storage registry (§9.10). Every control of the page
 that sends a command is drawn only for a role that runs it; for another role a field's
 mapping shows without opening a menu.
 
@@ -3764,8 +3837,8 @@ exists, hints to create one when it doesn't, or is omitted when the author ticks
 exists the section offers **Update** + a red **Delete**, asked first
 (`deletePrivacyPolicy`), and the route is recorded in `privacy.json`. The page's own words reach every language as the
 cookie policy's do (§9.10); the labels and purposes of collected data are the author's, each language's own. Descriptions render live from `translate/`;
-regeneration is only needed after data changes (new mappings, host
-re-classification).
+regeneration is only needed after data changes (a datum added or deleted, new
+mappings, host re-classification, the cookie tick, a sign-in provider wired).
 
 **Import prefill.** A native API import (`/admin/apis` → Import) may carry optional
 `privacy` blocks that populate the registry in one pass: an API-level
@@ -3774,12 +3847,12 @@ re-classification).
 (deduped across APIs); an endpoint field referencing a label the API didn't declare
 is flagged in the import preview and skipped. A part the server refuses does not stop the
 import: once it is done, a warning names each refusal in the server's words. Native format
-only — OpenAPI / Swagger imports classify and map afterward in the UI.
+only — an import in another format (OpenAPI 3) classifies and maps afterward in the UI.
 
 ### 9.12 Memberships (/admin/memberships) & Project members (/admin/members)
 
 Two pages cover the consent-model membership surface (see COMMAND_API.md — *Project
-members* / *My memberships*), reached from the **Members** nav group. The group
+members*, and *What is deliberately not a command* for the caller's own inbox), reached from the **Members** nav group. The group
 toggle carries a count badge: pending invitations + undismissed notices awaiting
 **me**, plus queue entries awaiting **my** adjudication on projects where I am
 admin/owner — computed asynchronously from existing reads by `core/members-badge.js`
@@ -3789,13 +3862,16 @@ six-stat **Memberships** card with links to both pages.
 
 **My Memberships** (`/admin/memberships`) is the caller's own surface and works for
 every authenticated account — a freshly-registered, 0-membership user lands here to
-accept their first invitation, and the page fires only global self-service
-commands (zero 403 noise). Every project is named "Name #id"; a project you
+accept their first invitation, and the page calls one command, `listProjects`,
+and the account endpoint (`/admin/self`) for everything else; both answer any
+signed-in account (zero 403 noise). Every project is named "Name #id"; a project you
 have only asked to join shows its id alone, its name not being yours to see.
 Sections: **My projects** (`listProjects` — your starred projects first, then
 the others by name, each row starting with its ☆ / ★ toggle (§8.0); role chip,
 OWNED badge, *editing* chip on the current edit target, per-row pencil (*Edit this
-project*) = the selected-project write + reload, *Leave*, asked first — hidden on
+project*, absent on the row already edited) = the selected-project write + reload,
+**Builds** on a row whose role can read builds (it switches to that project first,
+then opens the Builds page), *Leave*, asked first — hidden on
 owned rows), **Invitation inbox** (accept, or decline after a question; inviter + note + `sponsored_by`
 shown; accepting opens the project: the selected-project write + reload, the message
 naming it carried across, and should that write fail you are a member and the page
@@ -3812,13 +3888,14 @@ a second change before you dismiss it keeps the first role, a change back to it 
 the notice away, and the one who makes a change is never told of it. A project can
 hold both of these at once, one row each, each dismissed on its own; the menu's dot
 and the dashboard count each row), and a **Request to join** form (project id, with or
-without the `#` it is shown with, + mandatory note; every error code mapped to a
-human message). Leaving, declining and withdrawing run from their question in the panel's
+without the `#` it is shown with, + mandatory note; the five refusals a person can
+cause — no such open project, already a member, already invited, already asked, a
+notice still waiting — said in the page's words, any other in the server's). Leaving, declining and withdrawing run from their question in the panel's
 confirm (§5.1), which stays open while the command runs, a refusal staying in it in the
 server's words. Reading the inbox repairs your own copy of each pending entry from
 its project's roster, by the rule the header's menu is repaired with (§8.0): an
 entry the roster contradicts takes the roster's side and keeps its own date, one it
-no longer lists goes, and a roster that cannot be read is left alone. An accepted
+no longer lists goes, as does one whose project folder is gone, and a roster that cannot be read is left alone. An accepted
 request's notice is listed only while the roster lists you as a member; a later
 removal or deletion replaces it with its own notice, and leaving the project takes
 it away with the membership. No repair writes one: it exists only when the approval
@@ -3833,7 +3910,7 @@ absent when none waits. Access requires membership of the edited project (`PAGE_
 sections render by role server-side: every rank sees the **Roster**
 (`getProjectRoster` — rank-ordered, "you" marker, `user_id` shown; a pencil that
 changes the role and a bin that removes the member, with an optional reason shown to
-them, only on rows the caller strictly outranks) and the **Propose**
+them, only on rows the caller strictly outranks) and every rank but the owner the **Propose**
 form (look the person up by exact public name → pick the `{user_id, name}` match → suggested
 role + mandatory vouch). Admin/owner additionally get the **Pending queue**
 (`listMembers` — invitation / join request / proposal chips with notes and
@@ -3861,15 +3938,16 @@ exactly as a search match does, and the bin beside it (*Forget this contact*) dr
 person chosen, after a question: they leave the list, and their account and their
 memberships are not touched. The block is hidden
 entirely until there is somebody on it, so a new account never sees an empty
-panel above the search box. Somebody who is not on the list is still found the
-way they always were — by their exact public name — and succeeding at that, then
+panel above the search box. Somebody who is not on the list is found by their
+exact public name — and succeeding at that, then
 inviting or proposing them, is what puts them on it.
 
 The list is the caller's own and is stored on their account record, read and
 written at `/admin/self/contacts`, `/admin/self/add-contact` and
 `/admin/self/remove-contact` (see COMMAND_API.md — *What is deliberately not a
 command*). It is deliberately **not** a directory and cannot be used as one: it
-holds only the `user_id` and the display name as it read when it was recorded,
+holds only the `user_id`, the display name as it read when it was recorded and
+the date it was added,
 and it is replayed exactly as stored rather than resolved against the
 installation's accounts, so it can only ever show the caller something they
 already found themselves. A name that changes afterwards refreshes the next time
@@ -3877,8 +3955,7 @@ they look that person up and work with them again; the `user_id` shown beside it
 is what the invitation actually uses, so an out-of-date name never misdirects one.
 A person who deletes their account leaves every list in the same write, so nobody
 keeps someone who no longer exists. An id no account has, still on a list (one
-written by hand, or kept from before an account's deletion took it out), is
-forgotten when an invitation or a proposal to it answers that no account has it,
+written by hand), is forgotten when an invitation or a proposal to it answers that no account has it,
 and the toast says so.
 
 Both pages render all dynamic rows via `QSDom` helpers (createElement +
@@ -3888,8 +3965,8 @@ textContent); static structure and all labels live in the PHP templates
 ### 9.13 My account (/admin/account)
 
 The signed-in account's own self-service surface, reached from the account menu,
-which your name in the header opens. Every command it drives is global-scope with `access: 'any'`, so
-the page is open to **every authenticated user** — including one who belongs to
+which your name in the header opens. It drives one command, `logoutSession` (global-scope, `access: 'any'`), and two routes of the account endpoint
+(`/admin/self`), which answer any signed-in account, so the page is open to **every authenticated user** — including one who belongs to
 no project — and carries no role gate.
 
 **Identity** is read-only and rendered server-side from the session: display
@@ -3907,8 +3984,9 @@ most — nothing in the panel displays it.
 one twice, and enforces `auth.php`'s `min_password_length` client-side before the
 server does. Succeeding ends every **other** session of the account and keeps the
 one that asked — that is the containment story for "someone has my old password".
-A wrong current password answers `401 auth.invalid_credentials`, which `api.js`
-deliberately does not treat as a dead session, so the user stays on the page.
+A wrong current password answers `401 auth.invalid_credentials`, which the account
+endpoint's caller in `api.js` (`accountRequest()`) hands back to the page like any other
+answer, so the user stays on the page.
 The page says each refusal in the panel's words: *your current password is not
 correct*, followed by the wait it started when it started one (the answer's
 `retry_after`: *too many failed attempts — try again in 30 seconds*); an attempt
@@ -3928,8 +4006,8 @@ in mind, and one that cannot be clicked through). The page does not hold the
 username, so the server checks it together with the password: a wrong one of
 either is refused the same way, `401 auth.invalid_credentials`, on the login
 throttle, so the page never reveals which half was wrong — the wait a refusal
-starts included, said as the password change says it. The command refuses
-while the caller is the sole owner of any project, since that would leave the
+starts included, said as the password change says it. The deletion is refused
+(`409 account.sole_owner`) while the caller is the sole owner of any project, since that would leave the
 project unownable and undeletable; the page lists the blocking projects by name
 and member count so the next step is obvious. An externally-managed account (no
 local password) is told so up front and is shown neither password-gated form.
@@ -3957,8 +4035,8 @@ container nor `js/core/update-notice.js` — the notice is absent from the page
 rather than hidden in it.
 
 **The list grants nothing.** It decides whether a notice renders and nothing
-else. The update check answers any authenticated account, exactly as it always
-did; no code path uses the list to authorise anything.
+else. The update check answers any authenticated account; no code path uses the
+list to authorise anything.
 That is what keeps it a display preference rather than an installation-wide
 role, which the authority model does not have (`ARCHITECTURE.md` §3).
 
@@ -3992,11 +4070,11 @@ An image card can carry two controls, in opposite corners, and they mean unrelat
 | Top right | ☆ / ⭐ star | Include this asset in AI workflow prompts. **Multi-select**, capped at 15. Read by the site-building workflows so generated pages use real images instead of placeholders. |
 | Top left | Favicon radio | Make this asset the site favicon. **Single-select** — exactly one asset can hold it. |
 
-Both appear on hover and stay visible while set.
+Both appear on hover and stay visible while set; at a tablet's width and under, where there is no hover, both are always in view.
 
 #### The favicon control
 
-It is a **radio, not a toggle**, because a site has exactly one favicon. Choosing a new asset clears the previous one without the old card having to be found or unset — the choice is a single value in the project config, and the grid re-reads it. Clicking the asset that is *already* the favicon clears the setting, which is the only route back to the site default.
+It is a **radio, not a toggle**, because a site has exactly one favicon. Choosing a new asset clears the previous one without the old card having to be found or unset — the choice is a single value in the project config, and the grid re-reads it. Clicking the asset that is *already* the favicon clears the setting, which is the page's one control back to the site default.
 
 It is only rendered on formats a browser will actually render as an icon — `ico`, `png`, `svg`, `gif`, `jpg`, `jpeg`, `webp`, `avif`. The list comes from the server, so the control appears on exactly the formats `editFavicon` accepts rather than on a copy of that list kept in the page. A `.bmp` is a perfectly good image and has no favicon control at all: an absent control says "this format cannot be an icon", which is more honest than a disabled one nobody can explain. Non-image assets never show it.
 
@@ -4024,7 +4102,7 @@ Media keeps the text in the project's word files under a translation key, which 
 
 A write that is refused stops the save: what the save already wrote is taken back, newest first, the form keeps what was typed, and the line under **Save Changes** says which language was refused and why — a key that cannot be made (`alt` held as a single word in a language) is said there, not worked around. A take-back that is itself refused is said too, with the key the word files still hold.
 
-The **badge** under a picture's card names the languages it has no alt text in, by their codes — *No alt text: FR, DE* — or, on a one-language project, *No alt text*; a picture described in every language has none. A text written before the alt had languages counts as described. The page reads the languages and the word files once when it loads and again after a save, not once per card. The grid's own `<img alt>` and the edit form's preview show the text in the project's default language, or the file name when there is none.
+The **badge** under a picture's card names the languages it has no alt text in, by their codes — *No alt text: FR, DE* — or, on a one-language project, *No alt text*; a picture described in every language has none. A text written before the alt had languages counts as described. The page reads the languages and the word files once when it loads and again each time the grid reloads (a save, an upload, a rename, a delete), not once per card. The grid's own `<img alt>`, the edit form's preview and the viewer show the text in the project's default language; with none, the grid's falls back to the file name and the other two stay empty.
 
 What reads a picture's `alt`: a picture placed in the editor (the picker copies the key into the element, §8.1), the link-preview tags (`og:image:alt`, in the page's language: no tag where that language has no text, §9.19), and the site-building workflows, which read the starred pictures with `listAssets`.
 
@@ -4032,7 +4110,7 @@ The upload queue and the address import have no alt field: a picture's alt text 
 
 #### A picture shown large
 
-A click on a picture's thumbnail — a raster or an SVG — shows it in the panel's dialog: the picture, its file name, and an × at the top right; Escape, the × or a click beside it closes it, and the focus goes back to the thumbnail. The thumbnail is a button, so Tab reaches it and Enter or Space opens it. The picture shows at its own size, or smaller to fit the window, sized by the stylesheet alone; an SVG, which has no size in pixels, shows 24rem wide, or the window's width when that is narrower. A video and a sound keep their play buttons, a font its specimen. In **Select** mode a click selects the card and nothing opens; the pencil keeps opening the details.
+A click on a picture's thumbnail — a raster or an SVG — shows it in the panel's dialog: the picture, its file name, and an × at the top right; Escape, the × or a click beside it closes it, and the focus goes back to the thumbnail. The thumbnail is a button, so Tab reaches it and Enter or Space opens it. The picture shows at its own size, or smaller to fit the window, sized by the stylesheet alone; an SVG, which has no size in pixels, shows 24rem wide, or the window's width when that is narrower. A video and a sound keep their play buttons, a font its specimen. In **Select** mode a click selects the card and nothing opens: the pencils, the bin, the star and the favicon radio are not drawn, and only a video's or a sound's play button still acts. Outside it the pencil opens the details.
 
 #### What each role sees
 
@@ -4052,12 +4130,12 @@ Where a project becomes a site you can put on a server: build it, download the a
 | A build | Its name, when it was made, its size, how many files and pages it carries, its languages, and the public / secure folder names and URL space it was built for. |
 | A build that did not finish | The same, marked **incomplete**, with a note saying it carries no manifest and can only be deleted. |
 | A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. To a role that may not set the project's OAuth keys (a developer, say), no **Download** and no **Delete** — here or in the dashboard's Manage Space — but a line saying that only a role that may set the keys can download or delete this build, and to ask the project's owner or an admin to build again. |
-| A build whose sign-in is not ready | A warning naming the providers it carries without build keys (their sign-in fails on the deployed site until the server sets the keys or the project's build keys are entered and the project built again), the providers whose client secret it left out (their sign-in fails until the secret is written into its `<secure>/data/oauth-secrets.json` on the server, `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` is set there, or the project is built again with the secrets included), any provider a sign-in route names that the installation no longer offers, and a route that takes its provider from the address when no provider has build keys — with a link to the OAuth providers page for a role that can open it. |
+| A build whose sign-in is not ready | A warning naming the providers it carries without build keys (their sign-in fails on the deployed site until the server sets the keys or the project's build keys are entered and the project built again), the providers whose client secret it left out (their sign-in fails until the secret is written into its `<secure>/data/oauth-secrets.json` on the server, `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` is set there, or the project is built again with the secrets included), any provider a sign-in route names that the installation does not offer, and a route that takes its provider from the address when no provider has build keys — with a link to the OAuth providers page for a role that can open it. |
 | A build you may download | Under the buttons, a line saying how it reaches a server: download it, and follow `README.txt` inside the archive. |
 
 #### Choosing the folder names and the URL space
 
-`build` has always taken three parameters that decide the shape of what it produces. They sit behind a closed **Folder names and URL space** disclosure beside the Build button — closed because the defaults suit most projects and the common path should stay one click, present because they are not right for everyone.
+`build` takes three parameters that decide the shape of what it produces. They sit behind a closed **Folder names and URL space** disclosure beside the Build button — closed because the defaults suit most projects and the common path should stay one click, present because they are not right for everyone.
 
 | Field | Default | When to change it |
 |---|---|---|
@@ -4073,7 +4151,7 @@ A rejected name comes back **into the form** with what was typed still in it and
 
 #### Including the OAuth secrets
 
-Beside **Build now**, the project's owner and admin — the roles that may set its OAuth keys — see a box **Include the OAuth secrets**, in the warning style, unticked each time the page loads and again after a build. Its explanation says what each choice means:
+Beside **Build now**, the project's owner and admin — the roles that may set its OAuth keys — see a box **Include the OAuth secrets**, in the warning style, unticked each time the page loads and again after a build. Its explanation says what leaving it unticked does; the two choices are:
 
 - **Unticked** (the default): better not to share real secrets. The build keeps each provider's **client id** as it is — it is public, every sign-in shows it to the browser — and writes a placeholder for its **secret** in its `<secure>/data/oauth-secrets.json`. The placeholder reads *REPLACE THIS VALUE with the client secret, or set QS_OAUTH_<PROVIDER>_CLIENT_SECRET on the server*; the deployed site reads it as not set, so its sign-in answers that it is not configured until the deployer writes the secret into that file on the server, or sets `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` there (the sign-in reads the server first). The build's `README.txt` says the same, provider by provider.
 - **Ticked**: the real secrets go in, and the build is a credential (the warning above says so).
@@ -4090,7 +4168,7 @@ The reason it works this way: the build on disk is the only copy. Overwriting on
 
 #### Deleting offers a download first
 
-The question says two things — that this is the only copy, and that deleting is how you make room for the next build — and puts **Download it first** inside it, above **Cancel** and the red **Delete**. Deleting is the normal step in a rebuild, so the moment you are about to lose the archive is exactly the moment to be offered it. The build is deleted with the question still open, and a refusal stays in it in the server's words.
+The question says two things — that this is the only copy, and that deleting is how you make room for the next build — and, for a build that can be downloaded, puts **Download it first** inside it, above **Cancel** and the red **Delete**. Deleting is the normal step in a rebuild, so the moment you are about to lose the archive is exactly the moment to be offered it. The build is deleted with the question still open, and a refusal stays in it in the server's words.
 
 #### The space panel, and the warning
 
@@ -4112,9 +4190,9 @@ The page is open to every member of the project: viewing a build needs `getBuild
 
 #### Getting there
 
-Three routes, each gated on the same read the page is:
+Three routes. The menu entry needs `editStructure` as well as `getBuild`; the other two are gated on the same read the page is:
 
-- **Build → Builds** in the sidebar.
+- **Build → Builds** in the menu.
 - **Dashboard → Manage Space → Builds → Open builds page**, beside the same build the panel lists.
 - **My memberships**, per project row — this one switches the edited project first, so it works from any project you belong to without visiting the picker.
 
@@ -4197,7 +4275,7 @@ A field `help` marks `ui_type` `date` has a date picker above **Or enter manuall
 
 #### A command your role cannot run
 
-The index leaves it out, and a search with three matches or fewer shows it greyed with a lock, its bubble saying why. It is still a link: its page opens, its documentation renders, and where the fields and **Execute Command** would be, a notice says your role in this project does not allow the command. This is the panel reading your permissions and no boundary: the command refuses the call itself.
+The index leaves it out, and a search that leaves three commands or fewer the role can run shows it greyed with a lock, its bubble saying why. It is still a link: its page opens, its documentation renders, and where the fields and **Execute Command** would be, a notice says your role in this project does not allow the command. This is the panel reading your permissions and no boundary: the command refuses the call itself.
 
 #### An address that names no command
 
@@ -4218,9 +4296,11 @@ value is being a complete view of the command surface, and a row that has quietl
 gone missing is a worse answer to "does this command exist" than a row that
 explains itself.
 
-`register` is in the same category and **is** still runnable: it returns no
-session and no user id, so neither hazard applies to it, and it gates itself on
-the installation's own registration settings.
+`register` is in the same category and **is** runnable where the installation
+accepts self-registration: it returns no session and no user id, so neither hazard
+applies to it. Where self-registration is off, its submit is closed with that reason
+above the fields, since the command gates itself on the installation's own
+registration settings.
 
 ⚠ Like the console switch above, this is not a security control. Permissions
 authorise both commands server-side exactly as before, and turning the page off
@@ -4258,7 +4338,7 @@ A cell whose value would otherwise begin with `=`, `+`, `-`, `@`, tab or carriag
 
 #### Clearing
 
-**Clear History**, a red button, deletes stored history for the current project. It is irreversible, so its question (*Delete this project's command history?*) does not ask over an unknown quantity: choosing a date asks the command what it *would* delete and shows the answer — how many entries, in how many days, and how many kilobytes — and the red **Delete permanently** stays disabled until that preview has come back. The history is deleted with the question still open, and a refusal stays in it in the server's words.
+**Clear History**, a red button, deletes stored history for the current project. It is irreversible, so its question (*Delete this project's command history?*) does not ask over an unknown quantity: choosing a date asks the command what it *would* delete and shows the answer — how many entries, in how many days, and how many kilobytes — and the red **Delete permanently** stays disabled until that preview has come back with something to delete. The history is deleted with the question still open, and a refusal stays in it in the server's words.
 
 ⚠ **A whole day at a time.** History is stored one file per day, and clearing removes whole days from **before** the chosen date. A day's date is the one in its **file name**, not the `timestamp` inside any record — so editing a record's timestamp does not move it into another day, and it cannot be cleared separately from the day it was written in.
 
@@ -4268,7 +4348,7 @@ Clearing is available here whether or not the command console is switched on. Th
 
 ### 9.19 Social previews (/admin/social-previews)
 
-The card a link to the site gets when someone shares it on Facebook, X, LinkedIn, WhatsApp, Discord, Slack, Telegram or iMessage, drawn as a look-alike, and the values it is drawn from: the description, Open Graph and X tags every page carries in its head ([ARCHITECTURE.md](ARCHITECTURE.md) §6.4). The page reads everything from one `getSocialPreview` and writes through `setSocialPreview`; it reads again after each save.
+The card a link to the site gets when someone shares it on Facebook, X, LinkedIn, WhatsApp, Discord, Slack, Telegram or iMessage, drawn as a look-alike, and the values it is drawn from: the description, Open Graph and X tags every page carries in its head ([ARCHITECTURE.md](ARCHITECTURE.md) §6.4). The page reads the values, the cards and the platform table from one `getSocialPreview` (and, for a role that can write, Media's pictures for the picture lists) and writes through `setSocialPreview`; it reads again after each save.
 
 #### The whole site, or a page
 
@@ -4299,7 +4379,7 @@ The page says the cards are look-alikes: each platform draws its own card and ca
 
 #### Who sees what
 
-Every member of the project opens the page: it needs `getSocialPreview`, which every role holds. The form is drawn only for a role that can run `setSocialPreview` (editor and up); a viewer chooses the whole site or a page as anyone does, and sees the same values as text and a line saying that their role can read them, not change them. The page is in the Advanced menu, in the **Site** group after Sitemap (the group's word opens Sitemap); opened in simple mode, it says it lives in the Advanced menu (§5.1).
+Every member of the project opens the page: it needs `getSocialPreview`, which every role holds. The form is drawn only for a role that can run `setSocialPreview` (editor and up); a viewer chooses the whole site or a page as anyone does, and sees the same values as text and a line saying that their role can read them, not change them. The page is in the Advanced menu, in the **Site** group after Sitemap and Translations (the group's word opens Sitemap); opened in simple mode, it says it lives in the Advanced menu (§5.1).
 
 ### 9.20 Translations (/admin/translations)
 
@@ -4358,6 +4438,41 @@ text at is shown instead, never written over; a refusal shows the server's words
 the key, asked first in a dialog that shows its word in each language: on a multilingual site in one language or in every one
 (`deleteTranslationKeys`); on a one-language site from `default.json` and its language's file.
 
+### 9.21 AI connections (/admin/ai-connections)
+
+The AI connections the Workflows tool calls (§8.12): **cloud** ones, with a key of your own (BYOK), and **local** ones, an AI
+that runs on your machine. They live in this browser and nowhere else: the page is a UI over `QSConnectionsStore`
+(`pages/ai/lib/connections-store.js`, §5.4), and a call goes from the browser to the provider directly, through `QSAiCall`
+(`ai-call.js`). A key never reaches the server, and the page sends no command.
+
+| Part | What it does |
+|---|---|
+| **Connections** | One row per connection: its name, *Cloud* or *Local*, its models, streaming on or off, and its status (*Never tested*, *OK* with how long ago, *Failed*). Its dot tests it in place, its star makes it the default, its pencil edits it and its bin deletes it, asked first. **Add connection** opens the dialog. |
+| **Defaults & automation** | **Keep cloud keys after closing the browser**: on, the connections are kept in `localStorage`; off, in `sessionStorage`, cleared when the tab closes (`aiPersist`, `aiConnectionsV3`, §6); a local connection is always kept. **Run without stopping** (`aiAutoExecute`, §6), the same switch as Settings' and the Workflows tool's (§8.12). |
+| **The dialog** | First the kind: a cloud provider, a local one (Ollama or LM Studio, with their origin-scoped CORS instructions, `local-presets.js`), or a custom OpenAI-compatible endpoint. Then its name, its base URL (local and custom), its API key (optional for a local one), streaming, and its **output limit**: the most the AI may write in one answer, a whole number from 256 to 1000000 tokens, 16384 until one is set. The key or the address is tested as it is typed; a test that works lists the models, each to enable, and the default one to pick. |
+
+Every signed-in account reaches it: its entry is **AI** in the Settings group, in the simple menu too, and needs no command.
+`/admin/ai-settings` answers with a redirect to it. Its words are the `aiConnections` section (§7), the AI library's messages
+(`aiConnections.call`) among them.
+
+### 9.22 OAuth providers (/admin/oauth-providers)
+
+The sign-in providers the installation offers, which its operator lists in `<secure>/management/config/oauth-providers.json`,
+and this project's keys for each: one set for the preview, one for a build. What a visitor's sign-in does with them is §9.5's
+Tier 4; this page holds the keys.
+
+| Part | What it shows |
+|---|---|
+| A provider's card | Its pills: whether each set of keys is set, and whether the project's sign-in routes are ready, partly created or not there yet. **How to get the keys**: a link to the provider's console, the callback address to register for the preview keys, the path the deployed site's address ends with for the build keys, and the provider's own note. |
+| **Preview keys** | The client ID and secret the sign-in uses while the site is tested in the preview. |
+| **Build keys** | The set a build carries to the deployed site (§9.16, *Including the OAuth secrets*); preview keys never leave the installation. Shown to the project's owner and admin only. |
+
+The page reads `listOAuthProviders`: an editor and the roles above it reach it, a viewer does not. Saving a set is
+`setOAuthCredentials`, for the owner and an admin (another role reads the page and is told so): it sets or removes one set in the
+project's `data/oauth-secrets.json`, the removal asked first. A secret is never answered back, the page learns only that one is
+set, and a secret field left empty keeps the stored one. Its menu entry is **Authentication**, in the advanced menu; its address
+opens it in either mode.
+
 ## 10. Data attribute reference
 
 QuickSite's runtime understands a small set of `data-*` attributes that
@@ -4371,7 +4486,9 @@ wizard's Advanced custom-params section AND the Edit Params surface
 (the action panel's **Edit Params**, between Add and Duplicate). The same picker —
 autocomplete dropdown, per-attribute description box, smart widgets
 (store/field cascader, enum select, the storage attributes' widget) — applies
-whether you're authoring a new element OR editing an existing one's bindings.
+whether you're authoring a new element OR editing an existing one's bindings; a
+row Edit Params fills from the saved element shows its smart widget at once, and
+its description box only once the attribute is picked again from the dropdown.
 
 **The storage attributes' widget.** `data-storage-show`, `data-storage-value` and
 `data-auth-source` get it whether their name is picked from the dropdown or typed in
@@ -4396,10 +4513,10 @@ deep-dive.
 | `data-state-show` | state | `storeId.field` | Toggles `hidden` on truthiness — gate Next/Prev on cursors, "Load more" on hasMore, etc. Falsy means `null` / `undefined` / `''` / `0` / `false` / `[]` | §9.6 |
 | `data-state-show-empty` | state | `storeId.field` | The inverse of `data-state-show`: visible when the field is falsy. Pair the two on one field to carry a "no data" fallback beside the happy path; it is also what a route using the resolver's `onMiss: 'render-empty'` renders when the fetch fails | §9.7 |
 | `data-state-pagenav` | state | `storeId` | Runtime-rendered numbered-page navigator. Companion attrs: `-page-field`, `-totalpages-field`, `-window`, `-prev-next` | §8.7 (paged-navigator) |
-| `data-auth-show` | auth | `in` / `out` | Show only when logged in / out. Needs `data-auth-source` on element or ancestor | §9.5 |
-| `data-auth-source` | auth | `localStorage:key` | Where the token lives for `data-auth-show` resolution | §9.5 |
+| `data-auth-show` | auth | `in` / `out`; also `connecting` / `failed` | Show only when logged in / out (by token presence; needs `data-auth-source` on element or ancestor); `connecting` and `failed` follow a magic-link or OAuth exchange and need no source | §9.5 |
+| `data-auth-source` | auth | `localStorage:key` / `sessionStorage:key` | Where the token lives for `data-auth-show` resolution | §9.5 |
 | `data-storage-show` | storage | `has:loc:key` / `missing:loc:key` | Generic show/hide on any storage key presence | §9.5 |
-| `data-storage-value` | storage | `localStorage:key` | Element text = the stored value | §9.5 |
+| `data-storage-value` | storage | `localStorage:key` / `sessionStorage:key` | Element text = the stored value | §9.5 |
 | `data-consent-show` | consent | `granted:<cat>` / `denied:<cat>` | Show/hide on cookie-consent state for a category (e.g. `granted:analytics`) | §9.10 |
 | `data-consent-action` | consent | `customize` / `accept-all` / `refuse-all` / `save` / `close` | A consent control: every action inside the banner and the popup; anywhere else only `customize`, which reopens the cookie preferences | §9.10 |
 | `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open; its row shows while the category has a declared key | §9.10 |
@@ -4408,8 +4525,11 @@ deep-dive.
 | `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent; never an event handler, `srcdoc`, an iframe's `src` or `sandbox`, a `data-consent-*` name, or a meta's `content` or `http-equiv`; a URL with a scheme outside the allowlist is written as `#`, and one starting with one `/` is composed as a written one is | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |
 | `data-error-for` | form | field `name` | Container for `QS.validate` error messages — set value to the input's `name` | §8.7 (field-row / form-scaffold) |
-| `data-qs-complex` | complex | `table` (today) | Marks a complex-element subtree root — enables Translate-from-CSV | §8.7 (Translate from CSV) |
+| `data-qs-complex` | complex | `table` | Marks a complex-element subtree root — enables Translate-from-CSV | §8.7 (Translate from CSV) |
 | `data-qs-complex-id` | complex | identifier | Companion to `data-qs-complex` — identifies the structure for cross-language lookup | §8.7 |
+
+The four companions of `data-state-pagenav` (`-page-field`, `-totalpages-field`, `-window`, `-prev-next`) are catalogue
+entries of their own, listed in §10.3.
 
 **Editor-only chrome** (auto-emitted by the renderer in editor mode;
 users should NOT author these): `data-qs-textkey`, `data-qs-raw`,
@@ -4419,7 +4539,7 @@ to see them.
 
 ### 10.2 How to author these — admin-panel click paths
 
-Three common scenarios, end-to-end. Each is reachable from the visual
+Four common scenarios, end-to-end. Each is reachable from the visual
 editor with no JSON editing.
 
 #### Scenario A — Hide a Next button at the last page (`data-state-show`)
@@ -4427,15 +4547,17 @@ editor with no JSON editing.
 ```
 Admin Panel → Visual Editor → Select mode (cursor icon in the tools' row)
   → Click the "Next" button in the iframe to select it
-  → Sidebar action panel → Advanced → "+ Add custom param"
+  → Sidebar action panel → "Edit Params" → Advanced → "+ Add another"
   → KEY field: type "data-"
     Autocomplete dropdown opens, grouped by category. Pick data-state-show.
-    Description appears above the value field:
-      data-state-show — toggles the standard hidden attribute on
-      truthiness. Use to gate Prev/Next on cursors, Load-more on
-      hasMore, counters on total > 0.
-  → VALUE field: type "people.nextPage" (smart-widget store/field picker
-    auto-renders when the attribute's value shape is `store-field-ref`)
+    Description appears in a box under the row:
+      Toggle the standard hidden attribute on truthiness of a state-store
+      field. Falsy (null / "" / 0 / false / []) hides; truthy shows.
+      Handy for gating Next/Prev on cursors, Load-more on hasMore,
+      counters on total>0.
+  → VALUE: the value field gives way to two lists (the catalog declares
+    valueShape: store-field-ref): pick the store "people", then the
+    field "nextPage". A page with no state store shows a hint instead
   → Save → Button hides automatically when people.nextPage is null
 ```
 
@@ -4443,18 +4565,21 @@ Admin Panel → Visual Editor → Select mode (cursor icon in the tools' row)
 
 ```
 Admin Panel → Visual Editor → Select mode
-  → Click empty area in the page to add at root → "+ Add"
-  → Add Element → HTML Tag tab → tag = button, text = "Logout"
-  → Advanced → "+ Add custom param"
+  → Click the element the button goes beside or inside → "Add Element"
+  → Add Element → HTML Tag tab → tag = button (its text "Logout" is
+    added afterwards, from the Text tab, inside the button)
+  → Advanced → "+ Add another"
   → type "data-" → pick data-auth-show
-    Description: "show only when logged in (in) or out (out). Needs
-    data-auth-source on element or ancestor."
+    Description: "Show this element only when logged IN or OUT. Auth
+    sugar over data-storage-show (presence of a token). Requires
+    data-auth-source on this element or an ancestor."
   → VALUE field: select widget shows [in | out] (the catalog declares
     valueShape: enum). Pick "in".
-  → Companion hint: "No data-auth-source found on element
-    or ancestors. + Add to <body>?"
-  → Click "Add to <body>" → wires the source automatically
-  → Done. Logout button shows only when localStorage.authToken is set.
+  → The description box ends with "Often paired with: + data-auth-source"
+  → Click "+ data-auth-source": a second row is added on the same
+    element, with the storage widget; pick localStorage and the key authToken
+  → Save. The button shows only while the project key authToken (the
+    localStorage slot qsp_<projectId>_authToken) holds a value.
 ```
 
 #### Scenario C — Hand-author a form field error span (`data-error-for`)
@@ -4465,20 +4590,22 @@ spans to a generated form.
 
 ```
 Admin Panel → Visual Editor → Select mode
-  → Click a <span> placed after an <input name="email">
-  → "+ Add custom param"
+  → Click a <span> placed after an <input name="email">, inside the same form
+  → Sidebar action panel → "Edit Params" → Advanced → "+ Add another"
   → type "data-" → pick data-error-for
     Description: "Container for QS.validate error messages. Set the
     value to the input's name attribute."
-  → VALUE field: text input, placeholder "fieldName"
-  → Type "email" → done
+  → VALUE field: text input, placeholder "email"
+  → Type "email" → Save
 ```
 
 #### Scenario D — Change an existing element's binding (`Edit Params`)
 
 Same picker, applied to existing elements instead of authoring new ones.
-The autocomplete, smart widgets and companion hints all behave the same
-as in Scenarios A–C.
+The autocomplete and the smart widgets behave the same as in Scenarios
+A–C. A row filled from the saved element shows its widget without the
+description box, so its companion buttons appear only once the attribute
+is picked again; a row added with "+ Add another" behaves as in A–C.
 
 ```
 Admin Panel → Visual Editor → Select mode
@@ -4489,8 +4616,10 @@ Admin Panel → Visual Editor → Select mode
   → Form opens pre-populated:
     - Class tokens land in the CSS Class combobox as chips
     - Per-tag mandatory attrs (src for img, href for a, …) fill their widgets
-    - All other params become custom rows — the picker auto-attaches and
-      smart widgets render under the value field for known catalog entries
+    - A translation-key param (alt on img, title on iframe) fills its key
+      picker, and a field's own params (a srcset's) fill that field
+    - All other params become custom rows: the picker auto-attaches and a
+      known catalog entry shows its smart widget in place of the value field
   → Edit any value → Save
     `editNode` receives a diff (addParams = new + changed, removeParams =
     keys removed from the form); the iframe updates in place, no full reload
@@ -4514,17 +4643,19 @@ Several attributes are designed to pair with another:
 | `data-bind` | A surrounding `data-state-list` OR `data-list-template` container |
 
 The catalog encodes these in each entry's `companion` field; the
-autocomplete surfaces them as "+ Add companion" hints.
+description box lists them after "Often paired with:", as one "+ data-…"
+button each, which adds that attribute as a new row.
 
-`data-state-pagenav`'s four are all optional, and each has a default that
-covers the ordinary offset-pagination store:
+`data-state-pagenav`'s four are all optional; the first three have a default
+that covers the ordinary offset-pagination store, and the chevrons are off
+unless asked for:
 
 | Companion | Default | What it does |
 |---|---|---|
 | `data-state-pagenav-page-field` | `page` | the store field holding the current page number — written on click, then the store re-fetches |
 | `data-state-pagenav-totalpages-field` | `totalPages` | the store field holding the page count, read to size the navigator. When it is missing or `≤ 1`, the navigator hides itself |
 | `data-state-pagenav-window` | `2` | how many sibling pages to show each side of the current one before ellipsing. `0` collapses the whole thing to `1 … current … N` |
-| `data-state-pagenav-prev-next` | `true` | adds `‹ Prev` / `Next ›` chevrons. Anything other than the literal string `"true"` hides them |
+| `data-state-pagenav-prev-next` | none (no chevrons) | `true` adds a `‹` and a `›` button (previous page, next page). Left out, or any value other than the literal string `"true"`, there are none; the paged-navigator wizard ticks it by default and writes `true` |
 
 The navigator itself re-renders on every store update. It is emitted by the
 `paged-navigator` complex element (§8.7), but the binding is hand-authorable —
@@ -4535,6 +4666,7 @@ nothing about it depends on having used the wizard.
 - **`data-state-*`** = bind to a state store (live data flow). See §9.6.
 - **`data-auth-*`** / **`data-storage-*`** = bind to localStorage / sessionStorage
   (auth + storage UI). See §9.5.
+- **`data-consent-*`** = cookie-consent controls and consent-gated display. See §9.10.
 - **`data-qs-complex*`** = mark a structure as bulk-translatable. See §8.7.
 - **`data-bind`** / **`data-bind-attr`** / **`data-list-template`** = template-clone
   mechanics shared by `data-state-list` AND componentList rendering. See §9.2.
@@ -4547,20 +4679,22 @@ nothing about it depends on having used the wizard.
 | Field | Purpose |
 |---|---|
 | `name` | The attribute (e.g. `data-state-show`) |
-| `description` | One-sentence English; rendered as the autocomplete tooltip |
-| `category` | `state` / `auth` / `storage` / `template` / `form` / `complex` / `internal` — drives optgroup grouping in the picker |
-| `valueShape` | `store-field-ref` / `selector` / `enum` / `storage-spec` / `plain-string` / `boolean-string` — drives the value-field widget |
-| `valueOptions` | (enum only) allowed values list |
-| `companion` | Names of attributes commonly paired — surfaces a "+ Add companion" hint |
+| `description` | English text; its first 80 characters show under the name in the dropdown, the whole of it in the description box once the attribute is picked |
+| `category` | `state` / `auth` / `storage` / `consent` / `template` / `form` / `complex` / `internal` — the heading each group gets in the picker |
+| `valueShape` | `store-field-ref` / `storage-spec` / `enum` (these three get a widget) / `selector` / `dot-path` / `plain-string` / `boolean-string` / `none` (these keep the plain text field) |
+| `valuePlaceholder` | Placeholder of the value field, also shown as "Value shape:" in the description box; for a `store-field-ref` or `storage-spec` entry it picks the widget's form (`storeId` alone, a leading `has:`) |
+| `valueOptions` | (enum; also written on the `boolean-string` entries, where no widget reads it) allowed values list |
+| `companion` | Names of attributes commonly paired — one "+ data-…" button each in the description box, after "Often paired with:" |
+| `tagsAllowed` | `['*']` or the tags it suits; informational, not enforced |
 | `internal` | `true` for editor chrome (hidden from user picker by default) |
-| `docAnchor` | Link target for "Full reference" in the picker |
+| `docAnchor` | The section of the documentation that covers the attribute; answered by `listDataBindings`, not shown in the picker |
 | `examplePayload` | Short usage snippet |
 | `since` | Version the attribute was introduced |
 
 To add a new data-* attribute: implement the runtime hook (in `qs.js`
-or wherever), then add one entry to the catalog. The picker, this
-section, and any future renderer-side validation pick it up
-automatically. Same pattern as `qsVerbCatalog.php`.
+or wherever), then add one entry to the catalog. The picker picks it
+up automatically; add its row to §10.1 by hand. Same pattern as
+`qsVerbCatalog.php`.
 
 ---
 

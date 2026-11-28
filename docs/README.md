@@ -9,7 +9,3 @@
 - [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) — Workflow engine reference: JSON spec format, markdown templates, condition syntax.
 - [PANEL_TRANSLATION.md](PANEL_TRANSLATION.md) — Translating the admin panel: its word files, how a word is written, what stays English, and the French glossary.
 - [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) — Locked design decisions: what was chosen, why, and what was rejected.
-
-## Images
-
-PNG assets live in [`images/`](images/). They are referenced by the Build QuickSite template workflow (`secure/admin/workflows/core/build-quicksite.json`) via raw GitHub URLs (`https://raw.githubusercontent.com/Sangiovanni/quicksite/main/docs/images/<file>.png`). If you rename or move them, update those URLs in the workflow in the same commit so the build doesn't 404.
